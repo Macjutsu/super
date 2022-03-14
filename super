@@ -1,0 +1,2782 @@
+#!/bin/bash
+#
+# S.U.P.E.R.M.A.N.
+# Software Update Policy Enforcement (with) Recursive Messaging And Notification
+#
+# S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
+#
+# Version 0.9
+# 3/1/22
+# Kevin M. White <kevinmwhite@me.com>
+#
+######## S.U.P.E.R.M.A.N. REQUIREMENTS ########
+#
+# Mac computers with Intel:
+#  - Validated on macOS 10.14 or later. Earlier versions of macOS may work, but have not been validated.
+#  - Any version of Jamf Pro 10.xx.
+#
+# Mac computers with Apple Silicon:
+# SUPER IMPORTANT >>> Mac computers with Apple Silicon require additional authorization (beyond root privileges) to update automatically without user interaction.
+# Without this additional authorization, S.U.P.E.R.M.A.N. CAN NOT ENFORCE macOS software updates on Apple Silicon!
+# This authorization is possible via three methods: an existing local account, a newly created local service account, and/or a Jamf Pro API account.
+#
+# Apple Silicon software update via an existing local account:
+#  - Any version of macOS for Apple Silicon (macOS 11.0 or later).
+#  - You must provide S.U.P.E.R.M.A.N. with the credentials for an existing local (standard or admin) user account who already has volume ownership permissions.
+#    (User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see: https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e)
+#  - The provided credentials are used to authenticate the Apple softwareupdate command.
+#  - The provided credentials are stored in the System Keychain and can be viewed by other admin users.
+#
+# Apple Silicon software update via a local service account:
+#  - Any version of macOS for Apple Silicon (macOS 11.0 or later).
+#  - You must provide S.U.P.E.R.M.A.N. with the credentials for an existing local admin user account who already has volume ownership permissions.
+#    (User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see: https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e)
+#  - The provided admin credentials are used to automatically generate a new local S.U.P.E.R.M.A.N. service account. This service account provides authentication for the Apple softwareupdate command.
+#  - The creation of the account triggers a system security dialog unless you also deploy a PPPC Configuration Profile granting "SystemPolicySysAdminFiles" to either the "com.apple.Terminal" or "/usr/local/jamf/bin/jamf" and "com.jamf.management.Jamf".
+#  - The admin credentials you provide are never saved to disk, but the local S.U.P.E.R.M.A.N. service account credentials are stored in the System Keychain and can be viewed by other admin users.
+#  - The local S.U.P.E.R.M.A.N. service account is not an admin and can not log into the Mac, but if FileVault is enabled this account is visible at startup and can unlock the drive.
+#
+# Apple Silicon MDM software update via Jamf Pro API:
+#  - macOS 11.5 or later and Jamf Pro 10.35 or later.
+#  - Jamf Pro must have the bootstrap token escrowed for the computer. This is the default behavior for Jamf Pro via any enrollment method for Apple Silicon computers.
+#  - You must provide S.U.P.E.R.M.A.N. with credentials that can authorize macOS software update MDM commands via the Jamf Pro API.
+#  - The Jamf Pro API credentials you provide are stored in the System Keychain and can be viewed by other admin users.
+#  - The default Jamf Pro privileges required for this account are "Jamf Pro Server Objects > Computers > Create & Read" and "Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update".
+#  - You can significantly reduce the security risk of this account by removing the "Computers > Read" privilege requirement via a custom Configuration Profile with the following; Preference Domain "com.macjutsu.super", Key "JamfProID", String "$JSSID".
+#
+# ** If multiple authentication methods are provided, the priority order is as follows; an existing local account, the local S.U.P.E.R.M.A.N. service account, and finally the Jamf Pro API credentials. **
+#
+######## S.U.P.E.R.M.A.N. INSTALLATION ########
+#
+# To install and run locally:
+#  1. Make sure the S.U.P.E.R.M.A.N. script (named just "super") has appropriate execute permissions and then run it like any other local management script, "sudo /wherever/the/heck/you/put/super --help".
+#  2. The super script automatically installs itself (and various other accouterments) anytime it's ran from outside it's working folder, which is defaulted to /Library/Management/super.
+#  3. There's no step three. After self-installation, super automatically restarts itself with your previously specified options and, if necessary, creates a LaunchDaemon to keep things going.
+#
+# To deploy via Jamf Pro:
+#  1. Create a new Policy adding just the super script as-is.
+#  2. Add to the Policy a configuration for: Files and Processes > Execute Command > "/Library/Management/super/super --bunch-of-options --go-here".
+#  3. There's "basically" no step three (besides running the Policy). The super script automatically installs itself then restart via LaunchDaemon, thus freeing the jamf agent to get on with other things.
+#
+######## S.U.P.E.R.M.A.N. USAGE ########
+#
+# Although super is technically just a "regular" shell script, it's architected to behave like a background daemon that runs automatically via LaunchDaemon.
+#
+# The super script can also be interacted with directly from Terminal for configuration and testing, but it does require sudo.
+#
+# Obviously "sudo super --help" is a good place to start, and you can view the help documentation at any time without interrupting the super LaunchDaemon.
+#
+# However, if super is ran without the --help option, it will do your bidding, but depending on your options and the state of macOS updates, this may not result in an active LaunchDaemon.
+#
+# Fear not, super always let you now what it's doing in both Terminal and it's log file, which is defaulted to "/Library/Management/super/super.log".
+#
+# Also, you can easily kill any active super instance, helpers, and LaunchDaemons with "sudo super --skip-updates".
+#
+# If super exits without creating a new LaunchDaemon, you can always run it again from Terminal or a Jamf Pro Policy. For example, it could be run via a Policy with a daily frequency.
+#
+# In fact, super is designed to automatically stop once macOS is up to date. Then, when you decide the next macOS update needs to be enforced, restart super via a Jamf Pro Policy.
+#
+# Finally, to customize the notifications and dialogs, you can modify the contents of the $helperARRAY[] in the functions with names that start with "notification" or "dialog".
+#
+# For more information about possible options in the $helperARRAY[], use the following in Terminal: "/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -help"
+#
+######## DEBUGGING STUFF ########
+#
+# The next line disables irrelevant shellcheck codes for the entire script. https://github.com/koalaman/shellcheck
+# shellcheck disable=SC2206,SC2068
+# Uncomment the next line for debugging code.
+# set -x
+#
+######## FUNCTIONS - DOCUMENTATION ########
+
+# Show usage documentation. 
+showUsage() {
+echo "
+  S.U.P.E.R.M.A.N.
+  Software Update Policy Enforcement (with) Recursive Messaging And Notification
+
+  Version 0.9
+  3/1/22
+  Kevin M. White <kevinmwhite@me.com>
+
+  Usage:
+  sudo ./super
+
+  Options:
+  [--default-defer seconds] [--focus-defer seconds]
+  [--menu-defer \"seconds,seconds,etc...\"] [--display-timeout seconds]
+  [--display-redraw seconds] [--display-icon \"/local/path or URL\"]
+  [--focus-deadline YYYY-MM-DD:hh:mm] [--soft-deadline YYYY-MM-DD:hh:mm]
+  [--hard-deadline YYYY-MM-DD:hh:mm] [--count-deadline number] [--clear-count]
+  [--local-account \"AccountName\"] [--local-password \"Password\"]
+  [--admin-account \"AccountName\"] [--admin-password \"Password\"]
+  [--super-account \"AccountName\"] [--super-password \"Password\"]
+  [--jamf-account \"AccountName\"] [--jamf-password \"Password\"]
+  [--purge-accounts] [--policy-triggers \"PolicyTrigger,PolicyTrigger,etc...\"]
+  [--skip-updates] [--no-skip-updates] [--force-restart] [--no-force-restart]
+  [--test-mode ] [--no-test-mode ] [--test-mode-timeout seconds] [--reset-super]
+  [--verbose-mode] [--no-verbose-mode] [--open-logs] [--usage] [--help]
+
+  * Managed preferences override local options via domain: com.macjutsu.super
+  <key>DefaultDefer</key> <string>seconds</string>
+  <key>FocusDefer</key> <string>seconds</string>
+  <key>MenuDefer</key> <string>seconds,seconds,etc...</string>
+  <key>DisplayTimeout</key> <string>seconds</string>
+  <key>DisplayRedraw</key> <string>seconds</string>
+  <key>DisplayIcon</key> <string>path</string>
+  <key>FocusDeadline</key> <string>YYYY-MM-DD:hh:mm</string>
+  <key>SoftDeadline</key> <string>YYYY-MM-DD:hh:mm</string>
+  <key>HardDeadline</key> <string>YYYY-MM-DD:hh:mm</string>
+  <key>CountDeadline</key> <string>number</string>
+  <key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>
+  <key>SkipUpdates</key> <true/> | <false/>
+  <key>ForceRestart</key> <true/> | <false/>
+  <key>TestMode</key> <true/> | <false/>
+  <key>TestModeTimeout</key> <string>seconds</string>
+  <key>VerboseMode</key> <true/> | <false/>
+"
+}
+
+# Show help documentation.
+showHelp() {
+echo "  --default-defer seconds | --default-defer X
+  * Managed preference: <key>DefaultDefer</key> <string>seconds</string>
+  The number of seconds to defer until the next update attempt if a user choses
+  not to update restart. This deferral time is also used in cases when a
+  required service is temporarily unavailable (for example, network or Jamf Pro
+  connectivity issues). Using this option overrides the default deferral time
+  which is set to 3600 seconds (1 hour) via the $defaultDeferSECONDS parameter.
+  Times less than 120 seconds are unreliable and are automatically rounded up to
+  120. Also see the --menu option to display a pop-up menu allowing the user to
+  select an alternate deferral time. Finally, use a value of X to return this
+  option to its default.
+
+  --focus-defer seconds | --focus-defer X
+  * Managed preference: <key>FocusDefer</key> <string>seconds</string>
+  The number of seconds to defer the update restart dialog automatically if a
+  process has prevented display sleep (for example, during an active meeting) or
+  the user has Focus or Do Not Disturb enabled. With this option you should also
+  consider using --focus-deadline and --soft-deadline to ensure users are
+  offered a chance to defer before a required update restart is enforced via
+  --hard-deadline. Times less than 120 seconds are unreliable and are
+  automatically rounded up to 120. Finally, use a value of X to disable this
+  option.
+
+  --menu-defer \"seconds,seconds,etc...\" | --focus-defer X
+  * Managed preference: <key>MenuDefer</key>
+  <string>seconds,seconds,etc...</string>
+  Display a deferral time pop-up menu in the non-deadline update restart dialog
+  that allows the user to overide the default --default-defer time. The time
+  selections are specified with one or more number of seconds that are comma
+  separated with no spaces. Times less than 120 seconds are unreliable and are
+  automatically rounded up to 120. Finally, use a value of X to disable this
+  option.
+
+  --display-timeout seconds | --display-timeout X
+  * Managed preference: <key>DisplayTimeout</key> <string>seconds</string>
+  Sets an automatic timeout for interactive update restart dialogs in seconds.
+  Use this option with caution, as once the timeout expires, the default
+  \"Restart\" button is selected. This option also displays a countdown of the
+  timeout in the update restart dialog. Finally, use a value of X to disable
+  this option.
+
+  --display-redraw seconds | --display-redraw X
+  * Managed preference: <key>DisplayRedraw</key> <string>seconds</string>
+  If a user ignores a notification or dialog (for example, it's moved offscreen)
+  this specifies the number of seconds to wait before closing and then reopening
+  the notification or dialog, thus redrawing the notification or dialog back in
+  it's original open possition. Avoid low numbers as re-centering results in a
+  \"flash\" of the notification or dialog. Also note that when --display-redraw
+  is used along with --display-timeout, timeout seconds that are too low are
+  automatically corrected to equal three times the redraw seconds. This results
+  in the notification or dialog redrawing twice before the timeout automatically
+  selects the \"Restart\" button. Finally, use a value of X to disable this
+  option.
+
+  --display-icon \"/local/path or URL\" | --display-icon X
+  * Managed preference: <key>DisplayIcon</key> <string>path</string>
+  Local path or http(s) URL to a file that is the picture to display in 
+  notifications or dialogs. Both local file paths and http(s) URLs are be copied
+  to the path at \$cachedICON. If the path or URL can not be found or this option
+  is not set, then the file at the \$defaultICON path is used. Because the path
+  is quoted, do not use the escape ( \ ) character. Finally, use a value of X to
+  return this option to its default.
+
+  --focus-deadline YYYY-MM-DD:hh:mm | --focus-deadline X
+  * Managed preference: <key>FocusDeadline</key>
+  <string>YYYY-MM-DD:hh:mm</string>
+  Always used along with --focus-defer. If this date has passed, the update
+  restart dialog (with deferral options) always appears even if a process is
+  preventing display sleep or the user has Focus or Do Not Disturb enabled.
+  When used along with --soft-deadline and/or --hard-deadline, the
+  --focus-deadline date should always be the earliest. At a minimum, you must
+  always specify year-month-day. Hours are represented by a 24-hour clock, and
+  any non-specified hours or minutes are rounded to 00. Also see the
+  \$dateFORMAT and \$timeFORMAT parameters for date display options. For testing
+  use a date:time in the past to simulate this deadline. Finally, use a value of
+  X to disable this option.
+
+  --soft-deadline YYYY-MM-DD:hh:mm | --soft-deadline X
+  * Managed preference: <key>SoftDeadline</key>
+  <string>YYYY-MM-DD:hh:mm</string>
+  If this date has passed, an interactive update restart dialog appears
+  indicating that no more user deferrals are allowed. When used along with
+  --focus-deadline, the --soft-deadline date should always be later. However,
+  if used along with --hard-deadline, the --soft-deadline date should always be
+  earlier. At a minimum, you must always specify year-month-day. Hours are
+  represented by a 24-hour clock, and any non-specified hours or minutes are
+  rounded to 00. Also see the \$dateFORMAT and \$timeFORMAT parameters for date
+  display options. For testing use a date:time in the past to simulate this
+  deadline. Finally, use a value of X to disable this option.
+
+  --hard-deadline YYYY-MM-DD:hh:mm | --hard-deadline X
+  * Managed preference: <key>HardDeadline</key>
+  <string>YYYY-MM-DD:hh:mm</string>
+  If this date has passed, the computer updates and restarts without asking the
+  user for approval. However, the user is notified that a restart is pending.
+  When used along with --focus-deadline and/or --soft-deadline, the
+  --hard-deadline date should always be last. At a minimum, you must always
+  specify year-month-day. Hours are represented by a 24-hour clock, and any
+  non-specified hours or minutes are rounded to 00. Also see the \$dateFORMAT
+  and \$timeFORMAT parameters for date display options. For testing use a
+  date:time in the past to simulate this deadline. Finally, use a value of X to
+  disable this option.
+
+  --count-deadline number | --count-deadline X
+  * Managed preference: <key>CountDeadline</key> <string>number</string>
+  The maximum number of user deferrals allowed before an interactive update
+  restart dialog appears indicating that no more user deferrals are allowed.
+  This is similar to the --soft-deadline behavior, so you may also want to use
+  --hard-deadline to enforce a required update restart. Automatic deferrals
+  (like when the user has Focus enabled) do not count against the maximum
+  deferral deadline. For testing, use 0 to simulate being past this deadline.
+  Finally, use a value of X to disable this option.
+
+  -C | --clear-count
+  Reset the current local defer count, thus restarting the deferral counter.
+
+  --local-account \"AccountName\"
+  Apple Silicon only. A local (standard or admin) user account name with volume
+  ownership privileges. You must also provide the --local-password for this
+  account. The account you provide is used to authenticate the Apple
+  softwareupdate command.
+
+  --local-password \"Password\"
+  Apple Silicon only. The local user password to authenticate the account
+  specified by --local-account. Note that these credentials are stored in the
+  System keychain and can be viewed by any other admin user.
+
+  --admin-account \"AccountName\"
+  Apple Silicon only. A local admin user account name with volume ownership
+  privileges. You must also provide the --admin-password for this account. The
+  account you provide is used to create a new local super service account that
+  authenticatates the Apple softwareupdate command.
+
+  --admin-password \"Password\"
+  Apple Silicon only. The local admin user password to authenticate the account
+  specified by --admin-account. These credentials are never saved to disk.
+
+  --super-account \"AccountName\"
+  Apple Silicon only. Specify a unique account name for the local super service
+  account. You must also provide --admin-account credentials for modifying the
+  super service account. Using this option overrides the default service account
+  name \"super\" and full name \"Super Update Service\".
+
+  --super-password \"Password\"
+  Apple Silicon only. Specify a unique password for the local super service
+  account. You must also provide --admin-account credentials for modifying the
+  super service account. Using this option overrides the default service account
+  password which is randomized via the uuidgen command. Note that these
+  credentials are stored in the System keychain and can be viewed by any other
+  admin user.
+
+  --jamf-account \"AccountName\"
+  Apple Silicon only. A Jamf Pro user account that can authorize macOS software
+  update MDM commands. You must also provide the --jamf-password for this
+  account. The default Jamf Pro privileges required for this account are;
+  \"Computers Create\", \" Compuers Read\", and  \"Send Computer Remote Command
+  to Download and Install macOS Update\". You can avoid the \" Compuers Read\"
+  requirement by providing a Configuratino Profile with the following managed
+  preference: <key>JamfProID</key> <string>$JSSID</string>. Note that valid
+  local update credentials (local user account or super service account) take
+  precedence over the the Jamf Pro API credentials.
+
+  --jamf-password \"Password\"
+  Apple Silicon only. The Jamf Pro user account password to authenticate the
+  account specified by --jamf-account. Note that these credentials are stored in
+  the System keychain and can be viewed by any other local admin user.
+
+  -P | --purge-accounts
+  Remove any previously created super serivce account and Jamf Pro API
+  account credentials. This behavior is automatic when new accounts are
+  provided, however this option is also available to remove all credentials even
+  if you're not specifying new ones.
+
+  --policy-triggers \"PolicyTrigger,PolicyTrigger,etc...\" | --policy-triggers X
+  * Managed preference: <key>PolicyTriggers</key>
+  <string>PolicyTrigger,PolicyTrigger,etc...</string>
+  One or more Jamf Pro Policy Triggers that are comma separated with no spaces.
+  If a restart is required for system updates or forced via --force-restart,
+  this list of Jamf Policy Triggers runs before any available updates install
+  and the computer restarts. This option can also be used along with the
+  --skip-updates option to run only the Jamf Policy Triggers. Finally, use a
+  value of X to disable this option.
+
+  -S | --skip-updates
+  * Managed preference: <key>SkipUpdates</key> <true/>
+  Skip Apple software updates, even if they are available. This option can also
+  be used along with --force-restart and --jamf-policies to only run Jamf Pro
+  Polices and then restart the computer while still taking advantage of
+  notifications, dialogs, deferrals, and deadline options. Alternatley, use this
+  option along with --reset-super to clear any super preferences, kill any
+  existing super processes and delete the super LaunchDaemon.
+
+  -s | --no-skip-updates
+  * Managed preference: <key>SkipUpdates</key> <false/>
+  Resume checking Apple software updates in super workflows.
+
+  -F | --force-restart
+  * Managed preference: <key>ForceRestart</key> <true/>
+  Force a restart even if Apple software updates do not need it. Useful when
+  used along with --test-mode or if no updates are available but you still
+  want to use --jamf-policies and then restart.
+
+  -f | --no-force-restart
+  * Managed preference: <key>ForceRestart</key> <false/>
+  Disable forced restart in super workflows.
+
+  -T | --test-mode
+  * Managed preference: <key>TestMode</key> <true/>
+  Mode to validate parameters, credentials, notifications, dialogs, deferrals,
+  and deadline logic. This mode does not attempt any Apple software updates,
+  Jamf Polices, or restarts. Thus, allowing for quick iteration testing.
+
+  -t | --no-test-mode
+  * Managed preference: <key>TestMode</key> <false/>
+  Disable test mode in super workflows.
+
+  --test-mode-timeout seconds | --test-mode-timeout X
+  * Managed preference: <key>TestModeTimeout</key> <string>seconds</string>
+  The amount of time in seconds to leave test notifications and dialogs open
+  before moving on in the workflow. Using this option overrides the default test
+  mode timeout which is set to 10 seconds via the \$testModeTIMEOUT default
+  parameter. Finally, use a value of X to return this option to its default.
+
+  -R | --reset-super
+  Reset the local super prefrences, thus clearing all previous settings. Use
+  this option along with --skip-updates to clear any super preferences, kill any
+  existing super processes and delete the super LaunchDaemon.
+
+  -V | --verbose-mode
+  * Managed preference: <key>VerboseMode</key> <true/>
+  Mode to generate additional log output. Note that with this mode passwords
+  are visible in Terminal but are not saved to \$superLOG.
+
+  -v | --no-verbose-mode
+  * Managed preference: <key>VerboseMode</key> <false/>
+  Disable test mode in super workflows.
+
+  -o | -O | --open-logs
+  macOS 11 or later only. If manually running super from the command line while
+  logged into the GUI, this option also opens the \$superLOG, \$updateLOG, and
+  if needed the \$mdmLOG in Console.app.
+
+  -u | -U | --usage
+  Display basic usage documentation.
+
+  -h | -H | --help
+  Display this full help documentation.
+
+  [Unrecognized Options]
+  Display usage, display help, and unrecognized options errors.
+"
+}
+
+######## FUNCTIONS - PARAMETERS ########
+
+# Set default parameters that are used throughout the script.
+setDefaults(){
+# Installation folder:
+superFOLDER="/Library/Management/super"
+
+# Symbolic link in default path for super.
+superLINK="/usr/local/bin/super"
+
+# Path to a PID file:
+superPIDFILE="/var/run/super.pid"
+
+# Path to a local property list file:
+superPLIST="$superFOLDER/com.macjutsu.super" # No trailing ".plist"
+
+# Path to a managed property list file:
+superMANAGEDPLIST="/Library/Managed Preferences/com.macjutsu.super" # No trailing ".plist"
+
+# Path to main workflow log file:
+superLOG="$superFOLDER/super.log"
+
+# Path to filtered MDM progress log file:
+mdmLOG="$superFOLDER/mdm.log"
+
+# Path to filtered software update progress log file:
+updateLOG="$superFOLDER/update.log"
+
+# Path to the jamf binary:
+jamfBINARY="/usr/local/bin/jamf"
+
+# Cache folder used by the jamf binary when installing scripts via Policy:
+jamfCACHE="/Library/Application Support/JAMF/tmp"
+
+# Path to the jamfHELPER binary:
+jamfHELPER="/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
+
+# The default number of seconds to defer if a user choses not to restart or a required service is temporarily unavailable.
+defaultDeferSECONDS=3600
+
+# Path to for the cached display icon:
+cachedICON="$superFOLDER/icon.png"
+
+# The default icon in the if no $displayIconOPTION is specified or found.
+defaultICON="/System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns"
+
+# This button is at the far-right of an interactive dialog, in the highlight color, and respond to the "return" key.
+defaultBUTTON="Restart"
+
+# This button is to the left of the $defaultBUTTON, not highlighted, and respond to the "esc" key.
+cancelBUTTON="Defer"
+
+# This is the name for the LaunchDaemon.
+launchDaemonNAME="com.macjutsu.super" # No trailing ".plist"
+
+# Deadline date display format.
+dateFORMAT="+%B %d, %Y" # Formatting options can be found in the man page for the date command.
+
+# Deadline time display format.
+timeFORMAT="+%l:%M %p" # Formatting options can be found in the man page for the date command.
+
+# The default amount of time in seconds to leave test notifications and dialogs open before moving on in the workflow.
+testModeTIMEOUT=10
+
+# These parameters identify the macOS version and architecture.
+macosMAJOR=$(sw_vers -productVersion | cut -d'.' -f1) # Expected output: 10, 11, 12
+macosMINOR=$(sw_vers -productVersion | cut -d'.' -f2) # Expected output: 14, 15, 06, 01
+macosVERSION=${macosMAJOR}$(printf "%02d" "$macosMINOR") # Expected output: 1014, 1015, 1106, 1200
+macosARCH=$(arch) # Expected output: i386, arm64
+}
+
+# Collect input options and set associated parameters.
+getOptions() {
+unrecognizedOPTIONS=()
+while test $# -gt 0; do
+	case "$1" in
+		--default-defer )
+			defaultDeferOPTION="$2"
+			shift 2
+		;;
+		--focus-defer )
+			focusDeferOPTION="$2"
+			shift 2
+		;;
+		--menu-defer )
+			menuDeferOPTION="$2"
+			shift 2
+		;;
+		--display-timeout )
+			displayTimeoutOPTION="$2"
+			shift 2
+		;;
+		--display-redraw )
+			displayRedrawOPTION="$2"
+			shift 2
+		;;
+		--display-icon )
+			displayIconOPTION="$2"
+			shift 2
+		;;
+		--focus-deadline )
+			focusDeadlineOPTION="$2"
+			shift 2
+		;;
+		--soft-deadline )
+			softDeadlineOPTION="$2"
+			shift 2
+		;;
+		--hard-deadline )
+			hardDeadlineOPTION="$2"
+			shift 2
+		;;
+		--count-deadline )
+			countDeadlineOPTION="$2"
+			shift 2
+		;;
+		-C|--clear-count )
+			clearCOUNT="TRUE"
+			shift
+		;;
+		--local-account )
+			localOPTION="$2"
+			shift 2
+		;;
+		--local-password )
+			localPASSWORD="$2"
+			shift 2
+		;;
+		--admin-account )
+			adminACCOUNT="$2"
+			shift 2
+		;;
+		--admin-password )
+			adminPASSWORD="$2"
+			shift 2
+		;;
+		--super-account )
+			superOPTION="$2"
+			shift 2
+		;;
+		--super-password )
+			superPASSWORD="$2"
+			shift 2
+		;;
+		--jamf-account )
+			jamfOPTION="$2"
+			shift 2
+		;;
+		--jamf-password )
+			jamfPASSWORD="$2"
+			shift 2
+		;;
+		-P|--purge-accounts )
+			purgeACCOUNTS="TRUE"
+			shift
+		;;
+		--policy-triggers )
+			policyTriggersOPTION="$2"
+			shift 2
+		;;
+		-S|--skip-updates )
+			skipUpdatesOPTION="TRUE"
+			shift
+		;;
+		-s|--no-skip-updates )
+			skipUpdatesOPTION="FALSE"
+			shift
+		;;
+		-F|--force-restart )
+			forceRestartOPTION="TRUE"
+			shift
+		;;
+		-f|--no-force-restart )
+			forceRestartOPTION="FALSE"
+			shift
+		;;
+		-T|--test-mode )
+			testModeOPTION="TRUE"
+			shift
+		;;
+		-t|--no-test-mode )
+			testModeOPTION="FALSE"
+			shift
+		;;
+		--test-mode-timeout )
+			testModeTimeoutOPTION="$2"
+			shift 2
+		;;
+		-R|--reset-super )
+			resetLocalPROPERTIES="TRUE"
+			shift
+		;;
+		-V|--verbose-mode )
+			verboseModeOPTION="TRUE"
+			shift
+		;;
+		-v|--no-verbose-mode )
+			verboseModeOPTION="FALSE"
+			shift
+		;;
+		-o|-O|--open-logs )
+			openLOGS="TRUE"
+			shift
+		;;
+		-u|-U|--usage )
+			showUsage
+			echo -e "  Use --help to view detailed usage information.\n"
+			exit 0
+			shift
+		;;
+		-h|-H|--help )
+			showUsage
+			showHelp
+			exit 0
+			shift
+		;;
+		*)
+			unrecognizedOPTIONS+=("$1")
+			shift
+		;;
+	esac
+done
+
+# Log any unrecognized options.
+if [[ -n $unrecognizedOPTIONS ]]; then
+	showUsage
+	showHelp
+	sendToLog  "Error: Unrecognzied Options: ${unrecognizedOPTIONS[*]}"; parameterERROR="TRUE"
+	echo
+fi
+}
+
+# Collect any parameters stored in $superMANAGEDPLIST and/or $superPLIST.
+getPreferences() {
+# If $resetLocalPROPERTIES is specified, then clear all local non-account preferences.
+if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
+	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
+	defaults delete "$superPLIST" FocusDefer 2> /dev/null
+	defaults delete "$superPLIST" MenuDefer 2> /dev/null
+	defaults delete "$superPLIST" DisplayTimeout 2> /dev/null
+	defaults delete "$superPLIST" DisplayRedraw 2> /dev/null
+	defaults delete "$superPLIST" DisplayIcon 2> /dev/null
+	defaults delete "$superPLIST" FocusDeadline 2> /dev/null
+	defaults delete "$superPLIST" SoftDeadline 2> /dev/null
+	defaults delete "$superPLIST" HardDeadline 2> /dev/null
+	defaults delete "$superPLIST" CountDeadline 2> /dev/null
+	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
+	defaults delete "$superPLIST" SkipUpdates 2> /dev/null
+	defaults delete "$superPLIST" ForceRestart 2> /dev/null
+	defaults delete "$superPLIST" TestMode 2> /dev/null
+	defaults delete "$superPLIST" TestModeTimeout 2> /dev/null
+	rm -r "$cachedICON" > /dev/null 2>&1
+fi
+
+# Collect any managed preferences from $superMANAGEDPLIST.
+if [[ -f "$superMANAGEDPLIST.plist" ]]; then
+	jamfProIdMANAGED=$(defaults read "$superMANAGEDPLIST" JamfProID 2> /dev/null)
+	defaultDeferMANAGED=$(defaults read "$superMANAGEDPLIST" DefaultDefer 2> /dev/null)
+	focusDeferMANAGED=$(defaults read "$superMANAGEDPLIST" FocusDefer 2> /dev/null)
+	menuDeferMANAGED=$(defaults read "$superMANAGEDPLIST" MenuDefer 2> /dev/null)
+	displayTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayTimeout 2> /dev/null)
+	displayRedrawMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayRedraw 2> /dev/null)
+	displayIconMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayIcon 2> /dev/null)
+	focusDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" FocusDeadline 2> /dev/null)
+	softDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" SoftDeadline 2> /dev/null)
+	hardDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" HardDeadline 2> /dev/null)
+	countDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" CountDeadline 2> /dev/null)
+	policyTriggersMANAGED=$(defaults read "$superMANAGEDPLIST" PolicyTriggers 2> /dev/null)
+	skipUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" SkipUpdates 2> /dev/null)
+	forceRestartMANAGED=$(defaults read "$superMANAGEDPLIST" ForceRestart 2> /dev/null)
+	testModeMANAGED=$(defaults read "$superMANAGEDPLIST" TestMode 2> /dev/null)
+	testModeTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" TestModeTimeout 2> /dev/null)
+fi
+
+# Collect any local preferences from $superPLIST.
+if [[ -f "$superPLIST.plist" ]]; then
+	defaultDeferPROPERTY=$(defaults read "$superPLIST" DefaultDefer 2> /dev/null)
+	focusDeferPROPERTY=$(defaults read "$superPLIST" FocusDefer 2> /dev/null)
+	menuDeferPROPERTY=$(defaults read "$superPLIST" MenuDefer 2> /dev/null)
+	displayTimeoutPROPERTY=$(defaults read "$superPLIST" DisplayTimeout 2> /dev/null)
+	displayRedrawPROPERTY=$(defaults read "$superPLIST" DisplayRedraw 2> /dev/null)
+	focusDeadlinePROPERTY=$(defaults read "$superPLIST" FocusDeadline 2> /dev/null)
+	softDeadlinePROPERTY=$(defaults read "$superPLIST" SoftDeadline 2> /dev/null)
+	hardDeadlinePROPERTY=$(defaults read "$superPLIST" HardDeadline 2> /dev/null)
+	countDeadlinePROPERTY=$(defaults read "$superPLIST" CountDeadline 2> /dev/null)
+	policyTriggersPROPERTY=$(defaults read "$superPLIST" PolicyTriggers 2> /dev/null)
+	skipUpdatesPROPERTY=$(defaults read "$superPLIST" SkipUpdates 2> /dev/null)
+	forceRestartPROPERTY=$(defaults read "$superPLIST" ForceRestart 2> /dev/null)
+	testModePROPERTY=$(defaults read "$superPLIST" TestMode 2> /dev/null)
+	testModeTimeoutPROPERTY=$(defaults read "$superPLIST" TestModeTimeout 2> /dev/null)
+fi
+
+# This logic ensures the priority order of managed preference overrides the new input option which overrides the saved local preference.
+if [[ -n $defaultDeferMANAGED ]]; then
+	defaultDeferOPTION="$defaultDeferMANAGED"
+elif [[ -z $defaultDeferOPTION ]] && [[ -n $defaultDeferPROPERTY ]]; then
+	defaultDeferOPTION="$defaultDeferPROPERTY"
+fi
+if [[ -n $focusDeferMANAGED ]]; then
+	focusDeferOPTION="$focusDeferMANAGED"
+elif [[ -z $focusDeferOPTION ]] && [[ -n $focusDeferPROPERTY ]]; then
+	focusDeferOPTION="$focusDeferPROPERTY"
+fi
+if [[ -n $menuDeferMANAGED ]]; then
+	menuDeferOPTION="$menuDeferMANAGED"
+elif [[ -z $menuDeferOPTION ]] && [[ -n $menuDeferPROPERTY ]]; then
+	menuDeferOPTION="$menuDeferPROPERTY"
+fi
+if [[ -n $displayTimeoutMANAGED ]]; then
+	displayTimeoutOPTION="$displayTimeoutMANAGED"
+elif [[ -z $displayTimeoutOPTION ]] && [[ -n $displayTimeoutPROPERTY ]]; then
+	displayTimeoutOPTION="$displayTimeoutPROPERTY"
+fi
+if [[ -n $displayRedrawMANAGED ]]; then
+	displayRedrawOPTION="$displayRedrawMANAGED"
+elif [[ -z $displayRedrawOPTION ]] && [[ -n $displayRedrawPROPERTY ]]; then
+	displayRedrawOPTION="$displayRedrawPROPERTY"
+fi
+[[ -n $displayIconMANAGED ]] && displayIconOPTION="$displayIconMANAGED"
+if [[ -n $focusDeadlineMANAGED ]]; then
+	focusDeadlineOPTION="$focusDeadlineMANAGED"
+elif [[ -z $focusDeadlineOPTION ]] && [[ -n $focusDeadlinePROPERTY ]]; then
+	focusDeadlineOPTION="$focusDeadlinePROPERTY"
+fi
+if [[ -n $softDeadlineMANAGED ]]; then
+	softDeadlineOPTION="$softDeadlineMANAGED"
+elif [[ -z $softDeadlineOPTION ]] && [[ -n $softDeadlinePROPERTY ]]; then
+	softDeadlineOPTION="$softDeadlinePROPERTY"
+fi
+if [[ -n $hardDeadlineMANAGED ]]; then
+	hardDeadlineOPTION="$hardDeadlineMANAGED"
+elif [[ -z $hardDeadlineOPTION ]] && [[ -n $hardDeadlinePROPERTY ]]; then
+	hardDeadlineOPTION="$hardDeadlinePROPERTY"
+fi
+if [[ -n $countDeadlineMANAGED ]]; then
+	countDeadlineOPTION="$countDeadlineMANAGED"
+elif [[ -z $countDeadlineOPTION ]] && [[ -n $countDeadlinePROPERTY ]]; then
+	countDeadlineOPTION="$countDeadlinePROPERTY"
+fi
+if [[ -n $policyTriggersMANAGED ]]; then
+	policyTriggersOPTION="$policyTriggersMANAGED"
+elif [[ -z $policyTriggersOPTION ]] && [[ -n $policyTriggersPROPERTY ]]; then
+	policyTriggersOPTION="$policyTriggersPROPERTY"
+fi
+if [[ -n $skipUpdatesMANAGED ]]; then
+	skipUpdatesOPTION="$skipUpdatesMANAGED"
+elif [[ -z $skipUpdatesOPTION ]] && [[ -n $skipUpdatesPROPERTY ]]; then
+	skipUpdatesOPTION="$skipUpdatesPROPERTY"
+fi
+if [[ -n $forceRestartMANAGED ]]; then
+	forceRestartOPTION="$forceRestartMANAGED"
+elif [[ -z $forceRestartOPTION ]] && [[ -n $forceRestartPROPERTY ]]; then
+	forceRestartOPTION="$forceRestartPROPERTY"
+fi
+if [[ -n $testModeMANAGED ]]; then
+	testModeOPTION="$testModeMANAGED"
+elif [[ -z $testModeOPTION ]] && [[ -n $testModePROPERTY ]]; then
+	testModeOPTION="$testModePROPERTY"
+fi
+if [[ -n $testModeTimeoutMANAGED ]]; then
+	testModeTimeoutOPTION="$testModeTimeoutMANAGED"
+elif [[ -z $testModeTimeoutOPTION ]] && [[ -n $testModeTimeoutPROPERTY ]]; then
+	testModeTimeoutOPTION="$testModeTimeoutPROPERTY"
+fi
+}
+
+# Validate non-credential parameters and manage $superPLIST. Any errors set $parameterERROR.
+manageParameters() {
+# Validate $jamfBINARY.
+if [[ -e "$jamfBINARY" ]]; then
+	jamfMAJOR=$("$jamfBINARY" -version | cut -c 9- | cut -d'.' -f1) # Expected output: 10
+	jamfMINOR=$("$jamfBINARY" -version | cut -c 9- | cut -d'.' -f2) # Expected output: 30, 31, 32, etc.
+	jamfVERSION=${jamfMAJOR}$(printf "%02d" "$jamfMINOR") # Expected output: 1030, 1031, 1032, etc.
+	jamfAPPLE="1035"
+	jamfINTEL="1000"
+	if [[ "$macosARCH" == "arm64" ]] && [[ "$jamfVERSION" -lt "$jamfAPPLE" ]]; then
+		sendToLog "Exit: Jamf Pro $jamfVERSION not supported for Apple Silicon."; parameterERROR="TRUE"
+	elif [[ "$macosARCH" == "i386" ]] && [[ "$jamfVERSION" -lt "$jamfINTEL" ]]; then
+		sendToLog "Exit: Jamf Pro $jamfVERSION not supported for Intel."; parameterERROR="TRUE"
+	fi
+else
+	sendToLog "Exit: Cannot locate jamf binary at: $jamfBINARY"; parameterERROR="TRUE"
+fi
+
+# Validate $jamfHelper.
+if [[ ! -e "$jamfHELPER" ]]; then
+	sendToLog "Exit: Cannot locate jamfHelper at: $jamfHELPER"; parameterERROR="TRUE"
+fi
+
+# Various regular expressions used for parameter validation.
+regexNUMBER="^[0-9]+$"
+regexMENU="^[0-9*,]+$"
+regexDATE="^[0-9][0-9][0-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$"
+regexTIME="^(2[0-3]|[01][0-9]):[0-5][0-9]$"
+regexDEADLINE="^[0-9][0-9][0-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1]):(2[0-3]|[01][0-9]):[0-5][0-9]$"
+
+# Validate $defaultDeferOPTION input and if valid override default $defaultDeferSECONDS parameter and save to $superPLIST.
+if [[ "$defaultDeferOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for default deferral."
+	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
+elif [[ -n $defaultDeferOPTION ]] && [[ $defaultDeferOPTION =~ $regexNUMBER ]]; then
+	if [[ $defaultDeferOPTION -ge 120 ]]; then
+		defaultDeferSECONDS="$defaultDeferOPTION"
+	else
+		sendToLog "Warning: Specified default deferral time of $defaultDeferOPTION seconds too low, rounding up to 120 seconds."
+		defaultDeferSECONDS="120"
+	fi
+	defaults write "$superPLIST" DefaultDefer -string "$defaultDeferSECONDS"
+elif [[ -n $defaultDeferOPTION ]] && ! [[ $defaultDeferOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The default deferral time must only be a number."; parameterERROR="TRUE"
+fi
+
+# Validate $focusDeferOPTION input and if valid set $focusDeferSECONDS and save to $superPLIST.
+if [[ "$focusDeferOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for Focus deferral."
+	defaults delete "$superPLIST" FocusDefer 2> /dev/null
+elif [[ -n $focusDeferOPTION ]] && [[ $focusDeferOPTION =~ $regexNUMBER ]]; then
+	if [[ $focusDeferOPTION -ge 120 ]]; then
+		focusDeferSECONDS="$focusDeferOPTION"
+	else
+		sendToLog "Warning: Specified Focus deferral time of $focusDeferOPTION seconds too low, rounding up to 120 seconds."
+		focusDeferSECONDS="120"
+	fi
+	defaults write "$superPLIST" FocusDefer -string "$focusDeferSECONDS"
+elif [[ -n $focusDeferOPTION ]] && ! [[ $focusDeferOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The Focus deferral time must only be a number."; parameterERROR="TRUE"
+fi
+
+# Validate $menuDeferOPTION input and if valid set $menuDeferSECONDS and save to $superPLIST.
+if [[ "$menuDeferOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for menu deferral."
+	defaults delete "$superPLIST" MenuDefer 2> /dev/null
+elif [[ -n $menuDeferOPTION ]] && [[ $menuDeferOPTION =~ $regexMENU ]]; then
+	oldIFS="$IFS"
+	IFS=$','
+	menuDeferARRAY=($menuDeferOPTION)
+	for i in "${!menuDeferARRAY[@]}"; do
+		if [[ ${menuDeferARRAY[i]} -lt 120 ]]; then
+			sendToLog "Warning: Specified menu deferral time of ${menuDeferARRAY[i]} seconds too low, rounding up to 120 seconds."
+			menuDeferARRAY[i]="120"
+		fi
+	done
+	menuDeferSECONDS="${menuDeferARRAY[*]}"
+	defaults write "$superPLIST" MenuDefer -string "$menuDeferSECONDS"
+	IFS="$oldIFS"
+elif [[ -n $menuDeferOPTION ]] && ! [[ $menuDeferOPTION =~ $regexMENU ]]; then
+	sendToLog "Exit: The defer pop-up menu time(s) must only contain numbers and commas (no spaces)."; parameterERROR="TRUE"
+fi
+
+# Validate $displayTimeoutOPTION and $displayRedrawOPTION inputs and if valid set $displayTimeoutSECONDS and $displayRedrawSECONDS and save to $superPLIST.
+if [[ "$displayTimeoutOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for display timeout."
+	defaults delete "$superPLIST" DisplayTimeout 2> /dev/null
+elif [[ -n $displayTimeoutOPTION ]] && [[ $displayTimeoutOPTION =~ $regexNUMBER ]]; then
+	displayTimeoutSECONDS="$displayTimeoutOPTION"
+	defaults write "$superPLIST" DisplayTimeout -string "$displayTimeoutSECONDS"
+elif [[ -n $displayTimeoutOPTION ]] && ! [[ $displayTimeoutOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The display timeout must only be a number."; parameterERROR="TRUE"
+fi
+if [[ "$displayRedrawOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for display redraw."
+	defaults delete "$superPLIST" DisplayRedraw 2> /dev/null
+elif [[ -n $displayRedrawOPTION ]] && [[ $displayRedrawOPTION =~ $regexNUMBER ]]; then
+	displayRedrawSECONDS="$displayRedrawOPTION"
+	defaults write "$superPLIST" DisplayRedraw -string "$displayRedrawSECONDS"
+elif [[ -n $displayRedrawOPTION ]] && ! [[ $displayRedrawOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The display redraw time must only be a number."; parameterERROR="TRUE"
+fi
+if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $displayTimeoutSECONDS ]] && [[ -n $displayRedrawSECONDS ]]; then
+	displayMinimumTIMEOUT=$(($displayRedrawSECONDS*3))
+	if [[ $displayTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
+		sendToLog "Warning: Specified display timeout of $displayTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing display timeout to $displayMinimumTIMEOUT seconds."
+		displayTimeoutSECONDS=$displayMinimumTIMEOUT
+		defaults write "$superPLIST" DisplayTimeout -string "$displayTimeoutSECONDS"
+	fi
+fi
+
+# Verify the $displayIconOPTION to be used for the super service account and in notifications and dialogs, and if valid copy and set $cachedICON and save to $superPLIST.
+if [[ "$displayIconOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting cached display icon."
+	[[ -f "$cachedICON" ]] && rm -f "$cachedICON"
+elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults read "$superPLIST" DisplayIconCache 2> /dev/null)" ]]; then
+	if [[ $(echo "$displayIconOPTION" | grep '^http://\|^https://' -c) -eq 1 ]]; then
+		sendToLog "Starter: Attempting to download requested icon from: $displayIconOPTION"
+		downloadRESULT=$(curl "$displayIconOPTION" -o "/tmp/cachedICON" 2>&1)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadRESULT: \n$downloadRESULT"
+		if [[ -f "/tmp/cachedICON" ]]; then
+			sipsRESULT=$(sips -s format png "/tmp/cachedICON" --out "$cachedICON" 2>&1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter sipsRESULT: \n$sipsRESULT"
+			defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
+		else
+			sendToLog "Warning: Unable to download specified icon from: $displayIconOPTION"
+		fi
+	elif [[ -e "$displayIconOPTION" ]]; then
+		sendToLog "Starter: Copying requested icon from: $displayIconOPTION"
+		sipsRESULT=$(sips -s format png "$displayIconOPTION" --out "$cachedICON" 2>&1)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter sipsRESULT: \n$sipsRESULT"
+		defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
+	else
+		sendToLog "Warning: Unable to locate specified icon from: $displayIconOPTION"
+	fi
+fi
+if [[ ! -f "$cachedICON" ]]; then
+	sendToLog "Starter: No custom display icon found, copying default icon from: $defaultICON"
+	sipsRESULT=$(sips -s format png "$defaultICON" --out "$cachedICON" 2>&1)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter sipsRESULT: \n$sipsRESULT"
+	defaults write "$superPLIST" DisplayIconCache -string "$defaultICON"
+fi
+
+# Validate $focusDeadlineOPTION, if valid set $focusDEADLINE, $focusEPOCH, $focusDATE, $focusTIME, $focusDEADLINE, and $focusDISPLAY.
+if [[ "$focusDeadlineOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for Focus deadline."
+	defaults delete "$superPLIST" FocusDeadline 2> /dev/null
+elif [[ -n $focusDeadlineOPTION ]]; then
+	extractDATE=$(echo "$focusDeadlineOPTION" | cut -c-10 )
+	if [[ $extractDATE =~ $regexDATE ]]; then
+		extractTIME=$(echo "$focusDeadlineOPTION" | cut -c11- )
+		if [[ -n $extractTIME ]]; then
+			extractHOURS=$(echo "$extractTIME" | cut -d: -f2)
+			[[ -z $extractHOURS ]] && extractHOURS="00"
+			extractMINUTES=$(echo "$extractTIME" | cut -d: -f3)
+			[[ -z $extractMINUTES ]] && extractMINUTES="00"
+			extractTIME="$extractHOURS:$extractMINUTES"
+		else
+			extractTIME="00:00"
+		fi
+		if [[ $extractTIME =~ $regexTIME ]]; then
+			calculatedDEADLINE="$extractDATE:$extractTIME"
+		else
+			sendToLog "Exit: The Focus deadline time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: The Focus deadline date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+	fi
+	if [[ $calculatedDEADLINE =~ $regexDEADLINE ]]; then
+		focusDEADLINE="$calculatedDEADLINE"
+		focusEPOCH=$(date -j -f "%Y-%m-%d:%H:%M" "$calculatedDEADLINE" +"%s")
+		focusDATE=$(date -r "$focusEPOCH" "$dateFORMAT")
+		if [[ "$extractTIME" == "00:00" ]]; then
+			focusDISPLAY="$focusDATE"
+		else
+			focusTIME=$(date -r "$focusEPOCH" "$timeFORMAT")
+			focusDISPLAY="$focusDATE at$focusTIME"
+		fi
+		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+			sendToLog "Parameter focusEPOCH: $focusEPOCH"
+			sendToLog "Parameter focusDISPLAY: $focusDISPLAY"
+		fi
+	else
+		sendToLog "Exit: The Focus deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+	fi
+fi
+
+# Validate that $focusDeadlineOPTION also includes a coordinating $focusDeferOPTION.
+if [[ -n $focusDeadlineOPTION ]] && [[ -z $focusDeferOPTION ]]; then
+	sendToLog "Exit: The Focus deadline date requires that you also set defer Focus seconds."; parameterERROR="TRUE"
+fi
+
+# Validate $softDeadlineOPTION, if valid set $softEPOCH, $softDATE, $softTIME, $softDEADLINE, and $softDISPLAY.
+if [[ "$softDeadlineOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for soft deadline."
+	defaults delete "$superPLIST" SoftDeadline 2> /dev/null
+elif [[ -n $softDeadlineOPTION ]]; then
+	extractDATE=$(echo "$softDeadlineOPTION" | cut -c-10 )
+	if [[ $extractDATE =~ $regexDATE ]]; then
+		extractTIME=$(echo "$softDeadlineOPTION" | cut -c11- )
+		if [[ -n $extractTIME ]]; then
+			extractHOURS=$(echo "$extractTIME" | cut -d: -f2)
+			[[ -z $extractHOURS ]] && extractHOURS="00"
+			extractMINUTES=$(echo "$extractTIME" | cut -d: -f3)
+			[[ -z $extractMINUTES ]] && extractMINUTES="00"
+			extractTIME="$extractHOURS:$extractMINUTES"
+		else
+			extractTIME="00:00"
+		fi
+		if [[ $extractTIME =~ $regexTIME ]]; then
+			calculatedDEADLINE="$extractDATE:$extractTIME"
+		else
+			sendToLog "Exit: The Soft deadline time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: The Soft deadline date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+	fi
+	if [[ $calculatedDEADLINE =~ $regexDEADLINE ]]; then
+		softDEADLINE="$calculatedDEADLINE"
+		softEPOCH=$(date -j -f "%Y-%m-%d:%H:%M" "$calculatedDEADLINE" +"%s")
+		softDATE=$(date -r "$softEPOCH" "$dateFORMAT")
+		if [[ "$extractTIME" == "00:00" ]]; then
+			softDISPLAY="$softDATE"
+		else
+			softTIME=$(date -r "$softEPOCH" "$timeFORMAT")
+			softDISPLAY="$softDATE at$softTIME"
+		fi
+		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+			sendToLog "Parameter softEPOCH: $softEPOCH"
+			sendToLog "Parameter softDISPLAY: $softDISPLAY"
+		fi
+	else
+		sendToLog "Exit: The Soft deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+	fi
+fi
+
+# Validate $hardDeadlineOPTION, if valid set $hardEPOCH, $hardDATE, $hardTIME, $hardDEADLINE, and $hardDISPLAY.
+if [[ "$hardDeadlineOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for hard deadline."
+	defaults delete "$superPLIST" HardDeadline 2> /dev/null
+elif [[ -n $hardDeadlineOPTION ]]; then
+	extractDATE=$(echo "$hardDeadlineOPTION" | cut -c-10 )
+	if [[ $extractDATE =~ $regexDATE ]]; then
+		extractTIME=$(echo "$hardDeadlineOPTION" | cut -c11- )
+		if [[ -n $extractTIME ]]; then
+			extractHOURS=$(echo "$extractTIME" | cut -d: -f2)
+			[[ -z $extractHOURS ]] && extractHOURS="00"
+			extractMINUTES=$(echo "$extractTIME" | cut -d: -f3)
+			[[ -z $extractMINUTES ]] && extractMINUTES="00"
+			extractTIME="$extractHOURS:$extractMINUTES"
+		else
+			extractTIME="00:00"
+		fi
+		if [[ $extractTIME =~ $regexTIME ]]; then
+			calculatedDEADLINE="$extractDATE:$extractTIME"
+		else
+			sendToLog "Exit: The Hard deadline time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: The Hard deadline date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+	fi
+	if [[ $calculatedDEADLINE =~ $regexDEADLINE ]]; then
+		hardDEADLINE="$calculatedDEADLINE"
+		hardEPOCH=$(date -j -f "%Y-%m-%d:%H:%M" "$calculatedDEADLINE" +"%s")
+		hardDATE=$(date -r "$hardEPOCH" "$dateFORMAT")
+		if [[ "$extractTIME" == "00:00" ]]; then
+			hardDISPLAY="$hardDATE"
+		else
+			hardTIME=$(date -r "$hardEPOCH" "$timeFORMAT")
+			hardDISPLAY="$hardDATE at$hardTIME"
+		fi
+		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+			sendToLog "Parameter hardEPOCH: $hardEPOCH"
+			sendToLog "Parameter hardDISPLAY: $hardDISPLAY"
+		fi
+	else
+		sendToLog "Exit: The Hard deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+	fi
+fi
+
+# Validate $focusEPOCH, $softEPOCH, and $hardEPOCH in relation to each other. If valid then save deadlines to $superPLIST.
+if [[ -n $hardEPOCH ]] && [[ -n $softEPOCH ]] && [[ $hardEPOCH -le $softEPOCH ]]; then
+	sendToLog "Exit: The Hard deadline of $hardDATE at $hardTIME must be later than the Soft deadline of $softDATE at $softTIME."; parameterERROR="TRUE"
+fi
+if [[ -n $hardEPOCH ]] && [[ -n $focusEPOCH ]] && [[ $hardEPOCH -le $focusEPOCH ]]; then
+	sendToLog "Exit: The Hard deadline of $hardDATE at $hardTIME must be later than the Focus deadline of $focusDATE at $focusTIME."; parameterERROR="TRUE"
+fi
+if [[ -n $softEPOCH ]] && [[ -n $focusEPOCH ]] && [[ $softEPOCH -le $focusEPOCH ]]; then
+	sendToLog "Exit: The Soft deadline of $softDATE at $softTIME must be later than the Focus deadline of $focusDATE at $focusTIME."; parameterERROR="TRUE"
+fi
+if [[ "$parameterERROR" != "TRUE" ]]; then
+	[[ -n $focusDEADLINE ]] && defaults write "$superPLIST" FocusDeadline -string "$focusDEADLINE"
+	[[ -n $softDEADLINE ]] && defaults write "$superPLIST" SoftDeadline -string "$softDEADLINE"
+	[[ -n $hardDEADLINE ]] && defaults write "$superPLIST" HardDeadline -string "$hardDEADLINE"
+fi
+
+# Validate $countDeadlineOPTION input and if valid set $countDEADLINE and save to $superPLIST.
+if [[ "$countDeadlineOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for count deadline."
+	defaults delete "$superPLIST" CountDeadline 2> /dev/null
+elif [[ -n $countDeadlineOPTION ]] && [[ $countDeadlineOPTION =~ $regexNUMBER ]]; then
+	countDEADLINE="$countDeadlineOPTION"
+	defaults write "$superPLIST" CountDeadline -string "$countDEADLINE"
+elif [[ -n $countDeadlineOPTION ]] && ! [[ $countDeadlineOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The deferral count deadline must only be a number."; parameterERROR="TRUE"
+fi
+
+# Validate $policyTriggersOPTION input and if valid set $policyTRIGGERS and save to $superPLIST.
+if [[ "$policyTriggersOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for Jamf Pro Policy triggers."
+	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
+elif [[ -n $policyTriggersOPTION ]]; then
+	policyTRIGGERS="$policyTriggersOPTION"
+	defaults write "$superPLIST" PolicyTriggers -string "$policyTRIGGERS"
+fi
+
+# Manage $skipUpdatesOPTION and save to $superPLIST.
+if [[ $skipUpdatesOPTION -eq 1 ]] || [[ "$skipUpdatesOPTION" == "TRUE" ]]; then
+	skipUpdatesOPTION="TRUE"
+else
+	skipUpdatesOPTION="FALSE"
+fi
+defaults write "$superPLIST" SkipUpdates -bool "$skipUpdatesOPTION"
+
+# Manage $forceRestartOPTION and save to $superPLIST.
+if [[ $forceRestartOPTION -eq 1 ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; then
+	forceRestartOPTION="TRUE"
+else
+	forceRestartOPTION="FALSE"
+fi
+defaults write "$superPLIST" ForceRestart -bool "$forceRestartOPTION"
+
+# Manage $testModeOPTION and save to $superPLIST.
+if [[ $testModeOPTION -eq 1 ]] || [[ "$testModeOPTION" == "TRUE" ]]; then
+	testModeOPTION="TRUE"
+else
+	testModeOPTION="FALSE"
+fi
+defaults write "$superPLIST" TestMode -bool "$testModeOPTION"
+if [[ "$testModeOPTION" == "TRUE" ]] && [[ "$currentUSER" == "FALSE" ]]; then
+	sendToLog "Exit: Test mode requires that a valid user is logged in."; parameterERROR="TRUE"
+fi
+
+# Validate $testModeTimeoutOPTION input and if valid set $testModeTIMEOUT and save to $superPLIST.
+if [[ "$testModeTimeoutOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for test mode timeout."
+	defaults delete "$superPLIST" TestModeTimeout 2> /dev/null
+elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBER ]]; then
+	testModeTIMEOUT="$testModeTimeoutOPTION"
+	defaults write "$superPLIST" TestModeTimeout -string "$testModeTIMEOUT"
+elif [[ -n $testModeTimeoutOPTION ]] && ! [[ $testModeTimeoutOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The test mode timeout must only be a number."; parameterERROR="TRUE"
+fi
+}
+
+# Manage update credentials given $purgeACCOUNTS, $localACCOUNT, $adminACCOUNT, $superACCOUNT, or $jamfACCOUNT. Any errors set $parameterERROR.
+manageUpdateCredentials () {
+# Validate that $localOPTION and $localPASSWORD are simultaneously provided.
+if [[ -n $localOPTION ]] && [[ -z $localPASSWORD ]]; then
+	sendToLog "Exit: A local volume owner account name requires that you also set a local volume owner password."; parameterERROR="TRUE"
+fi
+if [[ -z $localOPTION ]] && [[ -n $localPASSWORD ]]; then
+	sendToLog "Exit: A local volume owner password requires that you also set a local volume owner account name."; parameterERROR="TRUE"
+fi
+
+# Validate that $localOPTION exists, is a volume owner, and that $localPASSWORD is correct.
+if [[ -n $localOPTION ]] && [[ "$parameterERROR" != "TRUE" ]]; then
+	localGUID=$(dscl . read "/Users/$localOPTION" GeneratedUID 2> /dev/null | awk '{print $2;}')
+	if [[ -n $localGUID ]]; then
+		if ! [[ $(diskutil apfs listcryptousers / | grep -c "$localGUID") -ne 0 ]]; then
+			sendToLog "Exit: Provided account \"$localOPTION\" is not a system volume owner."; parameterERROR="TRUE"
+		fi
+		localVALID=$(dscl /Local/Default -authonly "$localOPTION" "$localPASSWORD" 2>&1)
+		if ! [[ "$localVALID" == "" ]];then
+			sendToLog "Exit: The provided password for account \"$localOPTION\" is not valid."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: Could not retrieve GUID for account \"$localOPTION\". Verify that account exists locally."; parameterERROR="TRUE"
+	fi
+fi
+
+# Validate that $adminACCOUNT and $adminPASSWORD are simultaneously provided.
+if [[ -n $adminACCOUNT ]] && [[ -z $adminPASSWORD ]]; then
+	sendToLog "Exit: A local admin account name requires that you also set a local admin password."; parameterERROR="TRUE"
+fi
+if [[ -z $adminACCOUNT ]] && [[ -n $adminPASSWORD ]]; then
+	sendToLog "Exit: A local admin password requires that you also set a local admin account name."; parameterERROR="TRUE"
+fi
+
+# Validate that $adminACCOUNT is also specified with $superOPTION.
+if [[ -n $superOPTION ]] && [[ -z $adminACCOUNT ]]; then
+	sendToLog "Exit: Local admin credentials are required to set a custom super service account name."; parameterERROR="TRUE"
+fi
+
+# Validate that $adminACCOUNT exists, is a volume owner, a local admin, and that $adminPASSWORD is correct.
+if [[ -n $adminACCOUNT ]] && [[ "$parameterERROR" != "TRUE" ]]; then
+	adminGUID=$(dscl . read "/Users/$adminACCOUNT" GeneratedUID 2> /dev/null | awk '{print $2;}')
+	if [[ -n $adminGUID ]]; then
+		if [[ $(groups "$adminACCOUNT" | grep "admin" -c) -eq 0 ]]; then
+			sendToLog "Exit: Provided account \"$adminACCOUNT\" is not a local administrator."; parameterERROR="TRUE"
+		fi
+		if ! [[ $(diskutil apfs listcryptousers / | grep -c "$adminGUID") -ne 0 ]]; then
+			sendToLog "Exit: Provided account \"$adminACCOUNT\" is not a system volume owner."; parameterERROR="TRUE"
+		fi
+		adminVALID=$(dscl /Local/Default -authonly "$adminACCOUNT" "$adminPASSWORD" 2>&1)
+		if ! [[ "$adminVALID" == "" ]];then
+			sendToLog "Exit: The provided password for account \"$adminACCOUNT\" is not valid."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: Could not retrieve GUID for account \"$adminACCOUNT\". Verify that account exists locally."; parameterERROR="TRUE"
+	fi
+fi
+
+# Validate that $jamfOPTION and $jamfPASSWORD are simultaneously provided.
+if [[ -n $jamfOPTION ]] && [[ -z $jamfPASSWORD ]]; then
+	sendToLog "Exit: A Jamf Pro API account name requires that you also set a Jamf Pro API password."; parameterERROR="TRUE"
+fi
+if [[ -z $jamfOPTION ]] && [[ -n $jamfPASSWORD ]]; then
+	sendToLog "Exit: A Jamf Pro API password requires that you also set a Jamf Pro API account name."; parameterERROR="TRUE"
+fi
+
+# Validate that the account $jamfOPTION and $jamfPASSWORD are valid.
+if [[ -n $jamfOPTION ]] && [[ "$parameterERROR" != "TRUE" ]]; then
+	jamfACCOUNT="$jamfOPTION"
+	jamfKEYCHAIN="$jamfPASSWORD"
+	getJamfProServer
+	if [[ "$jamfSERVER" != "FALSE" ]]; then
+		getJamfProAccount
+		[[ "$jamfERROR" == "TRUE" ]] && parameterERROR="TRUE"
+	else
+		sendToLog "Exit: Unable to connect to Jamf Pro to validate user account."; parameterERROR="TRUE"
+	fi
+	unset jamfACCOUNT
+	unset jamfKEYCHAIN
+fi
+
+# Collect any previously saved account names from $superPLIST.
+localPROPERTY=$(defaults read "$superPLIST" LocalAccount 2> /dev/null)
+superPROPERTY=$(defaults read "$superPLIST" SuperAccount 2> /dev/null)
+jamfPROPERTY=$(defaults read "$superPLIST" JamfAccount 2> /dev/null)
+
+# Some messaging to indicate if there are no saved accounts.
+( [[ -z $localPROPERTY ]] && [[ -z $superPROPERTY ]] && [[ -z $jamfPROPERTY ]] && [[ -n $purgeACCOUNTS ]] ) && sendToLog "Starter: No saved accounts to remove."
+
+# If there was a previous $localPROPERTY account and the user specified $localOPTION or $purgeACCOUNTS then delete any previously saved local account credentials.
+if [[ -n $localPROPERTY ]] && ( [[ -n $localOPTION ]] || [[ "$purgeACCOUNTS" == "TRUE" ]] ); then
+	sendToLog "Starter: Purging saved credentials for local account \"$localPROPERTY\"."
+	defaults delete "$superPLIST" LocalAccount > /dev/null 2>&1
+	security delete-generic-password -a "$localPROPERTY" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+	unset localPROPERTY
+fi
+
+# If there was a previous $superPROPERTY account and the user specified $adminACCOUNT or $purgeACCOUNTS then delete any previously saved super service account and credentials.
+if [[ -n $superPROPERTY ]] && ( [[ -n $adminACCOUNT ]] || [[ "$purgeACCOUNTS" == "TRUE" ]] ); then
+	sendToLog "Starter: Purging local account and saved cedentials for super service account \"$superPROPERTY\"."
+	sysadminctl -deleteUser "$superPROPERTY" > /dev/null 2>&1
+	defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
+	security delete-generic-password -a "$superPROPERTY" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+	unset superPROPERTY
+fi
+
+# If there was a previous $jamfPROPERTY account and the user specified $jamfOPTION or $purgeACCOUNTS then delete any previously saved Jamf Pro API credentials.
+if [[ -n $jamfPROPERTY ]] && ( [[ -n $jamfOPTION ]] || [[ "$purgeACCOUNTS" == "TRUE" ]] ); then
+	sendToLog "Starter: Purging saved credentials for Jamf Pro API account \"$jamfPROPERTY\"."
+	defaults delete "$superPLIST" JamfAccount > /dev/null 2>&1
+	security delete-generic-password -a "$jamfPROPERTY" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+	unset jamfPROPERTY
+fi
+
+# If any previous validation generated a $parameterERROR then it's not necessary to continue this function.
+[[ $parameterERROR == "TRUE" ]] && return 0
+
+# If a new local account was specified, save $localOPTION and $localPASSWORD credentials and then validate retrieval.
+if [[ -n $localOPTION ]]; then
+	sendToLog "Starter: Saving new credentials for local account \"$localOPTION\"..."
+	defaults write "$superPLIST" LocalAccount -string "$localOPTION"
+	localACCOUNT=$(defaults read "$superPLIST" LocalAccount 2> /dev/null)
+	if [[ "$localOPTION" == "$localACCOUNT" ]]; then
+		security add-generic-password -a "$localACCOUNT" -s "Super Local Account" -w "$localPASSWORD" -T /usr/bin/security /Library/Keychains/System.keychain
+		localKEYCHAIN=$(security find-generic-password -w -a "$localACCOUNT" -s "Super Local Account" /Library/Keychains/System.keychain 2> /dev/null)
+		if [[ "$localPASSWORD" == "$localKEYCHAIN" ]]; then
+			sendToLog "Starter: Validated saved credentials for local account \"$localACCOUNT\"."
+			localCREDENTIAL="TRUE"
+		else
+			sendToLog "Exit: Unable to validate saved password for local account \"$localACCOUNT\", deleting saved password."; parameterERROR="TRUE"
+			security delete-generic-password -a "$localACCOUNT" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+		fi
+	else
+		sendToLog "Exit: Unable to validate saved name for local account \"$localOPTION\", deleting saved name."; parameterERROR="TRUE"
+		defaults delete "$superPLIST" LocalAccount > /dev/null 2>&1
+	fi
+fi
+
+# If an $adminACCOUNT was specified then a new super service account needs to be created and its credentials saved.
+if [[ -n $adminACCOUNT ]]; then
+	# If the a custom super service account name is requested via $superOPTION.
+	if [[ -n $superOPTION ]]; then
+		superNEWACCT="$superOPTION"
+		superNEWFULL="$superOPTION"
+	else # Use the default names for the super service account.
+		superNEWACCT="super"
+		superNEWFULL="Super Update Service"
+	fi
+	
+	# If a custom super service account password is requested via $superPASSWORD.
+	if [[ -n $superPASSWORD ]]; then
+		superNEWPASS="$superPASSWORD"
+	else # Use the default random password for the super service account.
+		superNEWPASS=$(uuidgen)
+	fi
+	
+	# Save and validate new super service account credentials, and validate retrieval.
+	sendToLog "Starter: Saving new credentials for super service account \"$superNEWACCT\"..."
+	defaults write "$superPLIST" SuperAccount -string "$superNEWACCT"
+	superACCOUNT=$(defaults read "$superPLIST" SuperAccount 2> /dev/null)
+	if [[ "$superNEWACCT" == "$superACCOUNT" ]]; then
+		security add-generic-password -a "$superACCOUNT" -s "Super Service Account" -w "$superNEWPASS" -T /usr/bin/security /Library/Keychains/System.keychain
+		superKEYCHAIN=$(security find-generic-password -w -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain 2> /dev/null)
+		if [[ "$superNEWPASS" == "$superKEYCHAIN" ]]; then # Only if saved credentials are valid do we create the new super service account.
+			sendToLog "Starter: Validated saved credentials for new super service account \"$superACCOUNT\"."
+			if [[ $(id "$superACCOUNT" 2>&1 | grep "no such user" -c) -eq 1 ]]; then
+				sendToLog "Starter: Deleting existing super service account \"$superACCOUNT\" in preparation for new account."
+				sysadminctl -deleteUser "$superACCOUNT" > /dev/null 2>&1
+			fi
+			# Loop through local IDs to find the first vacant id after 500.
+			newUID=501
+			while [[ $(id $newUID 2>&1 | grep "no such user" -c) -ne 1 ]]; do
+				newUID=$((newUID+1))
+			done
+			sendToLog "Starter: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
+			addRESULT=$(sysadminctl -addUser "$superNEWACCT" -fullName "$superNEWFULL" -password "$superNEWPASS" -UID $newUID -GID 20 -shell /dev/null -home /dev/null -picture "$cachedICON" -adminUser "$adminACCOUNT" -adminPassword "$adminPASSWORD" 2>&1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter addRESULT: \n$addRESULT"
+			dscl . create /Users/"$superNEWACCT" IsHidden 1
+			updateACCOUNT="$superACCOUNT"
+			updateKEYCHAIN="$superKEYCHAIN"
+			checkLocalUpdateAccount
+			if [[ "$accountERROR" != "TRUE" ]]; then
+				sendToLog "Starter: Validated the creation of new super service account \"$superACCOUNT\"."
+				superCREDENTIAL="TRUE"
+			else
+				sendToLog "Exit: Unable to validate newly created super service account \"$superACCOUNT\", deleting account"; parameterERROR="TRUE"
+				sysadminctl -deleteUser "$superACCOUNT" > /dev/null 2>&1
+				defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
+				security delete-generic-password -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+				unset superPROPERTY
+			fi
+		else
+			sendToLog "Exit: Unable to validate saved password for new super service account \"$superNEWACCT\", deleting saved password."; parameterERROR="TRUE"
+			security delete-generic-password -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+		fi
+	else
+		sendToLog "Exit: Unable to validate saved name for new super service account \"$superNEWACCT\",deleting saved name."; parameterERROR="TRUE"
+		defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
+	fi
+fi
+
+# If a new Jamf Pro API account was specified, save $jamfOPTION and $jamfPASSWORD credentials and then validate retrieval.
+if [[ -n $jamfOPTION ]]; then
+	sendToLog "Starter: Saving new credentials for Jamf Pro API account \"$jamfOPTION\"..."
+	defaults write "$superPLIST" JamfAccount -string "$jamfOPTION"
+	jamfACCOUNT=$(defaults read "$superPLIST" JamfAccount 2> /dev/null)
+	if [[ "$jamfOPTION" == "$jamfACCOUNT" ]]; then
+		security add-generic-password -a "$jamfACCOUNT" -s "Super MDM Account" -w "$jamfPASSWORD" -T /usr/bin/security /Library/Keychains/System.keychain
+		jamfKEYCHAIN=$(security find-generic-password -w -a "$jamfACCOUNT" -s "Super MDM Account" /Library/Keychains/System.keychain 2> /dev/null)
+		if [[ "$jamfPASSWORD" == "$jamfKEYCHAIN" ]]; then
+			sendToLog "Starter: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
+			jamfCREDENTIAL="TRUE"
+		else
+			sendToLog "Exit: Unable to validate saved password for Jamf Pro API account \"$jamfACCOUNT\", deleting saved password."; parameterERROR="TRUE"
+			security delete-generic-password -a "$jamfACCOUNT" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
+		fi
+	else
+		sendToLog "Exit: Unable to validate saved name for Jamf Pro API account \"$jamfOPTION\", deleting saved name."; parameterERROR="TRUE"
+		defaults delete "$superPLIST" JamfAccount > /dev/null 2>&1
+	fi
+fi
+
+# If there is a previously saved local account (that wasn't just purged), validate the account and set $localACCOUNT and $localPASSWORD.
+if [[ -n $localPROPERTY ]]; then
+	localACCOUNT="$localPROPERTY"
+	localKEYCHAIN=$(security find-generic-password -w -a "$localACCOUNT" -s "Super Local Account" /Library/Keychains/System.keychain 2> /dev/null)
+	if [[ -n $localKEYCHAIN ]]; then
+		sendToLog "Starter: Found saved credentials for local account \"$localACCOUNT\"."
+		updateACCOUNT="$localACCOUNT"
+		updateKEYCHAIN="$localKEYCHAIN"
+		checkLocalUpdateAccount
+		if [[ "$accountERROR" != "TRUE" ]]; then
+			sendToLog "Starter: Validated saved credentials for local account \"$localACCOUNT\"."
+			localCREDENTIAL="TRUE"
+		else
+			sendToLog "Exit: Unable to validate saved credentials for local account \"$localACCOUNT\"."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: Unable to retrieve password for saved local account \"$localACCOUNT\"."; parameterERROR="TRUE"
+	fi
+fi
+
+# If there is a previously saved super service account (that wasn't just purged), validate the account and set $superACCOUNT and $superPASSWORD.
+if [[ -n $superPROPERTY ]]; then
+	superACCOUNT="$superPROPERTY"
+	superKEYCHAIN=$(security find-generic-password -w -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain 2> /dev/null)
+	if [[ -n $superKEYCHAIN ]]; then
+		sendToLog "Starter: Found saved credentials for super service account \"$superACCOUNT\"."
+		updateACCOUNT="$superACCOUNT"
+		updateKEYCHAIN="$superKEYCHAIN"
+		checkLocalUpdateAccount
+		if [[ "$accountERROR" != "TRUE" ]]; then
+			sendToLog "Starter: Validated saved credentials for super service account \"$superACCOUNT\"."
+			superCREDENTIAL="TRUE"
+		else
+			sendToLog "Exit: Unable to validate saved credentials for super service account \"$superACCOUNT\"."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: Unable to retrieve password for saved super service account \"$superACCOUNT\"."; parameterERROR="TRUE"
+	fi
+fi
+
+# If there is a previously saved Jamf PRO API account (that wasn't just purged), validate the account and set $jamfACCOUNT and $jamfPASSWORD.
+if [[ -n $jamfPROPERTY ]]; then
+	jamfACCOUNT="$jamfPROPERTY"
+	jamfKEYCHAIN=$(security find-generic-password -w -a "$jamfACCOUNT" -s "Super MDM Account" /Library/Keychains/System.keychain 2> /dev/null)
+	if [[ -n $jamfKEYCHAIN ]]; then
+		sendToLog "Starter: Found saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
+		getJamfProServer
+		if [[ "$jamfSERVER" != "FALSE" ]]; then
+			getJamfProAccount
+			if [[ "$jamfERROR" != "TRUE" ]]; then
+				sendToLog "Starter: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
+				if [[ $(profiles status -type bootstraptoken 2> /dev/null | grep "YES" -c) -eq 2 ]]; then
+					jamfCREDENTIAL="TRUE"
+				else
+					sendToLog "Exit: Can not use MDM update workflow because this computer's Bootstrap token is not escrowed."; parameterERROR="TRUE"
+				fi
+			else
+				parameterERROR="TRUE"
+			fi
+		else
+			sendToLog "Exit: Unable to connect to Jamf Pro to validate user account."; parameterERROR="TRUE"
+		fi
+	else
+		sendToLog "Exit: Unable to retrieve password for saved Jamf Pro API account \"$jamfACCOUNT\"."; parameterERROR="TRUE"
+	fi
+fi
+}
+
+######## FUNCTIONS - STARTUP ########
+
+# Install items required by super.
+superInstaller() {
+# Make sure the $superFOLDER exists.
+if [[ ! -d "$superFOLDER" ]]; then
+	mkdir -p "$superFOLDER"
+	sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
+	sendToLog "Installer: Made working folder: $superFOLDER"
+fi
+
+# Install super if it's running from any location that is not in the $superFOLDER or from the $superLINK.
+superPATH="$(dirname "$0")"
+if ! ( [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]] ); then
+	sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
+	sendToLog "Installer: Copying file: $superFOLDER/super"
+	cp "$0" "$superFOLDER/super" > /dev/null 2>&1
+	sendToLog "Installer: Creating default path link: $superLINK"
+	ln -s "$superFOLDER/super" "$superLINK" > /dev/null 2>&1
+	sendToLog "Installer: Creating file: $superFOLDER/super-starter"
+/bin/cat <<EOSS > "$superFOLDER/super-starter"
+#!/bin/sh
+echo "\$(date +"%a %b %d %T") \$(hostname -s) \$(basename "\$0")[\$\$]: **** S.U.P.E.R.M.A.N. LAUNCHDAEMON ****" | tee -a "$superLOG"
+"$superFOLDER/super" "\$@" &
+disown
+exit 0
+EOSS
+	[[ "$macosARCH" == "arm64" ]] && touch "$mdmLOG"
+	[[ "$macosMAJOR" != "10" ]] && touch "$updateLOG"
+	sendToLog "Installer: Setting permissions in: $superFOLDER"
+	chown -R root:wheel "$superFOLDER"
+	chown root:wheel "$superLINK"
+	chmod -R a+r "$superFOLDER"
+	chmod a+r "$superLINK"
+	chmod a+x "$superFOLDER/super"
+	chmod a+x "$superFOLDER/super-starter"
+	chmod a+x "$superLINK"
+	
+	# Detect if super was installed via Jamf.
+	if [[ "$superPATH" == "$jamfCACHE" ]]; then # Installed via Jamf, so exit this run with the assumption that Jamf is going to restart via "Execute Command" options in Policy.
+		sendToLog "Exit: Running from $superPATH, exiting for Jamf Policy restart."
+	else # Installed via other location, so restart using super script in $superFOLDER.
+		sendToLog "Exit: Running from $superPATH, restarting with parameters: $*"
+		bash "$superFOLDER/super" "$@" &
+		disown
+	fi
+	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+	exit 0
+fi
+}
+
+# Prepare super by cleaning after previous super runs, record various maintenance modes, validate parameters, and liberate super from Jamf Policy runs.
+superStarter() {
+# Record startup of super in $superLOG.
+sendToLog "**** S.U.P.E.R.M.A.N. STARTER ****"
+
+# Check for any previous super process still running, if so kill it.
+if [[ -f "$superPIDFILE" ]]; then
+	previousPID=$(cat "$superPIDFILE")
+	sendToLog "Starter: Found previous super instance running with PID $previousPID, killing..."
+	kill -9 "$previousPID" > /dev/null 2>&1
+fi
+
+# Kill any already running helper processes.
+killall -9 "softwareupdate" > /dev/null 2>&1
+killall -9 "jamfHelper" > /dev/null 2>&1
+
+# Create $superPIDFILE for this instance of super.
+echo $$ > "$superPIDFILE"
+
+# This unloads and removes any previous LaunchDaemons.
+if [[ -f "/Library/LaunchDaemons/$launchDaemonNAME.plist" ]]; then
+	sendToLog "Starter: Cleaning up previous LaunchDaemon $launchDaemonNAME.plist."
+	launchctl bootout system "/Library/LaunchDaemons/$launchDaemonNAME.plist" 2> /dev/null
+	rm -f "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+fi
+
+# Manage the $verboseModeOPTION and if enabled start additional logging.
+if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
+	sendToLog "Starter: Clearing local super preferences."
+	defaults delete "$superPLIST" VerboseMode 2> /dev/null
+fi
+if [[ -f "$superMANAGEDPLIST.plist" ]]; then
+	verboseModeMANAGED=$(defaults read "$superMANAGEDPLIST" VerboseMode 2> /dev/null)
+fi
+if [[ -f "$superPLIST.plist" ]]; then
+	verboseModePROPERTY=$(defaults read "$superPLIST" VerboseMode 2> /dev/null)
+fi
+if [[ -n $verboseModeMANAGED ]]; then
+	verboseModeOPTION="$verboseModeMANAGED"
+elif [[ -z $verboseModeOPTION ]] && [[ -n $verboseModePROPERTY ]]; then
+	verboseModeOPTION="$verboseModePROPERTY"
+fi
+if [[ $verboseModeOPTION -eq 1 ]] || [[ "$verboseModeOPTION" == "TRUE" ]]; then
+	verboseModeOPTION="TRUE"
+else
+	verboseModeOPTION="FALSE"
+fi
+defaults write "$superPLIST" VerboseMode -bool "$verboseModeOPTION"
+if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+	sendToLog "Starter: Verbose mode enabled."
+	sendToLog "Starter: Uptime: $(uptime)"
+	sendToLog "Starter: Managed preference file $superMANAGEDPLIST:\n$(defaults read "$superMANAGEDPLIST" 2> /dev/null)"
+	sendToLog "Starter: Local preference file before validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
+fi
+
+# Parameter and saved credential validation and management.
+checkCurrentUser
+manageParameters
+[[ "$macosARCH" == "arm64" ]] && manageUpdateCredentials
+if [[ "$parameterERROR" == "TRUE" ]]; then
+	rm -f "$superPIDFILE"
+	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+	exit 1
+fi
+
+# Detect if super is running via Jamf and if so restsart via LaunchDaemon to release the jamf process.
+# This is late in the starter workflow so as to only create a valid LaunchDaemon after parameter validation and housekeeping.
+if [[ $(ps -p "$PPID" | awk '{print $4;}' | grep -c "jamf") -gt 0 ]]; then
+	sendToLog "Starter: Detected Jamf as parent, restarting with new LaunchDaemon..."
+	makeLaunchDaemonRestartNow
+fi
+
+# Workflow for for $openLOGS.
+if [[ "$openLOGS" == "TRUE" ]] && [[ "$macosMAJOR" != "10" ]]; then
+	if [[ "$currentUSER" != "FALSE" ]]; then
+		sendToLog "Starter: Opening logs for user $currentUSER..."
+		sudo -u "$currentUSER" open "$superLOG"
+		( [[ "$jamfCREDENTIAL" == "TRUE" ]] && ( [[ "$localCREDENTIAL" != "TRUE" ]] || [[ "$superCREDENTIAL" != "TRUE" ]] ) ) && sudo -u "$currentUSER" open "$mdmLOG"
+		[[ "$macosMAJOR" != "10" ]] && sudo -u "$currentUSER" open "$updateLOG"
+	else
+		sendToLog "Starter: Open logs request denied because there is currently no local user logged into the GUI."
+	fi
+elif [[ "$openLOGS" == "TRUE" ]] && [[ "$macosMAJOR" == "10" ]]; then
+	sendToLog "Starter: Open logs request denied because macOS version doesn't require additonal logs."
+fi
+
+# Feedback for various alternate workflow modes.
+[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Starter: Skip Apple software udates enabled."
+[[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Starter: Forced restart enabled."
+[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Starter: Test mode enabled with $testModeTIMEOUT second timeout."
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Starter: Local preference file after validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
+[[ "$verboseModeOPTION" == "TRUE" ]] && logParameters
+
+# Make sure we have a network connection before moving on.
+# If there is still no network after two minutes, an automatic deferral is started.
+networkTIMEOUT=0
+while [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/d' -e '/inet/p' | wc -l) -le 0 ]] && [[ $networkTIMEOUT -lt 120 ]]; do
+	sendToLog "Starter: Waiting for network..."
+	sleep 5
+	networkTIMEOUT=$((networkTIMEOUT+5))
+done
+if [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/d' -e '/inet/p' | wc -l) -le 0 ]]; then
+	sendToLog "Starter: Network unavailalbe, trying again in $defaultDeferSECONDS seconds."
+	makeLaunchDaemonCalendar
+fi
+
+# Detect if super is running after an update restart and set $updateVALIDATE appropriately.
+[[ $(defaults read "$superPLIST" UpdateValidate 2> /dev/null) ]] && updateVALIDATE="TRUE"
+}
+
+######## FUNCTIONS - LOGGING ########
+
+# Append input to a log located at $superLOG.
+sendToLog() {
+echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "$superLOG"
+}
+
+# Append input to the command line only, so as not to save secrets to the $superLOG.
+sendToEcho() {
+echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: Not Logged: $*"
+}
+
+# Log any parameters that have values.
+logParameters() {
+sendToLog "Parameter macosVERSION: $macosVERSION"
+sendToLog "Parameter macosARCH: $macosARCH"
+sendToLog "Parameter jamfVERSION: $jamfVERSION"
+[[ -n $jamfSERVER ]] && sendToLog "Parameter jamfSERVER: $jamfSERVER"
+[[ -n $defaultDeferSECONDS ]] && sendToLog "Parameter defaultDeferSECONDS: $defaultDeferSECONDS"
+[[ -n $focusDeferSECONDS ]] && sendToLog "Parameter focusDeferSECONDS: $focusDeferSECONDS"
+[[ -n $menuDeferSECONDS ]] && sendToLog "Parameter menuDeferSECONDS: $menuDeferSECONDS"
+[[ -n $displayTimeoutSECONDS ]] && sendToLog "Parameter displayTimeoutSECONDS: $displayTimeoutSECONDS"
+[[ -n $displayRedrawSECONDS ]] && sendToLog "Parameter displayRedrawSECONDS: $displayRedrawSECONDS"
+[[ -n $focusDEADLINE ]] && sendToLog "Parameter focusDEADLINE: $focusDEADLINE"
+[[ -n $softDEADLINE ]] && sendToLog "Parameter softDEADLINE: $softDEADLINE"
+[[ -n $hardDEADLINE ]] && sendToLog "Parameter hardDEADLINE: $hardDEADLINE"
+[[ -n $countDEADLINE ]] && sendToLog "Parameter countDEADLINE: $countDEADLINE"
+[[ -n $clearCOUNT ]] && sendToLog "Parameter clearCOUNT: $clearCOUNT"
+[[ -n $localOPTION ]] && sendToLog "Parameter localOPTION: $localOPTION"
+[[ -n $localPASSWORD ]] && sendToEcho "Parameter localPASSWORD: $localPASSWORD"
+[[ -n $localACCOUNT ]] && sendToLog "Parameter localACCOUNT: $localACCOUNT"
+[[ -n $localKEYCHAIN ]] && sendToEcho "Parameter localKEYCHAIN: $localKEYCHAIN"
+[[ -n $localCREDENTIAL ]] && sendToLog "Parameter localCREDENTIAL: $localCREDENTIAL"
+[[ -n $adminACCOUNT ]] && sendToLog "Parameter adminACCOUNT: $adminACCOUNT"
+[[ -n $adminPASSWORD ]] && sendToEcho "Parameter adminPASSWORD: $adminPASSWORD"
+[[ -n $superOPTION ]] && sendToLog "Parameter superOPTION: $superOPTION"
+[[ -n $superPASSWORD ]] && sendToEcho "Parameter superPASSWORD: $superPASSWORD"
+[[ -n $superACCOUNT ]] && sendToLog "Parameter superACCOUNT: $superACCOUNT"
+[[ -n $superKEYCHAIN ]] && sendToEcho "Parameter superKEYCHAIN: $superKEYCHAIN"
+[[ -n $superCREDENTIAL ]] && sendToLog "Parameter superCREDENTIAL: $superCREDENTIAL"
+[[ -n $JamfProID ]] && sendToLog "Parameter JamfProID: $JamfProID"
+[[ -n $jamfOPTION ]] && sendToLog "Parameter jamfOPTION: $jamfOPTION"
+[[ -n $jamfPASSWORD ]] && sendToEcho "Parameter jamfPASSWORD: $jamfPASSWORD"
+[[ -n $jamfACCOUNT ]] && sendToLog "Parameter jamfACCOUNT: $jamfACCOUNT"
+[[ -n $jamfKEYCHAIN ]] && sendToEcho "Parameter jamfKEYCHAIN: $jamfKEYCHAIN"
+[[ -n $jamfCREDENTIAL ]] && sendToLog "Parameter jamfCREDENTIAL: $jamfCREDENTIAL"
+[[ -n $purgeACCOUNTS ]] && sendToLog "Parameter purgeACCOUNTS: $purgeACCOUNTS"
+[[ -n $policyTRIGGERS ]] && sendToLog "Parameter policyTRIGGERS: $policyTRIGGERS"
+}
+
+######## FUNCTIONS - JAMF PRO API ########
+
+# Validate the connection to a managed computer's Jamf Pro service and set $jamfSERVER accordingly.
+getJamfProServer() {
+jamfSTATUS=$("$jamfBINARY" checkJSSConnection -retry 1)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfSTATUS is: $jamfSTATUS"
+if [[ $(echo "$jamfSTATUS" | grep -c "available") -ne 0 ]]; then
+	jamfSERVER=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
+else
+	jamfSERVER="FALSE"
+	sendToLog "Status: Jamf Pro service unavaiable."
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfSERVER is: $jamfSERVER"
+}
+
+# Attempt to acquire a Jamf Pro $jamfProTOKEN via $jamfACCOUNT and $jamfKEYCHAIN credentials.
+getJamfProToken() {
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToEcho "Status: Saved credentials for Jamf Pro API account \"$jamfACCOUNT\" with password \"$jamfKEYCHAIN\"."
+if [[ "$macosMAJOR" -eq 10 ]] || [[ "$macosMAJOR" -eq 11 ]]; then
+	jamfProTOKEN=$(curl -X POST -u "$jamfACCOUNT:$jamfKEYCHAIN" -s "${jamfSERVER}api/v1/auth/token" | python -c 'import sys, json; print json.load(sys.stdin)["token"]')
+else
+	jamfProTOKEN=$(curl -X POST -u "$jamfACCOUNT:$jamfKEYCHAIN" -s "${jamfSERVER}api/v1/auth/token" | plutil -extract token raw -)
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfProTOKEN is: \n$jamfProTOKEN"
+}
+
+# Validate that the account $jamfACCOUNT and $jamfKEYCHAIN are valid credentials and has appropriate permissions to send MDM commands. If not set $jamfERROR.
+getJamfProAccount() {
+getJamfProToken
+if [[ -n $jamfProTOKEN ]]; then
+	getJamfProComputerID
+	if [[ -n $jamfProID ]]; then
+		sendBlankPush
+			if [[ $commandRESULT != 201 ]]; then
+				sendToLog "Exit: Unable to request Blank Push via Jamf Pro API user account \"$jamfACCOUNT\". Verify this account has has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\"."; jamfERROR="TRUE"
+			fi
+	else
+		sendToLog "Exit: Unable to acquire Jamf Pro ID for computer with UDID \"$computerUDID\". Verify that this computer is enrolled in Jamf Pro."
+		sendToLog "Exit: Also verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\"."; jamfERROR="TRUE"
+	fi
+else
+	sendToLog "Exit: Unable to acquire authentication token via Jamf Pro API user account \"$jamfACCOUNT\". Verify account name and password."; jamfERROR="TRUE"
+fi
+}
+
+# Use $jamfProIdMANAGED or $jamfProTOKEN to find the computer's Jamf Pro ID and set $jamfProID.
+getJamfProComputerID() {
+computerUDID=$(system_profiler SPHardwareDataType | awk '/UUID/ { print $3; }')
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter computerUDID is: $computerUDID"
+if [[ -n $jamfProIdMANAGED ]]; then
+	jamfProID="$jamfProIdMANAGED"
+else
+	sendToLog "Warning: Using a Jamf Pro API account with \"Computers > Read\" privileges to collect the computer ID is a security risk. Instead use a custom Configuration Profile with the following; Preference Domain \"com.macjutsu.super\", Key \"JamfProID\", String \"\$JSSID\"."
+	jamfProID=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --header "Accept: application/xml" --request GET --url "${jamfSERVER}JSSResource/computers/udid/${computerUDID}/subset/General" 2> /dev/null | xpath -e /computer/general/id 2>&1 | awk -F'<id>|</id>' '{print $2}' | xargs)
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfProID is: $jamfProID"
+}
+
+# Attempt to send a Blank Push to Jamf Pro.
+sendBlankPush() {
+commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/BlankPush/id/${jamfProID}")
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter commandRESULT is: \n$commandRESULT"
+}
+
+# Validate $jamfProTOKEN and if found invalid, a new token is requested and again validated.
+checkJamfProServerToken() {
+tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter tokenCHECK is: $tokenCHECK"
+if [[ $tokenCHECK -ne 200 ]]; then
+	getJamfProToken
+	tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter tokenCHECK is: $tokenCHECK"
+	if [[ $tokenCHECK -ne 200 ]]; then
+		sendToLog "Exit: Could not retrieve Jamf Pro API token for account \"$jamfACCOUNT\", verify account credentials." 
+		rm -f "$superPIDFILE"
+		sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+		exit 1
+	fi
+fi
+}
+
+######## FUNCTIONS - EVALUATE CONDITIONS ########
+
+# Verify that super is running with root privileges.
+checkRoot() {
+if [[ "$(id -u)" -ne 0 ]]; then
+	sendToEcho "Exit: $(basename "$0") must run with root privleges."
+	exit 1
+fi
+}
+
+# Set $currentUSER to the value of the currently logged in GUI user or "FALSE" if there is none or a system account.
+checkCurrentUser() {
+currentUSER=$(echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ && ! /loginwindow/ { print $3 }')
+if [[ -z $currentUSER ]]; then
+	sendToLog "Starter: No GUI user currently logged in."
+	currentUSER="FALSE"
+elif [[ "$currentUSER" = "root" ]] || [[ "$currentUSER" = "_mbsetupuser" ]] || [[ "$currentUSER" = "loginwindow" ]]; then
+	sendToLog "Starter: Current GUI user is system account $currentUSER."
+	currentUSER="FALSE"
+else
+	sendToLog "Starter: Current GUI user is $currentUSER."
+fi
+}
+
+# Validate that the account $updateACCOUNT and $updateKEYCHAIN are valid credentials is a volume owner. If not set $accountERROR.
+checkLocalUpdateAccount() {
+accountGUID=$(dscl . read "/Users/$updateACCOUNT" GeneratedUID 2> /dev/null | awk '{print $2;}')
+if [[ -n $accountGUID ]]; then
+	if ! [[ $(diskutil apfs listcryptousers / | grep -c "$accountGUID") -ne 0 ]]; then
+		sendToLog "Exit: Provided account \"$updateACCOUNT\" is not a system volume owner."; accountERROR="TRUE"
+	fi
+	accountVALID=$(dscl /Local/Default -authonly "$updateACCOUNT" "$updateKEYCHAIN" 2>&1)
+	if ! [[ "$accountVALID" == "" ]];then
+		sendToLog "Exit: The provided password for account \"$updateACCOUNT\" is not valid."; accountERROR="TRUE"
+	fi
+else
+	sendToLog "Exit: Could not retrieve GUID for account \"$updateACCOUNT\". Verify that account exists locally."; accountERROR="TRUE"
+fi
+}
+
+# Evaluate the $focusDEADLINE, $softDEADLINE, and $hardDEADLINE options and set $deadlineSTATUS accordingly.
+checkDateDeadlines() {
+deadlineSTATUS="FALSE"
+if [[ -n $focusDEADLINE ]] && [[ $focusEPOCH -lt $(date +%s) ]]; then
+		sendToLog "Status: Focus deadline of $focusDISPLAY has passed."
+		deadlineSTATUS="FOCUS"
+fi
+if [[ -n $softEPOCH ]] && [[ $softEPOCH -lt $(date +%s) ]]; then
+		sendToLog "Status: Soft deadline of $softDISPLAY has passed."
+		deadlineSTATUS="SOFT"
+fi
+if [[ -n $hardEPOCH ]] && [[ $hardEPOCH -lt $(date +%s) ]]; then
+		sendToLog "Status: Hard deadline of $hardDISPLAY has passed."
+		deadlineSTATUS="HARD"
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter deadlineSTATUS is: $deadlineSTATUS"
+}
+
+# Clear the DeferCount in $superPLIST to disable/reset the maximum deferral counter.
+clearMaxDeferralCounter() {
+sendToLog "Status: Clearing deferral deadline count."
+defaults delete "$superPLIST" DeferCount 2> /dev/null
+}
+
+# Evaluate the $countDEADLINE option and set $deadlineSTATUS accordingly.
+checkDeferCountDeadline() {
+[[ "$clearCOUNT" == "TRUE" ]] && clearMaxDeferralCounter
+if [[ -n $countDEADLINE ]]; then
+	if [[ "$focusDEFER" == "TRUE" ]]; then
+		sendToLog "Status: Focus or Do Not Disturb active, not incrementing defer counter."
+	else
+		previousCOUNT=$(defaults read "$superPLIST" DeferCount 2> /dev/null)
+		if [[ -z $previousCOUNT ]]; then
+			sendToLog "Status: Creating new defer counter in $superPLIST."
+			currentCOUNT=0
+			defaults write "$superPLIST" DeferCount -int $currentCOUNT
+		else
+			currentCOUNT=$((previousCOUNT + 1))
+			defaults write "$superPLIST" DeferCount -int $currentCOUNT
+		fi
+		if [[ $currentCOUNT -ge $countDEADLINE ]]; then
+			sendToLog "Status: Defer count deadline of $countDEADLINE exceeded."
+			deadlineSTATUS="COUNT"
+		else
+			countDISPLAY=$((countDEADLINE - currentCOUNT))
+			sendToLog "Status: Defer count deadline of $countDEADLINE not exceeded with $countDISPLAY remaining."
+		fi
+	fi
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter deadlineSTATUS is: $deadlineSTATUS"
+}
+
+# Evaluate if a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb, and set $focusDEFER accordingly.
+checkUserFocus() {
+focusDEFER="FALSE"
+if [[ -n $focusDeferSECONDS ]]; then
+	if [[ $macosMAJOR -eq 10 ]]; then
+		focusSTATUS=$(sudo -u "$currentUSER" defaults -currentHost read "/Users/$currentUSER/Library/Preferences/ByHost/com.apple.notificationcenterui" doNotDisturb 2>/dev/null)
+	elif [[ $macosMAJOR -eq 11 ]]; then
+		focusSTATUS=$(plutil -extract dnd_prefs xml1 -o - "/Users/$currentUSER/Library/Preferences/com.apple.ncprefs.plist" | xmllint --xpath "string(//data)" - | base64 --decode | plutil -convert xml1 - -o - | grep -ic userPref)
+	else
+		focusSTATUS=$(plutil -extract data.0.storeAssertionRecords.0.assertionDetails.assertionDetailsModeIdentifier raw -o - "/Users/$currentUSER/Library/DoNotDisturb/DB/Assertions.json" | grep -ic com.apple.)
+	fi
+	if [[ $focusSTATUS -gt 0 ]]; then
+		sendToLog "Status: Focus or Do Not Disturb enabled for user $currentUSER."
+		focusDEFER="TRUE"
+	fi
+	oldIFS="$IFS"
+	IFS=$'\n'
+	displayASSERTIONS=($(pmset -g assertions | awk '/NoDisplaySleepAssertion | PreventUserIdleDisplaySleep/ && match($0,/\(.+\)/) && ! /coreaudiod/ {gsub(/^\ +/,"",$0); print};'))
+	if [[ -n $displayASSERTIONS ]]; then
+		for assertionITEM in "${displayASSERTIONS[@]}"; do
+			sendToLog "Status: The following Display Sleep Assertions detected: $(echo ${assertionITEM} | awk -F: '{print $1}')"
+		done
+		focusDEFER="TRUE"
+	fi
+	IFS="$oldIFS"
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter focusDEFER is: $focusDEFER"
+}
+
+######## FUNCTIONS - UPDATES ########
+
+# Collect available Apple software updates and set $updateRESULT, $updateNAMES[], $updatesRECOMMENDED, $updatesRESTART, and $downloadREQUIRED accordingly.
+checkAppleUpdates() {
+# Collect Apple software updates list.
+sendToLog "Status: Checking available Apple software updates..."
+updateRESULT=$(softwareupdate --list 2>&1)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updateRESULT is: $updateRESULT"
+
+# Double-checking for false positives on macOS 11 or later.
+if [[ "$macosMAJOR" != "10" ]] && [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
+	sendToLog "Status: Double-checking available Apple software updates..."
+	sleep 5
+	updateRESULT=$(softwareupdate --list 2>&1)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updateRESULT is: $updateRESULT"
+fi
+
+# After checking updates parse the $updateRESULT and set $updatesRECOMMENDED, $updatesRESTART, and $downloadREQUIRED accordingly.
+if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
+	sendToLog "Status: No Apple software updates available. Some may be deferred via MDM."
+	updatesRECOMMENDED="FALSE"
+	updatesRESTART="FALSE"
+	downloadREQUIRED="FALSE"
+else
+	# Parse $updateRESULT for individual update names and save to $parsedNAMES.
+	if [[ $macosMAJOR -gt 10 ]] || [[ $macosVERSION -eq 1015 ]]; then
+		parsedNAMES=$(echo "$updateRESULT" | awk -F',' '/Title:/ {print $1}' | cut -d ' ' -f 2-)
+	else
+		parsedNAMES=$(echo "$updateRESULT" | awk -F'(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//')
+	fi
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter parsedNAMES is: \n$parsedNAMES"
+
+	# If any $parsedNAMES are available, create $updateNAMES[] array and send to log.
+	if [[ -n $parsedNAMES ]]; then
+		oldIFS="$IFS"
+		IFS=$'\n'
+		updateNAMES=($parsedNAMES)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updateNAMES is: \n${updateNAMES[*]}"
+		sendToLog "Status: ${#updateNAMES[@]} available software udpate(s)."
+		for i in "${!updateNAMES[@]}"; do
+			sendToLog "Update $((i+1)): ${updateNAMES[i]}"
+		done
+
+		# Evaluate $updateRESULT for any recommended software updates and set $updateRESULT accordingly.
+		updatesRECOMMENDED=$(echo "$updateRESULT" | grep "recommended\|Recommended" | grep -v "restart\|Restart")
+		if [[ -n "$updatesRECOMMENDED" ]]; then
+			sendToLog "Status: Recommended Apple software updates available."
+			updatesRECOMMENDED="TRUE"
+		else
+			updatesRECOMMENDED="FALSE"
+		fi
+
+		# Evaluate $updateRESULT for any software updates that require a restart and set $updateRESULT accordingly.
+		updatesRESTART=$(echo "$updateRESULT" | grep "restart\|Restart" | grep -v '\*' | cut -d , -f 1)
+		if [[ -n "$updatesRESTART" ]]; then
+			sendToLog "Status: Restart required Apple software updates available."
+			updatesRESTART="TRUE"
+		else
+			updatesRESTART="FALSE"
+		fi
+	
+		# Evaluate previously downloaded updates and compare them to currently available updates, setting $downloadREQUIRED accordingly.
+		previousDOWNLOADS=$(defaults read "$superPLIST" UpdateDownloads 2> /dev/null)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter previousDOWNLOADS is: \n$previousDOWNLOADS"
+		if [[ -n $previousDOWNLOADS ]]; then
+			downloadedNAMES=($(echo "$previousDOWNLOADS" | grep -wv -e '(' -e ')' | sed -e 's/    //g' -e 's/"//g' -e 's/,//g'))
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadedNAMES is: \n${downloadedNAMES[*]}"
+			if [[ ! $(echo -e "${downloadedNAMES[*]}\n${updateNAMES[*]}" | sort | uniq -u) ]]; then
+				downloadREQUIRED="FALSE"
+			else
+				sendToLog "Status: Previously downloaded update(s) does not match currently available updates."
+				downloadREQUIRED="TRUE"
+			fi
+		else
+			downloadREQUIRED="TRUE"
+		fi
+		IFS="$oldIFS"
+	else
+		sendToLog "Exit: Unable to parse Apple softwareupdate results."
+		rm -f "$superPIDFILE"
+		sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+		exit 1
+	fi
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updatesRECOMMENDED is: $updatesRECOMMENDED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updatesRESTART is: $updatesRESTART"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadREQUIRED is: $downloadREQUIRED"
+}
+
+# This function checks the update status after a previous super system update.
+checkAfterSoftwareUpdate() {
+checkAppleUpdates
+if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
+	getJamfProServer
+	if [[ "$jamfSERVER" != "FALSE" ]]; then
+		defaults delete "$superPLIST" UpdateValidate 2> /dev/null
+		sendToLog "Status: Submiting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+			jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfRESULT is: \n$jamfRESULT"
+		else
+			"$jamfBINARY" recon > /dev/null 2>&1
+		fi
+		sleep 5
+		sendToLog "Status: Running Jamf Pro check-in policies. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+			jamfRESULT=$("$jamfBINARY" policy -verbose 2>&1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfRESULT is: \n$jamfRESULT"
+		else
+			"$jamfBINARY" policy > /dev/null 2>&1
+		fi
+	else
+		sendToLog "Status: Unable to submit inventory to Jamf Pro, trying again in $defaultDeferSECONDS seconds."
+		makeLaunchDaemonCalendar
+	fi
+else
+	sendToLog "Status: Apple system updates did not complete after last restart, continuing normal update workflow."
+fi
+}
+
+# Download all available updates via the Apple softwareupdate, and also save results to $superLOG, $updateLOG, and $superPLIST.
+downloadAllUpdatesASU() {
+sendToLog "Status: Downloading all available Apple software updates via softwareupdate command..."
+
+# Start log streaming for softwareupdate progress and send to $updateLOG.
+if [[ "$macosMAJOR" != "10" ]]; then
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU DOWNLOAD START ****" >> "$updateLOG"
+	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+	updateStreamPID=$!
+	disown
+fi
+
+# Start the softwareupdate download.
+if [[ "$macosARCH" == "arm64" ]]; then # Apple Silicon requires local credentials.
+	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
+		downloadRESULT=$(softwareupdate --download --all --agree-to-license --user "$localACCOUNT" --stdinpass "$localKEYCHAIN" 2>&1)
+	elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
+		downloadRESULT=$(softwareupdate --download --all --agree-to-license --user "$superACCOUNT" --stdinpass "$superKEYCHAIN" 2>&1)
+	fi
+else # Intel. No credentials required, but slightly different between macOS versions.
+	if [[ $macosMAJOR -eq 10 ]]; then
+		downloadRESULT=$(softwareupdate --download --all 2>&1)
+	else
+		downloadRESULT=$(softwareupdate --download --all --agree-to-license 2>&1)
+	fi
+fi
+if [[ "$macosMAJOR" != "10" ]]; then
+	kill -9 $updateStreamPID > /dev/null 2>&1
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU DOWNLOAD END ****" >> "$updateLOG"
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadRESULT is: $downloadRESULT"
+
+# Parse $downloadRESULT for individual downloads and write to $superLOG and $superPLIST.
+parsedDOWNLOADS=$(echo "$downloadRESULT" | grep "Downloaded" | cut -d " " -f 2-)
+oldIFS="$IFS"
+IFS=$'\n'
+updateDOWNLOADS=($parsedDOWNLOADS)
+if [[ ${#updateDOWNLOADS[@]} -gt 0 ]]; then
+	sendToLog "Status: Downloaded ${#updateDOWNLOADS[@]} software udpate(s)."
+	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
+	for i in "${!updateDOWNLOADS[@]}"; do
+		sendToLog "Download $((i+1)): ${updateDOWNLOADS[i]}"
+		defaults write "$superPLIST" UpdateDownloads -array-add "${updateDOWNLOADS[i]}"
+	done
+else
+	sendToLog "Exit: Apple softwareupdate failed to download any updates, trying again in $defaultDeferSECONDS seconds. "
+	makeLaunchDaemonCalendar
+fi
+IFS="$oldIFS"
+}
+
+# Download all available updates via Apple MDM push command, and also save results to $superLOG, $mdmLOG, $updateLOG, and $superPLIST.
+downloadAllUpdatesMDM() {
+sendToLog "Status: Starting MDM download of all updates."
+# This pre-flights the MDM query locally and may also be useful for troubleshooting.
+availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter availableOSUPDATES is: \n$availableOSUPDATES"
+
+# Make sure we still have a valid Jamf Pro API token.
+checkJamfProServerToken
+
+# Start log streaming for MDM push acknowledgements and send to $mdmLOG.
+echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM DOWNLOAD START ****" >> "$mdmLOG"
+log stream --predicate '(subsystem == "com.apple.ManagedClient") && (category == "HTTPUtil")' >> "$mdmLOG" &
+mdmStreamPID=$!
+disown
+
+# Start log streaming for softwareupdate progress and send to $updateLOG.
+echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM DOWNLOAD START ****" >> "$updateLOG"
+log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+updateStreamPID=$!
+disown
+
+# Send the Jamf Pro API command to update and restart via MDM.
+commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/download/id/${jamfProID}")
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter commandRESULT is: \n$commandRESULT"
+
+# If the Jamf Pro API command was successfully created, monitor the download progress.
+if [[ $commandRESULT -eq 201 ]]; then
+	sendToLog "Status: Successful MDM download request."
+	# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
+	tail -n 0 -f "$mdmLOG" | while read logLINE ; do
+		if [[ $(echo "$logLINE" | grep "Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan):") ]]; then
+			sendToLog "Status: Acknowledged MDM update scan request, checking back after Jamf Pro's mandatory 5 minute delay..."
+			pkill -P $$ tail
+			break
+		fi
+	done
+	timerEND=300
+	while [[ $timerEND -ge 0 ]]; do
+		echo -ne "Waiting for Jamf Pro's mandatory 5 minute delay: -$(date -u -r $timerEND +%M:%S)\r"
+		timerEND=$((timerEND-1))
+		sleep 1
+	done
+	echo
+	sendBlankPush
+	
+	# Watch $mdmLOG while waiting for the MDM workflow to complete.
+	tail -n 0 -f "$mdmLOG" | while read logLINE ; do
+		if [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Idle\]') ]]; then
+			sendToLog "Status: Recieved MDM blank push."
+		elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates):') ]]; then
+			sendToLog "Status: Acknowledged MDM return available updates."
+		elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate):') ]]; then
+			sendToLog "Status: Acknowledged MDM scheduled software update, download should start soon..."
+			kill -9 $mdmStreamPID > /dev/null 2>&1
+			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM DOWNLOAD END ****" >> "$mdmLOG"
+			pkill -P $$ tail; break
+		fi
+	done
+	
+	# Watch $updateLOG while waiting for the download workflow to complete.
+	tail -n 0 -f "$updateLOG" | while read logLINE ; do
+		if [[ $(echo "$logLINE" | grep -w 'phase:DOWNLOADING_UPDATE') ]] && [[ "$logPROGRESS" != "Downloading" ]]; then
+			sendToLog "Status: Downloading software update..."
+			logPROGRESS="Downloading"
+		elif [[ $(echo "$logLINE" | grep -w 'phase:PREPARING_UPDATE') ]] && [[ "$logPROGRESS" != "Preparing" ]]; then
+			sendToLog "Status: Download complete, preparing software update, should be done in a few minutes..."
+			logPROGRESS="Preparing"
+		elif [[ $(echo "$logLINE" | grep -w 'phase:COMPLETED') ]]; then
+			sendToLog "Status: Software update is downloaded and prepared."
+			kill -9 $updateStreamPID > /dev/null 2>&1
+			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM DOWNLOAD END ****" >> "$updateLOG"
+			oldIFS="$IFS"
+			IFS=$'\n'
+			defaults write "$superPLIST" UpdateDownloads -array-add "${updateNAMES[i]}"
+			IFS="$oldIFS"
+			pkill -P $$ tail; break
+		fi
+	done
+else
+	sendToLog "Exit: Failed to send MDM download request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
+	kill -9 $mdmStreamPID > /dev/null 2>&1
+	rm -f "$superPIDFILE"
+	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+	exit 1
+fi
+}
+
+# Install only available recommended updates via Apple softwareupdate, and also save results to $superLOG and $updateLOG.
+installRecommendedUpdatesASU() {
+sendToLog "Status: Starting softwareupdate install of recommended updates. Check /var/log/install.log for more detail..."
+
+# Start log streaming for softwareupdate progress and send to $updateLOG.
+if [[ "$macosMAJOR" != "10" ]]; then
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU RECOMMENDED INSTALL START ****" >> "$updateLOG"
+	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+	updateStreamPID=$!
+	disown
+fi
+
+# Start the softwareupdate recommended install.
+if [[ "$macosARCH" == "arm64" ]]; then # Apple Silicon requires local credentials.
+	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
+		recommendedRESULT=$(softwareupdate --install --recommended --agree-to-license --user "$localACCOUNT" --stdinpass "$localKEYCHAIN" 2>&1)
+	elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
+		recommendedRESULT=$(softwareupdate --install --recommended --agree-to-license --user "$superACCOUNT" --stdinpass "$superKEYCHAIN" 2>&1)
+	fi
+else # Intel. No credentials required, but slightly different between macOS versions.
+	if [[ $macosMAJOR -eq 10 ]]; then
+		recommendedRESULT=$(softwareupdate --install --recommended 2>&1)
+	else
+		recommendedRESULT=$(softwareupdate --install --recommended --agree-to-license 2>&1)
+	fi
+fi
+if [[ "$macosMAJOR" != "10" ]]; then
+	kill -9 $updateStreamPID > /dev/null 2>&1
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU RECOMMENDED INSTALL END ****" >> "$updateLOG"
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter recommendedRESULT is: $recommendedRESULT"
+
+# Parse $recommendedRESULT for individual installations and send to log.
+parsedRECOMMENDED=$(echo "$recommendedRESULT" | grep "Done with" | cut -c 11-)
+oldIFS="$IFS"
+IFS=$'\n'
+updateRECOMMENDED=($parsedRECOMMENDED)
+if [[ ${#updateRECOMMENDED[@]} -gt 0 ]]; then
+	sendToLog "Status: Installed ${#updateRECOMMENDED[@]} recommended udpate(s)."
+	for i in "${!updateRECOMMENDED[@]}"; do
+		sendToLog "Install $((i+1)): ${updateRECOMMENDED[i]}"
+	done
+else
+	sendToLog "Exit: Apple softwareupdate failed to install recomended updates, trying again in $defaultDeferSECONDS seconds. "
+	makeLaunchDaemonCalendar
+fi
+IFS="$oldIFS"
+defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
+}
+
+# Install any optional $policyTRIGGERS.
+runJamfPolicies() {
+sendToLog "Status: Starting Jamf Policy triggers. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+oldIFS="$IFS"
+IFS=$','
+triggerARRAY=($policyTRIGGERS)
+for trigger in ${triggerARRAY[@]}; do
+	if [[ "$testModeOPTION" != "TRUE" ]]; then
+		sendToLog "Status: Jamf Policy with Trigger $trigger is starting..."
+		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+			jamfRESULT=$("$jamfBINARY" policy -trigger "$trigger" -verbose 2>&1)
+			sendToLog "Parameter jamfRESULT is: \n$jamfRESULT"
+		else
+			"$jamfBINARY" policy -trigger "$trigger" > /dev/null 2>&1
+		fi
+	else
+		sendToLog "Test Mode: Skipping Jamf Policy with Trigger $trigger."
+	fi
+done
+IFS="$oldIFS"
+}
+
+# This is the install and restart workflow when a user is NOT logged in.
+installRestartSilent(){
+[[ -n $policyTRIGGERS ]] && runJamfPolicies # If requested, run Jamf Policy Triggers.
+if [[ "$updatesRESTART" == "TRUE" ]]; then # Only install Apple updates if needed.
+	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+		installUpdatesRestartASU
+	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+		installUpdatesRestartMDM
+	else # # Apple Silicon with no valid update credentials.
+		sendToLog "Status: No valid Apple Silicon credentials and no current local user, trying again in $defaultDeferSECONDS seconds."
+		makeLaunchDaemonCalendar
+	fi
+else # Otherwise, this is the restart when there are no Apple updates but $forceRestartOPTION is enabled.
+	sendToLog "Status: Forced restart, Jamf restarting computer..."
+	"$jamfBINARY" reboot -immediately &
+	disown
+fi
+clearMaxDeferralCounter
+defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
+}
+
+# This is the install and restart workflow when a user is logged in.
+installRestartMain(){
+[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
+if [[ "$updatesRESTART" == "TRUE" ]] || [[ "$testModeOPTION" == "TRUE" ]]; then # Only install Apple updates if needed.
+	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+		notifyRestart
+		installUpdatesRestartASU
+	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+		notifyRestartPrepMDM
+		installUpdatesRestartMDM
+	else # Can only encourage manual update if Apple Silicon with no valid update credentials.
+		notifyEncourageSelfUpdate
+	fi
+else # Otherwise, this is the restart when there are no Apple updates but $forceRestartOPTION is enabled.
+	if [[ "$testModeOPTION" != "TRUE" ]]; then
+		sendToLog "Status: Forced restart, Jamf restarting computer..."
+		"$jamfBINARY" reboot -immediately &
+		disown
+	else
+		sendToLog "Test Mode: Skipping Jamf restart."
+	fi
+fi
+clearMaxDeferralCounter
+defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
+}
+
+# Install all available updates and restart the computer via Apple softwareupdate.
+installUpdatesRestartASU() {
+if [[ "$testModeOPTION" != "TRUE" ]]; then
+	sendToLog "Status: Starting softwareupdate install of all updates and restarting..."
+	
+	# Start log streaming for softwareupdate install progress and send to $updateLOG.
+	if [[ "$macosMAJOR" != "10" ]]; then
+		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU FULL INSTALL START ****" >> "$updateLOG"
+		log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+		updateStreamPID=$!
+		disown
+	fi
+	
+	if [[ "$macosARCH" == "arm64" ]]; then # Apple Silicon softwareupdate requires local credentials.
+		if [[ "$localCREDENTIAL" == "TRUE" ]]; then
+			softwareupdate --install --all --agree-to-license --restart --force --user "$localACCOUNT" --stdinpass "$localKEYCHAIN" &
+			disown
+		elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
+			softwareupdate --install --all --agree-to-license --restart --force --user "$superACCOUNT" --stdinpass "$superKEYCHAIN" &
+			disown
+		fi
+	else # Intel. No credentials required.
+		if [[ $macosMAJOR -eq 10 ]]; then # Older versions of macOS.
+			softwareupdate --install --all --restart --force &
+			disown
+		else # Newer versions of macOS require license agreement.
+			softwareupdate --install --all --agree-to-license --restart --force &
+			disown
+		fi
+	fi
+	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
+	defaults write "$superPLIST" UpdateValidate -bool true
+	makeLaunchDaemonOnStartup
+else
+	sendToLog "Test Mode: Skipping softwareupdate install of all updates and restart."
+	sendToLog "Test Mode: Killing update restart notification in $testModeTIMEOUT seconds..."
+	sleep "$testModeTIMEOUT"
+	kill -9 "$notifyPID" > /dev/null 2>&1
+	killall -9 "jamfHelper"  > /dev/null 2>&1
+fi
+}
+
+# Install all available updates and restarts the computer via Apple MDM push command, and also save results to $superLOG, $mdmLOG, $updateLOG, and $superPLIST.
+installUpdatesRestartMDM() {
+if [[ "$testModeOPTION" != "TRUE" ]]; then
+	sendToLog "Status: Starting MDM install of all updates and restarting."
+	# This pre-flights the MDM query locally and may also be useful for troubleshooting.
+	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter availableOSUPDATES is: \n$availableOSUPDATES"
+	
+	# Make sure we still have a valid Jamf Pro API token.
+	checkJamfProServerToken
+	
+	# Start log streaming for MDM push acknowledgements and send to $mdmLOG.
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM UPDATE/RESTART START ****" >> "$mdmLOG"
+	log stream --predicate '(subsystem == "com.apple.ManagedClient") && (category == "HTTPUtil")' >> "$mdmLOG" &
+	mdmStreamPID=$!
+	disown
+	
+	# Start log streaming for softwareupdate progress and send to $updateLOG.
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM UPDATE/RESTART START ****" >> "$updateLOG"
+	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+	updateStreamPID=$!
+	disown
+	
+	# Send the Jamf Pro API command to update and restart via MDM.
+	commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/install/id/${jamfProID}")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter commandRESULT is: \n$commandRESULT"
+	
+	# If the Jamf Pro API command was successfully created, monitor the update progress.
+	if [[ "$testModeOPTION" != "TRUE" ]] && [[ $commandRESULT -eq 201 ]]; then
+		sendToLog "Status: Successful MDM update and restart request."
+		
+		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
+		tail -n 0 -f "$mdmLOG" | while read logLINE ; do
+			if [[ $(echo "$logLINE" | grep "Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan):") ]]; then
+				sendToLog "Status: Acknowledged MDM update scan request, checking back after Jamf Pro's mandatory 5 minute delay..."
+				pkill -P $$ tail
+				break
+			fi
+		done
+		timerEND=300
+		while [[ $timerEND -ge 0 ]]; do
+			echo -ne "Waiting for Jamf Pro's mandatory 5 minute delay: -$(date -u -r $timerEND +%M:%S)\r"
+			timerEND=$((timerEND-1))
+			sleep 1
+		done
+		echo
+		sendBlankPush
+		kill -9 "$notifyPID" > /dev/null 2>&1
+		killall -9 "jamfHelper"  > /dev/null 2>&1
+		notifyRestart
+		
+		# Watch $mdmLOG while waiting for the MDM workflow to complete.
+		tail -n 0 -f "$mdmLOG" | while read logLINE ; do
+			if [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Idle\]') ]]; then
+				sendToLog "Status: Recieved MDM blank push."
+			elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates):') ]]; then
+				sendToLog "Status: Acknowledged MDM return available updates."
+			elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate):') ]]; then
+				sendToLog "Status: Acknowledged MDM scheduled software update and restart, restart should be very soon..."
+				kill -9 "$mdmStreamPID" > /dev/null 2>&1
+				echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM UPDATE END ****" >> "$mdmLOG"
+				pkill -P $$ tail; break
+			fi
+		done
+		
+		# Watch $updateLOG while waiting for the update and restart workflow to complete.
+		tail -n 0 -f "$updateLOG" | while read logLINE ; do
+			if [[ $(echo "$logLINE" | grep -w 'phase:APPLYING') ]]; then
+				sendToLog "Status: Software update and restart process is complete, restart imminent..."
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM UPDATE END ****" >> "$updateLOG"
+				defaults write "$superPLIST" UpdateValidate -bool true
+				makeLaunchDaemonOnStartup
+				pkill -P $$ tail; break
+			fi
+		done
+	else
+		sendToLog "Exit: Failed to send MDM update request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
+		kill -9 "$mdmStreamPID" > /dev/null 2>&1
+		rm -f "$superPIDFILE"
+		sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+		exit 1
+	fi
+else
+	sendToLog "Test Mode: Skipping MDM update and restart request."
+	commandRESULT=""
+	sendToLog "Test Mode: Killing MDM preparation notification in $testModeTIMEOUT seconds..."
+	sleep "$testModeTIMEOUT"
+	kill -9 "$notifyPID" > /dev/null 2>&1
+	killall -9 "jamfHelper"  > /dev/null 2>&1
+	notifyRestart
+	sendToLog "Test Mode: Killing update restart notification in $testModeTIMEOUT seconds..."
+	sleep "$testModeTIMEOUT"
+	kill -9 "$notifyPID" > /dev/null 2>&1
+	killall -9 "jamfHelper"  > /dev/null 2>&1
+fi
+}
+
+######## FUNCTIONS - LAUNCHDAEMON ########
+
+# Create a LaunchDaemon to run super-starter again right now, thus releasing any Jamf Pro Policy that may have started super.
+makeLaunchDaemonRestartNow() {
+# This creates a LaunchDaemon.plist file.
+/bin/cat <<EOLDL > "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$launchDaemonNAME</string>
+	<key>LaunchOnlyOnce</key>
+	<true/>
+	<key>AbandonProcessGroup</key>
+	<true/>
+	<key>UserName</key>
+	<string>root</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$superFOLDER/super-starter</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
+EOLDL
+
+# Additional verbose mode logging.
+if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+	sendToLog "LaunchDaemon: $launchDaemonNAME.plist...
+$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
+fi
+
+# Set proper permissions and load the LaunchDaemon.
+chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+chown root:wheel "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+sendToLog "Exit: LaunchDaemon $launchDaemonNAME.plist is scheduled to start right now."
+launchctl bootstrap system "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+rm -f "$superPIDFILE"
+sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+exit 0
+}
+
+# Create a LaunchDaemon to run super-starter again after system restart so we can validate the update progress.
+makeLaunchDaemonOnStartup() {
+# This creates a LaunchDaemon.plist file.
+/bin/cat <<EOLDL > "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$launchDaemonNAME</string>
+	<key>LaunchOnlyOnce</key>
+	<true/>
+	<key>AbandonProcessGroup</key>
+	<true/>
+	<key>UserName</key>
+	<string>root</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$superFOLDER/super-starter</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
+EOLDL
+
+# Additional verbose mode logging.
+if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+	sendToLog "LaunchDaemon: $launchDaemonNAME.plist...
+$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
+fi
+
+# Set proper permissions and load the LaunchDaemon.
+chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+chown root:wheel "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+sendToLog "Exit: LaunchDaemon $launchDaemonNAME.plist is scheduled at next startup."
+}
+
+# Create a LaunchDaemon to run super-starter again $defaultDeferSECONDS from now.
+makeLaunchDaemonCalendar() {
+# Calculate the appropriate deferment timer for the LaunchDaemon.
+deferCALC=$(($(date +%s) + defaultDeferSECONDS))
+month=$(date -j -f "%s" "$deferCALC" "+%m" | xargs)
+day=$(date -j -f "%s" "$deferCALC" "+%e" | xargs)
+hour=$(date -j -f "%s" "$deferCALC" "+%H" | xargs)
+minute=$(date -j -f "%s" "$deferCALC" "+%M" | xargs)
+
+# This creates a LaunchDaemon.plist file.
+/bin/cat <<EOLDL > "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$launchDaemonNAME</string>
+	<key>LaunchOnlyOnce</key>
+	<true/>
+	<key>AbandonProcessGroup</key>
+	<true/>
+	<key>UserName</key>
+	<string>root</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$superFOLDER/super-starter</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict>
+		<key>Month</key>
+		<integer>$month</integer>
+		<key>Day</key>
+		<integer>$day</integer>
+		<key>Hour</key>
+		<integer>$hour</integer>
+		<key>Minute</key>
+		<integer>$minute</integer>
+		</dict>
+	</array>
+</dict>
+</plist>
+EOLDL
+
+# Additional verbose mode logging.
+if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+	sendToLog "LaunchDaemon: $launchDaemonNAME.plist...
+$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
+fi
+
+# Set proper permissions and load the LaunchDaemon.
+chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+chown root:wheel "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+sendToLog "Exit: LaunchDaemon $launchDaemonNAME.plist is scheduled to start at $hour:$minute on $month/$day."
+launchctl bootstrap system "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+rm -f "$superPIDFILE"
+sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+exit 0
+}
+
+######## FUNCTIONS - USER INTERACTION ########
+
+# Open $jamfHELPER using the $helperARRAY[] options including the handling of any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
+openJamfHelper() {
+unset dialogRESULT
+if [[ -n $displayRedrawSECONDS ]]; then
+	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$(($displayTimeoutSECONDS-1))
+	while [[ -z $dialogRESULT ]]; do
+		[[ -n $displayTimeoutSECONDS ]] && helperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${helperARRAY[*]}"
+		(sleep "$displayRedrawSECONDS"; killall -9 "jamfHelper" > /dev/null 2>&1) &
+		killerPID=$!
+		dialogRESULT=$("$jamfHELPER" "${helperARRAY[@]}" 2> /dev/null)
+		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Notify Results: $dialogRESULT"
+		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS-displayRedrawSECONDS))
+	done
+else
+	[[ -n $displayTimeoutSECONDS ]] && helperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${helperARRAY[*]}"
+	dialogRESULT=$("$jamfHELPER" "${helperARRAY[@]}")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Notify Results: $dialogRESULT"
+fi
+}
+
+# Generate the $helperARRAY[] to display a non-interactive notification informing the user that softwareupdate is ready to restart.
+notifyRestart() {
+# Create initial $helperARRAY[] settings for the dialog.
+helperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "Software Updates Require Restart" -alignDescription left -icon "$cachedICON")
+# Description for preparing updates.
+if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
+	helperARRAY+=(-description "The final deadline has passed:
+$hardDISPLAY
+
+This computer will automatically restart very soon.
+
+Save any open documents now.")
+else # The update preparation notification for all other workflows.
+	helperARRAY+=(-description "This computer will automatically restart very soon.
+
+Save any open documents now.")
+fi
+
+# Non-interactive notifications do not need a timeout, so start without the $displayTimeoutSECONDS options.
+unset displayTimeoutSECONDS
+sendToLog "Notification: Update restart soon."
+openJamfHelper &
+notifyPID=$!
+disown
+}
+
+# Generate the $helperARRAY[] to display a non-interactive notification informing the user that the MDM update is progressing.
+notifyRestartPrepMDM() {
+# Create initial $helperARRAY[] settings for the dialog.
+helperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "Software Updates Require Restart" -alignDescription left -icon "$cachedICON" -timeout "$displayTimeoutSECONDS" -countdown)
+
+# Description for preparing updates.
+if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
+	helperARRAY+=(-description "The final deadline has passed:
+$hardDISPLAY
+
+A required software update will automatically restart this computer in about 5 minutes.
+
+During this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process.")
+else # The update preparation notification for all other workflows.
+	helperARRAY+=(-description "A required software update will automatically restart this computer in about 5 minutes.
+
+During this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process.")
+fi
+
+# Non-interactive notifications do not need a timeout, so start without the $displayTimeoutSECONDS options.
+unset displayTimeoutSECONDS
+sendToLog "Notification: MDM update restart preparation."
+openJamfHelper &
+notifyPID=$!
+disown
+}
+
+# Open both a non-interactive jamfHelper notification and the Software Update System Preference in the case where there are no valid Apple Silicon credentials but a restart update is required.
+notifyEncourageSelfUpdate() {
+sendToLog "Notification: No valid Apple Silicon credentials, encouraging user installation..."
+# Create initial $helperARRAY[] settings for the dialog.
+helperARRAY=(-windowType hud -windowPosition ul -lockHUD -title "Software Updates Require Restart" -alignDescription left -icon "$cachedICON")
+
+# Description for encouraging user restart update.
+helperARRAY+=(-description "You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update.")
+
+# Start System Preferences and the notification.
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${helperARRAY[*]}"
+unset dialogRESULT
+if [[ -n $displayRedrawSECONDS ]]; then
+	[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=0
+	[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Test Mode: Killing encourage update notification after 3 attempts..."
+	while [[ -z $dialogRESULT ]] && [[ redrawCOUNTER -lt 3 ]]; do
+		"$jamfHELPER" "${helperARRAY[@]}" &
+		sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" &
+		disown
+		sleep "$displayRedrawSECONDS"
+		[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=$((redrawCOUNTER+1))
+		killall -9 "jamfHelper" > /dev/null 2>&1
+		killall -9 "System Preferences" > /dev/null 2>&1
+	done
+else
+	"$jamfHELPER" "${helperARRAY[@]}" &
+	sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" &
+	disown
+	if [[ "$testModeOPTION" == "TRUE" ]]; then
+		sendToLog "Test Mode: Killing encourage update notification in $testModeTIMEOUT seconds..."
+		sleep "$testModeTIMEOUT"
+		killall -9 "jamfHelper" > /dev/null 2>&1
+		killall -9 "System Preferences" > /dev/null 2>&1
+	fi
+fi
+}
+
+# Generate the $helperARRAY[] to display an interactive dialog when $softDEADLINE has passed.
+dialogSoftDeadline() {
+# Create initial $helperARRAY[] settings for the dialog.
+helperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -button1 "$defaultBUTTON" -defaultButton 1)
+
+# Description for being past the hard deadline date.
+helperARRAY+=(-description "You have reached the deadline of:
+$softDISPLAY.")
+
+# Start the dialog.
+sendToLog "Dialog: Soft deadline passed..."
+openJamfHelper
+sendToLog "Status: User accepted soft deadline dialog."
+}
+
+# Generate the $helperARRAY[] to display an interactive dialog when $countDEADLINE is exceeded.
+dialogCountDeadline() {
+# Create initial $helperARRAY[] settings for the dialog.
+helperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -button1 "$defaultBUTTON" -defaultButton 1)
+
+# Description for being past the count deadline.
+helperARRAY+=(-description "You have deferred the maximum number of $countDEADLINE times.")
+
+# Start the dialog.
+sendToLog "Dialog: Defer count exceeded..."
+openJamfHelper
+sendToLog "Status: User accepted defer count exceeded deadline dialog."
+}
+
+# Generate the $helperARRAY[] to display an interactive dialog with deferral options.
+dialogAskForUpdate() {
+# Create initial $helperARRAY[] settings for the dialog.
+helperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -button1 "$defaultBUTTON" -button2 "$cancelBUTTON" -defaultButton 1 -cancelButton 2)
+
+# The soft deadline is always sooner, so it takes priority in the dialog.
+[[ -n $hardDEADLINE ]] && dateDISPLAY="$hardDISPLAY"
+[[ -n $softDEADLINE ]] && dateDISPLAY="$softDISPLAY"
+
+# Description variations based on deadline options.
+if [[ -n "$dateDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
+	helperARRAY+=(-description "¥ Deferral available until deadline of:
+$dateDISPLAY.
+
+¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
+elif [[ -n "$dateDISPLAY" ]]; then # Show only date deadline.
+	helperARRAY+=(-description "¥ Deferral available until deadline of:
+$dateDISPLAY.")
+elif [[ -n "$countDISPLAY" ]]; then # Show only maximum deferral count deadline.
+	helperARRAY+=(-description "¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
+else # Show no deadlines.
+	helperARRAY+=(-description "¥ No deadline date and unlimited deferrals.")
+fi
+
+# If needed, add the $menuDeferSECONDS option to the $helperARRAY[].
+if [[ -n $menuDeferSECONDS ]]; then
+	menuDeferSECONDS=$(echo "$menuDeferSECONDS" | sed 's/,/, /g')
+	helperARRAY+=(-showDelayOptions "$menuDeferSECONDS")
+fi
+
+# Start the dialog.
+sendToLog "Dialog: Ask for restart..."
+openJamfHelper
+
+# The $dialogRESULT contains the user's selection; "0" or "1" for Now and "2" for Later. The $dialogRESULT may also include the selected time in seconds.
+case "$dialogRESULT" in
+	0 | 1 | *1)
+		choiceINSTALL="TRUE"
+	;;
+	*2)
+		choiceINSTALL="FALSE"
+	;;
+esac
+}
+
+######## MAIN WORKFLOW ########
+
+mainWorkflow(){
+# Initial super workflow preparations.
+checkRoot
+setDefaults
+superInstaller "$@"
+getOptions "$@"
+getPreferences
+superStarter
+
+# Now the actual update workflows starts.
+if [[ "$macosARCH" == "arm64" ]]; then
+	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU LOCAL ****"
+	elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU SERVICE ****"
+	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON MDM ****"
+	else
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON REQUEST ONLY ****"
+	fi
+else
+	sendToLog "**** S.U.P.E.R.M.A.N. UPDATE INTEL ****"
+fi
+
+# Use local Apple software update to check for updates. This sets $updatesRECOMMENDED, $updatesRESTART, and $downloadREQUIRED.
+if [[ "$updateVALIDATE" == "TRUE" ]]; then # Checking after previous super system update, if successful, submit inventory to Jamf and check for Jamf Policies.
+	sendToLog "Status: Detected update restart validation."
+	checkAfterSoftwareUpdate
+else # Default workflow always checks for updates.
+	if [[ "$testModeOPTION" != "TRUE" ]] && [[ "$skipUpdatesOPTION" != "TRUE" ]]; then # Not $testModeOPTION, $skipUpdatesOPTION, or $updateVALIDATE, so it's time to check for new updates.
+		checkAppleUpdates
+	else # In $testModeOPTION or $skipUpdatesOPTION, so behave like there are no updates available.
+		if [[ "$forceRestartOPTION" == "TRUE" ]]; then
+			sendToLog "Status: Skipping Apple software updates."
+		else
+			sendToLog "Status: Skipping Apple software updates, use \"-F\" or \"--force-restart\" to force notifications and dialogs."
+		fi
+		updatesRECOMMENDED="FALSE"
+		updatesRESTART="FALSE"
+	fi
+fi
+
+# When using Apple softwareupdate (with local credentials for Apple Silicon or always for Intel), download all updates before updating.
+if [[ "$updatesRECOMMENDED" == "TRUE" ]] || [[ "$updatesRESTART" == "TRUE" ]]; then # If Apple software updates are available.
+	if [[ "$downloadREQUIRED" == "TRUE" ]]; then # Updates have not been downloaded yet.
+		if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+			downloadAllUpdatesASU
+		elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+			downloadAllUpdatesMDM
+		else # Apple Silicon with no valid update credentials.
+			sendToLog "Status: No valid Apple Silicon credentials, can not download updates."
+		fi
+	else # Updates were previously downloaded.
+		sendToLog "Status: Previously downloaded ${#downloadedNAMES[@]} software udpate(s)."
+		for i in "${!downloadedNAMES[@]}"; do
+			sendToLog "Previous Download $((i+1)): ${downloadedNAMES[i]}"
+		done
+	fi
+fi
+
+# When using Apple softwareupdate and only recommended (non-restart) Apple software updates are available, then install all available recommended updates.
+# After recommended updates, check Apple softwareupdate again, if successful, submit inventory to Jamf and check for Jamf Policies.
+if [[ "$updatesRECOMMENDED" == "TRUE" ]] && [[ "$updatesRESTART" == "FALSE" ]]; then
+	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+		installRecommendedUpdatesASU
+		checkAfterSoftwareUpdate
+	else # Apple Silicon with no valid update credentials or only $jamfCREDENTIAL.
+		sendToLog "Status: Based on the current Apple Silicon update credentials, recommended updates can not be installed."
+	fi
+fi
+
+# This is the main logic for determining what to do if a restart is required.
+if [[ "$updatesRESTART" == "TRUE" ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; then # A restart is required either via update check or $forceRestartOPTION.
+	if [[ "$currentUSER" == "FALSE" ]]; then # A normal user is not logged in.
+		installRestartSilent
+	else # A normal user is currently logged in.
+		checkDateDeadlines
+		( [[ "$deadlineSTATUS" != "HARD" ]] && [[ "$deadlineSTATUS" != "SOFT" ]] ) && checkDeferCountDeadline # Only need to check this if not past any hard or soft date deadlines.
+		( [[ "$deadlineSTATUS" == "FALSE" ]] || [[ "$deadlineSTATUS" != "FOCUS" ]] ) && checkUserFocus # Only need to check this if not past any deadlines.
+		if [[ "$deadlineSTATUS" == "HARD" ]]; then # The Hard deadline has passed, similar to no logged in user but with a notification.
+			installRestartMain
+		elif [[ "$deadlineSTATUS" == "SOFT" ]]; then # The Soft deadline has passed.
+			dialogSoftDeadline
+			installRestartMain
+		elif [[ "$deadlineSTATUS" == "COUNT" ]]; then # The defferal count deadline is exceeded.
+			dialogCountDeadline
+			installRestartMain
+		elif [[ "$focusDEFER" == "TRUE" ]]; then # No deadlines have passed but a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb.
+			defaultDeferSECONDS="$focusDeferSECONDS"
+			makeLaunchDaemonCalendar
+		else # Logically, this is the only time the choice dialog is shown.
+			dialogAskForUpdate
+			if [[ "$choiceINSTALL" == "TRUE" ]]; then
+				sendToLog "Status: User chose to restart now."
+				installRestartMain
+			else
+				if [[ -n $menuDeferSECONDS ]]; then
+					defaultDeferSECONDS=$(echo "$dialogRESULT" | sed 's/.$//')
+					sendToLog "Status: User chose to defer update for $defaultDeferSECONDS seconds."
+				else
+					sendToLog "Status: User chose to defer update, using the default defer of $defaultDeferSECONDS seconds."
+				fi
+				makeLaunchDaemonCalendar
+			fi
+		fi
+	fi
+fi
+}
+
+mainWorkflow "$@"
+rm -f "$superPIDFILE"
+sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+exit 0
