@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>JamfProID</key>
+	<string>$JSSID</string>
+	<key>DefaultDefer</key>
+	<string>100</string>
+	<key>FocusDefer</key>
+	<string>100</string>
+	<key>MenuDefer</key>
+	<string>100,200,300</string>
+	<key>DisplayTimeout</key>
+	<string>15</string>
+	<key>DisplayRedraw</key>
+	<string>10</string>
+	<key>DisplayIcon</key>
+	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
+	<key>IconSizeIbm</key>
+	<string>128</string>
+	<key>IconSizeJamf</key>
+	<string>128</string>
+	<key>PreferJamf</key>
+	<false/>
+	<key>FocusDeadline</key>
+	<string>2022-01-01</string>
+	<key>SoftDeadline</key>
+	<string>2022-01-02:02</string>
+	<key>HardDeadline</key>
+	<string>2022-01-03:03:03</string>
+	<key>CountDeadline</key>
+	<string>5</string>
+	<key>PolicyTriggers</key>
+	<string>trigger1,trigger2</string>
+	<key>SkipUpdates</key>
+	<true/>
+	<key>ForceRestart</key>
+	<true/>
+	<key>TestMode</key>
+	<true/>
+	<key>TestModeTimeout</key>
+	<string>15</string>
+	<key>VerboseMode</key>
+	<true/>
+</dict>
+</plist>
