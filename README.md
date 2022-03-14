@@ -5,6 +5,10 @@ S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 
 by Kevin M. White
 
+![<#Example update dialog#>](<#Screenshots/Ask.png#> "<#Example update dialog#>")
+
+![<#Example restart notification#>](<#Screenshots/Restart.png#> "<#Example restart notification#>")
+
 ### Requirements
 
 __Mac computers with Intel:__
