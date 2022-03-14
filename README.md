@@ -5,9 +5,9 @@ S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 
 by Kevin M. White
 
-![<#Example update dialog#>](<#Screenshots/Ask.png#> "<#Example update dialog#>")
+![Example update dialog](Screenshots/Ask.png)
 
-![<#Example restart notification#>](<#Screenshots/Restart.png#> "<#Example restart notification#>")
+![Example restart notification](Screenshots/Restart.png)
 
 ### Requirements
 
