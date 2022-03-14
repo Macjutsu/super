@@ -5,7 +5,13 @@ S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 
 by Kevin M. White
 
+### Screenshots
+
+__Update dialog with multiple deadlines and pop-up deferral choice__
+
 ![Example update dialog](Screenshots/Ask.png)
+
+__Restart notification__
 
 ![Example restart notification](Screenshots/Restart.png)
 
