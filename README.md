@@ -17,7 +17,7 @@ Mac computers with Apple Silicon require additional authorization (beyond root p
 __Without this additional authorization, S.U.P.E.R.M.A.N. can not enforce macOS software updates on Apple Silicon!__
 This authorization is possible via three methods:
 - An existing local account
-- A newly created local service account
+- An automatically created local service account
 - A Jamf Pro API account
 
 ### Apple Silicon Authorization Requirement Details
@@ -28,7 +28,7 @@ Apple Silicon `softwareupdate` via an __existing local account:__
 - The provided credentials are used to authenticate the `softwareupdate` command.
 - The provided credentials are stored in the System Keychain and can be viewed by other admin users.
 
-Apple Silicon `softwareupdate` via a __local service account:__
+Apple Silicon `softwareupdate` via an __automatically created local service account:__
 - Any version of macOS for Apple Silicon (macOS 11.0 or later).
 - You must provide credentials for an existing local admin user account who already has volume ownership permissions.  User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see the [Apple Platform Deployment](https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e) guide.
 - The provided admin credentials are used to automatically generate a new local service account. This service account provides authentication for the `softwareupdate` command.
@@ -42,15 +42,15 @@ Apple Silicon MDM update command via __Jamf Pro API:__
  - You must provide credentials that can authorize macOS software update MDM commands via the Jamf Pro API.
  - The Jamf Pro API credentials you provide are stored in the System Keychain and can be viewed by other admin users.
  - The default Jamf Pro privileges required for this account are "Jamf Pro Server Objects > Computers > Create & Read" and "Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update".
- - You can significantly reduce the security risk of this account by removing the "Computers > Read" privilege requirement via a custom Configuration Profile for the preference domain `com.macjutsu.super` containing the following: `<key>JamfProID</key> <string>$JSSID</string>`
+ - You can significantly reduce the security risk of this account by removing the "Computers > Read" privilege requirement. However, this requires deploying a custom Configuration Profile for the preference domain `com.macjutsu.super` containing the following: `<key>JamfProID</key> <string>$JSSID</string>`
 
-_If multiple authentication methods are provided, the priority order is as follows: an existing local account, the local service account, and finally the Jamf Pro API credentials._
+_If multiple valid authorization methods are provided, the priority order is as follows: an existing local account, the local service account, and finally the Jamf Pro API credentials._
 
 ### Installation
 
 __To install and run locally:__
 1. Make sure the S.U.P.E.R.M.A.N. script (named just `super`) has appropriate execute permissions and then run it like any other local management script: `sudo /wherever/the/heck/you/downloaded/super --help`
-2. The super script automatically installs itself (and various other accoutrements) anytime it's ran from outside it's working folder, which is defaulted to /Library/Management/super.
+2. The super script automatically installs itself (and various other accoutrements) anytime it's ran from outside its working folder, which is defaulted to /Library/Management/super.
 3. There's no step three. After self-installation, super automatically restarts itself with your previously specified options and, if necessary, creates a LaunchDaemon to keep things going.
 
 __To deploy via Jamf Pro:__
