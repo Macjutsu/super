@@ -4,7 +4,7 @@
 
 2022-03-14
 
-- Jamf Pro no longer required for Apple `softwareupdate` workflows.
+- Jamf Pro no longer required for `softwareupdate` workflow.
 - Initial commits to GitHub including Apache 2.0 LICENSE and CHANGELOG.md.
 - Introductory comments moved to README.md.
 - Example managed preference file com.macjutsu.super.plist

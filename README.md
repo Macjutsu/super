@@ -1,4 +1,4 @@
-# S.U.P.E.R.M.A.N.
+## S.U.P.E.R.M.A.N.
 ### Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
 S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
@@ -25,13 +25,13 @@ This authorization is possible via three methods:
 Apple Silicon `softwareupdate` via an __existing local account:__
 - Any version of macOS for Apple Silicon (macOS 11.0 or later).
 - You must provide credentials for an existing local (standard or admin) user account who already has volume ownership permissions. User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see the [Apple Platform Deployment](https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e) guide.
-- The provided credentials are used to authenticate the Apple `softwareupdate` command.
+- The provided credentials are used to authenticate the `softwareupdate` command.
 - The provided credentials are stored in the System Keychain and can be viewed by other admin users.
 
 Apple Silicon `softwareupdate` via a __local service account:__
 - Any version of macOS for Apple Silicon (macOS 11.0 or later).
 - You must provide credentials for an existing local admin user account who already has volume ownership permissions.  User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see the [Apple Platform Deployment](https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e) guide.
-- The provided admin credentials are used to automatically generate a new local service account. This service account provides authentication for the Apple `softwareupdate` command.
+- The provided admin credentials are used to automatically generate a new local service account. This service account provides authentication for the `softwareupdate` command.
 - The creation of the service account triggers a system security dialog unless you also deploy a PPPC Configuration Profile granting "SystemPolicySysAdminFiles" to either the "com.apple.Terminal" or "/usr/local/jamf/bin/jamf" and "com.jamf.management.Jamf".
 - The admin credentials you provide are never saved to disk, but the local service account credentials are stored in the System Keychain and can be viewed by other admin users.
 - The local service account is not an admin and can not log into the Mac, but if FileVault is enabled this account is visible at startup and can unlock the drive.
