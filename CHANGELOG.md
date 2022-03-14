@@ -13,11 +13,11 @@
 
 2022-03-09
 
- - [IBM Notifier.app](https://github.com/IBM/mac-ibm-notifications) is automatically downloaded and installed in the $superFOLDER.
- - [IBM Notifier.app](https://github.com/IBM/mac-ibm-notifications) is default for all user interactions, but if IBM Notifier.app can't be downloaded or is invalid then super will fall back to `jamfHelper`.
- - Ability to specify custom icon size when using [IBM Notifier.app](https://github.com/IBM/mac-ibm-notifications) via `--icon-size-ibm pixels` option and managed preference: `<key>IconSizeIbm</key> <string>number</string>`
+ - [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) is automatically downloaded and installed in the $superFOLDER.
+ - [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) is default for all user interactions, but if IBM Notifier.app can't be downloaded or is invalid then super will fall back to `jamfHelper`.
+ - Ability to specify custom icon size when using [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) via `--icon-size-ibm pixels` option and managed preference: `<key>IconSizeIbm</key> <string>number</string>`
  - Ability to specify custom icon size when using `jamfHelper` via `--icon-size-jamf pixels` option and managed preference: `<key>IconSizeJamf</key> <string>number</string>`
- - Ability to prefer `jamfHelper` over [IBM Notifier.app](https://github.com/IBM/mac-ibm-notifications) via `--prefer-jamf | --no-prefer-jamf` options and managed preference: `<key>PreferJamf</key> <true/> | <false/>`
+ - Ability to prefer `jamfHelper` over [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) via `--prefer-jamf | --no-prefer-jamf` options and managed preference: `<key>PreferJamf</key> <true/> | <false/>`
  - Deferral times all normalized to between 120 seconds and 86400 seconds (1 day).
  - Bug fixes and improvements for display redraw, display timeout, and test mode options.
  - Logging and verbose mode improvements.
