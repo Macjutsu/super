@@ -5,14 +5,14 @@
 #
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 #
-# Version 0.9
-# 3/1/22
-# Kevin M. White <kevinmwhite@me.com>
+# Version 1.0b
+# 3/9/22
+# Kevin M. White <kevin@macjutsu.com>
 #
 ######## S.U.P.E.R.M.A.N. REQUIREMENTS ########
 #
 # Mac computers with Intel:
-#  - Validated on macOS 10.14 or later. Earlier versions of macOS may work, but have not been validated.
+#  - Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
 #  - Any version of Jamf Pro 10.xx.
 #
 # Mac computers with Apple Silicon:
@@ -76,9 +76,26 @@
 #
 # In fact, super is designed to automatically stop once macOS is up to date. Then, when you decide the next macOS update needs to be enforced, restart super via a Jamf Pro Policy.
 #
-# Finally, to customize the notifications and dialogs, you can modify the contents of the $helperARRAY[] in the functions with names that start with "notification" or "dialog".
+# Finally, to customize the notifications and dialogs, you can modify the contents of the $jamfHelperARRAY[] in the functions with names that start with "notification" or "dialog".
 #
-# For more information about possible options in the $helperARRAY[], use the following in Terminal: "/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -help"
+# For more information about possible options in the $jamfHelperARRAY[], use the following in Terminal: "/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -help"
+#
+######## RELEASE NOTES ########
+#
+# Version 1.0b
+# 3/9/22
+#  - IBM Notifier.app is automatically downloaded and installed in the $superFOLDER.
+#  - IBM Notifier.app is default for all user interactions, but if IBM Notifier.app can't be downloaded or is invalid then super will fall back to jamfHelper.
+#  - Ability to specify custom icon size when using IBM Notifier.app via "--icon-size-ibm pixels" option and managed preference <key>IconSizeIbm</key> <string>number</string>
+#  - Ability to specify custom icon size when using jamfHelper via "--icon-size-jamf pixels" option and managed preference <key>IconSizeJamf</key> <string>number</string>
+#  - Ability to prefer jamfHelper over IBM Notifier.app via "--prefer-jamf" | "--no-prefer-jamf" options and managed preference <key>PreferJamf</key> <true/> | <false/>.
+#  - Deferral times all normalized to between 120 seconds and 86400 seconds (1 day).
+#  - Bug fixes and improvements for Display Redraw, Display Timeout, and Test Mode options.
+#  - Logging and Verbose Mode improvements.
+# 
+# Version 0.9
+# 2/28/22
+#  - Initial private release.
 #
 ######## DEBUGGING STUFF ########
 #
@@ -95,9 +112,9 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 0.9
-  3/1/22
-  Kevin M. White <kevinmwhite@me.com>
+  Version 1.0b
+  3/9/22
+  Kevin M. White <kevin@macjutsu.com>
 
   Usage:
   sudo ./super
@@ -106,6 +123,7 @@ echo "
   [--default-defer seconds] [--focus-defer seconds]
   [--menu-defer \"seconds,seconds,etc...\"] [--display-timeout seconds]
   [--display-redraw seconds] [--display-icon \"/local/path or URL\"]
+  [--icon-size-ibm pixels ] [--icon-size-jamf pixels ] [--prefer-jamf]
   [--focus-deadline YYYY-MM-DD:hh:mm] [--soft-deadline YYYY-MM-DD:hh:mm]
   [--hard-deadline YYYY-MM-DD:hh:mm] [--count-deadline number] [--clear-count]
   [--local-account \"AccountName\"] [--local-password \"Password\"]
@@ -124,6 +142,9 @@ echo "
   <key>DisplayTimeout</key> <string>seconds</string>
   <key>DisplayRedraw</key> <string>seconds</string>
   <key>DisplayIcon</key> <string>path</string>
+  <key>IconSizeIbm</key> <string>number</string>
+  <key>IconSizeJamf</key> <string>number</string>
+  <key>PreferJamf</key> <true/> | <false/>
   <key>FocusDeadline</key> <string>YYYY-MM-DD:hh:mm</string>
   <key>SoftDeadline</key> <string>YYYY-MM-DD:hh:mm</string>
   <key>HardDeadline</key> <string>YYYY-MM-DD:hh:mm</string>
@@ -146,10 +167,10 @@ echo "  --default-defer seconds | --default-defer X
   required service is temporarily unavailable (for example, network or Jamf Pro
   connectivity issues). Using this option overrides the default deferral time
   which is set to 3600 seconds (1 hour) via the $defaultDeferSECONDS parameter.
-  Times less than 120 seconds are unreliable and are automatically rounded up to
-  120. Also see the --menu option to display a pop-up menu allowing the user to
-  select an alternate deferral time. Finally, use a value of X to return this
-  option to its default.
+  Times less than 120 seconds or more than 86400 seconds (1 day) are rounded
+  accordingly. Also see the --menu option to display a pop-up menu allowing the
+  user to select an alternate deferral time. Finally, use a value of X to return
+  this option to its default.
 
   --focus-defer seconds | --focus-defer X
   * Managed preference: <key>FocusDefer</key> <string>seconds</string>
@@ -158,27 +179,28 @@ echo "  --default-defer seconds | --default-defer X
   the user has Focus or Do Not Disturb enabled. With this option you should also
   consider using --focus-deadline and --soft-deadline to ensure users are
   offered a chance to defer before a required update restart is enforced via
-  --hard-deadline. Times less than 120 seconds are unreliable and are
-  automatically rounded up to 120. Finally, use a value of X to disable this
+  --hard-deadline. Times less than 120 seconds or more than 86400 seconds
+  (1 day) are rounded accordingly. Finally, use a value of X to disable this
   option.
 
   --menu-defer \"seconds,seconds,etc...\" | --focus-defer X
   * Managed preference: <key>MenuDefer</key>
   <string>seconds,seconds,etc...</string>
   Display a deferral time pop-up menu in the non-deadline update restart dialog
-  that allows the user to overide the default --default-defer time. The time
-  selections are specified with one or more number of seconds that are comma
-  separated with no spaces. Times less than 120 seconds are unreliable and are
-  automatically rounded up to 120. Finally, use a value of X to disable this
-  option.
+  that allows the user to overide the --default-defer time. The time selections
+  are specified with one or more number of seconds that are comma separated with
+  no spaces. The first number in the list is the default selection for the menu,
+  thus it will be automatically selected if you also set --display-timeout.
+  Times less than 120 seconds or more than 86400 seconds (1 day) are rounded
+  accordingly. Finally, use a value of X to disable this option.
 
   --display-timeout seconds | --display-timeout X
   * Managed preference: <key>DisplayTimeout</key> <string>seconds</string>
   Sets an automatic timeout for interactive update restart dialogs in seconds.
-  Use this option with caution, as once the timeout expires, the default
-  \"Restart\" button is selected. This option also displays a countdown of the
-  timeout in the update restart dialog. Finally, use a value of X to disable
-  this option.
+  The countdown of the timeout is displayed in the update restart dialog. Use
+  this option with caution, as once the timeout expires, the restart button is
+  automatically selected for any dialogs showing that a deadline has passed.
+  Finally, use a value of X to disable this option.
 
   --display-redraw seconds | --display-redraw X
   * Managed preference: <key>DisplayRedraw</key> <string>seconds</string>
@@ -201,6 +223,30 @@ echo "  --default-defer seconds | --default-defer X
   is not set, then the file at the \$defaultICON path is used. Because the path
   is quoted, do not use the escape ( \ ) character. Finally, use a value of X to
   return this option to its default.
+
+  --icon-size-ibm pixels
+  * Managed preference: <key>IconSizeIbm</key> <string>number</string>
+  Number of pixels for the --display-icon in IBM Notifier dialogs. Using this
+  option overrides the default IBM Notifier icon size which is set to 96 pixels
+  via the $ibmNotifierIconSIZE parameter. Any size less than 32 pixles or more
+  than 150 pixles is rounded accordingly. Finally, use a value of X to return
+  this option to its default.
+  
+  --icon-size-jamf pixels
+  * Managed preference: <key>IconSizeJamf</key> <string>number</string>
+  Number of pixels for the --display-icon in jamfHelper dialogs and
+  notifications. Using this option overrides the default jamfHelper icon size
+  which is set to 96 pixels via the $jamfHelperIconSIZE parameter. Any size less
+  than 32 pixles or more than 256 pixles is rounded accordingly. Finally, use a
+  value of X to return this option to its default.
+  
+  --prefer-jamf
+  * Managed preference: <key>PreferJamf</key> <true/>
+  Prefer jamfHelpler over IBM Notifier.app for user interactions.
+
+  --no-prefer-jamf
+  * Managed preference: <key>PreferJamf</key> <false/>
+  Disable preferring jamfHelpler over IBM Notifier.app for user interactions.
 
   --focus-deadline YYYY-MM-DD:hh:mm | --focus-deadline X
   * Managed preference: <key>FocusDeadline</key>
@@ -420,6 +466,9 @@ mdmLOG="$superFOLDER/mdm.log"
 # Path to filtered software update progress log file:
 updateLOG="$superFOLDER/update.log"
 
+# This is the name for the LaunchDaemon.
+launchDaemonNAME="com.macjutsu.super" # No trailing ".plist"
+
 # Path to the jamf binary:
 jamfBINARY="/usr/local/bin/jamf"
 
@@ -429,23 +478,38 @@ jamfCACHE="/Library/Application Support/JAMF/tmp"
 # Path to the jamfHELPER binary:
 jamfHELPER="/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
 
+# URL to the IBM Notifier.app download:
+ibmNotifierURL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-2.5.0-b-76/IBM.Notifier.zip"
+
+# Target version for IBM Notifier.app:
+ibmNotifierVERSION="2.5.0"
+
+# Path to the local IBM Notifier.app:
+ibmNotifierAPP="$superFOLDER/IBM Notifier.app"
+
+# Path to the local IBM Notifier.app binary:
+ibmNotifierBINARY="$ibmNotifierAPP/Contents/MacOS/IBM Notifier"
+
 # The default number of seconds to defer if a user choses not to restart or a required service is temporarily unavailable.
 defaultDeferSECONDS=3600
 
-# Path to for the cached display icon:
+# Path to for the local cached display icon:
 cachedICON="$superFOLDER/icon.png"
 
 # The default icon in the if no $displayIconOPTION is specified or found.
 defaultICON="/System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns"
 
-# This button is at the far-right of an interactive dialog, in the highlight color, and respond to the "return" key.
-defaultBUTTON="Restart"
+# Default icon size for IBM Notifier.app.
+ibmNotifierIconSIZE=96
 
-# This button is to the left of the $defaultBUTTON, not highlighted, and respond to the "esc" key.
-cancelBUTTON="Defer"
+# Default icon size for jamfHelper.
+jamfHelperIconSIZE=96
 
-# This is the name for the LaunchDaemon.
-launchDaemonNAME="com.macjutsu.super" # No trailing ".plist"
+# Text for the restart button in all dialogs. Note that for deadline dialogs this will be the default button.
+restartButtonTEXT="Restart"
+
+# Text for the defferal button in all dialogs. Note that for deadline dialogs this will be the default button.
+deferButtonTEXT="Defer"
 
 # Deadline date display format.
 dateFORMAT="+%B %d, %Y" # Formatting options can be found in the man page for the date command.
@@ -491,6 +555,22 @@ while test $# -gt 0; do
 		--display-icon )
 			displayIconOPTION="$2"
 			shift 2
+		;;
+		--icon-size-ibm )
+			iconSizeIbmOPTION="$2"
+			shift 2
+		;;
+		--icon-size-jamf )
+			iconSizeJamfOPTION="$2"
+			shift 2
+		;;
+		--prefer-jamf )
+			preferJamfOPTION="TRUE"
+			shift
+		;;
+		--no-prefer-jamf )
+			preferJamfOPTION="FALSE"
+			shift
 		;;
 		--focus-deadline )
 			focusDeadlineOPTION="$2"
@@ -634,6 +714,9 @@ if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
 	defaults delete "$superPLIST" DisplayTimeout 2> /dev/null
 	defaults delete "$superPLIST" DisplayRedraw 2> /dev/null
 	defaults delete "$superPLIST" DisplayIcon 2> /dev/null
+	defaults delete "$superPLIST" PreferJamf 2> /dev/null
+	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
+	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
 	defaults delete "$superPLIST" FocusDeadline 2> /dev/null
 	defaults delete "$superPLIST" SoftDeadline 2> /dev/null
 	defaults delete "$superPLIST" HardDeadline 2> /dev/null
@@ -655,6 +738,9 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	displayTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayTimeout 2> /dev/null)
 	displayRedrawMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayRedraw 2> /dev/null)
 	displayIconMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayIcon 2> /dev/null)
+	iconSizeIbmMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeIbm 2> /dev/null)
+	iconSizeJamfMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeJamf 2> /dev/null)
+	preferJamfMANAGED=$(defaults read "$superMANAGEDPLIST" PreferJamf 2> /dev/null)
 	focusDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" FocusDeadline 2> /dev/null)
 	softDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" SoftDeadline 2> /dev/null)
 	hardDeadlineMANAGED=$(defaults read "$superMANAGEDPLIST" HardDeadline 2> /dev/null)
@@ -673,6 +759,9 @@ if [[ -f "$superPLIST.plist" ]]; then
 	menuDeferPROPERTY=$(defaults read "$superPLIST" MenuDefer 2> /dev/null)
 	displayTimeoutPROPERTY=$(defaults read "$superPLIST" DisplayTimeout 2> /dev/null)
 	displayRedrawPROPERTY=$(defaults read "$superPLIST" DisplayRedraw 2> /dev/null)
+	iconSizeIbmPROPERTY=$(defaults read "$superPLIST" IconSizeIbm 2> /dev/null)
+	iconSizeJamfPROPERTY=$(defaults read "$superPLIST" IconSizeJamf 2> /dev/null)
+	preferJamfPROPERTY=$(defaults read "$superPLIST" PreferJamf 2> /dev/null)
 	focusDeadlinePROPERTY=$(defaults read "$superPLIST" FocusDeadline 2> /dev/null)
 	softDeadlinePROPERTY=$(defaults read "$superPLIST" SoftDeadline 2> /dev/null)
 	hardDeadlinePROPERTY=$(defaults read "$superPLIST" HardDeadline 2> /dev/null)
@@ -711,6 +800,21 @@ elif [[ -z $displayRedrawOPTION ]] && [[ -n $displayRedrawPROPERTY ]]; then
 	displayRedrawOPTION="$displayRedrawPROPERTY"
 fi
 [[ -n $displayIconMANAGED ]] && displayIconOPTION="$displayIconMANAGED"
+if [[ -n $iconSizeIbmMANAGED ]]; then
+	iconSizeIbmOPTION="$iconSizeIbmMANAGED"
+elif [[ -z $iconSizeIbmOPTION ]] && [[ -n $iconSizeIbmPROPERTY ]]; then
+	iconSizeIbmOPTION="$iconSizeIbmPROPERTY"
+fi
+if [[ -n $iconSizeJamfMANAGED ]]; then
+	iconSizeJamfOPTION="$iconSizeJamfMANAGED"
+elif [[ -z $iconSizeJamfOPTION ]] && [[ -n $iconSizeJamfPROPERTY ]]; then
+	iconSizeJamfOPTION="$iconSizeJamfPROPERTY"
+fi
+if [[ -n $preferJamfMANAGED ]]; then
+	preferJamfOPTION="$preferJamfMANAGED"
+elif [[ -z $preferJamfOPTION ]] && [[ -n $preferJamfPROPERTY ]]; then
+	preferJamfOPTION="$preferJamfPROPERTY"
+fi
 if [[ -n $focusDeadlineMANAGED ]]; then
 	focusDeadlineOPTION="$focusDeadlineMANAGED"
 elif [[ -z $focusDeadlineOPTION ]] && [[ -n $focusDeadlinePROPERTY ]]; then
@@ -793,11 +897,14 @@ if [[ "$defaultDeferOPTION" == "X" ]]; then
 	sendToLog "Starter: Deleting local preference for default deferral."
 	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
 elif [[ -n $defaultDeferOPTION ]] && [[ $defaultDeferOPTION =~ $regexNUMBER ]]; then
-	if [[ $defaultDeferOPTION -ge 120 ]]; then
-		defaultDeferSECONDS="$defaultDeferOPTION"
-	else
-		sendToLog "Warning: Specified default deferral time of $defaultDeferOPTION seconds too low, rounding up to 120 seconds."
+	if [[ $defaultDeferOPTION -lt 120 ]]; then
+		sendToLog "Warning: Specified default deferral time of $defaultDeferOPTION seconds is too low, rounding up to 120 seconds."
 		defaultDeferSECONDS="120"
+	elif [[ $defaultDeferOPTION -gt 86400 ]]; then
+		sendToLog "Warning: Specified default deferral time of $defaultDeferOPTION seconds is too high, rounding down to 86400 seconds (1 day)."
+		defaultDeferSECONDS="86400"
+	else
+		defaultDeferSECONDS="$defaultDeferOPTION"
 	fi
 	defaults write "$superPLIST" DefaultDefer -string "$defaultDeferSECONDS"
 elif [[ -n $defaultDeferOPTION ]] && ! [[ $defaultDeferOPTION =~ $regexNUMBER ]]; then
@@ -809,11 +916,14 @@ if [[ "$focusDeferOPTION" == "X" ]]; then
 	sendToLog "Starter: Deleting local preference for Focus deferral."
 	defaults delete "$superPLIST" FocusDefer 2> /dev/null
 elif [[ -n $focusDeferOPTION ]] && [[ $focusDeferOPTION =~ $regexNUMBER ]]; then
-	if [[ $focusDeferOPTION -ge 120 ]]; then
-		focusDeferSECONDS="$focusDeferOPTION"
-	else
-		sendToLog "Warning: Specified Focus deferral time of $focusDeferOPTION seconds too low, rounding up to 120 seconds."
+	if [[ $focusDeferOPTION -lt 120 ]]; then
+		sendToLog "Warning: Specified focus deferral time of $focusDeferOPTION seconds is too low, rounding up to 120 seconds."
 		focusDeferSECONDS="120"
+	elif [[ $focusDeferOPTION -gt 86400 ]]; then
+		sendToLog "Warning: Specified focus deferral time of $focusDeferOPTION seconds is too high, rounding down to 86400 seconds (1 day)."
+		focusDeferSECONDS="86400"
+	else
+		focusDeferSECONDS="$focusDeferOPTION"
 	fi
 	defaults write "$superPLIST" FocusDefer -string "$focusDeferSECONDS"
 elif [[ -n $focusDeferOPTION ]] && ! [[ $focusDeferOPTION =~ $regexNUMBER ]]; then
@@ -830,8 +940,11 @@ elif [[ -n $menuDeferOPTION ]] && [[ $menuDeferOPTION =~ $regexMENU ]]; then
 	menuDeferARRAY=($menuDeferOPTION)
 	for i in "${!menuDeferARRAY[@]}"; do
 		if [[ ${menuDeferARRAY[i]} -lt 120 ]]; then
-			sendToLog "Warning: Specified menu deferral time of ${menuDeferARRAY[i]} seconds too low, rounding up to 120 seconds."
+			sendToLog "Warning: Specified menu deferral time of ${menuDeferARRAY[i]} seconds is too low, rounding up to 120 seconds."
 			menuDeferARRAY[i]="120"
+		elif [[ ${menuDeferARRAY[i]} -gt 86400 ]]; then
+			sendToLog "Warning: Specified menu deferral time of ${menuDeferARRAY[i]} seconds is too high, rounding down to 86400 seconds (1 day)."
+			menuDeferARRAY[i]="86400"
 		fi
 	done
 	menuDeferSECONDS="${menuDeferARRAY[*]}"
@@ -876,11 +989,11 @@ if [[ "$displayIconOPTION" == "X" ]]; then
 elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults read "$superPLIST" DisplayIconCache 2> /dev/null)" ]]; then
 	if [[ $(echo "$displayIconOPTION" | grep '^http://\|^https://' -c) -eq 1 ]]; then
 		sendToLog "Starter: Attempting to download requested icon from: $displayIconOPTION"
-		downloadRESULT=$(curl "$displayIconOPTION" -o "/tmp/cachedICON" 2>&1)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadRESULT: \n$downloadRESULT"
+		downloadRESULT=$(curl "$displayIconOPTION" -L -o "/tmp/cachedICON" 2>&1)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: downloadRESULT: \n$downloadRESULT"
 		if [[ -f "/tmp/cachedICON" ]]; then
 			sipsRESULT=$(sips -s format png "/tmp/cachedICON" --out "$cachedICON" 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter sipsRESULT: \n$sipsRESULT"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: sipsRESULT: \n$sipsRESULT"
 			defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
 		else
 			sendToLog "Warning: Unable to download specified icon from: $displayIconOPTION"
@@ -888,7 +1001,7 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 	elif [[ -e "$displayIconOPTION" ]]; then
 		sendToLog "Starter: Copying requested icon from: $displayIconOPTION"
 		sipsRESULT=$(sips -s format png "$displayIconOPTION" --out "$cachedICON" 2>&1)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter sipsRESULT: \n$sipsRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: sipsRESULT: \n$sipsRESULT"
 		defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
 	else
 		sendToLog "Warning: Unable to locate specified icon from: $displayIconOPTION"
@@ -897,8 +1010,46 @@ fi
 if [[ ! -f "$cachedICON" ]]; then
 	sendToLog "Starter: No custom display icon found, copying default icon from: $defaultICON"
 	sipsRESULT=$(sips -s format png "$defaultICON" --out "$cachedICON" 2>&1)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter sipsRESULT: \n$sipsRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: sipsRESULT: \n$sipsRESULT"
 	defaults write "$superPLIST" DisplayIconCache -string "$defaultICON"
+fi
+
+# Validate $iconSizeIbmOPTION input and if valid override default $ibmNotifierIconSIZE parameter and save to $superPLIST.
+if [[ "$iconSizeIbmOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for Ibm Notifier icon size."
+	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
+elif [[ -n $iconSizeIbmOPTION ]] && [[ $iconSizeIbmOPTION =~ $regexNUMBER ]]; then
+	if [[ $iconSizeIbmOPTION -lt 32 ]]; then
+		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeIbmOPTION pixels is too low, rounding up to 64 pixels."
+		ibmNotifierIconSIZE="32"
+	elif [[ $iconSizeIbmOPTION -gt 150 ]]; then
+		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeIbmOPTION pixels is too high, rounding down to 150 pixels."
+		ibmNotifierIconSIZE="150"
+	else
+		ibmNotifierIconSIZE="$iconSizeIbmOPTION"
+	fi
+	defaults write "$superPLIST" IconSizeIbm -string "$iconSizeIbmOPTION"
+elif [[ -n $iconSizeIbmOPTION ]] && ! [[ $iconSizeIbmOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The Ibm Notifier icon size must only be a number."; parameterERROR="TRUE"
+fi
+
+# Validate $iconSizeJamfOPTION input and if valid override default $jamfHelperIconSIZE parameter and save to $superPLIST.
+if [[ "$iconSizeJamfOPTION" == "X" ]]; then
+	sendToLog "Starter: Deleting local preference for Ibm Notifier icon size."
+	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
+elif [[ -n $iconSizeJamfOPTION ]] && [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; then
+	if [[ $iconSizeJamfOPTION -lt 32 ]]; then
+		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeJamfOPTION pixels is too low, rounding up to 64 pixels."
+		jamfHelperIconSIZE="32"
+	elif [[ $iconSizeJamfOPTION -gt 256 ]]; then
+		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeJamfOPTION pixels is too high, rounding down to 150 pixels."
+		jamfHelperIconSIZE="256"
+	else
+		jamfHelperIconSIZE="$iconSizeJamfOPTION"
+	fi
+	defaults write "$superPLIST" IconSizeJamf -string "$iconSizeJamfOPTION"
+elif [[ -n $iconSizeJamfOPTION ]] && ! [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Exit: The Ibm Notifier icon size must only be a number."; parameterERROR="TRUE"
 fi
 
 # Validate $focusDeadlineOPTION, if valid set $focusDEADLINE, $focusEPOCH, $focusDATE, $focusTIME, $focusDEADLINE, and $focusDISPLAY.
@@ -936,10 +1087,8 @@ elif [[ -n $focusDeadlineOPTION ]]; then
 			focusTIME=$(date -r "$focusEPOCH" "$timeFORMAT")
 			focusDISPLAY="$focusDATE at$focusTIME"
 		fi
-		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-			sendToLog "Parameter focusEPOCH: $focusEPOCH"
-			sendToLog "Parameter focusDISPLAY: $focusDISPLAY"
-		fi
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: focusEPOCH: $focusEPOCH"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: focusDISPLAY: $focusDISPLAY"
 	else
 		sendToLog "Exit: The Focus deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
@@ -985,10 +1134,8 @@ elif [[ -n $softDeadlineOPTION ]]; then
 			softTIME=$(date -r "$softEPOCH" "$timeFORMAT")
 			softDISPLAY="$softDATE at$softTIME"
 		fi
-		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-			sendToLog "Parameter softEPOCH: $softEPOCH"
-			sendToLog "Parameter softDISPLAY: $softDISPLAY"
-		fi
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: softEPOCH: $softEPOCH"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: softDISPLAY: $softDISPLAY"
 	else
 		sendToLog "Exit: The Soft deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
@@ -1029,10 +1176,8 @@ elif [[ -n $hardDeadlineOPTION ]]; then
 			hardTIME=$(date -r "$hardEPOCH" "$timeFORMAT")
 			hardDISPLAY="$hardDATE at$hardTIME"
 		fi
-		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-			sendToLog "Parameter hardEPOCH: $hardEPOCH"
-			sendToLog "Parameter hardDISPLAY: $hardDISPLAY"
-		fi
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: hardEPOCH: $hardEPOCH"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: hardDISPLAY: $hardDISPLAY"
 	else
 		sendToLog "Exit: The Hard deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
@@ -1289,7 +1434,7 @@ if [[ -n $adminACCOUNT ]]; then
 			done
 			sendToLog "Starter: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
 			addRESULT=$(sysadminctl -addUser "$superNEWACCT" -fullName "$superNEWFULL" -password "$superNEWPASS" -UID $newUID -GID 20 -shell /dev/null -home /dev/null -picture "$cachedICON" -adminUser "$adminACCOUNT" -adminPassword "$adminPASSWORD" 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter addRESULT: \n$addRESULT"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: addRESULT: \n$addRESULT"
 			dscl . create /Users/"$superNEWACCT" IsHidden 1
 			updateACCOUNT="$superACCOUNT"
 			updateKEYCHAIN="$superKEYCHAIN"
@@ -1407,17 +1552,40 @@ fi
 
 # Install items required by super.
 superInstaller() {
+# Figure out where super is running from and start Installer log if anything needs to be installed.
+superPATH="$(dirname "$0")"
+( [[ ! -d "$superFOLDER" ]] || [[ ! -d "$ibmNotifierAPP" ]] || ! ( [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]] ) ) && sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
+
 # Make sure the $superFOLDER exists.
 if [[ ! -d "$superFOLDER" ]]; then
 	mkdir -p "$superFOLDER"
-	sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
 	sendToLog "Installer: Made working folder: $superFOLDER"
 fi
 
+# Validate the IBM Notifier.app, if missing or invalid then install and check again.
+if [[ "$macosMAJOR" != "10" ]] || ( [[ "$macosMAJOR" == "10" ]] && [[ "$macosMINOR" -ge 15 ]]); then
+	if [[ ! -d "$ibmNotifierAPP" ]]; then
+		getIbmNotifier
+		[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
+		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after installation, falling back to jamfHelper."
+	else
+		checkIbmNotifier
+		if [[ "$ibmNotifierVALID" == "FALSE" ]]; then
+			sendToLog "Installer: Removing existing IBM Notifier.app."
+			rm -Rf "$ibmNotifierAPP" > /dev/null 2>&1
+			[[ -d "$superFOLDER/__MACOSX" ]] && rm -Rf "$superFOLDER/__MACOSX" > /dev/null 2>&1
+			getIbmNotifier
+			[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
+		fi
+		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after re-installation, falling back to jamfHelper."
+	fi
+else
+	sendToLog "Warning: IBM Notifier.app is not compatible with this version of macOS, falling back to jamfHelper."
+	ibmNotifierVALID="FALSE"
+fi
+
 # Install super if it's running from any location that is not in the $superFOLDER or from the $superLINK.
-superPATH="$(dirname "$0")"
 if ! ( [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]] ); then
-	sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
 	sendToLog "Installer: Copying file: $superFOLDER/super"
 	cp "$0" "$superFOLDER/super" > /dev/null 2>&1
 	sendToLog "Installer: Creating default path link: $superLINK"
@@ -1451,6 +1619,45 @@ EOSS
 	fi
 	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 	exit 0
+fi
+}
+
+# Download and install the IBM Notifier.app.
+getIbmNotifier() {
+ibmNotifierVALID="FALSE"
+sendToLog "Installer: Attempting to download and install IBM Notifier.app..."
+downloadRESULT=$(curl "$ibmNotifierURL" -L -o "/tmp/IBM.Notifier.zip" 2>&1)
+if [[ -f "/tmp/IBM.Notifier.zip" ]]; then
+	unzipRESULT=$(unzip "/tmp/IBM.Notifier.zip" -d "$superFOLDER/" 2>&1)
+	if [[ -d "$ibmNotifierAPP" ]]; then
+		[[ -d "$superFOLDER/__MACOSX" ]] && rm -Rf "$superFOLDER/__MACOSX" > /dev/null 2>&1
+		chmod -R a+rx "$ibmNotifierAPP"
+		ibmNotifierVALID="TRUE"
+	else
+		sendToLog "Warning: Unable to install IBM Notifier.app."
+		sendToLog "Verbose Mode: unzipRESULT: \n$unzipRESULT"
+	fi
+else
+	sendToLog "Warning: Unable to download IBM Notifier.app from: $ibmNotifierURL"
+	sendToLog "Verbose Mode: downloadRESULT: \n$downloadRESULT"
+fi
+}
+
+
+# Check the IBM Notifier.app for validity.
+checkIbmNotifier() {
+ibmNotifierVALID="FALSE"
+ibmNotifierCODESIGN=$(codesign --verify --verbose "$ibmNotifierAPP" 2>&1)
+if [[ $(echo "$ibmNotifierCODESIGN" | grep -c "valid on disk") -eq 1 ]]; then
+	ibmNotifierRESULT=$(defaults read "$ibmNotifierAPP/Contents/Info.plist" CFBundleShortVersionString)
+	if [[ "$ibmNotifierVERSION" == "$ibmNotifierRESULT" ]]; then
+		ibmNotifierVALID="TRUE"
+	else
+		sendToLog "Warning: IBM Notifier at path: $ibmNotifierAPP is version $ibmNotifierRESULT, this does not match target version $ibmNotifierVERSION"
+	fi
+else
+	sendToLog "Warning: unable validate signature for IBM Notifier at path: $ibmNotifierAPP."
+	sendToLog "Verbose Mode: ibmNotifierCODESIGN: \n$ibmNotifierCODESIGN"
 fi
 }
 
@@ -1541,8 +1748,9 @@ elif [[ "$openLOGS" == "TRUE" ]] && [[ "$macosMAJOR" == "10" ]]; then
 fi
 
 # Feedback for various alternate workflow modes.
-[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Starter: Skip Apple software udates enabled."
-[[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Starter: Forced restart enabled."
+[[ "$preferJamfOPTION" == "TRUE" ]] && sendToLog "Starter: Prefer jamfHelper mode enabled."
+[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Starter: Skip Apple software udates mode enabled."
+[[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Starter: Forced restart mode enabled."
 [[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Starter: Test mode enabled with $testModeTIMEOUT second timeout."
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Starter: Local preference file after validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
 [[ "$verboseModeOPTION" == "TRUE" ]] && logParameters
@@ -1578,40 +1786,44 @@ echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: Not Logged:
 
 # Log any parameters that have values.
 logParameters() {
-sendToLog "Parameter macosVERSION: $macosVERSION"
-sendToLog "Parameter macosARCH: $macosARCH"
-sendToLog "Parameter jamfVERSION: $jamfVERSION"
-[[ -n $jamfSERVER ]] && sendToLog "Parameter jamfSERVER: $jamfSERVER"
-[[ -n $defaultDeferSECONDS ]] && sendToLog "Parameter defaultDeferSECONDS: $defaultDeferSECONDS"
-[[ -n $focusDeferSECONDS ]] && sendToLog "Parameter focusDeferSECONDS: $focusDeferSECONDS"
-[[ -n $menuDeferSECONDS ]] && sendToLog "Parameter menuDeferSECONDS: $menuDeferSECONDS"
-[[ -n $displayTimeoutSECONDS ]] && sendToLog "Parameter displayTimeoutSECONDS: $displayTimeoutSECONDS"
-[[ -n $displayRedrawSECONDS ]] && sendToLog "Parameter displayRedrawSECONDS: $displayRedrawSECONDS"
-[[ -n $focusDEADLINE ]] && sendToLog "Parameter focusDEADLINE: $focusDEADLINE"
-[[ -n $softDEADLINE ]] && sendToLog "Parameter softDEADLINE: $softDEADLINE"
-[[ -n $hardDEADLINE ]] && sendToLog "Parameter hardDEADLINE: $hardDEADLINE"
-[[ -n $countDEADLINE ]] && sendToLog "Parameter countDEADLINE: $countDEADLINE"
-[[ -n $clearCOUNT ]] && sendToLog "Parameter clearCOUNT: $clearCOUNT"
-[[ -n $localOPTION ]] && sendToLog "Parameter localOPTION: $localOPTION"
-[[ -n $localPASSWORD ]] && sendToEcho "Parameter localPASSWORD: $localPASSWORD"
-[[ -n $localACCOUNT ]] && sendToLog "Parameter localACCOUNT: $localACCOUNT"
-[[ -n $localKEYCHAIN ]] && sendToEcho "Parameter localKEYCHAIN: $localKEYCHAIN"
-[[ -n $localCREDENTIAL ]] && sendToLog "Parameter localCREDENTIAL: $localCREDENTIAL"
-[[ -n $adminACCOUNT ]] && sendToLog "Parameter adminACCOUNT: $adminACCOUNT"
-[[ -n $adminPASSWORD ]] && sendToEcho "Parameter adminPASSWORD: $adminPASSWORD"
-[[ -n $superOPTION ]] && sendToLog "Parameter superOPTION: $superOPTION"
-[[ -n $superPASSWORD ]] && sendToEcho "Parameter superPASSWORD: $superPASSWORD"
-[[ -n $superACCOUNT ]] && sendToLog "Parameter superACCOUNT: $superACCOUNT"
-[[ -n $superKEYCHAIN ]] && sendToEcho "Parameter superKEYCHAIN: $superKEYCHAIN"
-[[ -n $superCREDENTIAL ]] && sendToLog "Parameter superCREDENTIAL: $superCREDENTIAL"
-[[ -n $JamfProID ]] && sendToLog "Parameter JamfProID: $JamfProID"
-[[ -n $jamfOPTION ]] && sendToLog "Parameter jamfOPTION: $jamfOPTION"
-[[ -n $jamfPASSWORD ]] && sendToEcho "Parameter jamfPASSWORD: $jamfPASSWORD"
-[[ -n $jamfACCOUNT ]] && sendToLog "Parameter jamfACCOUNT: $jamfACCOUNT"
-[[ -n $jamfKEYCHAIN ]] && sendToEcho "Parameter jamfKEYCHAIN: $jamfKEYCHAIN"
-[[ -n $jamfCREDENTIAL ]] && sendToLog "Parameter jamfCREDENTIAL: $jamfCREDENTIAL"
-[[ -n $purgeACCOUNTS ]] && sendToLog "Parameter purgeACCOUNTS: $purgeACCOUNTS"
-[[ -n $policyTRIGGERS ]] && sendToLog "Parameter policyTRIGGERS: $policyTRIGGERS"
+sendToLog "Verbose Mode: macosVERSION: $macosVERSION"
+sendToLog "Verbose Mode: macosARCH: $macosARCH"
+sendToLog "Verbose Mode: jamfVERSION: $jamfVERSION"
+[[ -n $jamfSERVER ]] && sendToLog "Verbose Mode: jamfSERVER: $jamfSERVER"
+[[ -n $ibmNotifierVALID ]] && sendToLog "Verbose Mode: ibmNotifierVALID: $ibmNotifierVALID"
+[[ -n $defaultDeferSECONDS ]] && sendToLog "Verbose Mode: defaultDeferSECONDS: $defaultDeferSECONDS"
+[[ -n $focusDeferSECONDS ]] && sendToLog "Verbose Mode: focusDeferSECONDS: $focusDeferSECONDS"
+[[ -n $menuDeferSECONDS ]] && sendToLog "Verbose Mode: menuDeferSECONDS: $menuDeferSECONDS"
+[[ -n $displayTimeoutSECONDS ]] && sendToLog "Verbose Mode: displayTimeoutSECONDS: $displayTimeoutSECONDS"
+[[ -n $displayRedrawSECONDS ]] && sendToLog "Verbose Mode: displayRedrawSECONDS: $displayRedrawSECONDS"
+[[ -n $ibmNotifierIconSIZE ]] && sendToLog "Verbose Mode: ibmNotifierIconSIZE: $ibmNotifierIconSIZE"
+[[ -n $jamfHelperIconSIZE ]] && sendToLog "Verbose Mode: jamfHelperIconSIZE: $jamfHelperIconSIZE"
+[[ -n $preferJamfOPTION ]] && sendToLog "Verbose Mode: preferJamfOPTION: $preferJamfOPTION"
+[[ -n $focusDEADLINE ]] && sendToLog "Verbose Mode: focusDEADLINE: $focusDEADLINE"
+[[ -n $softDEADLINE ]] && sendToLog "Verbose Mode: softDEADLINE: $softDEADLINE"
+[[ -n $hardDEADLINE ]] && sendToLog "Verbose Mode: hardDEADLINE: $hardDEADLINE"
+[[ -n $countDEADLINE ]] && sendToLog "Verbose Mode: countDEADLINE: $countDEADLINE"
+[[ -n $clearCOUNT ]] && sendToLog "Verbose Mode: clearCOUNT: $clearCOUNT"
+[[ -n $localOPTION ]] && sendToLog "Verbose Mode: localOPTION: $localOPTION"
+[[ -n $localPASSWORD ]] && sendToEcho "Verbose Mode: localPASSWORD: $localPASSWORD"
+[[ -n $localACCOUNT ]] && sendToLog "Verbose Mode: localACCOUNT: $localACCOUNT"
+[[ -n $localKEYCHAIN ]] && sendToEcho "Verbose Mode: localKEYCHAIN: $localKEYCHAIN"
+[[ -n $localCREDENTIAL ]] && sendToLog "Verbose Mode: localCREDENTIAL: $localCREDENTIAL"
+[[ -n $adminACCOUNT ]] && sendToLog "Verbose Mode: adminACCOUNT: $adminACCOUNT"
+[[ -n $adminPASSWORD ]] && sendToEcho "Verbose Mode: adminPASSWORD: $adminPASSWORD"
+[[ -n $superOPTION ]] && sendToLog "Verbose Mode: superOPTION: $superOPTION"
+[[ -n $superPASSWORD ]] && sendToEcho "Verbose Mode: superPASSWORD: $superPASSWORD"
+[[ -n $superACCOUNT ]] && sendToLog "Verbose Mode: superACCOUNT: $superACCOUNT"
+[[ -n $superKEYCHAIN ]] && sendToEcho "Verbose Mode: superKEYCHAIN: $superKEYCHAIN"
+[[ -n $superCREDENTIAL ]] && sendToLog "Verbose Mode: superCREDENTIAL: $superCREDENTIAL"
+[[ -n $JamfProID ]] && sendToLog "Verbose Mode: JamfProID: $JamfProID"
+[[ -n $jamfOPTION ]] && sendToLog "Verbose Mode: jamfOPTION: $jamfOPTION"
+[[ -n $jamfPASSWORD ]] && sendToEcho "Verbose Mode: jamfPASSWORD: $jamfPASSWORD"
+[[ -n $jamfACCOUNT ]] && sendToLog "Verbose Mode: jamfACCOUNT: $jamfACCOUNT"
+[[ -n $jamfKEYCHAIN ]] && sendToEcho "Verbose Mode: jamfKEYCHAIN: $jamfKEYCHAIN"
+[[ -n $jamfCREDENTIAL ]] && sendToLog "Verbose Mode: jamfCREDENTIAL: $jamfCREDENTIAL"
+[[ -n $purgeACCOUNTS ]] && sendToLog "Verbose Mode: purgeACCOUNTS: $purgeACCOUNTS"
+[[ -n $policyTRIGGERS ]] && sendToLog "Verbose Mode: policyTRIGGERS: $policyTRIGGERS"
 }
 
 ######## FUNCTIONS - JAMF PRO API ########
@@ -1619,25 +1831,24 @@ sendToLog "Parameter jamfVERSION: $jamfVERSION"
 # Validate the connection to a managed computer's Jamf Pro service and set $jamfSERVER accordingly.
 getJamfProServer() {
 jamfSTATUS=$("$jamfBINARY" checkJSSConnection -retry 1)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfSTATUS is: $jamfSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: jamfSTATUS is: $jamfSTATUS"
 if [[ $(echo "$jamfSTATUS" | grep -c "available") -ne 0 ]]; then
 	jamfSERVER=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
 else
 	jamfSERVER="FALSE"
 	sendToLog "Status: Jamf Pro service unavaiable."
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfSERVER is: $jamfSERVER"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: jamfSERVER is: $jamfSERVER"
 }
 
 # Attempt to acquire a Jamf Pro $jamfProTOKEN via $jamfACCOUNT and $jamfKEYCHAIN credentials.
 getJamfProToken() {
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToEcho "Status: Saved credentials for Jamf Pro API account \"$jamfACCOUNT\" with password \"$jamfKEYCHAIN\"."
 if [[ "$macosMAJOR" -eq 10 ]] || [[ "$macosMAJOR" -eq 11 ]]; then
 	jamfProTOKEN=$(curl -X POST -u "$jamfACCOUNT:$jamfKEYCHAIN" -s "${jamfSERVER}api/v1/auth/token" | python -c 'import sys, json; print json.load(sys.stdin)["token"]')
 else
 	jamfProTOKEN=$(curl -X POST -u "$jamfACCOUNT:$jamfKEYCHAIN" -s "${jamfSERVER}api/v1/auth/token" | plutil -extract token raw -)
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfProTOKEN is: \n$jamfProTOKEN"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: jamfProTOKEN is: \n$jamfProTOKEN"
 }
 
 # Validate that the account $jamfACCOUNT and $jamfKEYCHAIN are valid credentials and has appropriate permissions to send MDM commands. If not set $jamfERROR.
@@ -1662,30 +1873,30 @@ fi
 # Use $jamfProIdMANAGED or $jamfProTOKEN to find the computer's Jamf Pro ID and set $jamfProID.
 getJamfProComputerID() {
 computerUDID=$(system_profiler SPHardwareDataType | awk '/UUID/ { print $3; }')
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter computerUDID is: $computerUDID"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: computerUDID is: $computerUDID"
 if [[ -n $jamfProIdMANAGED ]]; then
 	jamfProID="$jamfProIdMANAGED"
 else
 	sendToLog "Warning: Using a Jamf Pro API account with \"Computers > Read\" privileges to collect the computer ID is a security risk. Instead use a custom Configuration Profile with the following; Preference Domain \"com.macjutsu.super\", Key \"JamfProID\", String \"\$JSSID\"."
 	jamfProID=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --header "Accept: application/xml" --request GET --url "${jamfSERVER}JSSResource/computers/udid/${computerUDID}/subset/General" 2> /dev/null | xpath -e /computer/general/id 2>&1 | awk -F'<id>|</id>' '{print $2}' | xargs)
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfProID is: $jamfProID"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: jamfProID is: $jamfProID"
 }
 
 # Attempt to send a Blank Push to Jamf Pro.
 sendBlankPush() {
 commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/BlankPush/id/${jamfProID}")
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter commandRESULT is: \n$commandRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
 }
 
 # Validate $jamfProTOKEN and if found invalid, a new token is requested and again validated.
 checkJamfProServerToken() {
 tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter tokenCHECK is: $tokenCHECK"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: tokenCHECK is: $tokenCHECK"
 if [[ $tokenCHECK -ne 200 ]]; then
 	getJamfProToken
 	tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter tokenCHECK is: $tokenCHECK"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: tokenCHECK is: $tokenCHECK"
 	if [[ $tokenCHECK -ne 200 ]]; then
 		sendToLog "Exit: Could not retrieve Jamf Pro API token for account \"$jamfACCOUNT\", verify account credentials." 
 		rm -f "$superPIDFILE"
@@ -1750,7 +1961,7 @@ if [[ -n $hardEPOCH ]] && [[ $hardEPOCH -lt $(date +%s) ]]; then
 		sendToLog "Status: Hard deadline of $hardDISPLAY has passed."
 		deadlineSTATUS="HARD"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter deadlineSTATUS is: $deadlineSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: deadlineSTATUS is: $deadlineSTATUS"
 }
 
 # Clear the DeferCount in $superPLIST to disable/reset the maximum deferral counter.
@@ -1784,7 +1995,7 @@ if [[ -n $countDEADLINE ]]; then
 		fi
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter deadlineSTATUS is: $deadlineSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: deadlineSTATUS is: $deadlineSTATUS"
 }
 
 # Evaluate if a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb, and set $focusDEFER accordingly.
@@ -1813,7 +2024,7 @@ if [[ -n $focusDeferSECONDS ]]; then
 	fi
 	IFS="$oldIFS"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter focusDEFER is: $focusDEFER"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: focusDEFER is: $focusDEFER"
 }
 
 ######## FUNCTIONS - UPDATES ########
@@ -1823,14 +2034,14 @@ checkAppleUpdates() {
 # Collect Apple software updates list.
 sendToLog "Status: Checking available Apple software updates..."
 updateRESULT=$(softwareupdate --list 2>&1)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updateRESULT is: $updateRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updateRESULT is: $updateRESULT"
 
 # Double-checking for false positives on macOS 11 or later.
 if [[ "$macosMAJOR" != "10" ]] && [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
 	sendToLog "Status: Double-checking available Apple software updates..."
 	sleep 5
 	updateRESULT=$(softwareupdate --list 2>&1)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updateRESULT is: $updateRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updateRESULT is: $updateRESULT"
 fi
 
 # After checking updates parse the $updateRESULT and set $updatesRECOMMENDED, $updatesRESTART, and $downloadREQUIRED accordingly.
@@ -1846,14 +2057,14 @@ else
 	else
 		parsedNAMES=$(echo "$updateRESULT" | awk -F'(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//')
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter parsedNAMES is: \n$parsedNAMES"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: parsedNAMES is: \n$parsedNAMES"
 
 	# If any $parsedNAMES are available, create $updateNAMES[] array and send to log.
 	if [[ -n $parsedNAMES ]]; then
 		oldIFS="$IFS"
 		IFS=$'\n'
 		updateNAMES=($parsedNAMES)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updateNAMES is: \n${updateNAMES[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updateNAMES is: \n${updateNAMES[*]}"
 		sendToLog "Status: ${#updateNAMES[@]} available software udpate(s)."
 		for i in "${!updateNAMES[@]}"; do
 			sendToLog "Update $((i+1)): ${updateNAMES[i]}"
@@ -1879,10 +2090,10 @@ else
 	
 		# Evaluate previously downloaded updates and compare them to currently available updates, setting $downloadREQUIRED accordingly.
 		previousDOWNLOADS=$(defaults read "$superPLIST" UpdateDownloads 2> /dev/null)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter previousDOWNLOADS is: \n$previousDOWNLOADS"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: previousDOWNLOADS is: \n$previousDOWNLOADS"
 		if [[ -n $previousDOWNLOADS ]]; then
 			downloadedNAMES=($(echo "$previousDOWNLOADS" | grep -wv -e '(' -e ')' | sed -e 's/    //g' -e 's/"//g' -e 's/,//g'))
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadedNAMES is: \n${downloadedNAMES[*]}"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: downloadedNAMES is: \n${downloadedNAMES[*]}"
 			if [[ ! $(echo -e "${downloadedNAMES[*]}\n${updateNAMES[*]}" | sort | uniq -u) ]]; then
 				downloadREQUIRED="FALSE"
 			else
@@ -1900,9 +2111,9 @@ else
 		exit 1
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updatesRECOMMENDED is: $updatesRECOMMENDED"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter updatesRESTART is: $updatesRESTART"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadREQUIRED is: $downloadREQUIRED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updatesRECOMMENDED is: $updatesRECOMMENDED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updatesRESTART is: $updatesRESTART"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: downloadREQUIRED is: $downloadREQUIRED"
 }
 
 # This function checks the update status after a previous super system update.
@@ -1915,7 +2126,7 @@ if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; t
 		sendToLog "Status: Submiting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfRESULT is: \n$jamfRESULT"
+			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
 		else
 			"$jamfBINARY" recon > /dev/null 2>&1
 		fi
@@ -1923,7 +2134,7 @@ if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; t
 		sendToLog "Status: Running Jamf Pro check-in policies. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" policy -verbose 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter jamfRESULT is: \n$jamfRESULT"
+			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
 		else
 			"$jamfBINARY" policy > /dev/null 2>&1
 		fi
@@ -1966,7 +2177,7 @@ if [[ "$macosMAJOR" != "10" ]]; then
 	kill -9 $updateStreamPID > /dev/null 2>&1
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU DOWNLOAD END ****" >> "$updateLOG"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter downloadRESULT is: $downloadRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: downloadRESULT is: $downloadRESULT"
 
 # Parse $downloadRESULT for individual downloads and write to $superLOG and $superPLIST.
 parsedDOWNLOADS=$(echo "$downloadRESULT" | grep "Downloaded" | cut -d " " -f 2-)
@@ -1992,7 +2203,7 @@ downloadAllUpdatesMDM() {
 sendToLog "Status: Starting MDM download of all updates."
 # This pre-flights the MDM query locally and may also be useful for troubleshooting.
 availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter availableOSUPDATES is: \n$availableOSUPDATES"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
 
 # Make sure we still have a valid Jamf Pro API token.
 checkJamfProServerToken
@@ -2011,7 +2222,7 @@ disown
 
 # Send the Jamf Pro API command to update and restart via MDM.
 commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/download/id/${jamfProID}")
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter commandRESULT is: \n$commandRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
 
 # If the Jamf Pro API command was successfully created, monitor the download progress.
 if [[ $commandRESULT -eq 201 ]]; then
@@ -2105,7 +2316,7 @@ if [[ "$macosMAJOR" != "10" ]]; then
 	kill -9 $updateStreamPID > /dev/null 2>&1
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU RECOMMENDED INSTALL END ****" >> "$updateLOG"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter recommendedRESULT is: $recommendedRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: recommendedRESULT is: $recommendedRESULT"
 
 # Parse $recommendedRESULT for individual installations and send to log.
 parsedRECOMMENDED=$(echo "$recommendedRESULT" | grep "Done with" | cut -c 11-)
@@ -2136,7 +2347,7 @@ for trigger in ${triggerARRAY[@]}; do
 		sendToLog "Status: Jamf Policy with Trigger $trigger is starting..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" policy -trigger "$trigger" -verbose 2>&1)
-			sendToLog "Parameter jamfRESULT is: \n$jamfRESULT"
+			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
 		else
 			"$jamfBINARY" policy -trigger "$trigger" > /dev/null 2>&1
 		fi
@@ -2149,18 +2360,19 @@ IFS="$oldIFS"
 
 # This is the install and restart workflow when a user is NOT logged in.
 installRestartSilent(){
-[[ -n $policyTRIGGERS ]] && runJamfPolicies # If requested, run Jamf Policy Triggers.
 if [[ "$updatesRESTART" == "TRUE" ]]; then # Only install Apple updates if needed.
 	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If requested, run Jamf Policy Triggers.
 		installUpdatesRestartASU
 	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If requested, run Jamf Policy Triggers.
 		installUpdatesRestartMDM
 	else # # Apple Silicon with no valid update credentials.
 		sendToLog "Status: No valid Apple Silicon credentials and no current local user, trying again in $defaultDeferSECONDS seconds."
 		makeLaunchDaemonCalendar
 	fi
 else # Otherwise, this is the restart when there are no Apple updates but $forceRestartOPTION is enabled.
-	sendToLog "Status: Forced restart, Jamf restarting computer..."
+	sendToLog "Forced Restart Mode: Jamf restarting computer..."
 	"$jamfBINARY" reboot -immediately &
 	disown
 fi
@@ -2170,28 +2382,40 @@ defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 
 # This is the install and restart workflow when a user is logged in.
 installRestartMain(){
-[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
-if [[ "$updatesRESTART" == "TRUE" ]] || [[ "$testModeOPTION" == "TRUE" ]]; then # Only install Apple updates if needed.
+if [[ "$updatesRESTART" == "TRUE" ]]; then # Only install Apple updates if needed.
 	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
 		notifyRestart
+		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
 		installUpdatesRestartASU
 	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
 		notifyRestartPrepMDM
+		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
 		installUpdatesRestartMDM
-	else # Can only encourage manual update if Apple Silicon with no valid update credentials.
-		notifyEncourageSelfUpdate
+	else # Can only encourage manual self-update if Apple Silicon with no valid update credentials.
+		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update crednetials to ensure a proper workflow."
+		notifySelfUpdate &
+		disown
 	fi
+	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 else # Otherwise, this is the restart when there are no Apple updates but $forceRestartOPTION is enabled.
+	notifyRestart
+	[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
 	if [[ "$testModeOPTION" != "TRUE" ]]; then
-		sendToLog "Status: Forced restart, Jamf restarting computer..."
+		sendToLog "Forced Restart Mode: Jamf restarting computer..."
 		"$jamfBINARY" reboot -immediately &
 		disown
 	else
-		sendToLog "Test Mode: Skipping Jamf restart."
+		sendToLog "Test Mode: Skipping Jamf restart, killing restart notification in $testModeTIMEOUT seconds..."
+		sleep "$testModeTIMEOUT"
+		kill -9 "$notifyPID" > /dev/null 2>&1
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+		else
+			killall -9 "jamfHelper" > /dev/null 2>&1
+		fi
 	fi
 fi
 clearMaxDeferralCounter
-defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 }
 
 # Install all available updates and restart the computer via Apple softwareupdate.
@@ -2232,7 +2456,11 @@ else
 	sendToLog "Test Mode: Killing update restart notification in $testModeTIMEOUT seconds..."
 	sleep "$testModeTIMEOUT"
 	kill -9 "$notifyPID" > /dev/null 2>&1
-	killall -9 "jamfHelper"  > /dev/null 2>&1
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+	else
+		killall -9 "jamfHelper" > /dev/null 2>&1
+	fi
 fi
 }
 
@@ -2242,7 +2470,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	sendToLog "Status: Starting MDM install of all updates and restarting."
 	# This pre-flights the MDM query locally and may also be useful for troubleshooting.
 	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter availableOSUPDATES is: \n$availableOSUPDATES"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
 	
 	# Make sure we still have a valid Jamf Pro API token.
 	checkJamfProServerToken
@@ -2261,7 +2489,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	
 	# Send the Jamf Pro API command to update and restart via MDM.
 	commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/install/id/${jamfProID}")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Parameter commandRESULT is: \n$commandRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
 	
 	# If the Jamf Pro API command was successfully created, monitor the update progress.
 	if [[ "$testModeOPTION" != "TRUE" ]] && [[ $commandRESULT -eq 201 ]]; then
@@ -2284,7 +2512,11 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		echo
 		sendBlankPush
 		kill -9 "$notifyPID" > /dev/null 2>&1
-		killall -9 "jamfHelper"  > /dev/null 2>&1
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+		else
+			killall -9 "jamfHelper" > /dev/null 2>&1
+		fi
 		notifyRestart
 		
 		# Watch $mdmLOG while waiting for the MDM workflow to complete.
@@ -2321,16 +2553,23 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	fi
 else
 	sendToLog "Test Mode: Skipping MDM update and restart request."
-	commandRESULT=""
 	sendToLog "Test Mode: Killing MDM preparation notification in $testModeTIMEOUT seconds..."
 	sleep "$testModeTIMEOUT"
 	kill -9 "$notifyPID" > /dev/null 2>&1
-	killall -9 "jamfHelper"  > /dev/null 2>&1
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+	else
+		killall -9 "jamfHelper" > /dev/null 2>&1
+	fi
 	notifyRestart
 	sendToLog "Test Mode: Killing update restart notification in $testModeTIMEOUT seconds..."
 	sleep "$testModeTIMEOUT"
 	kill -9 "$notifyPID" > /dev/null 2>&1
-	killall -9 "jamfHelper"  > /dev/null 2>&1
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+	else
+		killall -9 "jamfHelper" > /dev/null 2>&1
+	fi
 fi
 }
 
@@ -2362,11 +2601,7 @@ makeLaunchDaemonRestartNow() {
 </plist>
 EOLDL
 
-# Additional verbose mode logging.
-if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-	sendToLog "LaunchDaemon: $launchDaemonNAME.plist...
-$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
-fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "LaunchDaemon: $launchDaemonNAME.plist...\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
 
 # Set proper permissions and load the LaunchDaemon.
 chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
@@ -2404,11 +2639,7 @@ makeLaunchDaemonOnStartup() {
 </plist>
 EOLDL
 
-# Additional verbose mode logging.
-if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-	sendToLog "LaunchDaemon: $launchDaemonNAME.plist...
-$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
-fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "LaunchDaemon: $launchDaemonNAME.plist...\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
 
 # Set proper permissions and load the LaunchDaemon.
 chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
@@ -2460,11 +2691,7 @@ minute=$(date -j -f "%s" "$deferCALC" "+%M" | xargs)
 </plist>
 EOLDL
 
-# Additional verbose mode logging.
-if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-	sendToLog "LaunchDaemon: $launchDaemonNAME.plist...
-$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
-fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "LaunchDaemon: $launchDaemonNAME.plist...\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
 
 # Set proper permissions and load the LaunchDaemon.
 chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
@@ -2478,191 +2705,418 @@ exit 0
 
 ######## FUNCTIONS - USER INTERACTION ########
 
-# Open $jamfHELPER using the $helperARRAY[] options including the handling of any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
-openJamfHelper() {
+# Open $ibmNotifierBINARY using the $ibmNotifierARRAY[] options including the handling of any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
+openIbmNotifier() {
 unset dialogRESULT
+unset dialogRETURN
 if [[ -n $displayRedrawSECONDS ]]; then
 	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$(($displayTimeoutSECONDS-1))
-	while [[ -z $dialogRESULT ]]; do
-		[[ -n $displayTimeoutSECONDS ]] && helperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${helperARRAY[*]}"
-		(sleep "$displayRedrawSECONDS"; killall -9 "jamfHelper" > /dev/null 2>&1) &
+	while [[ -z $dialogRETURN ]] || [[ "$dialogRETURN" -eq 137 ]]; do
+		( [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+		( [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
+		(sleep "$displayRedrawSECONDS"; killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1) &
 		killerPID=$!
-		dialogRESULT=$("$jamfHELPER" "${helperARRAY[@]}" 2> /dev/null)
+		dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
+		dialogRETURN="$?"
 		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Notify Results: $dialogRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS-displayRedrawSECONDS))
 	done
 else
-	[[ -n $displayTimeoutSECONDS ]] && helperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${helperARRAY[*]}"
-	dialogRESULT=$("$jamfHELPER" "${helperARRAY[@]}")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Notify Results: $dialogRESULT"
+	( [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+	( [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
+	dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
+	dialogRETURN="$?"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
 fi
 }
 
-# Generate the $helperARRAY[] to display a non-interactive notification informing the user that softwareupdate is ready to restart.
+# Open $jamfHELPER using the $jamfHelperARRAY[] options including the handling of any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
+openJamfHelper() {
+unset dialogRESULT
+unset dialogRETURN
+if [[ -n $displayRedrawSECONDS ]]; then
+	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$(($displayTimeoutSECONDS-1))
+	while [[ -z $dialogRESULT ]]; do
+		[[ -n $displayTimeoutSECONDS ]] && jamfHelperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper options: ${jamfHelperARRAY[*]}"
+		(sleep "$displayRedrawSECONDS"; killall -9 "jamfHelper" > /dev/null 2>&1) &
+		killerPID=$!
+		dialogRESULT=$("$jamfHELPER" "${jamfHelperARRAY[@]}")
+		dialogRETURN="$?"
+		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
+		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS-displayRedrawSECONDS))
+	done
+else
+	[[ -n $displayTimeoutSECONDS ]] && jamfHelperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper options: ${jamfHelperARRAY[*]}"
+	dialogRESULT=$("$jamfHELPER" "${jamfHelperARRAY[@]}")
+	dialogRETURN="$?"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
+fi
+}
+
+# Display a non-interactive notification informing the user that the computer going to restart soon.
 notifyRestart() {
-# Create initial $helperARRAY[] settings for the dialog.
-helperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "Software Updates Require Restart" -alignDescription left -icon "$cachedICON")
-# Description for preparing updates.
-if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
-	helperARRAY+=(-description "The final deadline has passed:
-$hardDISPLAY
+# Non-interactive notifications do not need a redraw or timeout.
+unset displayRedrawSECONDS
+unset displayTimeoutSECONDS
+
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	# Create initial $ibmNotifierARRAY[] settings for the notification.
+	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "Software Updates Require Restart" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+
+	# Body text for pending restart.
+	if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
+		sendToLog "IBM Notifier: Hard Deadline restart soon notification."
+		ibmNotifierARRAY+=(-subtitle "The final deadline of $hardDISPLAY has passed.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now.")
+	else # The update preparation notification for all other workflows.
+		sendToLog "IBM Notifier: Restart soon notification."
+		ibmNotifierARRAY+=(-subtitle "This computer will automatically restart very soon.\n\nSave any open documents now.")
+	fi
+
+	# Open notification in the background allowing super to continue.
+	openIbmNotifier &
+	notifyPID=$!
+	disown
+else
+	# Create initial $jamfHelperARRAY[] settings for the dialog.
+	jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "Software Updates Require Restart" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
+	
+	# Body text for pending restart. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
+		sendToLog "jamfHelper Notification: Hard Deadline restart soon notification."
+		jamfHelperARRAY+=(-description "The final deadline of $hardDISPLAY has passed.
 
 This computer will automatically restart very soon.
 
 Save any open documents now.")
-else # The update preparation notification for all other workflows.
-	helperARRAY+=(-description "This computer will automatically restart very soon.
+	else # The update preparation notification for all other workflows.
+		sendToLog "jamfHelper: Restart soon notification."
+		jamfHelperARRAY+=(-description "This computer will automatically restart very soon.
 
 Save any open documents now.")
-fi
+	fi
 
-# Non-interactive notifications do not need a timeout, so start without the $displayTimeoutSECONDS options.
-unset displayTimeoutSECONDS
-sendToLog "Notification: Update restart soon."
-openJamfHelper &
-notifyPID=$!
-disown
+	# Open notification in the background allowing super to continue.
+	openJamfHelper &
+	notifyPID=$!
+	disown
+fi
 }
 
-# Generate the $helperARRAY[] to display a non-interactive notification informing the user that the MDM update is progressing.
+# Display a non-interactive notification informing the user that the MDM update process has started.
 notifyRestartPrepMDM() {
-# Create initial $helperARRAY[] settings for the dialog.
-helperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "Software Updates Require Restart" -alignDescription left -icon "$cachedICON" -timeout "$displayTimeoutSECONDS" -countdown)
+# Non-interactive notifications do not need a redraw or timeout.
+unset displayRedrawSECONDS
+unset displayTimeoutSECONDS
 
-# Description for preparing updates.
-if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
-	helperARRAY+=(-description "The final deadline has passed:
-$hardDISPLAY
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	# Create initial $ibmNotifierARRAY[] settings for the notification.
+	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "Software Updates Require Restart" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+
+	# Body text for MDM preparation.
+	if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
+		sendToLog "IBM Notifier: Hard Deadline MDM preparation notification."
+		ibmNotifierARRAY+=(-subtitle "The final deadline has passed: $hardDISPLAY\n\nA required software update will automatically restart this computer in about 5 minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process.")
+	else # The update preparation notification for all other workflows.
+		sendToLog "IBM Notifier: MDM preparation notification."
+		ibmNotifierARRAY+=(-subtitle "A required software update will automatically restart this computer in about 5 minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process.")
+	fi
+
+	# Open notification in the background allowing super to continue.
+	openIbmNotifier &
+	notifyPID=$!
+	disown
+else
+	# Create initial $jamfHelperARRAY[] settings for the dialog.
+	jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "Software Updates Require Restart" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
+
+	# Body text for MDM preparation. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	if [[ "$deadlineSTATUS" == "HARD" ]]; then # Only the hard deadline requires additional explanation.
+		sendToLog "jamfHelper: Hard Deadline MDM preparation notification."
+		jamfHelperARRAY+=(-description "The final deadline has passed: $hardDISPLAY
 
 A required software update will automatically restart this computer in about 5 minutes.
 
 During this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process.")
-else # The update preparation notification for all other workflows.
-	helperARRAY+=(-description "A required software update will automatically restart this computer in about 5 minutes.
+	else # The update preparation notification for all other workflows.
+		sendToLog "jamfHelper: Hard Deadline MDM preparation notification."
+		jamfHelperARRAY+=(-description "A required software update will automatically restart this computer in about 5 minutes.
 
 During this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process.")
-fi
+	fi
 
-# Non-interactive notifications do not need a timeout, so start without the $displayTimeoutSECONDS options.
-unset displayTimeoutSECONDS
-sendToLog "Notification: MDM update restart preparation."
-openJamfHelper &
-notifyPID=$!
-disown
+	# Open notification in the background allowing super to continue.
+	openJamfHelper &
+	notifyPID=$!
+	disown
+fi
 }
 
-# Open both a non-interactive jamfHelper notification and the Software Update System Preference in the case where there are no valid Apple Silicon credentials but a restart update is required.
-notifyEncourageSelfUpdate() {
-sendToLog "Notification: No valid Apple Silicon credentials, encouraging user installation..."
-# Create initial $helperARRAY[] settings for the dialog.
-helperARRAY=(-windowType hud -windowPosition ul -lockHUD -title "Software Updates Require Restart" -alignDescription left -icon "$cachedICON")
+# Open both a non-interactive notification and the Software Update System Preference in the case where there are no valid Apple Silicon credentials but a restart update is required.
+notifySelfUpdate() {
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	sendToLog "IBM Notifier: No valid Apple Silicon credentials, opening self-update notification..."
+	# Create initial $ibmNotifierARRAY[] settings for the notification.
+	ibmNotifierARRAY=(-type popup -always_on_top -position top_left -bar_title "Software Updates Require Restart" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 
-# Description for encouraging user restart update.
-helperARRAY+=(-description "You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update.")
+	# Body text for self-update notification.
+	ibmNotifierARRAY+=(-subtitle "You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update.")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
+else
+	sendToLog "jamfHelper: No valid Apple Silicon credentials, opening self-update notification..."
+	# Create initial $jamfHelperARRAY[] settings for the dialog.
+	jamfHelperARRAY=(-windowType hud -windowPosition ul -lockHUD -title "Software Updates Require Restart" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
+
+	# Body text for self-update notification. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	jamfHelperARRAY+=(-description "You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update.")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${jamfHelperARRAY[*]}"
+fi
 
 # Start System Preferences and the notification.
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${helperARRAY[*]}"
 unset dialogRESULT
 if [[ -n $displayRedrawSECONDS ]]; then
 	[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=0
-	[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Test Mode: Killing encourage update notification after 3 attempts..."
+	[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Test Mode: Killing self-update notification after 3 attempts..."
+	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self-update notification will re-display every $displayRedrawSECONDS seconds until the user restarts the computer."
 	while [[ -z $dialogRESULT ]] && [[ redrawCOUNTER -lt 3 ]]; do
-		"$jamfHELPER" "${helperARRAY[@]}" &
-		sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" &
-		disown
+		sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
+		else
+			"$jamfHELPER" "${jamfHelperARRAY[@]}" &
+		fi
 		sleep "$displayRedrawSECONDS"
 		[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=$((redrawCOUNTER+1))
-		killall -9 "jamfHelper" > /dev/null 2>&1
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+		else
+			killall -9 "jamfHelper" > /dev/null 2>&1
+		fi
 		killall -9 "System Preferences" > /dev/null 2>&1
 	done
 else
-	"$jamfHELPER" "${helperARRAY[@]}" &
-	sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" &
-	disown
+	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self-update notification will not close until the user restarts the computer."
+	sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
+	else
+		"$jamfHELPER" "${jamfHelperARRAY[@]}" &
+	fi
 	if [[ "$testModeOPTION" == "TRUE" ]]; then
-		sendToLog "Test Mode: Killing encourage update notification in $testModeTIMEOUT seconds..."
+		sendToLog "Test Mode: Killing self-update notification in $testModeTIMEOUT seconds..."
 		sleep "$testModeTIMEOUT"
-		killall -9 "jamfHelper" > /dev/null 2>&1
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+		else
+			killall -9 "jamfHelper" > /dev/null 2>&1
+		fi
 		killall -9 "System Preferences" > /dev/null 2>&1
 	fi
 fi
 }
 
-# Generate the $helperARRAY[] to display an interactive dialog when $softDEADLINE has passed.
+# Generate the $ibmNotifierARRAY[] or $jamfHelperARRAY[] to display an interactive dialog when $softDEADLINE has passed.
 dialogSoftDeadline() {
-# Create initial $helperARRAY[] settings for the dialog.
-helperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -button1 "$defaultBUTTON" -defaultButton 1)
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	sendToLog "IBM Notifier: Soft deadline passed dialog..."
+	# Create initial $ibmNotifierARRAY[] settings for the dialog.
+	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "Software Updates Require Restart" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$restartButtonTEXT")
 
-# Description for being past the hard deadline date.
-helperARRAY+=(-description "You have reached the deadline of:
-$softDISPLAY.")
+	# Body text for being past the hard deadline date.
+	ibmNotifierARRAY+=(-subtitle "You have reached the deadline of: $softDISPLAY.")
 
-# Start the dialog.
-sendToLog "Dialog: Soft deadline passed..."
-openJamfHelper
-sendToLog "Status: User accepted soft deadline dialog."
+	# Start the dialog.
+	openIbmNotifier
+
+	# The $dialogRETURN contains the IBM Notifier.app return code.
+	case "$dialogRETURN" in
+		0)
+			sendToLog "Status: User chose to restart."
+		;;
+		255)
+			sendToLog "Status: Display timeout automatically chose to restart."
+		;;
+	esac
+else
+	sendToLog "jamfHelper: Soft deadline passed dialog..."
+	# Create initial $jamfHelperARRAY[] settings for the dialog.
+	jamfHelperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$restartButtonTEXT" -defaultButton 1)
+
+	# Body text for being past the hard deadline date. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	jamfHelperARRAY+=(-description "You have reached the deadline of: $softDISPLAY.")
+
+	# Start the dialog.
+	openJamfHelper
+	sendToLog "Status: User or display timeout accepted soft deadline dialog."
+fi
 }
 
-# Generate the $helperARRAY[] to display an interactive dialog when $countDEADLINE is exceeded.
+# Generate the $ibmNotifierARRAY[] or $jamfHelperARRAY[] to display an interactive dialog when $countDEADLINE is exceeded.
 dialogCountDeadline() {
-# Create initial $helperARRAY[] settings for the dialog.
-helperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -button1 "$defaultBUTTON" -defaultButton 1)
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	sendToLog "IBM Notifier: Defer count exceeded dialog..."
+	# Create initial $ibmNotifierARRAY[] settings for the dialog.
+	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "Software Updates Require Restart" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$restartButtonTEXT")
 
-# Description for being past the count deadline.
-helperARRAY+=(-description "You have deferred the maximum number of $countDEADLINE times.")
+	# Body text for being past the hard deadline date.
+	ibmNotifierARRAY+=(-subtitle "You have deferred the maximum number of $countDEADLINE times.")
 
-# Start the dialog.
-sendToLog "Dialog: Defer count exceeded..."
-openJamfHelper
-sendToLog "Status: User accepted defer count exceeded deadline dialog."
+	# Start the dialog.
+	openIbmNotifier
+	
+	# The $dialogRETURN contains the IBM Notifier.app return code.
+	case "$dialogRETURN" in
+		0)
+			sendToLog "Status: User chose to restart."
+		;;
+		255)
+			sendToLog "Status: Display timeout automatically chose to restart."
+		;;
+	esac
+else
+	sendToLog "jamfHelper: Defer count exceeded dialog..."
+	# Create initial $jamfHelperARRAY[] settings for the dialog.
+	jamfHelperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$restartButtonTEXT" -defaultButton 1)
+
+	# Body text for being past the count deadline. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	jamfHelperARRAY+=(-description "You have deferred the maximum number of $countDEADLINE times.")
+
+	# Start the dialog.
+	openJamfHelper
+	sendToLog "Status: User or display timeout accepted defer count exceeded deadline dialog."
+fi
 }
 
-# Generate the $helperARRAY[] to display an interactive dialog with deferral options.
+# Generate the $jamfHelperARRAY[] to display an interactive dialog with deferral options. This sets $choiceINSTALL and if $menuDeferSECONDS then also sets $defaultDeferSECONDS.
 dialogAskForUpdate() {
-# Create initial $helperARRAY[] settings for the dialog.
-helperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -button1 "$defaultBUTTON" -button2 "$cancelBUTTON" -defaultButton 1 -cancelButton 2)
-
 # The soft deadline is always sooner, so it takes priority in the dialog.
 [[ -n $hardDEADLINE ]] && dateDISPLAY="$hardDISPLAY"
 [[ -n $softDEADLINE ]] && dateDISPLAY="$softDISPLAY"
 
-# Description variations based on deadline options.
-if [[ -n "$dateDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
-	helperARRAY+=(-description "¥ Deferral available until deadline of:
-$dateDISPLAY.
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	sendToLog "IBM Notifier: Ask for restart or defer dialog..."
+	# Create initial $ibmNotifierARRAY[] settings for the dialog.
+	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "Software Updates Require Restart" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonTEXT" -secondary_button_label "$restartButtonTEXT")
+
+	# Body text variations based on deadline options.
+	if [[ -n "$dateDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
+		ibmNotifierARRAY+=(-subtitle "¥ Deferral available until deadline of: $dateDISPLAY.\n\n¥ $countDISPLAY out of $countDEADLINE deferrals remain available.\n")
+	elif [[ -n "$dateDISPLAY" ]]; then # Show only date deadline.
+		ibmNotifierARRAY+=(-subtitle "¥ Deferral available until deadline of: $dateDISPLAY.\n")
+	elif [[ -n "$countDISPLAY" ]]; then # Show only maximum deferral count deadline.
+		ibmNotifierARRAY+=(-subtitle "¥ $countDISPLAY out of $countDEADLINE deferrals remain available.\n")
+	else # Show no deadlines.
+		ibmNotifierARRAY+=(-subtitle "¥ No deadline date and unlimited deferrals.\n")
+	fi
+
+	# If needed, add the $menuDeferSECONDS option to the $ibmNotifierARRAY[].
+	if [[ -n $menuDeferSECONDS ]]; then
+		oldIFS="$IFS"
+		IFS=$','
+		menuDeferSecondsARRAY=($menuDeferSECONDS)
+		menuDeferDisplayARRAY=($menuDeferSECONDS)
+		for i in "${!menuDeferDisplayARRAY[@]}"; do
+			if [[ ${menuDeferDisplayARRAY[i]} -lt 3600 ]]; then
+				menuDeferDisplayARRAY[i]="$((${menuDeferDisplayARRAY[i]} / 60)) minutes"
+			elif [[ ${menuDeferDisplayARRAY[i]} -eq 3600 ]]; then
+				menuDeferDisplayARRAY[i]="1 hour"
+			elif [[ ${menuDeferDisplayARRAY[i]} -gt 3600 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 7200 ]]; then
+				menuDeferDisplayARRAY[i]="1 hour $((${menuDeferDisplayARRAY[i]} % 3600 / 60)) Minutes"
+			elif [[ ${menuDeferDisplayARRAY[i]} -ge 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $(( ${menuDeferDisplayARRAY[i]} % 3600 )) -eq 0 ]]; then
+				menuDeferDisplayARRAY[i]="$((${menuDeferDisplayARRAY[i]} / 3600)) hours"
+			elif [[ ${menuDeferDisplayARRAY[i]} -gt 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $(( ${menuDeferDisplayARRAY[i]} % 3600 )) -ne 0 ]]; then
+				menuDeferDisplayARRAY[i]="$((${menuDeferDisplayARRAY[i]} / 3600)) hours $((${menuDeferDisplayARRAY[i]} % 3600 / 60)) minutes"
+			elif [[ ${menuDeferDisplayARRAY[i]} -eq 86400 ]]; then
+				menuDeferDisplayARRAY[i]="1 day"
+			fi
+		done
+		IFS=$'\n'
+		menuDisplayTEXT="${menuDeferDisplayARRAY[*]}"
+		IFS="$oldIFS"
+		ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title Defer software update for: /list $menuDisplayTEXT /selected 0")
+	fi
+
+	# Start the dialog.
+	openIbmNotifier
+
+	# The $dialogRETURN contains the IBM Notifier.app return code. If $menuDeferSECONDS was enabled then set $defaultDeferSECONDS.
+	case "$dialogRETURN" in
+		0)
+			choiceINSTALL="FALSE"
+			if [[ -n $menuDeferSECONDS ]]; then
+				defaultDeferSECONDS="${menuDeferSecondsARRAY[$dialogRESULT]}"
+				sendToLog "Status: User chose to defer update for $defaultDeferSECONDS seconds."
+			else
+				sendToLog "Status: User chose to defer update, using the default defer of $defaultDeferSECONDS seconds."
+			fi
+		;;
+		255)
+			choiceINSTALL="FALSE"
+			if [[ -n $menuDeferSECONDS ]]; then
+				defaultDeferSECONDS="${menuDeferSecondsARRAY[$dialogRESULT]}"
+				sendToLog "Status: Display timeout automatically chose to defer update for $defaultDeferSECONDS seconds."
+			else
+				sendToLog "Status: Display timeout automatically chose to defer update, using the default defer of $defaultDeferSECONDS seconds."
+			fi
+		;;
+		2)
+			sendToLog "Status: User chose to restart now."
+			choiceINSTALL="TRUE"
+		;;
+	esac
+else
+	sendToLog "jamfHelper: Ask for restart or defer dialog..."
+	# Create initial $jamfHelperARRAY[] settings for the dialog.
+	jamfHelperARRAY=(-windowType utility -title "Software Updates Require Restart" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonTEXT" -button2 "$restartButtonTEXT" -defaultButton 1 -cancelButton 2)
+
+	# Body text variations based on deadline options. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	if [[ -n "$dateDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
+		jamfHelperARRAY+=(-description "¥ Deferral available until deadline of: $dateDISPLAY.
 
 ¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
-elif [[ -n "$dateDISPLAY" ]]; then # Show only date deadline.
-	helperARRAY+=(-description "¥ Deferral available until deadline of:
-$dateDISPLAY.")
-elif [[ -n "$countDISPLAY" ]]; then # Show only maximum deferral count deadline.
-	helperARRAY+=(-description "¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
-else # Show no deadlines.
-	helperARRAY+=(-description "¥ No deadline date and unlimited deferrals.")
+	elif [[ -n "$dateDISPLAY" ]]; then # Show only date deadline.
+		jamfHelperARRAY+=(-description "¥ Deferral available until deadline of: $dateDISPLAY.")
+	elif [[ -n "$countDISPLAY" ]]; then # Show only maximum deferral count deadline.
+		jamfHelperARRAY+=(-description "¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
+	else # Show no deadlines.
+		jamfHelperARRAY+=(-description "¥ No deadline date and unlimited deferrals.")
+	fi
+
+	# If needed, add the $menuDeferSECONDS option to the $jamfHelperARRAY[].
+	if [[ -n $menuDeferSECONDS ]]; then
+		menuDeferSECONDS=$(echo "$menuDeferSECONDS" | sed 's/,/, /g')
+		jamfHelperARRAY+=(-showDelayOptions "$menuDeferSECONDS")
+	fi
+
+	# Start the dialog.
+	openJamfHelper
+
+	# The $dialogRESULT contains the user's selection; "0" or "1" for deferral and "2" for restart. If $menuDeferSECONDS was enabled then set $defaultDeferSECONDS.
+	case "$dialogRESULT" in
+		0 | 1 | *1)
+			choiceINSTALL="FALSE"
+			if [[ -n $menuDeferSECONDS ]]; then
+				defaultDeferSECONDS=$(echo "$dialogRESULT" | sed 's/.$//')
+				sendToLog "Status: User or display timeout chose to defer update for $defaultDeferSECONDS seconds."
+			else
+				sendToLog "Status: User or display timeout chose to defer update, using the default defer of $defaultDeferSECONDS seconds."
+			fi
+		;;
+		*2)
+			sendToLog "Status: User chose to restart now."
+			choiceINSTALL="TRUE"
+		;;
+	esac
 fi
-
-# If needed, add the $menuDeferSECONDS option to the $helperARRAY[].
-if [[ -n $menuDeferSECONDS ]]; then
-	menuDeferSECONDS=$(echo "$menuDeferSECONDS" | sed 's/,/, /g')
-	helperARRAY+=(-showDelayOptions "$menuDeferSECONDS")
-fi
-
-# Start the dialog.
-sendToLog "Dialog: Ask for restart..."
-openJamfHelper
-
-# The $dialogRESULT contains the user's selection; "0" or "1" for Now and "2" for Later. The $dialogRESULT may also include the selected time in seconds.
-case "$dialogRESULT" in
-	0 | 1 | *1)
-		choiceINSTALL="TRUE"
-	;;
-	*2)
-		choiceINSTALL="FALSE"
-	;;
-esac
 }
 
 ######## MAIN WORKFLOW ########
@@ -2695,22 +3149,25 @@ fi
 if [[ "$updateVALIDATE" == "TRUE" ]]; then # Checking after previous super system update, if successful, submit inventory to Jamf and check for Jamf Policies.
 	sendToLog "Status: Detected update restart validation."
 	checkAfterSoftwareUpdate
-else # Default workflow always checks for updates.
-	if [[ "$testModeOPTION" != "TRUE" ]] && [[ "$skipUpdatesOPTION" != "TRUE" ]]; then # Not $testModeOPTION, $skipUpdatesOPTION, or $updateVALIDATE, so it's time to check for new updates.
-		checkAppleUpdates
-	else # In $testModeOPTION or $skipUpdatesOPTION, so behave like there are no updates available.
-		if [[ "$forceRestartOPTION" == "TRUE" ]]; then
-			sendToLog "Status: Skipping Apple software updates."
+else # Default super workflow.
+	updatesRECOMMENDED="FALSE"
+	updatesRESTART="FALSE"
+	if [[ "$testModeOPTION" == "TRUE" ]]; then
+		if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then
+			sendToLog "Test Mode and Skip Update Mode: Use \"--force-restart\" and \"--policy-triggers\" to simulate workflow for only installing Jamf Policies."
 		else
-			sendToLog "Status: Skipping Apple software updates, use \"-F\" or \"--force-restart\" to force notifications and dialogs."
+			sendToLog "Test Mode: Simulating Apple software updates require a restart."
+			updatesRESTART="TRUE"
 		fi
-		updatesRECOMMENDED="FALSE"
-		updatesRESTART="FALSE"
+	elif [[ "$skipUpdatesOPTION" == "TRUE" ]]; then
+		sendToLog "Skip Update Mode: Not checking for Apple software updates."
+	else # Not $testModeOPTION, $skipUpdatesOPTION, or $updateVALIDATE, so it's time to check for new updates.
+		checkAppleUpdates
 	fi
 fi
 
 # When using Apple softwareupdate (with local credentials for Apple Silicon or always for Intel), download all updates before updating.
-if [[ "$updatesRECOMMENDED" == "TRUE" ]] || [[ "$updatesRESTART" == "TRUE" ]]; then # If Apple software updates are available.
+if ( [[ "$updatesRECOMMENDED" == "TRUE" ]] || [[ "$updatesRESTART" == "TRUE" ]] ) && [[ "$testModeOPTION" != "TRUE" ]]; then # If Apple software updates are available and not in test mode.
 	if [[ "$downloadREQUIRED" == "TRUE" ]]; then # Updates have not been downloaded yet.
 		if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
 			downloadAllUpdatesASU
@@ -2760,15 +3217,8 @@ if [[ "$updatesRESTART" == "TRUE" ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; t
 		else # Logically, this is the only time the choice dialog is shown.
 			dialogAskForUpdate
 			if [[ "$choiceINSTALL" == "TRUE" ]]; then
-				sendToLog "Status: User chose to restart now."
 				installRestartMain
 			else
-				if [[ -n $menuDeferSECONDS ]]; then
-					defaultDeferSECONDS=$(echo "$dialogRESULT" | sed 's/.$//')
-					sendToLog "Status: User chose to defer update for $defaultDeferSECONDS seconds."
-				else
-					sendToLog "Status: User chose to defer update, using the default defer of $defaultDeferSECONDS seconds."
-				fi
 				makeLaunchDaemonCalendar
 			fi
 		fi
