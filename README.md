@@ -1,26 +1,27 @@
-## S.U.P.E.R.M.A.N.
+# S.U.P.E.R.M.A.N.
+
 ### Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
 S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 
 by Kevin M. White
 
-### Features and Options
+## Features and Options
 
 - Fully automatic macOS software update workflow for both Intel and Apple Silicon computers.
-- Automatic dialogs and notifications via [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
+- Automatically generated dialogs and notifications via [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
 - Minimized downtime by automatically downloading and preparing updates before interrupting the user.
 - Automatic deferral option for user Focus, Do Not Disturb, and screen sleep (presentations, meetings, etc).
 - Update enforcement options including hard deadline, soft deadline, and maximum deferral count deadline.
 - Background agent (LaunchDaemon) works independently of management (MDM) service.
 - Automatic installation of all required items and dependencies.
 - Configurable via interactive command line `super` or MDM [managed preference](com.macjutsu.super.plist).
-- Absurd levels of validation and logging including both test mode and verbose mode.
+- Substantial validation and logging including both test and verbose modes.
 - For computers managed via Jamf Pro, automatic inventory and policy update as soon as possible after computer restarts.
 - For computers managed via Jamf Pro, option to run pre-update policies.
 - For computers managed via Jamf Pro, option to enforce policies and restart without macOS software updates.
 
-### Screenshots
+## Screenshots
 
 __Update dialog with multiple deadlines and pop-up deferral choice__
 
@@ -30,7 +31,7 @@ __Restart notification__
 
 ![Example restart notification](Screenshots/Restart.png)
 
-### Requirements
+## Requirements
 
 __Mac computers with Intel:__
 
@@ -45,7 +46,7 @@ This authorization is possible via three methods:
 - An automatically created local service account
 - A Jamf Pro API account
 
-### Apple Silicon Authorization Requirement Details
+## Apple Silicon Authorization Requirement Details
 
 Apple Silicon `softwareupdate` via an __existing local account:__
 - Any version of macOS for Apple Silicon (macOS 11.0 or later).
@@ -71,7 +72,7 @@ Apple Silicon MDM update command via __Jamf Pro API:__
 
 _If multiple valid authorization methods are provided, the priority order is as follows: an existing local account, the local service account, and finally the Jamf Pro API credentials._
 
-### Installation
+## Installation
 
 __To install and run locally:__
 1. Make sure the S.U.P.E.R.M.A.N. script (named just `super`) has appropriate execute permissions and then run it like any other local management script: `sudo /wherever/the/heck/you/downloaded/super --help`
@@ -83,6 +84,6 @@ __To deploy via Jamf Pro:__
 2. Add to the Policy a configuration for: Files and Processes > Execute Command > `/Library/Management/super/super --bunch-of-options --go-here`
 3. There's "basically" no step three (besides running the Policy). The super script automatically installs itself then restarts via LaunchDaemon, thus freeing the jamf agent to get on with other things.
 
-### General Usage
+## General Usage
 
 Wiki coming soon! Until then use: `sudo super --help`
