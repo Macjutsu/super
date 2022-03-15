@@ -4,103 +4,17 @@
 # Software Update Policy Enforcement (with) Recursive Messaging And Notification
 #
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
+# by Kevin M. White
 #
-# Version 1.0b
-# 3/9/22
-# Kevin M. White <kevin@macjutsu.com>
-#
-######## S.U.P.E.R.M.A.N. REQUIREMENTS ########
-#
-# Mac computers with Intel:
-#  - Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
-#  - Any version of Jamf Pro 10.xx.
-#
-# Mac computers with Apple Silicon:
-# SUPER IMPORTANT >>> Mac computers with Apple Silicon require additional authorization (beyond root privileges) to update automatically without user interaction.
-# Without this additional authorization, S.U.P.E.R.M.A.N. CAN NOT ENFORCE macOS software updates on Apple Silicon!
-# This authorization is possible via three methods: an existing local account, a newly created local service account, and/or a Jamf Pro API account.
-#
-# Apple Silicon software update via an existing local account:
-#  - Any version of macOS for Apple Silicon (macOS 11.0 or later).
-#  - You must provide S.U.P.E.R.M.A.N. with the credentials for an existing local (standard or admin) user account who already has volume ownership permissions.
-#    (User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see: https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e)
-#  - The provided credentials are used to authenticate the Apple softwareupdate command.
-#  - The provided credentials are stored in the System Keychain and can be viewed by other admin users.
-#
-# Apple Silicon software update via a local service account:
-#  - Any version of macOS for Apple Silicon (macOS 11.0 or later).
-#  - You must provide S.U.P.E.R.M.A.N. with the credentials for an existing local admin user account who already has volume ownership permissions.
-#    (User accounts created during Setup Assistant that have logged in at least once have volume ownership permissions. For more information see: https://support.apple.com/guide/deployment/use-secure-and-bootstrap-tokens-dep24dbdcf9e)
-#  - The provided admin credentials are used to automatically generate a new local S.U.P.E.R.M.A.N. service account. This service account provides authentication for the Apple softwareupdate command.
-#  - The creation of the account triggers a system security dialog unless you also deploy a PPPC Configuration Profile granting "SystemPolicySysAdminFiles" to either the "com.apple.Terminal" or "/usr/local/jamf/bin/jamf" and "com.jamf.management.Jamf".
-#  - The admin credentials you provide are never saved to disk, but the local S.U.P.E.R.M.A.N. service account credentials are stored in the System Keychain and can be viewed by other admin users.
-#  - The local S.U.P.E.R.M.A.N. service account is not an admin and can not log into the Mac, but if FileVault is enabled this account is visible at startup and can unlock the drive.
-#
-# Apple Silicon MDM software update via Jamf Pro API:
-#  - macOS 11.5 or later and Jamf Pro 10.35 or later.
-#  - Jamf Pro must have the bootstrap token escrowed for the computer. This is the default behavior for Jamf Pro via any enrollment method for Apple Silicon computers.
-#  - You must provide S.U.P.E.R.M.A.N. with credentials that can authorize macOS software update MDM commands via the Jamf Pro API.
-#  - The Jamf Pro API credentials you provide are stored in the System Keychain and can be viewed by other admin users.
-#  - The default Jamf Pro privileges required for this account are "Jamf Pro Server Objects > Computers > Create & Read" and "Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update".
-#  - You can significantly reduce the security risk of this account by removing the "Computers > Read" privilege requirement via a custom Configuration Profile with the following; Preference Domain "com.macjutsu.super", Key "JamfProID", String "$JSSID".
-#
-# ** If multiple authentication methods are provided, the priority order is as follows; an existing local account, the local S.U.P.E.R.M.A.N. service account, and finally the Jamf Pro API credentials. **
-#
-######## S.U.P.E.R.M.A.N. INSTALLATION ########
-#
-# To install and run locally:
-#  1. Make sure the S.U.P.E.R.M.A.N. script (named just "super") has appropriate execute permissions and then run it like any other local management script, "sudo /wherever/the/heck/you/put/super --help".
-#  2. The super script automatically installs itself (and various other accouterments) anytime it's ran from outside it's working folder, which is defaulted to /Library/Management/super.
-#  3. There's no step three. After self-installation, super automatically restarts itself with your previously specified options and, if necessary, creates a LaunchDaemon to keep things going.
-#
-# To deploy via Jamf Pro:
-#  1. Create a new Policy adding just the super script as-is.
-#  2. Add to the Policy a configuration for: Files and Processes > Execute Command > "/Library/Management/super/super --bunch-of-options --go-here".
-#  3. There's "basically" no step three (besides running the Policy). The super script automatically installs itself then restart via LaunchDaemon, thus freeing the jamf agent to get on with other things.
-#
-######## S.U.P.E.R.M.A.N. USAGE ########
-#
-# Although super is technically just a "regular" shell script, it's architected to behave like a background daemon that runs automatically via LaunchDaemon.
-#
-# The super script can also be interacted with directly from Terminal for configuration and testing, but it does require sudo.
-#
-# Obviously "sudo super --help" is a good place to start, and you can view the help documentation at any time without interrupting the super LaunchDaemon.
-#
-# However, if super is ran without the --help option, it will do your bidding, but depending on your options and the state of macOS updates, this may not result in an active LaunchDaemon.
-#
-# Fear not, super always let you now what it's doing in both Terminal and it's log file, which is defaulted to "/Library/Management/super/super.log".
-#
-# Also, you can easily kill any active super instance, helpers, and LaunchDaemons with "sudo super --skip-updates".
-#
-# If super exits without creating a new LaunchDaemon, you can always run it again from Terminal or a Jamf Pro Policy. For example, it could be run via a Policy with a daily frequency.
-#
-# In fact, super is designed to automatically stop once macOS is up to date. Then, when you decide the next macOS update needs to be enforced, restart super via a Jamf Pro Policy.
-#
-# Finally, to customize the notifications and dialogs, you can modify the contents of the $jamfHelperARRAY[] in the functions with names that start with "notification" or "dialog".
-#
-# For more information about possible options in the $jamfHelperARRAY[], use the following in Terminal: "/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -help"
-#
-######## RELEASE NOTES ########
-#
-# Version 1.0b
-# 3/9/22
-#  - IBM Notifier.app is automatically downloaded and installed in the $superFOLDER.
-#  - IBM Notifier.app is default for all user interactions, but if IBM Notifier.app can't be downloaded or is invalid then super will fall back to jamfHelper.
-#  - Ability to specify custom icon size when using IBM Notifier.app via "--icon-size-ibm pixels" option and managed preference <key>IconSizeIbm</key> <string>number</string>
-#  - Ability to specify custom icon size when using jamfHelper via "--icon-size-jamf pixels" option and managed preference <key>IconSizeJamf</key> <string>number</string>
-#  - Ability to prefer jamfHelper over IBM Notifier.app via "--prefer-jamf" | "--no-prefer-jamf" options and managed preference <key>PreferJamf</key> <true/> | <false/>.
-#  - Deferral times all normalized to between 120 seconds and 86400 seconds (1 day).
-#  - Bug fixes and improvements for Display Redraw, Display Timeout, and Test Mode options.
-#  - Logging and Verbose Mode improvements.
-# 
-# Version 0.9
-# 2/28/22
-#  - Initial private release.
+# Version 1.0rc1
+# 3/14/22
+# https://github.com/Macjutsu/super
 #
 ######## DEBUGGING STUFF ########
 #
 # The next line disables irrelevant shellcheck codes for the entire script. https://github.com/koalaman/shellcheck
 # shellcheck disable=SC2206,SC2068
+#
 # Uncomment the next line for debugging code.
 # set -x
 #
@@ -112,9 +26,9 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 1.0b
-  3/9/22
-  Kevin M. White <kevin@macjutsu.com>
+  Version 1.0rc1
+  3/14/22
+  https://github.com/Macjutsu/super
 
   Usage:
   sudo ./super
@@ -864,7 +778,7 @@ fi
 
 # Validate non-credential parameters and manage $superPLIST. Any errors set $parameterERROR.
 manageParameters() {
-# Validate $jamfBINARY.
+# Validate $jamfBINARY if installed and set $jamfVERSION accordingly.
 if [[ -e "$jamfBINARY" ]]; then
 	jamfMAJOR=$("$jamfBINARY" -version | cut -c 9- | cut -d'.' -f1) # Expected output: 10
 	jamfMINOR=$("$jamfBINARY" -version | cut -c 9- | cut -d'.' -f2) # Expected output: 30, 31, 32, etc.
@@ -877,12 +791,15 @@ if [[ -e "$jamfBINARY" ]]; then
 		sendToLog "Exit: Jamf Pro $jamfVERSION not supported for Intel."; parameterERROR="TRUE"
 	fi
 else
-	sendToLog "Exit: Cannot locate jamf binary at: $jamfBINARY"; parameterERROR="TRUE"
+	sendToLog "Starter: Unable to locate jamf binary at: $jamfBINARY"
+	jamfVERSION="FALSE"
 fi
 
-# Validate $jamfHelper.
-if [[ ! -e "$jamfHELPER" ]]; then
-	sendToLog "Exit: Cannot locate jamfHelper at: $jamfHELPER"; parameterERROR="TRUE"
+# If there is no IBM Notifier.app, then validate $jamfHelper.
+if [[ "$ibmNotifierVALID" == "FALSE" ]]; then
+	if [[ ! -e "$jamfHELPER" ]]; then
+		sendToLog "Exit: Cannot locate fallback jamfHelper at: $jamfHELPER"; parameterERROR="TRUE"
+	fi
 fi
 
 # Various regular expressions used for parameter validation.
@@ -1316,6 +1233,11 @@ if [[ -n $adminACCOUNT ]] && [[ "$parameterERROR" != "TRUE" ]]; then
 	fi
 fi
 
+# Validate that $jamfOPTION 
+if [[ -n $jamfOPTION ]] && [[ "$jamfVERSION" == "FALSE" ]]; then
+	sendToLog "Exit: A Jamf Pro API account name requires that this computer is enrolled in Jamf Pro."; parameterERROR="TRUE"
+fi
+
 # Validate that $jamfOPTION and $jamfPASSWORD are simultaneously provided.
 if [[ -n $jamfOPTION ]] && [[ -z $jamfPASSWORD ]]; then
 	sendToLog "Exit: A Jamf Pro API account name requires that you also set a Jamf Pro API password."; parameterERROR="TRUE"
@@ -1567,7 +1489,7 @@ if [[ "$macosMAJOR" != "10" ]] || ( [[ "$macosMAJOR" == "10" ]] && [[ "$macosMIN
 	if [[ ! -d "$ibmNotifierAPP" ]]; then
 		getIbmNotifier
 		[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
-		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after installation, falling back to jamfHelper."
+		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after installation, will attempt fallback to jamfHelper."
 	else
 		checkIbmNotifier
 		if [[ "$ibmNotifierVALID" == "FALSE" ]]; then
@@ -1577,10 +1499,10 @@ if [[ "$macosMAJOR" != "10" ]] || ( [[ "$macosMAJOR" == "10" ]] && [[ "$macosMIN
 			getIbmNotifier
 			[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
 		fi
-		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after re-installation, falling back to jamfHelper."
+		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after re-installation, will attempt fallback to jamfHelper."
 	fi
 else
-	sendToLog "Warning: IBM Notifier.app is not compatible with this version of macOS, falling back to jamfHelper."
+	sendToLog "Warning: IBM Notifier.app is not compatible with this version of macOS, will attempt fallback to jamfHelper."
 	ibmNotifierVALID="FALSE"
 fi
 
@@ -2119,28 +2041,33 @@ fi
 # This function checks the update status after a previous super system update.
 checkAfterSoftwareUpdate() {
 checkAppleUpdates
-if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
-	getJamfProServer
-	if [[ "$jamfSERVER" != "FALSE" ]]; then
-		defaults delete "$superPLIST" UpdateValidate 2> /dev/null
-		sendToLog "Status: Submiting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
-		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-			jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
-			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
+if [[ "$updatesRECOMMENDED" == "FALSE" ]] && [[ "$updatesRESTART" == "FALSE" ]]; then
+	if [[ "$jamfVERSION" != "FALSE" ]]; then
+		getJamfProServer
+		if [[ "$jamfSERVER" != "FALSE" ]]; then
+			defaults delete "$superPLIST" UpdateValidate 2> /dev/null
+			sendToLog "Status: Submiting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+			if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+				jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
+				sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
+			else
+				"$jamfBINARY" recon > /dev/null 2>&1
+			fi
+			sleep 5
+			sendToLog "Status: Running Jamf Pro check-in policies. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+			if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+				jamfRESULT=$("$jamfBINARY" policy -verbose 2>&1)
+				sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
+			else
+				"$jamfBINARY" policy > /dev/null 2>&1
+			fi
 		else
-			"$jamfBINARY" recon > /dev/null 2>&1
-		fi
-		sleep 5
-		sendToLog "Status: Running Jamf Pro check-in policies. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
-		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-			jamfRESULT=$("$jamfBINARY" policy -verbose 2>&1)
-			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
-		else
-			"$jamfBINARY" policy > /dev/null 2>&1
+			sendToLog "Status: Unable to submit inventory to Jamf Pro, trying again in $defaultDeferSECONDS seconds."
+			makeLaunchDaemonCalendar
 		fi
 	else
-		sendToLog "Status: Unable to submit inventory to Jamf Pro, trying again in $defaultDeferSECONDS seconds."
-		makeLaunchDaemonCalendar
+		defaults delete "$superPLIST" UpdateValidate 2> /dev/null
+		sendToLog "Status: All system updates complete, but Jamf Pro not present."
 	fi
 else
 	sendToLog "Status: Apple system updates did not complete after last restart, continuing normal update workflow."
