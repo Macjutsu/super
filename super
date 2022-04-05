@@ -2936,13 +2936,13 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 
 	# Body text variations based on deadline options.
 	if [[ -n "$dateDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
-		ibmNotifierARRAY+=(-subtitle "¥ Deferral available until deadline of: $dateDISPLAY.\n\n¥ $countDISPLAY out of $countDEADLINE deferrals remain available.\n")
+		ibmNotifierARRAY+=(-subtitle "Â¥ Deferral available until deadline of: $dateDISPLAY.\n\nÂ¥ $countDISPLAY out of $countDEADLINE deferrals remain available.\n")
 	elif [[ -n "$dateDISPLAY" ]]; then # Show only date deadline.
-		ibmNotifierARRAY+=(-subtitle "¥ Deferral available until deadline of: $dateDISPLAY.\n")
+		ibmNotifierARRAY+=(-subtitle "Â¥ Deferral available until deadline of: $dateDISPLAY.\n")
 	elif [[ -n "$countDISPLAY" ]]; then # Show only maximum deferral count deadline.
-		ibmNotifierARRAY+=(-subtitle "¥ $countDISPLAY out of $countDEADLINE deferrals remain available.\n")
+		ibmNotifierARRAY+=(-subtitle "Â¥ $countDISPLAY out of $countDEADLINE deferrals remain available.\n")
 	else # Show no deadlines.
-		ibmNotifierARRAY+=(-subtitle "¥ No deadline date and unlimited deferrals.\n")
+		ibmNotifierARRAY+=(-subtitle "Â¥ No deadline date and unlimited deferrals.\n")
 	fi
 
 	# If needed, add the $menuDeferSECONDS option to the $ibmNotifierARRAY[].
@@ -3007,15 +3007,15 @@ else
 
 	# Body text variations based on deadline options. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
 	if [[ -n "$dateDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
-		jamfHelperARRAY+=(-description "¥ Deferral available until deadline of: $dateDISPLAY.
+		jamfHelperARRAY+=(-description "Â¥ Deferral available until deadline of: $dateDISPLAY.
 
-¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
+Â¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
 	elif [[ -n "$dateDISPLAY" ]]; then # Show only date deadline.
-		jamfHelperARRAY+=(-description "¥ Deferral available until deadline of: $dateDISPLAY.")
+		jamfHelperARRAY+=(-description "Â¥ Deferral available until deadline of: $dateDISPLAY.")
 	elif [[ -n "$countDISPLAY" ]]; then # Show only maximum deferral count deadline.
-		jamfHelperARRAY+=(-description "¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
+		jamfHelperARRAY+=(-description "Â¥ $countDISPLAY out of $countDEADLINE deferrals remain available.")
 	else # Show no deadlines.
-		jamfHelperARRAY+=(-description "¥ No deadline date and unlimited deferrals.")
+		jamfHelperARRAY+=(-description "Â¥ No deadline date and unlimited deferrals.")
 	fi
 
 	# If needed, add the $menuDeferSECONDS option to the $jamfHelperARRAY[].
