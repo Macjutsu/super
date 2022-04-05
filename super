@@ -2273,10 +2273,10 @@ for trigger in ${triggerARRAY[@]}; do
 	if [[ "$testModeOPTION" != "TRUE" ]]; then
 		sendToLog "Status: Jamf Policy with Trigger $trigger is starting..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-			jamfRESULT=$("$jamfBINARY" policy -trigger "$trigger" -verbose 2>&1)
+			jamfRESULT=$("$jamfBINARY" policy -event "$trigger" -verbose 2>&1)
 			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
 		else
-			"$jamfBINARY" policy -trigger "$trigger" > /dev/null 2>&1
+			"$jamfBINARY" policy -event "$trigger" > /dev/null 2>&1
 		fi
 	else
 		sendToLog "Test Mode: Skipping Jamf Policy with Trigger $trigger."
