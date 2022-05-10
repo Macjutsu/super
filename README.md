@@ -10,16 +10,17 @@ by Kevin M. White
 
 - Fully automatic macOS software update workflow for both Intel and Apple Silicon computers.
 - Automatically generated dialogs and notifications via [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
-- Minimized downtime by automatically downloading and preparing updates before interrupting the user.
+- Minimize user downtime by automatically installing non-restart required Apple software updates without prompting the user.
+- Minimize user downtime by automatically downloading and preparing system updates before interrupting the user to restart.
 - Automatic deferral option for user Focus, Do Not Disturb, and screen sleep (presentations, meetings, etc).
 - Update enforcement options including hard deadline, soft deadline, and maximum deferral count deadline.
 - Background agent (LaunchDaemon) works independently of management (MDM) service.
 - Automatic installation of all required items and dependencies.
-- Configurable via interactive command line `super` or MDM [managed preference](com.macjutsu.super.plist).
+- Configurable via interactive command line `super` or MDM [managed preference](All_Managed_Options_com.macjutsu.super.plist).
 - Substantial validation and logging including both test and verbose modes.
 - For computers managed via Jamf Pro, automatic inventory and policy update as soon as possible after computer restarts.
-- For computers managed via Jamf Pro, option to run pre-update policies.
-- For computers managed via Jamf Pro, option to enforce policies and restart without macOS software updates.
+- For computers managed via Jamf Pro, option to run policies prior to system update restart.
+- For computers managed via Jamf Pro, option to run policies without Apple software updates but still take advantage of dialogs, notifications, deferrals, and deadline workflows.
 
 ## Screenshots
 
