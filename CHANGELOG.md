@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [1.1b2]
+
+2022-05-16
+
+- When used with Jamf Pro 10.38 or later, all MDM software update commands now use the Jamf Pro API (as opposed to the Classic API).
+- When used with Jamf Pro 10.38 or later, system updates via MDM now forces a restart by killing any apps that don't quit when requested.
+- More reliable logging when downloading and preparing updates via MDM.
+- The `--verbose-mode` option now shows the percentage complete when downloading and preparing updates via MDM.
+- The `--policy-triggers` option now detects when Jamf Pro Policies complete with success or failure. If all Jamf Pro Policies completed, then the `--policy-triggers` option is automatically cleared.
+- Various code syntax changes per [ShellCheck](https://github.com/koalaman/shellcheck) recommendations.
+
 ## [1.1b1]
 
 2022-05-10

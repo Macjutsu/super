@@ -6,14 +6,14 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 1.1b1
-# 5/10/22
+# Version 1.1b2
+# 2022/05/16
 # https://github.com/Macjutsu/super
 #
 ######## DEBUGGING STUFF ########
 #
-# The next line disables irrelevant "info" and "style" shellcheck codes for the entire script. https://github.com/koalaman/shellcheck
-# shellcheck disable=SC2004,SC2235,SC2086,SC2162,SC2143,SC2001
+# The next line disables specific ShellCheck codes for the entire script. https://github.com/koalaman/shellcheck
+# shellcheck disable=SC2001,SC2207
 #
 # Uncomment the next line for debugging code.
 # set -x
@@ -26,8 +26,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 1.1b1
-  5/10/22
+  Version 1.1b2
+  2022/05/16
   https://github.com/Macjutsu/super
 
   Usage:
@@ -615,7 +615,7 @@ while test $# -gt 0; do
 done
 
 # Log any unrecognized options.
-if [[ -n $unrecognizedOPTIONS ]]; then
+if [[ -n ${unrecognizedOPTIONS[*]} ]]; then
 	showUsage
 	showHelp
 	sendToLog  "Error: Unrecognzied Options: ${unrecognizedOPTIONS[*]}"; parameterERROR="TRUE"
@@ -857,9 +857,8 @@ if [[ "$menuDeferOPTION" == "X" ]]; then
 	sendToLog "Starter: Deleting local preference for menu deferral."
 	defaults delete "$superPLIST" MenuDefer 2> /dev/null
 elif [[ -n $menuDeferOPTION ]] && [[ $menuDeferOPTION =~ $regexMENU ]]; then
-	oldIFS="$IFS"
-	IFS=$','
-	menuDeferARRAY=($menuDeferOPTION)
+	oldIFS="$IFS"; IFS=','
+	read -r -a menuDeferARRAY <<< "$menuDeferOPTION"
 	for i in "${!menuDeferARRAY[@]}"; do
 		if [[ ${menuDeferARRAY[i]} -lt 120 ]]; then
 			sendToLog "Warning: Specified menu deferral time of ${menuDeferARRAY[i]} seconds is too low, rounding up to 120 seconds."
@@ -896,7 +895,7 @@ elif [[ -n $displayRedrawOPTION ]] && ! [[ $displayRedrawOPTION =~ $regexNUMBER 
 	sendToLog "Exit: The display redraw time must only be a number."; parameterERROR="TRUE"
 fi
 if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $displayTimeoutSECONDS ]] && [[ -n $displayRedrawSECONDS ]]; then
-	displayMinimumTIMEOUT=$(($displayRedrawSECONDS*3))
+	displayMinimumTIMEOUT=$((displayRedrawSECONDS * 3))
 	if [[ $displayTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
 		sendToLog "Warning: Specified display timeout of $displayTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing display timeout to $displayMinimumTIMEOUT seconds."
 		displayTimeoutSECONDS=$displayMinimumTIMEOUT
@@ -1275,10 +1274,10 @@ superPROPERTY=$(defaults read "$superPLIST" SuperAccount 2> /dev/null)
 jamfPROPERTY=$(defaults read "$superPLIST" JamfAccount 2> /dev/null)
 
 # Some messaging to indicate if there are no saved accounts.
-( [[ -z $localPROPERTY ]] && [[ -z $superPROPERTY ]] && [[ -z $jamfPROPERTY ]] && [[ -n $purgeACCOUNTS ]] ) && sendToLog "Starter: No saved accounts to remove."
+{ [[ -z $localPROPERTY ]] && [[ -z $superPROPERTY ]] && [[ -z $jamfPROPERTY ]] && [[ -n $purgeACCOUNTS ]]; } && sendToLog "Starter: No saved accounts to remove."
 
 # If there was a previous $localPROPERTY account and the user specified $localOPTION or $purgeACCOUNTS then delete any previously saved local account credentials.
-if [[ -n $localPROPERTY ]] && ( [[ -n $localOPTION ]] || [[ "$purgeACCOUNTS" == "TRUE" ]] ); then
+if [[ -n $localPROPERTY ]] && { [[ -n $localOPTION ]] || [[ "$purgeACCOUNTS" == "TRUE" ]]; }; then
 	sendToLog "Starter: Purging saved credentials for local account \"$localPROPERTY\"."
 	defaults delete "$superPLIST" LocalAccount > /dev/null 2>&1
 	security delete-generic-password -a "$localPROPERTY" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
@@ -1286,7 +1285,7 @@ if [[ -n $localPROPERTY ]] && ( [[ -n $localOPTION ]] || [[ "$purgeACCOUNTS" == 
 fi
 
 # If there was a previous $superPROPERTY account and the user specified $adminACCOUNT or $purgeACCOUNTS then delete any previously saved super service account and credentials.
-if [[ -n $superPROPERTY ]] && ( [[ -n $adminACCOUNT ]] || [[ "$purgeACCOUNTS" == "TRUE" ]] ); then
+if [[ -n $superPROPERTY ]] && { [[ -n $adminACCOUNT ]] || [[ "$purgeACCOUNTS" == "TRUE" ]]; } then
 	sendToLog "Starter: Purging local account and saved cedentials for super service account \"$superPROPERTY\"."
 	sysadminctl -deleteUser "$superPROPERTY" > /dev/null 2>&1
 	defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
@@ -1295,7 +1294,7 @@ if [[ -n $superPROPERTY ]] && ( [[ -n $adminACCOUNT ]] || [[ "$purgeACCOUNTS" ==
 fi
 
 # If there was a previous $jamfPROPERTY account and the user specified $jamfOPTION or $purgeACCOUNTS then delete any previously saved Jamf Pro API credentials.
-if [[ -n $jamfPROPERTY ]] && ( [[ -n $jamfOPTION ]] || [[ "$purgeACCOUNTS" == "TRUE" ]] ); then
+if [[ -n $jamfPROPERTY ]] && { [[ -n $jamfOPTION ]] || [[ "$purgeACCOUNTS" == "TRUE" ]]; } then
 	sendToLog "Starter: Purging saved credentials for Jamf Pro API account \"$jamfPROPERTY\"."
 	defaults delete "$superPLIST" JamfAccount > /dev/null 2>&1
 	security delete-generic-password -a "$jamfPROPERTY" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
@@ -1360,7 +1359,7 @@ if [[ -n $adminACCOUNT ]]; then
 			# Loop through local IDs to find the first vacant id after 500.
 			newUID=501
 			while [[ $(id $newUID 2>&1 | grep "no such user" -c) -ne 1 ]]; do
-				newUID=$((newUID+1))
+				newUID=$((newUID + 1))
 			done
 			sendToLog "Starter: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
 			addRESULT=$(sysadminctl -addUser "$superNEWACCT" -fullName "$superNEWFULL" -password "$superNEWPASS" -UID $newUID -GID 20 -shell /dev/null -home /dev/null -picture "$cachedICON" -adminUser "$adminACCOUNT" -adminPassword "$adminPASSWORD" 2>&1)
@@ -1484,7 +1483,7 @@ fi
 superInstaller() {
 # Figure out where super is running from and start Installer log if anything needs to be installed.
 superPATH="$(dirname "$0")"
-( [[ ! -d "$superFOLDER" ]] || [[ ! -d "$ibmNotifierAPP" ]] || ! ( [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]] ) ) && sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
+{ [[ ! -d "$superFOLDER" ]] || [[ ! -d "$ibmNotifierAPP" ]] || ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; } } && sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
 
 # Make sure the $superFOLDER exists.
 if [[ ! -d "$superFOLDER" ]]; then
@@ -1493,7 +1492,7 @@ if [[ ! -d "$superFOLDER" ]]; then
 fi
 
 # Validate the IBM Notifier.app, if missing or invalid then install and check again.
-if [[ "$macosMAJOR" != "10" ]] || ( [[ "$macosMAJOR" == "10" ]] && [[ "$macosMINOR" -ge 15 ]]); then
+if [[ "$macosMAJOR" != "10" ]] || { [[ "$macosMAJOR" == "10" ]] && [[ "$macosMINOR" -ge 15 ]]; }; then
 	if [[ ! -d "$ibmNotifierAPP" ]]; then
 		getIbmNotifier
 		[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
@@ -1515,7 +1514,7 @@ else
 fi
 
 # Install super if it's running from any location that is not in the $superFOLDER or from the $superLINK.
-if ! ( [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]] ); then
+if ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; }; then
 	sendToLog "Installer: Copying file: $superFOLDER/super"
 	cp "$0" "$superFOLDER/super" > /dev/null 2>&1
 	sendToLog "Installer: Creating default path link: $superLINK"
@@ -1670,7 +1669,7 @@ if [[ "$openLOGS" == "TRUE" ]]; then
 		sendToLog "Starter: Opening logs for user $currentUSER..."
 		sudo -u "$currentUSER" open "$superLOG"
 		if [[ "$macosMAJOR" != "10" ]]; then
-			( [[ "$jamfCREDENTIAL" == "TRUE" ]] && ( [[ "$localCREDENTIAL" != "TRUE" ]] || [[ "$superCREDENTIAL" != "TRUE" ]] ) ) && sudo -u "$currentUSER" open "$mdmLOG"
+			{ [[ "$jamfCREDENTIAL" == "TRUE" ]] && { [[ "$localCREDENTIAL" != "TRUE" ]] || [[ "$superCREDENTIAL" != "TRUE" ]]; } } && sudo -u "$currentUSER" open "$mdmLOG"
 			sudo -u "$currentUSER" open "$updateLOG"
 		fi
 	else
@@ -1692,7 +1691,7 @@ networkTIMEOUT=0
 while [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/d' -e '/inet/p' | wc -l) -le 0 ]] && [[ $networkTIMEOUT -lt 120 ]]; do
 	sendToLog "Starter: Waiting for network..."
 	sleep 5
-	networkTIMEOUT=$((networkTIMEOUT+5))
+	networkTIMEOUT=$((networkTIMEOUT + 5))
 done
 if [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/d' -e '/inet/p' | wc -l) -le 0 ]]; then
 	sendToLog "Starter: Network unavailalbe, trying again in $defaultDeferSECONDS seconds."
@@ -1816,17 +1815,17 @@ fi
 
 # Attempt to send a Blank Push to Jamf Pro.
 sendBlankPush() {
-commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/BlankPush/id/${jamfProID}")
+commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/BlankPush/id/${jamfProID}")
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
 }
 
 # Validate $jamfProTOKEN and if found invalid, a new token is requested and again validated.
 checkJamfProServerToken() {
-tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
+tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: tokenCHECK is: $tokenCHECK"
 if [[ $tokenCHECK -ne 200 ]]; then
 	getJamfProToken
-	tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
+	tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: tokenCHECK is: $tokenCHECK"
 	if [[ $tokenCHECK -ne 200 ]]; then
 		sendToLog "Exit: Could not retrieve Jamf Pro API token for account \"$jamfACCOUNT\", verify account credentials." 
@@ -1944,12 +1943,11 @@ if [[ -n $focusDeferSECONDS ]]; then
 		sendToLog "Status: Focus or Do Not Disturb enabled for user $currentUSER."
 		focusDEFER="TRUE"
 	fi
-	oldIFS="$IFS"
-	IFS=$'\n'
+	oldIFS="$IFS"; IFS=$'\n'
 	displayASSERTIONS=($(pmset -g assertions | awk '/NoDisplaySleepAssertion | PreventUserIdleDisplaySleep/ && match($0,/\(.+\)/) && ! /coreaudiod/ {gsub(/^\ +/,"",$0); print};'))
-	if [[ -n $displayASSERTIONS ]]; then
+	if [[ -n ${displayASSERTIONS[*]} ]]; then
 		for assertionITEM in "${displayASSERTIONS[@]}"; do
-			sendToLog "Status: The following Display Sleep Assertions detected: $(echo ${assertionITEM} | awk -F: '{print $1}')"
+			sendToLog "Status: The following Display Sleep Assertions detected: $(echo "${assertionITEM}" | awk -F: '{print $1}')"
 		done
 		focusDEFER="TRUE"
 	fi
@@ -1987,8 +1985,7 @@ downloadREQUIRED="FALSE"
 if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
 	sendToLog "Status: No Apple software updates available. Some may be deferred via MDM."
 else
-	oldIFS="$IFS"
-	IFS=$'\n'
+	oldIFS="$IFS"; IFS=$'\n'
 	allLABLES=()
 	allTITLES=()
 	restartLABLES=()
@@ -2010,20 +2007,20 @@ else
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: recommendedLABLES[] is: \n${recommendedLABLES[*]}"
 
 	# If any updates are available, send to log and evaluate download status.
-	if [[ -n $allLABLES ]]; then
-		if [[ -n $recommendedLABLES ]]; then
+	if [[ -n ${allLABLES[*]} ]]; then
+		if [[ -n ${recommendedLABLES[*]} ]]; then
 			sendToLog "Status: ${#recommendedLABLES[@]} available non-restart \"recommended\" software udpate(s)."
 			for i in "${!recommendedLABLES[@]}"; do
-				sendToLog "Status: Recommended Software Update $((i+1)): ${recommendedLABLES[i]}"
+				sendToLog "Status: Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}"
 			done
 			updatesRECOMMENDED="TRUE"
 		else
 			sendToLog "Status: No available non-restart \"recommended\" software udpate(s). Some may be deferred via MDM."
 		fi
-		if [[ -n $restartLABLES ]]; then
+		if [[ -n ${restartLABLES[*]} ]]; then
 			sendToLog "Status: ${#restartLABLES[@]} available restart required system udpate(s)."
 			for i in "${!restartLABLES[@]}"; do
-				sendToLog "Status: Restart Required System Update $((i+1)): ${restartLABLES[i]}"
+				sendToLog "Status: Restart Required System Update $((i + 1)): ${restartLABLES[i]}"
 			done
 			updatesRESTART="TRUE"
 		else
@@ -2142,10 +2139,9 @@ else
 	sendToLog "Status: Starting softwareupdate install of recommended updates. Check /var/log/install.log for more detail..."
 fi
 
-oldIFS="$IFS"
-IFS=$'\n'
+oldIFS="$IFS"; IFS=$'\n'
 for i in "${!recommendedLABLES[@]}"; do
-	sendToLog "Status: Installing Recommended Software Update $((i+1)): ${recommendedLABLES[i]}..."
+	sendToLog "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
 	if [[ $macosMAJOR -eq 10 ]]; then
 		recommendedRESULT=$(softwareupdate --install "${recommendedLABLES[i]}" 2>&1)
 	else
@@ -2199,14 +2195,13 @@ fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: downloadRESULT is: $downloadRESULT"
 
 # Parse $downloadRESULT for individual downloads and write to $superLOG and $superPLIST.
-oldIFS="$IFS"
-IFS=$'\n'
+oldIFS="$IFS"; IFS=$'\n'
 downloadedTITLES=($(echo "$downloadRESULT" | grep "Downloaded" | cut -d " " -f 2-))
 if [[ ${#downloadedTITLES[@]} -gt 0 ]]; then
 	sendToLog "Status: Downloaded ${#downloadedTITLES[@]} software udpate(s)."
 	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 	for i in "${!downloadedTITLES[@]}"; do
-		sendToLog "Status: Downloaded Software Update $((i+1)): ${downloadedTITLES[i]}"
+		sendToLog "Status: Downloaded Software Update $((i + 1)): ${downloadedTITLES[i]}"
 		defaults write "$superPLIST" UpdateDownloads -array-add "${downloadedTITLES[i]}"
 	done
 else
@@ -2238,16 +2233,25 @@ log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") &
 updateStreamPID=$!
 disown
 
-# Send the Jamf Pro API command to update and restart via MDM.
-commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/download/id/${jamfProID}")
+# Send the Jamf Pro API command to download via MDM.
+if [[ $jamfVERSION -ge 1038 ]]; then
+	jamfAPIURL="${jamfSERVER}api/v1/macos-managed-software-updates/send-updates"
+	jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "skipVersionVerification": false, "applyMajorUpdate": false, "updateAction": "DOWNLOAD_ONLY" }'
+	commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --header "Content-Type: application/json" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "$jamfAPIURL" --data "$jamfJSON")
+else
+	sendToLog "Warning: Using legacy Jamf Pro Classic API. You should upgrade your Jamf Pro instance to 10.38 or later."
+	commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/download/id/${jamfProID}")
+fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
 
 # If the Jamf Pro API command was successfully created, monitor the download progress.
-if [[ $commandRESULT -eq 201 ]]; then
+if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	sendToLog "Status: Successful MDM download request."
+	sendBlankPush
+	
 	# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
-	tail -n 0 -f "$mdmLOG" | while read logLINE ; do
-		if [[ $(echo "$logLINE" | grep "Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan):") ]]; then
+	tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
+		if echo "$logLINE" | grep -q "Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan):"; then
 			sendToLog "Status: Acknowledged MDM update scan request, checking back after Jamf Pro's mandatory 5 minute delay..."
 			pkill -P $$ tail
 			break
@@ -2256,19 +2260,19 @@ if [[ $commandRESULT -eq 201 ]]; then
 	timerEND=300
 	while [[ $timerEND -ge 0 ]]; do
 		echo -ne "Waiting for Jamf Pro's mandatory 5 minute delay: -$(date -u -r $timerEND +%M:%S)\r"
-		timerEND=$((timerEND-1))
+		timerEND=$((timerEND - 1))
 		sleep 1
 	done
 	echo
 	sendBlankPush
 	
 	# Watch $mdmLOG while waiting for the MDM workflow to complete.
-	tail -n 0 -f "$mdmLOG" | while read logLINE ; do
-		if [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Idle\]') ]]; then
+	tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
+		if echo "$logLINE" | grep -q 'Received HTTP response (200) \[Idle\]'; then
 			sendToLog "Status: Recieved MDM blank push."
-		elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates):') ]]; then
+		elif echo "$logLINE" | grep -q 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates):'; then
 			sendToLog "Status: Acknowledged MDM return available updates."
-		elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate):') ]]; then
+		elif echo "$logLINE" | grep -q 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate):'; then
 			sendToLog "Status: Acknowledged MDM scheduled software update, download should start soon..."
 			kill -9 $mdmStreamPID > /dev/null 2>&1
 			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM DOWNLOAD END ****" >> "$mdmLOG"
@@ -2277,19 +2281,20 @@ if [[ $commandRESULT -eq 201 ]]; then
 	done
 	
 	# Watch $updateLOG while waiting for the download workflow to complete.
-	tail -n 0 -f "$updateLOG" | while read logLINE ; do
-		if [[ $(echo "$logLINE" | grep -w 'phase:DOWNLOADING_UPDATE') ]] && [[ "$logPROGRESS" != "Downloading" ]]; then
-			sendToLog "Status: Downloading software update..."
+	tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
+		if echo "$logLINE" | grep -q -w 'phase:DOWNLOADING_SFR\|phase:DOWNLOADING_UPDATE'; then
+			[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading software update..."
 			logPROGRESS="Downloading"
-		elif [[ $(echo "$logLINE" | grep -w 'phase:PREPARING_UPDATE') ]] && [[ "$logPROGRESS" != "Preparing" ]]; then
-			sendToLog "Status: Download complete, preparing software update, should be done in a few minutes..."
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Downloading and preparing update percentage complete: $(echo "$logLINE" | awk -F '[ :]+' '{ print $23*100; }' | cut -c 1-4)%"
+		elif echo "$logLINE" | grep -q -w 'phase:PREPARING_UPDATE'; then
+			[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, preparing software update, should be done in a few minutes..."
 			logPROGRESS="Preparing"
-		elif [[ $(echo "$logLINE" | grep -w 'phase:COMPLETED') ]]; then
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Downloading and preparing update percentage complete: $(echo "$logLINE" | awk -F '[ :]+' '{ print $23*100; }' | cut -c 1-4)%"
+		elif echo "$logLINE" | grep -q -w 'phase:COMPLETED'; then
 			sendToLog "Status: Software update is downloaded and prepared."
 			kill -9 $updateStreamPID > /dev/null 2>&1
 			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM DOWNLOAD END ****" >> "$updateLOG"
-			oldIFS="$IFS"
-			IFS=$'\n'
+			oldIFS="$IFS", IFS=$'\n'
 			defaults write "$superPLIST" UpdateDownloads -array-add "${allTITLES[i]}"
 			IFS="$oldIFS"
 			pkill -P $$ tail; break
@@ -2307,23 +2312,47 @@ fi
 # Install any optional $policyTRIGGERS.
 runJamfPolicies() {
 sendToLog "Status: Starting Jamf Policy triggers. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
-oldIFS="$IFS"
-IFS=$','
-triggerARRAY=($policyTRIGGERS)
+oldIFS="$IFS"; IFS=','
+read -r -a triggerARRAY <<< "$policyTRIGGERS"
 for trigger in "${triggerARRAY[@]}"; do
 	if [[ "$testModeOPTION" != "TRUE" ]]; then
-		sendToLog "Status: Jamf Policy with Trigger $trigger is starting..."
+		sendToLog "Status: Jamf Policy with Trigger \"$trigger\" is starting..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" policy -event "$trigger" -verbose 2>&1)
+			jamfRETURN=$?
 			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
+			sendToLog "Verbose Mode: jamfRETURN is: $jamfRETURN"
 		else
 			"$jamfBINARY" policy -event "$trigger" > /dev/null 2>&1
+			jamfRETURN=$?
+		fi
+		if [ $jamfRETURN -ne 0 ]; then
+			sendToLog "Error: Jamf Policy with Trigger \"$trigger\" failed!"; jamfERROR="TRUE"
+		else
+			sendToLog "Status: Jamf Policy with Trigger \"$trigger\" was succesfull."
 		fi
 	else
-		sendToLog "Test Mode: Skipping Jamf Policy with Trigger $trigger."
+		sendToLog "Test Mode: Skipping Jamf Policy with Trigger: $trigger."
 	fi
 done
 IFS="$oldIFS"
+if [[ "$testModeOPTION" != "TRUE" ]]; then
+	if [[ "$jamfERROR" != "TRUE" ]]; then
+		sendToLog "Status: All Jamf Policies completed, clearing --policy-triggers option."
+		defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
+	else
+		sendToLog "Status: Some Jamf Policies failed, not clearing --policy-triggers option."
+	fi
+else
+	sendToLog "Test Mode: Killing update restart notification in $testModeTIMEOUT seconds..."
+	sleep "$testModeTIMEOUT"
+	kill -9 "$notifyPID" > /dev/null 2>&1
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+	else
+		killall -9 "jamfHelper" > /dev/null 2>&1
+	fi
+fi
 }
 
 # This is the install and restart workflow when a user is NOT logged in.
@@ -2465,16 +2494,24 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	disown
 	
 	# Send the Jamf Pro API command to update and restart via MDM.
-	commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out %{http_code} --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/install/id/${jamfProID}")
+	if [[ $jamfVERSION -ge 1038 ]]; then
+		jamfAPIURL="${jamfSERVER}api/v1/macos-managed-software-updates/send-updates"
+		jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "skipVersionVerification": false, "applyMajorUpdate": false, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+		commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --header "Content-Type: application/json" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfAPIURL}" --data "${jamfJSON}")
+	else
+		sendToLog "Warning: Using legacy Jamf Pro Classic API. You should upgrade your Jamf Pro instance to 10.38 or later."
+		commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/install/id/${jamfProID}")
+	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
 	
 	# If the Jamf Pro API command was successfully created, monitor the update progress.
-	if [[ "$testModeOPTION" != "TRUE" ]] && [[ $commandRESULT -eq 201 ]]; then
+	if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 		sendToLog "Status: Successful MDM update and restart request."
+		sendBlankPush
 		
 		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
-		tail -n 0 -f "$mdmLOG" | while read logLINE ; do
-			if [[ $(echo "$logLINE" | grep "Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan):") ]]; then
+		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
+			if echo "$logLINE" | grep -q "Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan):"; then
 				sendToLog "Status: Acknowledged MDM update scan request, checking back after Jamf Pro's mandatory 5 minute delay..."
 				pkill -P $$ tail
 				break
@@ -2483,7 +2520,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		timerEND=300
 		while [[ $timerEND -ge 0 ]]; do
 			echo -ne "Waiting for Jamf Pro's mandatory 5 minute delay: -$(date -u -r $timerEND +%M:%S)\r"
-			timerEND=$((timerEND-1))
+			timerEND=$((timerEND - 1))
 			sleep 1
 		done
 		echo
@@ -2497,12 +2534,12 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		notifyRestart
 		
 		# Watch $mdmLOG while waiting for the MDM workflow to complete.
-		tail -n 0 -f "$mdmLOG" | while read logLINE ; do
-			if [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Idle\]') ]]; then
+		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
+			if echo "$logLINE" | grep -q 'Received HTTP response (200) \[Idle\]'; then
 				sendToLog "Status: Recieved MDM blank push."
-			elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates):') ]]; then
+			elif echo "$logLINE" | grep -q 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates):'; then
 				sendToLog "Status: Acknowledged MDM return available updates."
-			elif [[ $(echo "$logLINE" | grep 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate):') ]]; then
+			elif echo "$logLINE" | grep -q 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate):'; then
 				sendToLog "Status: Acknowledged MDM scheduled software update and restart, restart should be very soon..."
 				kill -9 "$mdmStreamPID" > /dev/null 2>&1
 				echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM UPDATE END ****" >> "$mdmLOG"
@@ -2511,8 +2548,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		done
 		
 		# Watch $updateLOG while waiting for the update and restart workflow to complete.
-		tail -n 0 -f "$updateLOG" | while read logLINE ; do
-			if [[ $(echo "$logLINE" | grep -w 'phase:APPLYING') ]]; then
+		tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
+			if echo "$logLINE" | grep -q -w 'phase:APPLYING'; then
 				sendToLog "Status: Software update and restart process is complete, restart imminent..."
 				kill -9 "$updateStreamPID" > /dev/null 2>&1
 				echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM UPDATE END ****" >> "$updateLOG"
@@ -2687,10 +2724,10 @@ openIbmNotifier() {
 unset dialogRESULT
 unset dialogRETURN
 if [[ -n $displayRedrawSECONDS ]]; then
-	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$(($displayTimeoutSECONDS-1))
+	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - 1))
 	while [[ -z $dialogRETURN ]] || [[ "$dialogRETURN" -eq 137 ]]; do
-		( [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
-		( [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+		{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+		{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
 		(sleep "$displayRedrawSECONDS"; killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1) &
 		killerPID=$!
@@ -2699,11 +2736,11 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
-		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS-displayRedrawSECONDS))
+		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
 	done
 else
-	( [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
-	( [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]] ) && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+	{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
+	{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "Please make selection in %@" -timeout "$displayTimeoutSECONDS")
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
 	dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 	dialogRETURN="$?"
@@ -2717,7 +2754,7 @@ openJamfHelper() {
 unset dialogRESULT
 unset dialogRETURN
 if [[ -n $displayRedrawSECONDS ]]; then
-	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$(($displayTimeoutSECONDS-1))
+	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - 1))
 	while [[ -z $dialogRESULT ]]; do
 		[[ -n $displayTimeoutSECONDS ]] && jamfHelperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper options: ${jamfHelperARRAY[*]}"
@@ -2728,7 +2765,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
-		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS-displayRedrawSECONDS))
+		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
 	done
 else
 	[[ -n $displayTimeoutSECONDS ]] && jamfHelperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
@@ -2872,7 +2909,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 			"$jamfHELPER" "${jamfHelperARRAY[@]}" &
 		fi
 		sleep "$displayRedrawSECONDS"
-		[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=$((redrawCOUNTER+1))
+		[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=$((redrawCOUNTER + 1))
 		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 		else
@@ -2997,21 +3034,20 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 
 	# If needed, add the $menuDeferSECONDS option to the $ibmNotifierARRAY[].
 	if [[ -n $menuDeferSECONDS ]]; then
-		oldIFS="$IFS"
-		IFS=$','
-		menuDeferSecondsARRAY=($menuDeferSECONDS)
-		menuDeferDisplayARRAY=($menuDeferSECONDS)
+		oldIFS="$IFS"; IFS=','
+		read -r -a menuDeferSecondsARRAY <<< "$menuDeferSECONDS"
+		read -r -a menuDeferDisplayARRAY <<< "$menuDeferSECONDS"
 		for i in "${!menuDeferDisplayARRAY[@]}"; do
 			if [[ ${menuDeferDisplayARRAY[i]} -lt 3600 ]]; then
-				menuDeferDisplayARRAY[i]="$((${menuDeferDisplayARRAY[i]} / 60)) minutes"
+				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 60)) minutes"
 			elif [[ ${menuDeferDisplayARRAY[i]} -eq 3600 ]]; then
 				menuDeferDisplayARRAY[i]="1 hour"
 			elif [[ ${menuDeferDisplayARRAY[i]} -gt 3600 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 7200 ]]; then
-				menuDeferDisplayARRAY[i]="1 hour $((${menuDeferDisplayARRAY[i]} % 3600 / 60)) Minutes"
-			elif [[ ${menuDeferDisplayARRAY[i]} -ge 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $(( ${menuDeferDisplayARRAY[i]} % 3600 )) -eq 0 ]]; then
-				menuDeferDisplayARRAY[i]="$((${menuDeferDisplayARRAY[i]} / 3600)) hours"
-			elif [[ ${menuDeferDisplayARRAY[i]} -gt 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $(( ${menuDeferDisplayARRAY[i]} % 3600 )) -ne 0 ]]; then
-				menuDeferDisplayARRAY[i]="$((${menuDeferDisplayARRAY[i]} / 3600)) hours $((${menuDeferDisplayARRAY[i]} % 3600 / 60)) minutes"
+				menuDeferDisplayARRAY[i]="1 hour $((menuDeferDisplayARRAY[i] % 3600 / 60)) Minutes"
+			elif [[ ${menuDeferDisplayARRAY[i]} -ge 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $((menuDeferDisplayARRAY[i] % 3600)) -eq 0 ]]; then
+				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 3600)) hours"
+			elif [[ ${menuDeferDisplayARRAY[i]} -gt 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $((menuDeferDisplayARRAY[i] % 3600)) -ne 0 ]]; then
+				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 3600)) hours $((menuDeferDisplayARRAY[i] % 3600 / 60)) minutes"
 			elif [[ ${menuDeferDisplayARRAY[i]} -eq 86400 ]]; then
 				menuDeferDisplayARRAY[i]="1 day"
 			fi
@@ -3170,7 +3206,7 @@ if [[ "$updatesRESTART" == "TRUE" ]] && [[ "$testModeOPTION" != "TRUE" ]]; then 
 	else # Updates were previously downloaded.
 		sendToLog "Status: Previously downloaded ${#downloadedTITLES[@]} software udpate(s)."
 		for i in "${!downloadedTITLES[@]}"; do
-			sendToLog "Previous Download $((i+1)): ${downloadedTITLES[i]}"
+			sendToLog "Previous Download $((i + 1)): ${downloadedTITLES[i]}"
 		done
 	fi
 fi
@@ -3182,8 +3218,8 @@ if [[ "$updatesRESTART" == "TRUE" ]] || [[ -n $policyTRIGGERS ]] || [[ "$forceRe
 		installRestartSilent
 	else # A normal user is currently logged in.
 		checkDateDeadlines
-		( [[ "$deadlineSTATUS" != "HARD" ]] && [[ "$deadlineSTATUS" != "SOFT" ]] ) && checkDeferCountDeadline # Only need to check this if not past any hard or soft date deadlines.
-		( [[ "$deadlineSTATUS" == "FALSE" ]] || [[ "$deadlineSTATUS" != "FOCUS" ]] ) && checkUserFocus # Only need to check this if not past any deadlines.
+		{ [[ "$deadlineSTATUS" != "HARD" ]] && [[ "$deadlineSTATUS" != "SOFT" ]]; } && checkDeferCountDeadline # Only need to check this if not past any hard or soft date deadlines.
+		{ [[ "$deadlineSTATUS" == "FALSE" ]] || [[ "$deadlineSTATUS" != "FOCUS" ]]; } && checkUserFocus # Only need to check this if not past any deadlines.
 		if [[ "$deadlineSTATUS" == "HARD" ]]; then # The Hard deadline has passed, similar to no logged in user but with a notification.
 			installRestartMain
 		elif [[ "$deadlineSTATUS" == "SOFT" ]]; then # The Soft deadline has passed.
