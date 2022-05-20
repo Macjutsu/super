@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [1.1]
+
+2022-05-20
+
+- Resolved missing code that prevented the `PreferJamf` managed preference key from being respected.
+- The `--prefer-jamf` option will now result in an exit error if run from a computer with no Jamf binary.
+
 ## [1.1b2]
 
 2022-05-16

@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 1.1b2
-# 2022/05/16
+# Version 1.1
+# 2022/05/20
 # https://github.com/Macjutsu/super
 #
 ######## DEBUGGING STUFF ########
@@ -26,8 +26,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 1.1b2
-  2022/05/16
+  Version 1.1
+  2022/05/20
   https://github.com/Macjutsu/super
 
   Usage:
@@ -971,6 +971,20 @@ elif [[ -n $iconSizeJamfOPTION ]] && [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; 
 	defaults write "$superPLIST" IconSizeJamf -string "$iconSizeJamfOPTION"
 elif [[ -n $iconSizeJamfOPTION ]] && ! [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; then
 	sendToLog "Exit: The Ibm Notifier icon size must only be a number."; parameterERROR="TRUE"
+fi
+
+# Manage $preferJamfOPTION and save to $superPLIST.
+if [[ -n $preferJamfOPTION ]]; then
+	if [[ $preferJamfOPTION -eq 1 ]] || [[ "$preferJamfOPTION" == "TRUE" ]]; then
+		if [[ "$jamfVERSION" != "FALSE" ]]; then
+			preferJamfOPTION="TRUE"
+		else
+			sendToLog "Exit: No local Jamf binary detected, thus can not prefer jamfHelper."; parameterERROR="TRUE"
+		fi
+	else
+		preferJamfOPTION="FALSE"
+	fi
+	defaults write "$superPLIST" PreferJamf -bool "$preferJamfOPTION"
 fi
 
 # Validate $focusDeadlineOPTION, if valid set $focusDEADLINE, $focusEPOCH, $focusDATE, $focusTIME, $focusDEADLINE, and $focusDISPLAY.
