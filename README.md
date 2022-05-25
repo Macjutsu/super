@@ -36,7 +36,7 @@ __Restart notification__
 
 __Mac computers with Intel:__
 
-- Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
+Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
 
 __Mac computers with Apple Silicon:__
 
@@ -46,6 +46,12 @@ This authorization is possible via three methods:
 - An existing local account
 - An automatically created local service account
 - A Jamf Pro API account
+
+__macOS Monterey Notification Fix:__
+
+On macOS Monterey all `super` workflows leveraging `softwareupdate` (the default for Intel, and optional for Apple Silicon) will hang during downloads due to an issue where the `softwareupdate` process [fails to generate a system notification when it's run via a LaunchDaemon](https://developer.apple.com/forums/thread/701096). The workaround is to deploy a Configuration Profile that disables the built-in alerts and notifications for `softwareupdate` via the Bundle ID: `_system_center_:com.apple.softwareupdatenotification`. This has the dual benefit of also preventing system notification collisions with `super` generated notifications.
+
+![Example Configuration Profile to disable softwareupdate alerts and notifications](Screenshots/NotificationsConfigurationProfile.png)
 
 ## Apple Silicon Authorization Requirement Details
 

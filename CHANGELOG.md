@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [1.1.1]
+
+2022-05-25
+
+- No code changes in `super` script.
+- [Significant macOS Monterey requirement changes](https://github.com/Macjutsu/super#requirements) to work around `softwareupdate` workflows that are hanging during system update downloads. Please see the "macOS Monterey Notification Fix Requirement" section. ([#11](https://github.com/Macjutsu/super/pull/11), thanks to @KMudedla).
+
 ## [1.1]
 
 2022-05-20
