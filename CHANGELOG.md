@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [2.0b1]
+
+2022-06-16
+
+- There are so many new features in `super` 2.x that any existing scripts, Configuration Profiles, or other workflows designed for `super` 1.x are not compatible with `super` 2.x. Plese review `sudo super --help` in addition to this change log!
+- All option flags with a variable value now require the use of equals ( = ). For example, `--default-defer=3600`. However, quoting is no longer required for option variables (unless they use a reserved character like "space").
+- When running `super` via Jamf Pro Policy, you can now use script Parameter Values for configuration. However, you can only use one option per Parameter Value, so you are limited to a total of 8 options with this method. Obviously, you should consider using a [Configuration Profile](https://github.com/Macjutsu/super/blob/main/All_Managed_Options_com.macjutsu.super.plist) for setting more options.
+- New `--recheck-defer=seconds` option allows `super` to re-run on a regular basis even when no Apple software updates are found. Thus, `super` "remains active" to enforce ongoing Apple software update checking.
+- Significantly updated deferral mechanism now allows for all deadline types (focus, soft, and hard) for all deferral types, including...
+- New `--focus-days=number`, `--soft-days=number`, and `--hard-days=number` options allow you specify a maximum number of days to defer after an Apple software update is found.
+- New `--zero-day=YYYY-MM-DD:hh:mm` option allows you to specify a manual day zero instead of relying on the default automatic zero day, which is based on when new Apple system updates are available.
+- Maximum deferral count and maximum deferral days deadlines can now be restarted with the `--restart-count` and `--restart-days` options.
+- Multiple options of a simliar type can now be deleted with a single option, this includes; `--delete-deferrals`, `--delete-counts`, `--delete-days`, `--delete-dates`, and `--delete-accounts`.
+- Improved icon scaling when using the `--icon-size-ibm` option courtesy of...
+- IBM Notifier [Version 2.7.1 Build 81](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-2.7.1-b-81) is automatically downloaded and installed in the $superFOLDER.
+- As a default behavior, the `--policy-triggers` option now waits for restart-required system updates to become available before running any Jamf Policy Triggers. Alternately, you can combine this option with the `--skip-updates` option to run the Jamf Policy triggers without waiting for a restart-required system update.
+- The `--clear-super` option is renamed to `--reset-super` and also includes improved logging.
+- Improved behavior for the `--open-logs` option.
+- All notification and dialog text strings are now consolidated into a single, easier to customize, `setDisplayLanguage()` function.
+- MDM workflow parsing updates should improve detection of MDM download and install progress.
+- A lot of documentation improvements and internal refactoring to align with new features and renamed options.
+
 ## [1.1.1]
 
 2022-05-25
@@ -12,7 +34,7 @@
 2022-05-20
 
 - Resolved missing code that prevented the `PreferJamf` managed preference key from being respected.
-- The `--prefer-jamf` option will now result in an exit error if run from a computer with no Jamf binary.
+- The `--prefer-jamf` option now results in an exit error if run from a computer with no Jamf binary.
 
 ## [1.1b2]
 
