@@ -109,4 +109,4 @@ __To deploy via Jamf Pro:__
 
 Wiki coming soon! No, really! I was just waiting to finalize `super` 2.x... Until then use: `sudo super --help`
 
-You can also join the conversation at the [Mac Admins Foundation Slack](https://www.macadmins.org) in channel [#super](slack://channel?team={T04QVKUQG}&id={C03LKQ8EN2C}).
+You can also join the conversation at the [Mac Admins Foundation Slack](https://www.macadmins.org) in channel [super](https://macadmins.slack.com/archives/C03LKQ8EN2C).
