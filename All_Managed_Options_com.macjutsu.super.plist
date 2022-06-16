@@ -5,15 +5,37 @@
 	<key>JamfProID</key>
 	<string>$JSSID</string>
 	<key>DefaultDefer</key>
-	<string>100</string>
+	<string>120</string>
 	<key>FocusDefer</key>
-	<string>100</string>
+	<string>120</string>
 	<key>MenuDefer</key>
-	<string>100,200,300</string>
+	<string>120,200,300</string>
+	<key>RecheckDefer</key>
+	<string>120</string>
+	<key>FocusCount</key>
+	<string>5</string>
+	<key>SoftCount</key>
+	<string>5</string>
+	<key>HardCount</key>
+	<string>5</string>
+	<key>FocusDays</key>
+	<string>2</string>
+	<key>SoftDays</key>
+	<string>4</string>
+	<key>HardDays</key>
+	<string>6</string>
+	<key>ZeroDay</key>
+	<string>2022-07-01</string>
+	<key>FocusDate</key>
+	<string>2022-07-01</string>
+	<key>SoftDate</key>
+	<string>2022-07-02:02</string>
+	<key>HardDate</key>
+	<string>2022-07-03:03:03</string>
 	<key>DisplayTimeout</key>
-	<string>15</string>
+	<string>60</string>
 	<key>DisplayRedraw</key>
-	<string>10</string>
+	<string>20</string>
 	<key>DisplayIcon</key>
 	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
 	<key>IconSizeIbm</key>
@@ -22,14 +44,6 @@
 	<string>128</string>
 	<key>PreferJamf</key>
 	<false/>
-	<key>FocusDeadline</key>
-	<string>2022-01-01</string>
-	<key>SoftDeadline</key>
-	<string>2022-01-02:02</string>
-	<key>HardDeadline</key>
-	<string>2022-01-03:03:03</string>
-	<key>CountDeadline</key>
-	<string>5</string>
 	<key>PolicyTriggers</key>
 	<string>trigger1,trigger2</string>
 	<key>SkipUpdates</key>

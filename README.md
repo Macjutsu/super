@@ -6,37 +6,45 @@ S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 
 by Kevin M. White
 
+## Introduction
+
+S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides administrators with a comprehensive workflow to encourage and enforce macOS software updates for both Intel and Apple Silicon computers. Deployed via a single script, `super` creates a background agent (aka LaunchDaemon) that ensures macOS software updates are applied with the least user interference possible. Further, `super` can also enforce macOS software updates with options for customizable deferrals and deadlines. In other words, `super` makes the macOS update experience better for both users and administrators alike.
+
+__Version 2.x Compatibility__
+
+There are so many new features in `super` 2.x that any existing scripts, Configuration Profiles, or other workflows designed for `super` 1.x are not compatible with `super` 2.x. Plese review the [change log](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) and `sudo super --help`!
+
 ## Features and Options
 
-- Fully automatic macOS software update workflow for both Intel and Apple Silicon computers.
-- Automatically generated dialogs and notifications via [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
-- Minimize user downtime by automatically installing non-restart required Apple software updates without prompting the user.
-- Minimize user downtime by automatically downloading and preparing system updates before interrupting the user to restart.
-- Automatic deferral option for user Focus, Do Not Disturb, and screen sleep (presentations, meetings, etc).
-- Update enforcement options including hard deadline, soft deadline, and maximum deferral count deadline.
+- Fully automated (no user authentication required) macOS software update workflow for both Intel and Apple Silicon computers.
+- Customizable software update dialogs and notifications via [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
+- Minimizes user downtime by automatically installing non-restart Apple software updates (Safari, Xcode, etc.) without prompting the user.
+- Minimizes user downtime by automatically downloading and preparing system updates before interrupting the user to restart.
+- Automatic deferral option for user Focus, Do Not Disturb, and screen sleep assertions (presentations, meetings, etc).
+- A variety of enforcement options including maximum deferral counts, maximum deferral days, and date deadlines.
 - Background agent (LaunchDaemon) works independently of management (MDM) service.
 - Automatic installation of all required items and dependencies.
 - Configurable via interactive command line `super` or MDM [managed preference](All_Managed_Options_com.macjutsu.super.plist).
-- Substantial validation and logging including both test and verbose modes.
-- For computers managed via Jamf Pro, automatic inventory and policy update as soon as possible after computer restarts.
+- Substantial validation and logging including both testing and verbose modes.
+- For computers managed via Jamf Pro, automatic inventory and policy check-in as soon as possible after computer restarts.
 - For computers managed via Jamf Pro, option to run policies prior to system update restart.
-- For computers managed via Jamf Pro, option to run policies without Apple software updates but still take advantage of dialogs, notifications, deferrals, and deadline workflows.
+- For computers managed via Jamf Pro, option to run policies without Apple software updates and still take advantage of dialogs, notifications, deferrals, and deadline workflows.
 
 ## Screenshots
 
 __Update dialog with multiple deadlines and pop-up deferral choice__
 
-![Example update dialog](Screenshots/Ask.png)
+![Example update dialog](https://github.com/Macjutsu/super/blob/main/Screenshots/Ask.png)
 
 __Restart notification__
 
-![Example restart notification](Screenshots/Restart.png)
+![Example restart notification](https://github.com/Macjutsu/super/blob/main/Screenshots/Restart.png)
 
 ## Requirements
 
 __Mac computers with Intel:__
 
-- Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
+Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
 
 __Mac computers with Apple Silicon:__
 
@@ -46,6 +54,12 @@ This authorization is possible via three methods:
 - An existing local account
 - An automatically created local service account
 - A Jamf Pro API account
+
+__macOS Monterey Notification Fix:__
+
+On macOS Monterey all `super` workflows leveraging `softwareupdate` (the default for Intel, and optional for Apple Silicon) hangs during downloads due to an issue where the `softwareupdate` process [fails to generate a system notification when it's run via a LaunchDaemon](https://developer.apple.com/forums/thread/701096). The workaround is to deploy a Configuration Profile that disables the built-in alerts and notifications for `softwareupdate` via the Bundle ID: `_system_center_:com.apple.softwareupdatenotification`. This has the dual benefit of also preventing system notification collisions with `super` generated notifications.
+
+![Example Configuration Profile to disable softwareupdate alerts and notifications](Screenshots/NotificationsConfigurationProfile.png)
 
 ## Apple Silicon Authorization Requirement Details
 
@@ -75,16 +89,24 @@ _If multiple valid authorization methods are provided, the priority order is as 
 
 ## Installation
 
+__Version 2.x Compatibility__
+
+There are so many new features in `super` 2.x that any existing scripts, Configuration Profiles, or other workflows designed for `super` 1.x are not compatible with `super` 2.x. Plese review the [change log](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) and `sudo super --help`!
+
 __To install and run locally:__
-1. Make sure the S.U.P.E.R.M.A.N. script (named just `super`) has appropriate execute permissions and then run it like any other local management script: `sudo /wherever/the/heck/you/downloaded/super --help`
-2. The super script automatically installs itself (and various other accoutrements) anytime it's ran from outside its working folder, which is defaulted to /Library/Management/super.
-3. There's no step three. After self-installation, super automatically restarts itself with your previously specified options and, if necessary, creates a LaunchDaemon to keep things going.
+
+1. Make sure the S.U.P.E.R.M.A.N. script (named just `super`) has appropriate execute permissions and then run it like any other local management script: `sudo /wherever/the/heck/you/downloaded/super --usage`
+2. The `super` script automatically installs itself (and various other accoutrements) anytime it's ran from outside its working folder, which is defaulted to /Library/Management/super.
+3. There's no step three. After self-installation, `super` automatically restarts itself using your previously specified options. Further, depending on your options, `super` may create a LaunchDeamon to keep itself running.
 
 __To deploy via Jamf Pro:__
-1. Create a new Policy adding just the super script as-is.
-2. Add to the Policy a configuration for: Files and Processes > Execute Command > `/Library/Management/super/super --bunch-of-options --go-here`
-3. There's "basically" no step three (besides running the Policy). The super script automatically installs itself then restarts via LaunchDaemon, thus freeing the jamf agent to get on with other things.
+
+1. Create a new Policy adding the `super` script as-is, you don't need to modify it for most workflows.
+2. If you only want to install `super` for testing, then use a single script Parameter Value of `--usage`. Alternately, you can specify multiple `super` options in the script Parameter Value fields, but only one option per field. Thus, you are limited to a total of 8 options with this method. Consider using a [Configuration Profile](https://github.com/Macjutsu/super/blob/main/All_Managed_Options_com.macjutsu.super.plist) for setting more options.
+3. There's "basically" no step three (besides running the Policy). When run via Jamf Pro `super` automatically installs itself (and various other accoutrements) and then restarts itself using the options from the Parameter Values. Further, depending on your options, `super` may create a LaunchDeamon to keep itself running.
 
 ## General Usage
 
-Wiki coming soon! Until then use: `sudo super --help`
+Wiki coming soon! No, really! I was just waiting to finalize `super` 2.x... Until then use: `sudo super --help`
+
+You can also join the conversation at the [Mac Admins Foundation Slack](https://www.macadmins.org) in channel [#super](slack://channel?team={T04QVKUQG}&id={C03LKQ8EN2C}).
