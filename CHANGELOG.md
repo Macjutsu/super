@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2.0b2]
+
+2022-08-01
+
+- Re-arranged the main workflow so that if there is no current user then the system update is attempted immediately, thus skipping the pre-download functions. This prevents an issue where in some cases `softwareupdate` was re-downloading the system update.
+- Significant rewrite of the `softwarupdate` workflows to fully support macOS 11 and later on both Intel and Apple Silicon computers. The previous "macOS Monterey Notification Fix" is no longer necessary. (Huge thanks to @Stephen Grall for help on this!)
+- The MDM update workflow via Jamf Pro is now supported on both Intel and Apple Silicon computers running macOS 11.5 and later.
+- Credentials for the MDM update workflow via Jamf Pro are now validated and saved on all versions of macOS, thus allowing for use of the MDM update workflow once the system has reached macOS 11.5 or later.
+- Updated the `checkCurrentUser()` function with more resilient code that now also collects the current UID.
+- Resolved an issue when validating the maximum seconds for the `--recheck-defer` option.
+
 ## [2.0b1]
 
 2022-06-16

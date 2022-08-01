@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 2.0b1
-# 2022/06/16
+# Version 2.0b2
+# 2022/08/01
 # https://github.com/Macjutsu/super
 #
 ######## DEBUGGING STUFF ########
@@ -26,8 +26,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 2.0b1
-  2022/06/16
+  Version 2.0b2
+  2022/08/01
   https://github.com/Macjutsu/super
 
   Usage:
@@ -410,20 +410,22 @@ echo "  Deferment Timer Options:
   admin user.
 
   --jamf-account=AccountName
-  Apple Silicon only. A Jamf Pro user account that can authorize macOS software
-  update MDM commands. You must also provide the --jamf-password for this
-  account. The default Jamf Pro privileges required for this account are;
-  Computers Create,  Compuers Read, and  Send Computer Remote Command
-  to Download and Install macOS Update. You can avoid the  Compuers Read
-  requirement by providing a Configuratino Profile with the following managed
-  preference: <key>JamfProID</key> <string>$JSSID</string>. Note that valid
-  local update credentials (local user account or super service account) take
-  precedence over the the Jamf Pro API credentials.
+  A Jamf Pro user account that can authorize macOS software update MDM commands.
+  You must also provide the --jamf-password for this account. The default Jamf
+  Pro privileges required for this account are; Computers Create, Compuers Read,
+  and Send Computer Remote Command to Download and Install macOS Update. You can
+  avoid the Compuers Read requirement by providing a Configuratino Profile with
+  the following managed preference: <key>JamfProID</key><string>$JSSID</string>.
+  Note that only computers with macOS 11.5 or later can reliably update via MDM
+  commands. As such, on older systems valid credentials will be saved but the
+  MDM method will not be attempted until the system is at least macOS 11.5.
+  Also, on Apple Silicon, valid local update credentials (local user account or
+  super service account) take precedence over the the MDM update workflow.
 
   --jamf-password=Password
-  Apple Silicon only. The Jamf Pro user account password to authenticate the
-  account specified by --jamf-account. Note that these credentials are stored in
-  the System keychain and can be viewed by any other local admin user.
+  The Jamf Pro user account password to authenticate the account specified by
+  --jamf-account. Note that these credentials are stored in the System keychain
+  and can be viewed by any other local admin user.
 
   -D | --delete-accounts
   Delete all previously saved Apple Silicon update credentials. This includes
@@ -1147,7 +1149,7 @@ elif [[ -n $recheckDeferOPTION ]] && [[ $recheckDeferOPTION =~ $regexNUMBER ]]; 
 	if [[ $recheckDeferOPTION -lt 120 ]]; then
 		sendToLog "Warning: Specified recheck deferral time of $recheckDeferOPTION seconds is too low, rounding up to 120 seconds."
 		recheckDeferSECONDS="120"
-	elif [[ $recheckDeferOPTION -gt 86400 ]]; then
+	elif [[ $recheckDeferOPTION -gt 2628288 ]]; then
 		sendToLog "Warning: Specified recheck deferral time of $recheckDeferOPTION seconds is too high, rounding down to 2628288 seconds (30 days)."
 		recheckDeferSECONDS="2628288"
 	else
@@ -1581,63 +1583,67 @@ fi
 
 # Manage update credentials given $deleteACCOUNTS, $localACCOUNT, $adminACCOUNT, $superACCOUNT, or $jamfACCOUNT. Any errors set $parameterERROR.
 manageUpdateCredentials () {
-# Validate that $localOPTION and $localPASSWORD are simultaneously provided.
-if [[ -n $localOPTION ]] && [[ -z $localPASSWORD ]]; then
-	sendToLog "Exit: A local volume owner account name requires that you also set a local volume owner password."; parameterERROR="TRUE"
-fi
-if [[ -z $localOPTION ]] && [[ -n $localPASSWORD ]]; then
-	sendToLog "Exit: A local volume owner password requires that you also set a local volume owner account name."; parameterERROR="TRUE"
-fi
 
-# Validate that $localOPTION exists, is a volume owner, and that $localPASSWORD is correct.
-if [[ -n $localOPTION ]] && [[ "$parameterERROR" != "TRUE" ]]; then
-	localGUID=$(dscl . read "/Users/$localOPTION" GeneratedUID 2> /dev/null | awk '{print $2;}')
-	if [[ -n $localGUID ]]; then
-		if ! [[ $(diskutil apfs listcryptousers / | grep -c "$localGUID") -ne 0 ]]; then
-			sendToLog "Exit: Provided account \"$localOPTION\" is not a system volume owner."; parameterERROR="TRUE"
+# Local update credentials are only validated for Apple Silicon computers.
+if [[ "$macosARCH" == "arm64" ]]; then
+	# Validate that $localOPTION and $localPASSWORD are simultaneously provided.
+	if [[ -n $localOPTION ]] && [[ -z $localPASSWORD ]]; then
+		sendToLog "Exit: A local volume owner account name requires that you also set a local volume owner password."; parameterERROR="TRUE"
+	fi
+	if [[ -z $localOPTION ]] && [[ -n $localPASSWORD ]]; then
+		sendToLog "Exit: A local volume owner password requires that you also set a local volume owner account name."; parameterERROR="TRUE"
+	fi
+
+	# Validate that $localOPTION exists, is a volume owner, and that $localPASSWORD is correct.
+	if [[ -n $localOPTION ]] && [[ "$parameterERROR" != "TRUE" ]]; then
+		localGUID=$(dscl . read "/Users/$localOPTION" GeneratedUID 2> /dev/null | awk '{print $2;}')
+		if [[ -n $localGUID ]]; then
+			if ! [[ $(diskutil apfs listcryptousers / | grep -c "$localGUID") -ne 0 ]]; then
+				sendToLog "Exit: Provided account \"$localOPTION\" is not a system volume owner."; parameterERROR="TRUE"
+			fi
+			localVALID=$(dscl /Local/Default -authonly "$localOPTION" "$localPASSWORD" 2>&1)
+			if ! [[ "$localVALID" == "" ]];then
+				sendToLog "Exit: The provided password for account \"$localOPTION\" is not valid."; parameterERROR="TRUE"
+			fi
+		else
+			sendToLog "Exit: Could not retrieve GUID for account \"$localOPTION\". Verify that account exists locally."; parameterERROR="TRUE"
 		fi
-		localVALID=$(dscl /Local/Default -authonly "$localOPTION" "$localPASSWORD" 2>&1)
-		if ! [[ "$localVALID" == "" ]];then
-			sendToLog "Exit: The provided password for account \"$localOPTION\" is not valid."; parameterERROR="TRUE"
+	fi
+
+	# Validate that $adminACCOUNT and $adminPASSWORD are simultaneously provided.
+	if [[ -n $adminACCOUNT ]] && [[ -z $adminPASSWORD ]]; then
+		sendToLog "Exit: A local admin account name requires that you also set a local admin password."; parameterERROR="TRUE"
+	fi
+	if [[ -z $adminACCOUNT ]] && [[ -n $adminPASSWORD ]]; then
+		sendToLog "Exit: A local admin password requires that you also set a local admin account name."; parameterERROR="TRUE"
+	fi
+
+	# Validate that $adminACCOUNT is also specified with $superOPTION.
+	if [[ -n $superOPTION ]] && [[ -z $adminACCOUNT ]]; then
+		sendToLog "Exit: Local admin credentials are required to set a custom super service account name."; parameterERROR="TRUE"
+	fi
+
+	# Validate that $adminACCOUNT exists, is a volume owner, a local admin, and that $adminPASSWORD is correct.
+	if [[ -n $adminACCOUNT ]] && [[ "$parameterERROR" != "TRUE" ]]; then
+		adminGUID=$(dscl . read "/Users/$adminACCOUNT" GeneratedUID 2> /dev/null | awk '{print $2;}')
+		if [[ -n $adminGUID ]]; then
+			if [[ $(groups "$adminACCOUNT" | grep "admin" -c) -eq 0 ]]; then
+				sendToLog "Exit: Provided account \"$adminACCOUNT\" is not a local administrator."; parameterERROR="TRUE"
+			fi
+			if ! [[ $(diskutil apfs listcryptousers / | grep -c "$adminGUID") -ne 0 ]]; then
+				sendToLog "Exit: Provided account \"$adminACCOUNT\" is not a system volume owner."; parameterERROR="TRUE"
+			fi
+			adminVALID=$(dscl /Local/Default -authonly "$adminACCOUNT" "$adminPASSWORD" 2>&1)
+			if ! [[ "$adminVALID" == "" ]];then
+				sendToLog "Exit: The provided password for account \"$adminACCOUNT\" is not valid."; parameterERROR="TRUE"
+			fi
+		else
+			sendToLog "Exit: Could not retrieve GUID for account \"$adminACCOUNT\". Verify that account exists locally."; parameterERROR="TRUE"
 		fi
-	else
-		sendToLog "Exit: Could not retrieve GUID for account \"$localOPTION\". Verify that account exists locally."; parameterERROR="TRUE"
 	fi
 fi
 
-# Validate that $adminACCOUNT and $adminPASSWORD are simultaneously provided.
-if [[ -n $adminACCOUNT ]] && [[ -z $adminPASSWORD ]]; then
-	sendToLog "Exit: A local admin account name requires that you also set a local admin password."; parameterERROR="TRUE"
-fi
-if [[ -z $adminACCOUNT ]] && [[ -n $adminPASSWORD ]]; then
-	sendToLog "Exit: A local admin password requires that you also set a local admin account name."; parameterERROR="TRUE"
-fi
-
-# Validate that $adminACCOUNT is also specified with $superOPTION.
-if [[ -n $superOPTION ]] && [[ -z $adminACCOUNT ]]; then
-	sendToLog "Exit: Local admin credentials are required to set a custom super service account name."; parameterERROR="TRUE"
-fi
-
-# Validate that $adminACCOUNT exists, is a volume owner, a local admin, and that $adminPASSWORD is correct.
-if [[ -n $adminACCOUNT ]] && [[ "$parameterERROR" != "TRUE" ]]; then
-	adminGUID=$(dscl . read "/Users/$adminACCOUNT" GeneratedUID 2> /dev/null | awk '{print $2;}')
-	if [[ -n $adminGUID ]]; then
-		if [[ $(groups "$adminACCOUNT" | grep "admin" -c) -eq 0 ]]; then
-			sendToLog "Exit: Provided account \"$adminACCOUNT\" is not a local administrator."; parameterERROR="TRUE"
-		fi
-		if ! [[ $(diskutil apfs listcryptousers / | grep -c "$adminGUID") -ne 0 ]]; then
-			sendToLog "Exit: Provided account \"$adminACCOUNT\" is not a system volume owner."; parameterERROR="TRUE"
-		fi
-		adminVALID=$(dscl /Local/Default -authonly "$adminACCOUNT" "$adminPASSWORD" 2>&1)
-		if ! [[ "$adminVALID" == "" ]];then
-			sendToLog "Exit: The provided password for account \"$adminACCOUNT\" is not valid."; parameterERROR="TRUE"
-		fi
-	else
-		sendToLog "Exit: Could not retrieve GUID for account \"$adminACCOUNT\". Verify that account exists locally."; parameterERROR="TRUE"
-	fi
-fi
-
-# Validate that $jamfOPTION 
+# Validate that $jamfOPTION is only used on computers with the jamf binary installed.
 if [[ -n $jamfOPTION ]] && [[ "$jamfVERSION" == "FALSE" ]]; then
 	sendToLog "Exit: A Jamf Pro API account name requires that this computer is enrolled in Jamf Pro."; parameterERROR="TRUE"
 fi
@@ -1670,7 +1676,7 @@ localPROPERTY=$(defaults read "$superPLIST" LocalAccount 2> /dev/null)
 superPROPERTY=$(defaults read "$superPLIST" SuperAccount 2> /dev/null)
 jamfPROPERTY=$(defaults read "$superPLIST" JamfAccount 2> /dev/null)
 
-# Some messaging to indicate if there are no saved accounts.
+# Some messaging to indicate if there are no saved accounts when a delete is requested.
 { [[ -z $localPROPERTY ]] && [[ -z $superPROPERTY ]] && [[ -z $jamfPROPERTY ]] && [[ -n $deleteACCOUNTS ]]; } && sendToLog "Starter: No saved accounts to delete."
 
 # If there was a previous $localPROPERTY account and the user specified $localOPTION or $deleteACCOUNTS then delete any previously saved local account credentials.
@@ -1701,8 +1707,8 @@ fi
 # If any previous validation generated a $parameterERROR then it's not necessary to continue this function.
 [[ $parameterERROR == "TRUE" ]] && return 0
 
-# If a new local account was specified, save $localOPTION and $localPASSWORD credentials and then validate retrieval.
-if [[ -n $localOPTION ]]; then
+# On Apple Silicon, if a new local account was specified, save $localOPTION and $localPASSWORD credentials and then validate retrieval.
+if [[ "$macosARCH" == "arm64" ]] && [[ -n $localOPTION ]]; then
 	sendToLog "Starter: Saving new credentials for local account \"$localOPTION\"..."
 	defaults write "$superPLIST" LocalAccount -string "$localOPTION"
 	localACCOUNT=$(defaults read "$superPLIST" LocalAccount 2> /dev/null)
@@ -1722,8 +1728,8 @@ if [[ -n $localOPTION ]]; then
 	fi
 fi
 
-# If an $adminACCOUNT was specified then a new super service account needs to be created and its credentials saved.
-if [[ -n $adminACCOUNT ]]; then
+# On Apple Silicon, if an $adminACCOUNT was specified then a new super service account needs to be created and its credentials saved.
+if [[ "$macosARCH" == "arm64" ]] && [[ -n $adminACCOUNT ]]; then
 	# If the a custom super service account name is requested via $superOPTION.
 	if [[ -n $superOPTION ]]; then
 		superNEWACCT="$superOPTION"
@@ -1806,8 +1812,8 @@ if [[ -n $jamfOPTION ]]; then
 	fi
 fi
 
-# If there is a previously saved local account (that wasn't just deleted), validate the account and set $localACCOUNT and $localPASSWORD.
-if [[ -n $localPROPERTY ]]; then
+# On Apple Silicon, if there is a previously saved local account (that wasn't just deleted), validate the account and set $localACCOUNT and $localPASSWORD.
+if [[ "$macosARCH" == "arm64" ]] && [[ -n $localPROPERTY ]]; then
 	localACCOUNT="$localPROPERTY"
 	localKEYCHAIN=$(security find-generic-password -w -a "$localACCOUNT" -s "Super Local Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n $localKEYCHAIN ]]; then
@@ -1826,8 +1832,8 @@ if [[ -n $localPROPERTY ]]; then
 	fi
 fi
 
-# If there is a previously saved super service account (that wasn't just deleted), validate the account and set $superACCOUNT and $superPASSWORD.
-if [[ -n $superPROPERTY ]]; then
+# On Apple Silicon, if there is a previously saved super service account (that wasn't just deleted), validate the account and set $superACCOUNT and $superPASSWORD.
+if [[ "$macosARCH" == "arm64" ]] && [[ -n $superPROPERTY ]]; then
 	superACCOUNT="$superPROPERTY"
 	superKEYCHAIN=$(security find-generic-password -w -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n $superKEYCHAIN ]]; then
@@ -1858,6 +1864,7 @@ if [[ -n $jamfPROPERTY ]]; then
 			if [[ "$jamfERROR" != "TRUE" ]]; then
 				sendToLog "Starter: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
 				if [[ $(profiles status -type bootstraptoken 2> /dev/null | grep "YES" -c) -eq 2 ]]; then
+					sendToLog "Starter: Bootstrap token escrow validated."
 					jamfCREDENTIAL="TRUE"
 				else
 					sendToLog "Exit: Can not use MDM update workflow because this computer's Bootstrap token is not escrowed."; parameterERROR="TRUE"
@@ -1963,8 +1970,8 @@ echo "\$(date +"%a %b %d %T") \$(hostname -s) \$(basename "\$0")[\$\$]: **** S.U
 disown
 exit 0
 EOSS
-	[[ "$macosARCH" == "arm64" ]] && touch "$mdmLOG"
-	[[ "$macosMAJOR" != "10" ]] && touch "$updateLOG"
+	[[ "$macosVERSION" -ge 1105 ]] && touch "$mdmLOG"
+	[[ "$macosMAJOR" -gt 10 ]] && touch "$updateLOG"
 	sendToLog "Installer: Setting permissions in: $superFOLDER"
 	chown -R root:wheel "$superFOLDER"
 	chown root:wheel "$superLINK"
@@ -2019,7 +2026,7 @@ fi
 # Parameter and saved credential validation and management.
 checkCurrentUser
 manageParameters
-[[ "$macosARCH" == "arm64" ]] && manageUpdateCredentials
+manageUpdateCredentials
 if [[ "$parameterERROR" == "TRUE" ]]; then
 	rm -f "$superPIDFILE"
 	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
@@ -2227,17 +2234,20 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 }
 
-# Set $currentUSER to the value of the currently logged in GUI user or "FALSE" if there is none or a system account.
+# Set $currentUSER and $currentUID to the currently logged in GUI user or "FALSE" if there is none or a system account.
 checkCurrentUser() {
-currentUSER=$(echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ && ! /loginwindow/ { print $3 }')
+currentUSER=$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ { print $3 }')
 if [[ -z $currentUSER ]]; then
-	sendToLog "Starter: No GUI user currently logged in."
+	sendToLog "Status: No GUI user currently logged in."
 	currentUSER="FALSE"
+	currentUID="FALSE"
 elif [[ "$currentUSER" = "root" ]] || [[ "$currentUSER" = "_mbsetupuser" ]] || [[ "$currentUSER" = "loginwindow" ]]; then
-	sendToLog "Starter: Current GUI user is system account $currentUSER."
+	sendToLog "Status: Current GUI user is system account $currentUSER."
 	currentUSER="FALSE"
+	currentUID="0"
 else
-	sendToLog "Starter: Current GUI user is $currentUSER."
+	currentUID=$(id -u "$currentUSER")
+	sendToLog "Status: Current GUI user is $currentUSER with a UID of $currentUID."
 fi
 }
 
@@ -2534,11 +2544,21 @@ updateRESULT=$(softwareupdate --list 2>&1)
 if [[ "$macosMAJOR" != "10" ]] && [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
 	sendToLog "Status: Double-checking available Apple software updates..."
 	launchctl kickstart -k system/com.apple.softwareupdated
-	sleep 5
+	sleep 10
 	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2>&1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
 	updateRESULT=$(softwareupdate --list 2>&1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updateRESULT is: $updateRESULT"
+	
+	# If no updates still reported, but there was a previously downloaded system update... then try again in 15 minutes.
+	if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
+		previousDOWNLOADS=$(defaults read "$superPLIST" UpdateDownloads 2> /dev/null)
+		if [[ -n $previousDOWNLOADS ]]; then
+			sendToLog "Exit: A system update was previously downloaded but the softwareupdate is not finding any available updates, trying again in 15 minutes."
+			defaultDeferSECONDS=900
+			makeLaunchDaemonCalendar
+		fi
+	fi
 fi
 
 # After checking updates parse the $updateRESULT and set $updatesRECOMMENDED, $updatesRESTART, and $downloadREQUIRED accordingly.
@@ -2708,17 +2728,23 @@ fi
 oldIFS="$IFS"; IFS=$'\n'
 for i in "${!recommendedLABLES[@]}"; do
 	sendToLog "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
-	if [[ $macosMAJOR -eq 10 ]]; then
-		recommendedRESULT=$(softwareupdate --install "${recommendedLABLES[i]}" 2>&1)
-	else
-		recommendedRESULT=$(softwareupdate --install "${recommendedLABLES[i]}" --agree-to-license 2>&1)
+	if [[ $macosMAJOR -ge 12 ]]; then
+			if [[ "$currentUSER" == "FALSE" ]]; then
+				recommendedRESULT=$(sudo -i softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license 2>&1)
+			else # Local user is logged in.
+				recommendedRESULT=$(launchctl asuser "$currentUID" sudo -i softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license 2>&1)
+			fi
+	elif [[ $macosMAJOR -eq 11 ]]; then
+		recommendedRESULT=$(softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license 2>&1)
+	else # macOS 10.X
+		recommendedRESULT=$(softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan 2>&1)
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: recommendedRESULT is: $recommendedRESULT"
 	updateRECOMMENDED=$(echo "$recommendedRESULT" | grep "Done with" | cut -c 11-)
 	if [[ -n $updateRECOMMENDED ]]; then
 		sendToLog "Status: Installed Recommended Software Update: $updateRECOMMENDED."
 	else
-		sendToLog "Error: Apple softwareupdate failed to install recommended software update: $updateRECOMMENDED."; updateERROR="TRUE"
+		sendToLog "Error: Apple softwareupdate failed to install recommended software update: ${recommendedLABLES[i]}."; updateERROR="TRUE"
 	fi
 done
 IFS="$oldIFS"
@@ -2730,9 +2756,18 @@ fi
 
 # Download restart-required system update via softwareupdate command, and also save results to $superLOG, $updateLOG, and $superPLIST.
 downloadSystemUpdateASU() {
-sendToLog "Status: Starting download of system update via softwareupdate command..."
+# For macOS 12 or later restarting the Software Update Notification Manager daemon prevents system updates from hanging.
+if [[ $macosMAJOR -ge 12 ]] && [[ "$currentUSER" != "FALSE" ]]; then
+	sendToLog "Status: Restarting Software Update Notification Manager daemon..."
+	if ! launchctl kickstart -k "gui/$currentUID/com.apple.SoftwareUpdateNotificationManager"; then
+		echo "Restarting Software Update Notification Manager didn't respond, trying again in one minute..."
+		sleep 60
+		launchctl kickstart -k "gui/$currentUID/com.apple.SoftwareUpdateNotificationManager"
+	fi
+fi
 
 # Start log streaming for softwareupdate progress and send to $updateLOG.
+sendToLog "Status: Starting download of system update via softwareupdate command..."
 if [[ "$macosMAJOR" != "10" ]]; then
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU SYSTEM DOWNLOAD START ****" >> "$updateLOG"
 	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
@@ -2740,20 +2775,32 @@ if [[ "$macosMAJOR" != "10" ]]; then
 	disown
 fi
 
-# Start the softwareupdate download.
-if [[ "$macosARCH" == "arm64" ]]; then # Apple Silicon requires local credentials.
-	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
-		downloadRESULT=$(softwareupdate --download --all --agree-to-license --user "$localACCOUNT" --stdinpass "$localKEYCHAIN" 2>&1)
-	elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
-		downloadRESULT=$(softwareupdate --download --all --agree-to-license --user "$superACCOUNT" --stdinpass "$superKEYCHAIN" 2>&1)
+# Start the softwareupdate download, different requirements between macOS versions.
+if [[ $macosMAJOR -ge 12 ]]; then
+	if [[ "$macosARCH" == "arm64" ]]; then
+		downloadRESULT=$(launchctl asuser "$currentUID" sudo -u root softwareupdate --download --all --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" 2>&1)
+	else # Intel.
+		downloadRESULT=$(launchctl asuser "$currentUID" sudo -u root softwareupdate --download --all --force --no-scan --agree-to-license 2>&1)
 	fi
-else # Intel. No credentials required, but slightly different between macOS versions.
-	if [[ $macosMAJOR -eq 10 ]]; then
-		downloadRESULT=$(softwareupdate --download --all 2>&1)
-	else
-		downloadRESULT=$(softwareupdate --download --all --agree-to-license 2>&1)
+elif [[ $macosMAJOR -eq 11 ]]; then
+	if [[ "$macosARCH" == "arm64" ]]; then
+		downloadRESULT=$(expect -c "
+		set timeout -1
+		spawn softwareupdate --download --all --force --no-scan --agree-to-license 2>&1
+		expect \"Password:\"
+		send {${asuPASSWORD}}
+		send \r
+		expect eof
+		wait
+		")
+	else # Intel.
+		downloadRESULT=$(softwareupdate --download --all --force --no-scan --agree-to-license 2>&1)
 	fi
+else # macOS 10.X
+	downloadRESULT=$(softwareupdate --download --all --force --no-scan 2>&1)
 fi
+
+# Stop log streaming the softwareupdate progress.
 if [[ "$macosMAJOR" != "10" ]]; then
 	kill -9 $updateStreamPID > /dev/null 2>&1
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU SYSTEM DOWNLOAD END ****" >> "$updateLOG"
@@ -2770,6 +2817,7 @@ if [[ ${#downloadedTITLES[@]} -gt 0 ]]; then
 		sendToLog "Status: Downloaded System Update $((i + 1)): ${downloadedTITLES[i]}"
 		defaults write "$superPLIST" UpdateDownloads -array-add "${downloadedTITLES[i]}"
 	done
+	downloadREQUIRED="FALSE"
 else
 	sendToLog "Exit: Apple softwareupdate failed to download any updates, trying again in $defaultDeferSECONDS seconds. "
 	makeLaunchDaemonCalendar
@@ -2848,6 +2896,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	done
 	
 	# Watch $updateLOG while waiting for the download workflow to complete.
+	logPROGRESS=""
 	tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
 		if echo "$logLINE" | grep -q -w 'phase:DOWNLOADING_SFR\|phase:DOWNLOADING_UPDATE'; then
 			[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading system update..."
@@ -2871,6 +2920,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 			pkill -P $$ tail; break
 		fi
 	done
+	downloadREQUIRED="FALSE"
 else
 	sendToLog "Exit: Failed to send MDM download request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 	kill -9 $mdmStreamPID > /dev/null 2>&1
@@ -2927,12 +2977,12 @@ fi
 }
 
 # This is the install and restart workflow when a user is NOT logged in.
-installRestartSilent(){
+installRestartNoUser(){
 if [[ "$updatesRESTART" == "TRUE" ]]; then # Install restart required system updates if needed.
-	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+	if [[ "$updateWORKFLOW" == "ASU" ]]; then
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If requested, run Jamf Policy Triggers before system update.
 		installSystemUpdateASU
-	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+	elif [[ "$updateWORKFLOW" == "JAMF" ]]; then
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If requested, run Jamf Policy Triggers before system update.
 		installSystemUpdateMDM
 	else # Apple Silicon with no valid update credentials.
@@ -2962,11 +3012,11 @@ fi
 # This is the install and restart workflow when a user is logged in.
 installRestartMain(){
 if [[ "$updatesRESTART" == "TRUE" ]]; then # Install restart required system updates if needed.
-	if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
+	if [[ "$updateWORKFLOW" == "ASU" ]]; then
 		notifyRestart
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
 		installSystemUpdateASU
-	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+	elif [[ "$updateWORKFLOW" == "JAMF" ]]; then
 		notifyPrepMDM
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
 		installSystemUpdateMDM
@@ -3006,33 +3056,73 @@ fi
 # Install restart-required system via the softwareupdate command, and also save results to $superLOG, $updateLOG, and $superPLIST.
 installSystemUpdateASU() {
 if [[ "$testModeOPTION" != "TRUE" ]]; then
-	sendToLog "Status: Starting install of system update via softwareupdate command..."
+	# For macOS 12 or later restarting the Software Update Notification Manager daemon or the softwareupdate daemon prevents system updates from hanging.
+	if [[ $macosMAJOR -ge 12 ]]; then
+		if [[ "$currentUSER" != "FALSE" ]]; then
+			sendToLog "Status: Restarting Software Update Notification Manager daemon..."
+			if ! launchctl kickstart -k "gui/$currentUID/com.apple.SoftwareUpdateNotificationManager"; then
+				echo "Restarting Software Update Notification Manager didn't respond, trying again in one minute..."
+				sleep 60
+				launchctl kickstart -k "gui/$currentUID/com.apple.SoftwareUpdateNotificationManager"
+			fi
+		else # No user is logged in, so just restart the softwareupdate process.
+			sendToLog "Status: Restarting softwareupdate daemon..."
+			launchctl kickstart -k system/com.apple.softwareupdated
+			sleep 60
+		fi
+	fi
+	
+	# If no $currentUSER then the sytem update was not pre-downloaded.
+	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+		sendToLog "Status: Starting download and install of system update via softwareupdate command..."
+	else
+		sendToLog "Status: Starting install of system update via softwareupdate command..."
+	fi
 	
 	# Start log streaming for softwareupdate install progress and send to $updateLOG.
 	if [[ "$macosMAJOR" != "10" ]]; then
-		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU SYSTEM UPDATE START ****" >> "$updateLOG"
+		if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU SYSTEM DOWNLOAD AND UPDATE START ****" >> "$updateLOG"
+		else
+			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. ASU SYSTEM UPDATE START ****" >> "$updateLOG"
+		fi
 		log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
 		updateStreamPID=$!
 		disown
 	fi
 	
-	if [[ "$macosARCH" == "arm64" ]]; then # Apple Silicon softwareupdate requires local credentials.
-		if [[ "$localCREDENTIAL" == "TRUE" ]]; then
-			softwareupdate --install --all --agree-to-license --restart --force --user "$localACCOUNT" --stdinpass "$localKEYCHAIN" &
-			disown
-		elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
-			softwareupdate --install --all --agree-to-license --restart --force --user "$superACCOUNT" --stdinpass "$superKEYCHAIN" &
-			disown
+	# Start the softwareupdate installation in the background, different requirements between macOS versions.
+	if [[ $macosMAJOR -ge 12 ]]; then
+		if [[ "$currentUSER" == "FALSE" ]]; then
+			if [[ "$macosARCH" == "arm64" ]]; then
+				sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" &
+			else # Intel.
+				sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license &
+			fi
+		else # Local user is logged in.
+			if [[ "$macosARCH" == "arm64" ]]; then
+				launchctl asuser "$currentUID" sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" &
+			else # Intel.
+				launchctl asuser "$currentUID" sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license &
+			fi
 		fi
-	else # Intel. No credentials required.
-		if [[ $macosMAJOR -eq 10 ]]; then # Older versions of macOS.
-			softwareupdate --install --all --restart --force &
-			disown
-		else # Newer versions of macOS require license agreement.
-			softwareupdate --install --all --agree-to-license --restart --force &
-			disown
+	elif [[ $macosMAJOR -eq 11 ]]; then
+		if [[ "$macosARCH" == "arm64" ]]; then
+			expect -c "
+			set timeout -1
+			spawn softwareupdate --install --all --restart --force --no-scan --agree-to-license
+			expect \"Password:\"
+			send {${asuPASSWORD}}
+			expect eof
+			wait
+			" &
+		else # Intel.
+			softwareupdate --install --all --restart --force --no-scan --agree-to-license &
 		fi
+	else # macOS 10.X
+		softwareupdate --install --all --restart --force --no-scan &
 	fi
+	
 	# Reset various items after system update is complete.
 	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 	defaults write "$superPLIST" UpdateValidate -bool true
@@ -3056,7 +3146,13 @@ fi
 # Install restart-required system update via MDM push command, and also save results to $superLOG, $mdmLOG, $updateLOG, and $superPLIST.
 installSystemUpdateMDM() {
 if [[ "$testModeOPTION" != "TRUE" ]]; then
-	sendToLog "Status: Starting install of system udpate via MDM command..."
+	# If no $currentUSER then the sytem update was not pre-downloaded.
+	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+		sendToLog "Status: Starting download and install of system udpate via MDM command..."
+	else
+		sendToLog "Status: Starting install of system udpate via MDM command..."
+	fi
+	
 	# This pre-flights the MDM query locally and may also be useful for troubleshooting.
 	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2>&1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
@@ -3065,13 +3161,21 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	checkJamfProServerToken
 	
 	# Start log streaming for MDM push acknowledgements and send to $mdmLOG.
-	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE START ****" >> "$mdmLOG"
+	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE START ****" >> "$mdmLOG"
+	else
+		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE START ****" >> "$mdmLOG"
+	fi
 	log stream --predicate '(subsystem == "com.apple.ManagedClient") && (category == "HTTPUtil")' >> "$mdmLOG" &
 	mdmStreamPID=$!
 	disown
 	
 	# Start log streaming for softwareupdate progress and send to $updateLOG.
-	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE START ****" >> "$updateLOG"
+	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE START ****" >> "$updateLOG"
+	else
+		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE START ****" >> "$updateLOG"
+	fi
 	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
 	updateStreamPID=$!
 	disown
@@ -3115,7 +3219,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		fi
 		sendToLog "Status: Jamf Pro's mandatory 5 minute delay should be complete, sending Blank Push..."
 		sendBlankPush
-		notifyRestart
+		[[ "$currentUSER" != "FALSE" ]] && notifyRestart
 		
 		# Watch $mdmLOG while waiting for the MDM workflow to complete.
 		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
@@ -3124,22 +3228,47 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates)'; then
 				sendToLog "Status: Recieved MDM command \"AvailableOSUpdates\"."
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)'; then
-				sendToLog "Status: Recieved MDM command \"ScheduleOSUpdate\", restart should be soon..."
+				if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+					sendToLog "Status: Recieved MDM command \"ScheduleOSUpdate\", download and update should start soon..."
+					echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE END ****" >> "$mdmLOG"
+				else
+					sendToLog "Status: Recieved MDM command \"ScheduleOSUpdate\", restart should be soon..."
+					echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE END ****" >> "$mdmLOG"
+				fi
 				kill -9 "$mdmStreamPID" > /dev/null 2>&1
-				echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE END ****" >> "$mdmLOG"
 				pkill -P $$ tail; break
 			fi
 		done
 		
 		# Watch $updateLOG while waiting for the update and restart workflow to complete.
-		tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
-			if echo "$logLINE" | grep -q -w 'phase:APPLYING'; then
-				sendToLog "Status: Software update process is complete, restart is imminent..."
-				kill -9 "$updateStreamPID" > /dev/null 2>&1
-				echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE END ****" >> "$updateLOG"
-				pkill -P $$ tail; break
-			fi
-		done
+		if [[ "$downloadREQUIRED" == "TRUE" ]]; then
+			logPROGRESS=""
+			tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
+				if echo "$logLINE" | grep -q -w 'phase:DOWNLOADING_SFR\|phase:DOWNLOADING_UPDATE'; then
+					[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading system update..."
+					logPROGRESS="Downloading"
+					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Downloading/preparing percentage complete: $(echo "$logLINE" | awk -F '[ :]+' '{ print $23*100; }' | cut -c 1-4)%"
+				elif echo "$logLINE" | grep -q -w 'phase:PREPARING_UPDATE'; then
+					[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, now preparing system update, should be done in a few minutes..."
+					logPROGRESS="Preparing"
+					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Downloading/preparing update percentage complete: $(echo "$logLINE" | awk -F '[ :]+' '{ print $23*100; }' | cut -c 1-4)%"
+				elif echo "$logLINE" | grep -q -w 'phase:APPLYING'; then
+					sendToLog "Status: Software update process is complete, restart is imminent..."
+					kill -9 "$updateStreamPID" > /dev/null 2>&1
+					echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE END ****" >> "$updateLOG"
+					pkill -P $$ tail; break
+				fi
+			done
+		else
+			tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
+				if echo "$logLINE" | grep -q -w 'phase:APPLYING'; then
+					sendToLog "Status: Software update process is complete, restart is imminent..."
+					kill -9 "$updateStreamPID" > /dev/null 2>&1
+					echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE END ****" >> "$updateLOG"
+					pkill -P $$ tail; break
+				fi
+			done
+		fi
 		
 		# Reset various items after system update is complete.
 		defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
@@ -3165,7 +3294,7 @@ else
 	else
 		killall -9 "jamfHelper" > /dev/null 2>&1
 	fi
-	notifyRestart
+	[[ "$currentUSER" != "FALSE" ]] && notifyRestart
 	sendToLog "Test Mode: Killing update restart notification in $testModeTIMEOUT seconds..."
 	sleep "$testModeTIMEOUT"
 	kill -9 "$notifyPID" > /dev/null 2>&1
@@ -3420,7 +3549,7 @@ This computer will automatically restart very soon.
 Save any open documents now."
 
 #### Language for notifySelfUpdate(), a non-interactive notification informing the user that they must perform their own update.
-# This is used for Apple Silicon computers if no valid update credentials are provided.
+# This is used if there is no valid system update enforcement workflow possible.
 notifySelfUpdateTITLE="Software Updates Require Restart"
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 notifySelfUpdateBodyIBM="You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in the Software Update preferences."
@@ -3605,16 +3734,16 @@ else
 fi
 }
 
-# Open both a non-interactive notification and the Software Update System Preference in the case where there are no valid Apple Silicon credentials but a restart update is required.
+# Open both a non-interactive notification and the Software Update System Preference in the case where there is no valid system update enforcement workflow possible.
 notifySelfUpdate() {
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
-	sendToLog "IBM Notifier: No valid Apple Silicon credentials, opening self-update notification..."
+	sendToLog "IBM Notifier: Opening self-update notification..."
 	# Create initial $ibmNotifierARRAY[] settings for the notification.
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_left -bar_title "$notifySelfUpdateTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 	ibmNotifierARRAY+=(-subtitle "$notifySelfUpdateBodyIBM")
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
 else
-	sendToLog "jamfHelper: No valid Apple Silicon credentials, opening self-update notification..."
+	sendToLog "jamfHelper: Opening self-update notification..."
 	# Create initial $jamfHelperARRAY[] settings for the dialog.
 	jamfHelperARRAY=(-windowType hud -windowPosition ul -lockHUD -title "$notifySelfUpdateTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
 	jamfHelperARRAY+=(-description "$notifySelfUpdateBodyJAMF")
@@ -3716,15 +3845,8 @@ else
 fi
 }
 
-#### Fix comments and logic for date shown here.
 # Generate the $jamfHelperARRAY[] to display an interactive dialog with deferral options. This sets $choiceINSTALL and if $menuDeferSECONDS then also sets $defaultDeferSECONDS.
 dialogAskForUpdate() {
-
-
-
-
-
-
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Ask for restart or defer dialog..."
 	# Create initial $ibmNotifierARRAY[] settings for the dialog.
@@ -3852,20 +3974,47 @@ getPreferences
 superStarter "$@"
 sendToLog "**** S.U.P.E.R.M.A.N. STARTER END ****"
 
-# Now the actual update workflows starts.
+# This logic determines what $updateWORKFLOW will run; JAMF, ASU, or USER
 if [[ "$macosARCH" == "arm64" ]]; then
 	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
-		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU LOCAL ****"
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU LOCAL ACCOUNT ****"
+		updateWORKFLOW="ASU"
+		asuACCOUNT="$localACCOUNT"
+		asuPASSWORD="$localKEYCHAIN"
 	elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
-		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU SERVICE ****"
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU SERVICE ACCOUNT ****"
+		updateWORKFLOW="ASU"
+		asuACCOUNT="$superACCOUNT"
+		asuPASSWORD="$superKEYCHAIN"
 	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
-		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON MDM ****"
+		if [[ "$macosVERSION" -ge 1105 ]]; then
+			sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON JAMF PRO MDM ****"
+			updateWORKFLOW="JAMF"
+		else
+			sendToLog "Warning: System updates via MDM can only be enforced on Apple Silicon computers with macOS 11.5 or later."
+			sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON USER REQUEST ****"
+			updateWORKFLOW="USER"
+		fi
 	else
-		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON REQUEST ONLY ****"
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON USER REQUEST ****"
+		updateWORKFLOW="USER"
 	fi
-else
-	sendToLog "**** S.U.P.E.R.M.A.N. UPDATE INTEL ****"
+else # Mac computers with Intel.
+	if [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
+		if [[ "$macosVERSION" -ge 1105 ]]; then
+			sendToLog "**** S.U.P.E.R.M.A.N. UPDATE INTEL JAMF PRO MDM ****"
+			updateWORKFLOW="JAMF"
+		else
+			sendToLog "Warning: System updates via MDM can only be enforced on Apple Silicon computers with macOS 11.5 or later."
+			sendToLog "**** S.U.P.E.R.M.A.N. UPDATE INTEL ASU ****"
+			updateWORKFLOW="ASU"
+		fi
+	else
+		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE INTEL ASU ****"
+		updateWORKFLOW="ASU"
+	fi
 fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updateWORKFLOW: $updateWORKFLOW"
 
 # If requested then restart counters.
 [[ "$restartDAYS" == "TRUE" ]] && restartZeroDay
@@ -3906,30 +4055,30 @@ if [[ "$updatesRECOMMENDED" == "TRUE" ]]; then
 	fi
 fi
 
-# If restart required system updates are available, then download and prepare all available.
-if [[ "$updatesRESTART" == "TRUE" ]] && [[ "$testModeOPTION" != "TRUE" ]]; then # If not in test mode.
-	if [[ "$downloadREQUIRED" == "TRUE" ]]; then # Updates have not been downloaded yet.
-		if [[ "$localCREDENTIAL" == "TRUE" ]] || [[ "$superCREDENTIAL" == "TRUE" ]] || [[ "$macosARCH" == "i386" ]]; then
-			downloadSystemUpdateASU
-		elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
-			downloadSystemUpdateMDM
-		else # Apple Silicon with no valid update credentials.
-			sendToLog "Status: No valid Apple Silicon credentials, can not download updates."
-		fi
-	else # Updates were previously downloaded.
-		sendToLog "Status: Previously downloaded ${#downloadedTITLES[@]} software udpate(s)."
-		for i in "${!downloadedTITLES[@]}"; do
-			sendToLog "Previous Download $((i + 1)): ${downloadedTITLES[i]}"
-		done
-	fi
-fi
-
 # This is the main logic for determining what to do in the case of available restart required system updates, $policyTRIGGERS, or the $forceRestartOPTION.
 if [[ "$updatesRESTART" == "TRUE" ]] || [[ -n $policyTRIGGERS ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; then
-	checkCurrentUser # Checking the user again because it may have been quite a while since the workflow started (due to earlier installations and downloads).
-	if [[ "$currentUSER" == "FALSE" ]]; then # A normal user is not logged in.
-		installRestartSilent
+	checkCurrentUser # Checking the user again because it may have been quite a while since the workflow started (due to earlier installations).
+	if [[ "$currentUSER" == "FALSE" ]]; then # A normal user is not logged in, start installation immediately.
+		installRestartNoUser
 	else # A normal user is currently logged in.
+		if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
+			if [[ "$downloadREQUIRED" == "TRUE" ]]; then # Updates have not been downloaded yet.
+				if [[ "$updateWORKFLOW" == "ASU" ]]; then
+					downloadSystemUpdateASU
+				elif [[ "$updateWORKFLOW" == "JAMF" ]]; then
+					downloadSystemUpdateMDM
+				else
+					sendToLog "Status: Self-update workflow, unable to automatically download system udpates."
+				fi
+			else # Updates were previously downloaded.
+				sendToLog "Status: Previously downloaded ${#downloadedTITLES[@]} software udpate(s)."
+				for i in "${!downloadedTITLES[@]}"; do
+					sendToLog "Previous Download $((i + 1)): ${downloadedTITLES[i]}"
+				done
+			fi
+		else
+			sendToLog "Test Mode: Skipping download of restart required system update."
+		fi
 		checkZeroDay # This may need to start the automatic day zero date, so it always runs first.
 		checkDateDeadlines
 		checkDaysDeadlines

@@ -44,24 +44,16 @@ __Restart notification__
 
 __Mac computers with Intel:__
 
-Validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
+- Update via `softwareupdate` workflow validated on macOS 10.14 and later. Earlier versions of macOS may work, but have not been validated.
+- Update via MDM workflow requires macOS 11.5 or later, Jamf Pro 10.35 or later, and providing `super` with credentials to a Jamf Pro API account.
 
 __Mac computers with Apple Silicon:__
 
-Mac computers with Apple Silicon require additional authorization (beyond root privileges) to update automatically without user interaction.
-__Without this additional authorization, S.U.P.E.R.M.A.N. can not enforce macOS software updates on Apple Silicon!__
-This authorization is possible via three methods:
-- An existing local account
-- An automatically created local service account
-- A Jamf Pro API account
+- Update via `softwareupdate` workflow requires providing `super` with credentials to an existing local account.
+- Update via MDM workflow requires macOS 11.5 or later, Jamf Pro 10.35 or later, and providing `super` with credentials to a Jamf Pro API account.
+- If update credentials are not provided to `super` then system updates can not be enforced on Apple Silicon computers. In this case `super` will prompt the user to update locally.
 
-__macOS Monterey Notification Fix:__
-
-On macOS Monterey all `super` workflows leveraging `softwareupdate` (the default for Intel, and optional for Apple Silicon) hangs during downloads due to an issue where the `softwareupdate` process [fails to generate a system notification when it's run via a LaunchDaemon](https://developer.apple.com/forums/thread/701096). The workaround is to deploy a Configuration Profile that disables the built-in alerts and notifications for `softwareupdate` via the Bundle ID: `_system_center_:com.apple.softwareupdatenotification`. This has the dual benefit of also preventing system notification collisions with `super` generated notifications.
-
-![Example Configuration Profile to disable softwareupdate alerts and notifications](Screenshots/NotificationsConfigurationProfile.png)
-
-## Apple Silicon Authorization Requirement Details
+## Update Credential Details
 
 Apple Silicon `softwareupdate` via an __existing local account:__
 - Any version of macOS for Apple Silicon (macOS 11.0 or later).
@@ -77,13 +69,13 @@ Apple Silicon `softwareupdate` via an __automatically created local service acco
 - The admin credentials you provide are never saved to disk, but the local service account credentials are stored in the System Keychain and can be viewed by other admin users.
 - The local service account is not an admin and can not log into the Mac, but if FileVault is enabled, this account is visible at startup and can unlock the drive.
 
-Apple Silicon MDM update command via __Jamf Pro API:__
+Apple Silicon or Intel MDM software update command via the __Jamf Pro API:__
  - macOS 11.5 or later and Jamf Pro 10.35 or later.
- - Jamf Pro must have the bootstrap token escrowed for the computer. This is the default behavior for Jamf Pro via any enrollment method for Apple Silicon computers.
+ - Jamf Pro must have the bootstrap token escrowed for the computer. This is the default behavior for Jamf Pro via for computers with macOS 11 or later.
  - You must provide credentials that can authorize macOS software update MDM commands via the Jamf Pro API.
  - The Jamf Pro API credentials you provide are stored in the System Keychain and can be viewed by other admin users.
  - The default Jamf Pro privileges required for this account are "Jamf Pro Server Objects > Computers > Create & Read" and "Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update".
- - You can significantly reduce the security risk of this account by removing the "Computers > Read" privilege requirement. However, this requires deploying a custom Configuration Profile for the preference domain `com.macjutsu.super` containing the following: `<key>JamfProID</key> <string>$JSSID</string>`
+ - You can significantly reduce the security risk of this account by removing the "Computers > Read" privilege requirement. However, this requires also deploying a custom Configuration Profile for the preference domain `com.macjutsu.super` containing the following: `<key>JamfProID</key> <string>$JSSID</string>`
 
 _If multiple valid authorization methods are provided, the priority order is as follows: an existing local account, the local service account, and finally the Jamf Pro API credentials._
 
