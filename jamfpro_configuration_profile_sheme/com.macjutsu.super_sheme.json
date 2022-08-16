@@ -1,0 +1,308 @@
+{
+  "title": "com.macjutsu.super Preferences",
+  "description": "S.U.P.E.R.M.A.N. Preferences",
+  "__preferencedomain": "com.macjutsu.super",
+  "properties": {
+    "DefaultDefer": {
+      "title": "Default Defer",
+      "description": "The number of seconds to defer until the next update attempt if a user choses not to update restart.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "FocusDefer": {
+      "title": "Focus Defer",
+      "description": "The number of seconds to defer the update restart dialog automatically if a process has prevented display sleep (for example, during an active meeting) or the user has Focus or Do Not Disturb enabled.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "MenuDefer": {
+      "title": "Menu Defer",
+      "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DefaultDefer time.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "1800,3600,86400"
+            }
+          }
+        }
+      ]
+    },
+    "DisplayTimeout": {
+      "title": "Display Timeout",
+      "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "DisplayRedraw": {
+      "title": "Display Redraw",
+      "description": "If a user ignores a notification or dialog (for example, it's moved offscreen)this specifies the number of seconds to wait before closing and then reopening the notification or dialog, thus redrawing the notification or dialog back in it's original open possition.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "DisplayIcon": {
+      "title": "Display Icon",
+      "description": "Local path or http(s) URL to a file that is the picture to display in  notifications or dialogs.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "https://example.com/sample.png"
+            }
+          }
+        }
+      ]
+    },
+    "IconSizeIbm": {
+      "title": "Icon Size IBM",
+      "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "IconSizeJamf": {
+      "title": "Icon Size Jamf",
+      "description": "Number of pixels for the --display-icon in jamfHelper dialogs and notifications.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "PreferJamf": {
+      "title": "Prefer Jamf",
+      "description": "Prefer jamfHelpler over IBM Notifier.app for user interactions.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "boolean"
+        }
+      ]
+    },
+    "FocusDeadline": {
+      "title": "Focus Deadline",
+      "description": "If this date has passed, the update restart dialog (with deferral options) always appears even if a process is preventing display sleep or the user has Focus or Do Not Disturb enabled.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
+    "SoftDeadline": {
+      "title": "Soft Deadline",
+      "description": "If this date has passed, an interactive update restart dialog appears indicating that no more user deferrals are allowed.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
+    "HardDeadline": {
+      "title": "HardDeadline",
+      "description": "If this date has passed, the computer updates and restarts without asking the user for approval.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
+    "CountDeadline": {
+      "title": "Count Deadline",
+      "description": "The maximum number of user deferrals allowed before an interactive update restart dialog appears indicating that no more user deferrals are allowed.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "10"
+            }
+          }
+        }
+      ]
+    },
+    "PolicyTriggers": {
+      "title": "Policy Triggers",
+      "description": "If a restart is required for system updates or forced via ForceRestart, this list of Jamf Policy Triggers runs before any available updates install and the computer restarts.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "triggerA,triggerB,triggerC"
+            }
+          }
+        }
+      ]
+    },
+    "SkipUpdates": {
+      "title": "Skip Updates",
+      "description": "Skip Apple software updates, even if they are available.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "boolean"
+        }
+      ]
+    },
+    "ForceRestart": {
+      "title": "ForceRestart",
+      "description": "Force a restart even if Apple software updates do not need it.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "boolean"
+        }
+      ]
+    },
+    "TestMode": {
+      "title": "Test Mode",
+      "description": "Mode to validate parameters, credentials, notifications, dialogs, deferrals, and deadline logic.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "boolean"
+        }
+      ]
+    },
+    "TestModeTimeout": {
+      "title": "Test Mode Timeout",
+      "description": "The amount of time in seconds to leave test notifications and dialogs open before moving on in the workflow.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "VerboseMode": {
+      "title": "Verbose Mode",
+      "description": "Mode to generate additional log output.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "boolean"
+        }
+      ]
+    }
+  }
+}
