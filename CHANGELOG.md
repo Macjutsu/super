@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2.0rc1]
+
+2022-08-23
+
+- Validated against the late August 2022 Apple Security Updates.
+- The Jamf Pro API token is now invalidated when `super` exits (previously it was only deleted from local memory).
+- You can now set custom dialog timeout text for both the "Ask for Update" and "Soft Deadline" dialogs in the `setDisplayLanguage()` function.
+- IBM Notifier [Version 2.8.0 Build 87](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-2.8.0-b-87) is automatically downloaded and installed in the $superFOLDER.
+- Resolved an issue where deleting account credentials did not set the appropriate update workflow.
+
 ## [2.0b2]
 
 2022-08-01
