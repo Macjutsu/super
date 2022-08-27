@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 2.0b2
-# 2022/08/01
+# Version 2.0rc1
+# 2022/08/23
 # https://github.com/Macjutsu/super
 #
 ######## DEBUGGING STUFF ########
@@ -26,8 +26,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 2.0b2
-  2022/08/01
+  Version 2.0rc1
+  2022/08/23
   https://github.com/Macjutsu/super
 
   Usage:
@@ -566,10 +566,10 @@ jamfBINARY="/usr/local/bin/jamf"
 jamfHELPER="/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
 
 # URL to the IBM Notifier.app download:
-ibmNotifierURL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-2.7.1-b-81/IBM.Notifier.zip"
+ibmNotifierURL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-2.8.0-b-87/IBM.Notifier.zip"
 
 # Target version for IBM Notifier.app:
-ibmNotifierVERSION="2.7.1"
+ibmNotifierVERSION="2.8.0"
 
 # Path to the local IBM Notifier.app:
 ibmNotifierAPP="$superFOLDER/IBM Notifier.app"
@@ -1685,6 +1685,7 @@ if [[ -n $localPROPERTY ]] && { [[ -n $localOPTION ]] || [[ "$deleteACCOUNTS" ==
 	defaults delete "$superPLIST" LocalAccount > /dev/null 2>&1
 	security delete-generic-password -a "$localPROPERTY" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	unset localPROPERTY
+	localCREDENTIAL="FALSE"
 fi
 
 # If there was a previous $superPROPERTY account and the user specified $adminACCOUNT or $deleteACCOUNTS then delete any previously saved super service account and credentials.
@@ -1694,6 +1695,7 @@ if [[ -n $superPROPERTY ]] && { [[ -n $adminACCOUNT ]] || [[ "$deleteACCOUNTS" =
 	defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
 	security delete-generic-password -a "$superPROPERTY" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	unset superPROPERTY
+	superCREDENTIAL="FALSE"
 fi
 
 # If there was a previous $jamfPROPERTY account and the user specified $jamfOPTION or $deleteACCOUNTS then delete any previously saved Jamf Pro API credentials.
@@ -1702,6 +1704,7 @@ if [[ -n $jamfPROPERTY ]] && { [[ -n $jamfOPTION ]] || [[ "$deleteACCOUNTS" == "
 	defaults delete "$superPLIST" JamfAccount > /dev/null 2>&1
 	security delete-generic-password -a "$jamfPROPERTY" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	unset jamfPROPERTY
+	jamfCREDENTIAL="FALSE"
 fi
 
 # If any previous validation generated a $parameterERROR then it's not necessary to continue this function.
@@ -2028,6 +2031,7 @@ checkCurrentUser
 manageParameters
 manageUpdateCredentials
 if [[ "$parameterERROR" == "TRUE" ]]; then
+	[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 	rm -f "$superPIDFILE"
 	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 	exit 1
@@ -2217,10 +2221,26 @@ if [[ $tokenCHECK -ne 200 ]]; then
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: tokenCHECK is: $tokenCHECK"
 	if [[ $tokenCHECK -ne 200 ]]; then
 		sendToLog "Exit: Could not retrieve Jamf Pro API token for account \"$jamfACCOUNT\", verify account credentials."
+		[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 		rm -f "$superPIDFILE"
 		sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 		exit 1
 	fi
+fi
+}
+
+# Invalidate and remove from local memory the $jamfProTOKEN.
+deleteJamfProServerToken() {
+invalidateTOKEN=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}api/v1/auth/invalidate-token")
+if [[ $invalidateTOKEN -eq 204 ]]; then
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Jamf Pro API token successfully invalidated."
+	unset jamfProTOKEN
+elif [[ $invalidateTOKEN -eq 401 ]]; then
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Jamf Pro API token already invalid."
+	unset jamfProTOKEN
+else
+	sendToLog "Error: Invalidating Jamf Pro API token."
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: invalidateTOKEN is: $invalidateTOKEN"
 fi
 }
 
@@ -2629,6 +2649,7 @@ else
 	else
 		IFS="$oldIFS"
 		sendToLog "Exit: Unable to parse Apple softwareupdate results."
+		[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 		rm -f "$superPIDFILE"
 		sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 		exit 1
@@ -2924,6 +2945,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 else
 	sendToLog "Exit: Failed to send MDM download request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 	kill -9 $mdmStreamPID > /dev/null 2>&1
+	[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 	rm -f "$superPIDFILE"
 	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 	exit 1
@@ -3280,6 +3302,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	else
 		sendToLog "Exit: Failed to send MDM update request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		kill -9 "$mdmStreamPID" > /dev/null 2>&1
+		[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 		rm -f "$superPIDFILE"
 		sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 		exit 1
@@ -3341,6 +3364,7 @@ chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 chown root:wheel "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 sendToLog "Exit: LaunchDaemon $launchDaemonNAME.plist is scheduled to start right now."
 launchctl bootstrap system "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 rm -f "$superPIDFILE"
 sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 exit 0
@@ -3431,6 +3455,7 @@ chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 chown root:wheel "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 sendToLog "Exit: LaunchDaemon $launchDaemonNAME.plist is scheduled to start at $hour:$minute on $month/$day."
 launchctl bootstrap system "/Library/LaunchDaemons/$launchDaemonNAME.plist"
+[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 rm -f "$superPIDFILE"
 sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 exit 0
@@ -3446,10 +3471,6 @@ restartButtonTEXT="Restart"
 #### Language for the deferral button in dialogs. Note that for non-deadline dialogs this is the default button.
 deferButtonTEXT="Defer"
 
-#### Language for the display timeout in notifications and dialogs.
-displayTimeoutTEXT="Please make selection in"
-# jamfHelper does not allow for customizing the display timeout language.
-
 #### Useful display variables:
 # $countDISPLAY is the current number of user soft/hard deferrals.
 # $countMaxDISPLAY is the maximum number of user soft/hard deferrals.
@@ -3463,12 +3484,12 @@ displayTimeoutTEXT="Please make selection in"
 
 #### Language for dialogAskForUpdate(), an interactive dialog giving the user a choice to defer the update or restart.
 dialogAskForUpdateTITLE="Software Updates Require Restart"
-dialogAskForUpdateDeferMenuTitleIBM="Defer software update for:"
+dialogAskForUpdateDeferMenuTitleIBM="Defer software update for:" # jamfHelper does not allow for customizing the deferral menu language.
 dialogAskForUpdateDeferMenuMinutesIBM="minutes"
 dialogAskForUpdateDeferMenuHourIBM="hour"
 dialogAskForUpdateDeferMenuHoursIBM="hours"
 dialogAskForUpdateDeferMenuDayIBM="day"
-# jamfHelper does not allow for customizing the deferral menu language.
+dialogAskForUpdateTimeoutTEXT="Please make selection in" # jamfHelper does not allow for customizing the display timeout language.
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 dialogAskForUpdateBodyUnlimitedIBM="• No deadline date and unlimited deferrals.\n"
 dialogAskForUpdateBodyUnlimitedJAMF="• No deadline date and unlimited deferrals."
@@ -3483,6 +3504,7 @@ dialogAskForUpdateBodyDateCountJAMF="• Deferral available until $deadlineDISPL
 
 #### Language for dialogSoftDeadline(), an interactive dialog when a soft deadline has passed, giving the user only one button to continue the workflow.
 dialogSoftDeadlineTITLE="Software Updates Require Restart"
+dialogSoftDeadlineTimeoutTEXT="Update will automatically start in" # jamfHelper does not allow for customizing the display timeout language.
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 dialogSoftDeadlineBodyCountIBM="You have deferred the maximum number of $countMaxDISPLAY times."
 dialogSoftDeadlineBodyCountJAMF="You have deferred the maximum number of $countMaxDISPLAY times."
@@ -3752,6 +3774,7 @@ fi
 
 # Start System Preferences and the notification.
 unset dialogRESULT
+unset displayTimeoutSECONDS
 if [[ -n $displayRedrawSECONDS ]]; then
 	[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=0
 	[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Test Mode: Killing self-update notification after 3 attempts..."
@@ -3810,6 +3833,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 		sendToLog "IBM Notifier: soft count deadline dialog..."
 		ibmNotifierARRAY+=(-subtitle "$dialogSoftDeadlineBodyCountIBM")
 	fi
+	displayTimeoutTEXT="$dialogSoftDeadlineTimeoutTEXT"
 
 	# Start the dialog.
 	openIbmNotifier
@@ -3862,6 +3886,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 	else # Show no deadlines.
 		ibmNotifierARRAY+=(-subtitle "$dialogAskForUpdateBodyUnlimitedIBM")
 	fi
+	displayTimeoutTEXT="$dialogAskForUpdateTimeoutTEXT"
 
 	# If needed, add the $menuDeferSECONDS option to the $ibmNotifierARRAY[].
 	if [[ -n $menuDeferSECONDS ]]; then
@@ -4119,5 +4144,6 @@ fi
 
 mainWorkflow "$@"
 rm -f "$superPIDFILE"
+[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
 exit 0
