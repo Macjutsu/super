@@ -3,6 +3,20 @@
   "description": "S.U.P.E.R.M.A.N. Preferences",
   "__preferencedomain": "com.macjutsu.super",
   "properties": {
+    "JamfProID":{
+      "titile": "JamfPro ID",
+      "description": "Put '$JSSID' when use Jamf Pro API account." ,
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
     "DefaultDefer": {
       "title": "Default Defer",
       "description": "The number of seconds to defer until the next update attempt if a user choses not to update restart.It must be between 120 and 86400. Default defferral time is 3600.",
