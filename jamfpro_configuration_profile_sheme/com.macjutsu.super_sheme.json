@@ -5,7 +5,7 @@
   "properties": {
     "DefaultDefer": {
       "title": "Default Defer",
-      "description": "The number of seconds to defer until the next update attempt if a user choses not to update restart.",
+      "description": "The number of seconds to defer until the next update attempt if a user choses not to update restart.It must be between 120 and 86400. Default defferral time is 3600.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -19,7 +19,7 @@
     },
     "FocusDefer": {
       "title": "Focus Defer",
-      "description": "The number of seconds to defer the update restart dialog automatically if a process has prevented display sleep (for example, during an active meeting) or the user has Focus or Do Not Disturb enabled.",
+      "description": "The number of seconds to defer the update restart dialog automatically if a process has prevented display sleep (for example, during an active meeting) or the user has Focus or Do Not Disturb enabled.It must be between 120 and 86400. Put X to diable this option.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -33,7 +33,7 @@
     },
     "MenuDefer": {
       "title": "Menu Defer",
-      "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DefaultDefer time.",
+      "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DefaultDefer time. It must be between 120 and 86400. Put X to diable this option.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -50,9 +50,183 @@
         }
       ]
     },
+    "RecheckDefer": {
+        "title": "Recheck Defer",
+        "description": "The number of seconds to defer if no software updates are found. It must be between 120 and 2628288. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "FocusCount": {
+        "title": "Focus Count",
+        "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "SoftCount": {
+        "title": "Soft Count",
+        "description": "The maximum number of user selected deferrals allowed before the soft deadline automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "HardCount": {
+        "title": "Hard Count",
+        "description": "The maximum number of user selected deferrals allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "FocusDays": {
+        "title": "Focus Days",
+        "description": "The maximum number of days that automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "SoftDays": {
+        "title": "Soft Days",
+        "description": "The maximum number of days allowed before the soft deadline dialog. The soft deadline is an interactive update restart dialog indicating that no more deferrals are allowed. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "HardDays": {
+        "title": "Hard Days",
+        "description": "The maximum number of days allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string"
+        }
+      ]
+    },
+    "ZeroDay": {
+        "title": "Zero Day",
+        "description": "Instead of having the days deadline counter automatically select the day zero date. PutX to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
+    "FocusDate": {
+        "title": "Focus Date",
+        "description": "This is the last date and time when automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
+    "SoftDate": {
+        "title": "Soft Date",
+        "description": "If this date and time have passed, an interactive update restart dialog appears indicating that no more user deferrals are allowed. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
+    "HardDate": {
+        "title": "Hard Date",
+        "description": "If this date has passed, the computer restarts and udpates without asking the user for approval. Put X to diable this option.",
+      "anyOf": [
+        {
+          "title": "Not Configured",
+          "type": "null"
+        },
+        {
+          "title": "Configured",
+          "type": "string",
+          "options": {
+            "inputAttributes": {
+              "placeholder": "YYYY-MM-DD:hh:mm"
+            }
+          }
+        }
+      ]
+    },
     "DisplayTimeout": {
       "title": "Display Timeout",
-      "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog.",
+      "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -66,7 +240,7 @@
     },
     "DisplayRedraw": {
       "title": "Display Redraw",
-      "description": "If a user ignores a notification or dialog (for example, it's moved offscreen)this specifies the number of seconds to wait before closing and then reopening the notification or dialog, thus redrawing the notification or dialog back in it's original open possition.",
+      "description": "If a user ignores a notification or dialog (for example, it's moved offscreen)this specifies the number of seconds to wait before closing and then reopening the notification or dialog, thus redrawing the notification or dialog back in it's original open possition. Put X to diable this option.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -80,7 +254,7 @@
     },
     "DisplayIcon": {
       "title": "Display Icon",
-      "description": "Local path or http(s) URL to a file that is the picture to display in  notifications or dialogs.",
+      "description": "Local path or http(s) URL to a file that is the picture to display in  notifications or dialogs. Put X to reset this to default.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -99,7 +273,7 @@
     },
     "IconSizeIbm": {
       "title": "Icon Size IBM",
-      "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs.",
+      "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs. The value must be in between 96 and 150. Put X to reset this to default.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -113,7 +287,7 @@
     },
     "IconSizeJamf": {
       "title": "Icon Size Jamf",
-      "description": "Number of pixels for the --display-icon in jamfHelper dialogs and notifications.",
+      "description": "Number of pixels for the --display-icon in jamfHelper dialogs and notifications. The value must be in between 96 and 150. Put X to reset this to default.",
       "anyOf": [
         {
           "title": "Not Configured",
@@ -136,82 +310,6 @@
         {
           "title": "Configured",
           "type": "boolean"
-        }
-      ]
-    },
-    "FocusDeadline": {
-      "title": "Focus Deadline",
-      "description": "If this date has passed, the update restart dialog (with deferral options) always appears even if a process is preventing display sleep or the user has Focus or Do Not Disturb enabled.",
-      "anyOf": [
-        {
-          "title": "Not Configured",
-          "type": "null"
-        },
-        {
-          "title": "Configured",
-          "type": "string",
-          "options": {
-            "inputAttributes": {
-              "placeholder": "YYYY-MM-DD:hh:mm"
-            }
-          }
-        }
-      ]
-    },
-    "SoftDeadline": {
-      "title": "Soft Deadline",
-      "description": "If this date has passed, an interactive update restart dialog appears indicating that no more user deferrals are allowed.",
-      "anyOf": [
-        {
-          "title": "Not Configured",
-          "type": "null"
-        },
-        {
-          "title": "Configured",
-          "type": "string",
-          "options": {
-            "inputAttributes": {
-              "placeholder": "YYYY-MM-DD:hh:mm"
-            }
-          }
-        }
-      ]
-    },
-    "HardDeadline": {
-      "title": "HardDeadline",
-      "description": "If this date has passed, the computer updates and restarts without asking the user for approval.",
-      "anyOf": [
-        {
-          "title": "Not Configured",
-          "type": "null"
-        },
-        {
-          "title": "Configured",
-          "type": "string",
-          "options": {
-            "inputAttributes": {
-              "placeholder": "YYYY-MM-DD:hh:mm"
-            }
-          }
-        }
-      ]
-    },
-    "CountDeadline": {
-      "title": "Count Deadline",
-      "description": "The maximum number of user deferrals allowed before an interactive update restart dialog appears indicating that no more user deferrals are allowed.",
-      "anyOf": [
-        {
-          "title": "Not Configured",
-          "type": "null"
-        },
-        {
-          "title": "Configured",
-          "type": "string",
-          "options": {
-            "inputAttributes": {
-              "placeholder": "10"
-            }
-          }
         }
       ]
     },
