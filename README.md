@@ -8,7 +8,7 @@ by Kevin M. White
 
 ## Introduction
 
-S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides administrators with a comprehensive workflow to encourage and enforce macOS software updates for both Intel and Apple Silicon computers. Deployed via a single script, `super` creates a background agent (aka LaunchDaemon) that ensures macOS software updates are applied with the least user interference possible. Further, `super` can also enforce macOS software updates with options for customizable deferrals and deadlines. In other words, `super` makes the macOS update experience better for both users and administrators alike.
+S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides administrators with a comprehensive workflow to encourage and enforce macOS software updates for both Intel and Apple silicon Mac computers. Deployed using a single script, `super` creates a background agent (aka LaunchDaemon) that ensures software updates are applied with the least user interference possible. Further, `super` can also enforce software updates with options for customizable deferrals and deadlines. In other words, `super` makes the macOS update experience better for both users and administrators.
 
 ## Learn More
 
