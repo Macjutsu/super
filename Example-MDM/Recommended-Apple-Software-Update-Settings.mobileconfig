@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1">
+  <dict>
+    <key>PayloadUUID</key>
+    <string>11F60840-A42D-4D5E-BCA7-44C4AEC4F7C9</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadOrganization</key>
+    <string>Macjutsu</string>
+    <key>PayloadIdentifier</key>
+    <string>11F60840-A42D-4D5E-BCA7-44C4AEC4F7C9</string>
+    <key>PayloadDisplayName</key>
+    <string>Apple Software Update Settings</string>
+    <key>PayloadDescription</key>
+    <string>These settings disable the automatic download and installation of system updates but enable the automatic installation of all other software update types.</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadEnabled</key>
+    <true/>
+    <key>PayloadRemovalDisallowed</key>
+    <true/>
+    <key>PayloadScope</key>
+    <string>System</string>
+    <key>PayloadContent</key>
+    <array>
+      <dict>
+        <key>PayloadUUID</key>
+        <string>85671462-39F4-47E4-9C48-AF2F4D9266EB</string>
+        <key>PayloadType</key>
+        <string>com.apple.SoftwareUpdate</string>
+        <key>PayloadOrganization</key>
+        <string>Macjutsu</string>
+        <key>PayloadIdentifier</key>
+        <string>85671462-39F4-47E4-9C48-AF2F4D9266EB</string>
+        <key>PayloadDisplayName</key>
+        <string>Software Update</string>
+        <key>PayloadDescription</key>
+        <string/>
+        <key>PayloadVersion</key>
+        <integer>1</integer>
+        <key>PayloadEnabled</key>
+        <true/>
+        <key>CatalogURL</key>
+        <string/>
+        <key>AutomaticallyInstallAppUpdates</key>
+        <true/>
+        <key>AutomaticallyInstallMacOSUpdates</key>
+        <false/>
+        <key>AutomaticCheckEnabled</key>
+        <true/>
+        <key>AutomaticDownload</key>
+        <false/>
+        <key>ConfigDataInstall</key>
+        <true/>
+        <key>CriticalUpdateInstall</key>
+        <true/>
+      </dict>
+    </array>
+  </dict>
+</plist>
