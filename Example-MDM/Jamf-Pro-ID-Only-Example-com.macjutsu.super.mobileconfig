@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1">
+  <dict>
+    <key>PayloadUUID</key>
+    <string>C70AFE28-6CB4-467D-99E6-AE5F2C5E4716</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadOrganization</key>
+    <string>Macjutsu</string>
+    <key>PayloadIdentifier</key>
+    <string>C70AFE28-6CB4-467D-99E6-AE5F2C5E4716</string>
+    <key>PayloadDisplayName</key>
+    <string>S.U.P.E.R.M.A.N. Jamf Pro ID Only Example</string>
+    <key>PayloadDescription</key>
+    <string>This sends the computer's Jamf Pro ID for use by the super update script.</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadEnabled</key>
+    <true/>
+    <key>PayloadRemovalDisallowed</key>
+    <true/>
+    <key>PayloadScope</key>
+    <string>System</string>
+    <key>PayloadContent</key>
+    <array>
+      <dict>
+        <key>PayloadDisplayName</key>
+        <string>Custom Settings</string>
+        <key>PayloadIdentifier</key>
+        <string>F4B5AEAE-4579-4C62-A95E-2645ADA76815</string>
+        <key>PayloadOrganization</key>
+        <string>Macjutsu</string>
+        <key>PayloadType</key>
+        <string>com.apple.ManagedClient.preferences</string>
+        <key>PayloadUUID</key>
+        <string>F4B5AEAE-4579-4C62-A95E-2645ADA76815</string>
+        <key>PayloadVersion</key>
+        <integer>1</integer>
+        <key>PayloadContent</key>
+        <dict>
+          <key>com.macjutsu.super</key>
+          <dict>
+            <key>Forced</key>
+            <array>
+              <dict>
+                <key>mcx_preference_settings</key>
+                <dict>
+                  <key>JamfProID</key>
+                  <string>$JSSID</string>
+                </dict>
+              </dict>
+            </array>
+          </dict>
+        </dict>
+      </dict>
+    </array>
+  </dict>
+</plist>

@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 2.0rc1
-# 2022/08/23
+# Version 2.0
+# 2022/09/02
 # https://github.com/Macjutsu/super
 #
 ######## DEBUGGING STUFF ########
@@ -26,8 +26,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 2.0rc1
-  2022/08/23
+  Version 2.0
+  2022/09/02
   https://github.com/Macjutsu/super
 
   Usage:
@@ -98,434 +98,28 @@ echo "
   <key>TestMode</key> <true/> | <false/>
   <key>TestModeTimeout</key> <string>seconds</string>
   <key>VerboseMode</key> <true/> | <false/>
+
+  ** For detailed documentation visit: https://github.com/Macjutsu/super/wiki
+  ** Or use --help to automatically open the S.U.P.E.R.M.A.N. Wiki.
 "
+sendToLog "Exit: User chose to view usage."
+sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+exit 0
 }
 
-# Show help documentation.
+# If there is a real current user then open the S.U.P.E.R.M.A.N. Wiki, otherwise run the showUsage() function.
 showHelp() {
-echo "  Deferment Timer Options:
+checkCurrentUser
+if [[ "$currentUSER" != "FALSE" ]]; then
+	sendToLog "Starter: Opening S.U.P.E.R.M.A.N. Wiki for user $currentUSER..."
+	sudo -u "$currentUSER" open "https://github.com/Macjutsu/super/wiki" &
+else
+	showUsage
+fi
 
-  --default-defer=seconds | --default-defer=X
-  * Managed preference: <key>DefaultDefer</key> <string>seconds</string>
-  The number of seconds to defer until the next update attempt if a user choses
-  not to update restart. This deferral time is also used in cases when a
-  required service is temporarily unavailable (for example, network or MDM
-  connectivity issues). Using this option overrides the default deferral time
-  which is set to 3600 seconds (1 hour) via the $defaultDeferSECONDS parameter.
-  Times less than 120 seconds or more than 86400 seconds (1 day) are rounded
-  accordingly. Also see the --menu-defer option to display a pop-up menu
-  allowing the user to select an alternate deferral time. Finally, use a seconds
-  value of X to return this option to its default setting.
-
-  --focus-defer=seconds | --focus-defer=X
-  * Managed preference: <key>FocusDefer</key> <string>seconds</string>
-  The number of seconds to defer automatically if the system is in user-enabled
-  Focus/Do Not Disturb or when a process has requested that the display not go
-  to sleep (for example, during an active meeting). With this option you should
-  also consider using --focus-count, --focus-days, or --focus-date to ensure
-  users are offered a chance to defer before an update restart is automatically
-  enforced via soft or hard deadlines. Times less than 120 seconds or more than
-  86400 seconds (1 day) are rounded accordingly. Finally, use a seconds value of
-  X to disable this option.
-
-  --menu-defer=seconds,seconds,etc... | --menu-defer=X
-  * Managed preference: <key>MenuDefer</key>
-  <string>seconds,seconds,etc...</string>
-  Display a deferral time pop-up menu in the non-deadline update restart dialog
-  that allows the user to overide the --default-defer time. The time selections
-  are specified with one or more number of seconds that are comma separated with
-  no spaces. The first number in the list is the default selection for the menu,
-  thus it is automatically selected if you also set --display-timeout. Times
-  less than 120 seconds or more than 86400 seconds (1 day) are rounded
-  accordingly. Finally, use a seconds value of X to disable this option.
-
-  --recheck-defer=seconds | --recheck-defer=X
-  * Managed preference: <key>RecheckDefer</key> <string>seconds</string>
-  The number of seconds to defer if no software updates are found. Enabaling
-  this option results in super acting as a permanent agent that checks for
-  software updates on a regular basis. Logically, this option can not be used
-  along with the --skip-updates option. Times less than 120 seconds or more than
-  2628288 seconds (30 days) are rounded accordingly. Finally, use a seconds
-  value of X to disable this option.
-
-  --delete-deferrals
-  Delete all locally set deferral options, resulting in only the default defer,
-  which is set the via the $defaultDeferSECONDS parameter. Note that options
-  specified via a managed preference still remain in effect.
-
-  Deferment Count Deadline Options:
-
-  --focus-count=number | --focus-count=X
-  * Managed preference: <key>FocusCount</key> <string>number</string>
-  The maximum number of automatic deferrals allowed if the system is in
-  user-enabled Focus/Do Not Disturb or when a process has requested that the
-  display not go to sleep (for example, during an active meeting). After this
-  deadline the update restart dialogs always appear as normal. With this option
-  you should also consider setting a specific --focus-defer time, otherwise the
-  focus deferrment time is based on the --default-defer time. Note that if a
-  user is always in a Focus mode, the --focus-count deadline must pass first
-  before the --soft-count or --hard-count options are started. Additionally,
-  other maximum days or date deadlines that have passed can overide this option.
-  For testing, use a number value of 0 to simulate being past the maximum focus
-  count deadline. Finally, use a number value of X to disable this option.
-
-  --soft-count=number | --soft-count=X
-  * Managed preference: <key>SoftCount</key> <string>number</string>
-  The maximum number of user selected deferrals allowed before the soft deadline
-  dialog. The soft deadline is an interactive update restart dialog indicating
-  that no more deferrals are allowed. This option can not be used along with the
-  --hard-count option as logically there can only be one behavior after passing
-  the maximum number of user deferrals. Note that if this option is also used
-  with the --focus-count option and the user is always in a Focus mode, then the
-  --focus-count deadline must pas first before the --soft-count is started.
-  Additionally, other maximum days or date deadlines that have passed can
-  overide this option. For testing, use a number value of 0 to simulate being
-  past the maximum soft count deadline. Finally, use a number value of X to
-  disable this option.
-
-  --hard-count=number | --hard-count=X
-  * Managed preference: <key>HardCount</key> <string>number</string>
-  The maximum number of user selected deferrals allowed before the computer
-  automatically restarts for updates without asking the user for approval.
-  However, the user is notified that a restart is pending. This option can not
-  be used along with the --soft-count option as logicially there can only be one
-  behavior after passing the maximum number of user deferrals. Note that if this
-  option is also used with the --focus-count option and the user is always in a
-  Focus mode, then the --focus-count deadline must pas first before the
-  --hard-count is started. Additionally, other maximum days or date deadlines
-  that have passed can overide this option. For testing, use a number value of 0
-  to simulate being past the maximum hard count deadline. Finally, use a number
-  value of X to disable this option.
-
-  --restart-counts
-  Restart all active defer counters, thus allowing for the maximum number of
-  deferrals again.
-
-  --delete-counts
-  Delete all locally set maximum deferral deadlines, thus returning to the
-  default of an unlimited number of deferrals. Note that options specified via
-  a managed preference still remain in effect.
-
-  Deferment Days Deadline Options:
-
-  --focus-days=number | focus-days=X
-  * Managed preference: <key>FocusDays</key> <string>number</string>
-  The maximum number of days that automatic deferrals are allowed if the system
-  is in user-enabled Focus/Do Not Disturb or when a process has requested that
-  the display not go to sleep (for example, during an active meeting). After
-  this deadline the update restart dialogs always appear. With this option you
-  should also consider setting a specific --focus-defer time, otherwise the
-  focus deferrment time is be based on the --default-defer time. Note that when
-  used along with the --soft-days or --hard-days options, logically the
-  --focus-days value must always be the least number of days. Additionally,
-  other maximum deferral count or date deadlines that have passed can overide
-  this option. For testing, use a day value of 0 or the --zero-day option to'
-  simulate being past the maxiumum number of days deadline. Finally, use a days
-  value of X to disable this option.
-
-  --soft-days=number | --soft-days=X
-  * Managed preference: <key>SoftDays</key> <string>number</string>
-  The maximum number of days allowed before the soft deadline dialog. The soft
-  deadline is an interactive update restart dialog indicating that no more
-  deferrals are allowed. Note that when used along with the --focus-days or
-  --hard-days options, logically the --soft-days value must always be more than
-  the --focus-days value and less than the --hard-days value. Additionally,
-  other maximum deferral count or date deadlines that have passed can overide
-  this option. For testing, use a day value of 0 or the --zero-day option to
-  simulate being past the maxiumum number of days deadline. Finally, use a days
-  value of X to disable this option.
-
-  --hard-days=number | --hard-days=X
-  * Managed preference: <key>HardDays</key> <string>number</string>
-  The maximum number of days allowed before the computer automatically restarts
-  for updates without asking the user for approval. However, the user is
-  notified that a restart is pending. Note that when used along with the
-  --focus-days or --soft-days options, logically the --hard-days value must
-  always be the most number of days. Additionally, other maximum deferral count
-  or date deadlines that have passed can overide this option. For testing, use
-  a day value of 0 or the --zero-day option to simulate being past the maxiumum
-  number of days deadline. Finally, use a days value of X to disable this
-  option.
-
-  --zero-day=YYYY-MM-DD:hh:mm | --zero-day=X
-  * Managed preference: <key>ZeroDay</key> <string>YYYY-MM-DD:hh:mm</string>
-  Instead of having the days deadline counter automatically select the day zero
-  date, this option sets a specific date and time as day zero. Note that you
-  need to manually update this value every time you want to set a new day zero.
-  Finally, use a date value of X to disable this option.
-
-  --restart-days
-  Restart the automatically selected zero day date and time, thus allowing for
-  the maximum number of days allowed for deferral again. Note that using the
-  --zero-day option overrides the automatically seleted zero day, and thus also
-  overrides this restart option.
-
-  --delete-days
-  Delete all locally set maximum days deadlines and manual day zero date, thus
-  returning to the default of an unlimited number of days allowed for deferrals.
-  Note that options specified via a managed preference still remain in effect.
-
-  Deferment Date Deadline Options:
-
-  --focus-date=YYYY-MM-DD:hh:mm | --focus-date=X
-  * Managed preference: <key>FocusDate</key> <string>YYYY-MM-DD:hh:mm</string>
-  This is the last date and time when automatic deferrals are allowed if the
-  system is in user-enabled Focus/Do Not Disturb or when a process has requested
-  that the display not go to sleep (for example, during an active meeting).
-  After this deadline the update restart dialogs always appear. At a minimum,
-  you must always specify year-month-day. Hours are represented by a 24-hour
-  clock, and any non-specified hours or minutes are rounded to 00. Also see the
-  \$dateFORMAT and \$timeFORMAT parameters for date display options. Note that
-  when used along with the --soft-date or --hard-date options, the --focus-date
-  value must always be the earliest in time. Additionally, other maximum
-  deferral count or maximum days deadlines that have passed can overide this
-  option. For testing use a date and time value in the past to simulate being
-  past this date deadline. Finally, use a date value of X to disable this
-  option.
-
-  --soft-date=YYYY-MM-DD:hh:mm | --soft-date=X
-  * Managed preference: <key>SoftDate</key> <string>YYYY-MM-DD:hh:mm</string>
-  If this date and time have passed, an interactive update restart dialog
-  appears indicating that no more user deferrals are allowed. At a minimum, you
-  must always specify year-month-day. Hours are represented by a 24-hour clock,
-  and any non-specified hours or minutes are rounded to 00. Also see the
-  \$dateFORMAT and \$timeFORMAT parameters for date display options. Note that
-  when used along with the --focus-date or --hard-date options, the --soft-date
-  value must always be after the --focus-date in time but before the --hard-date
-  in time. Additionally, other maximum deferral count or maximum days deadlines
-  that have passed can overide this option. For testing use a date and time
-  value in the past to simulate being past this date deadline. Finally, use a
-  date value of X to disable this option.
-
-  --hard-date=YYYY-MM-DD:hh:mm | --hard-date=X
-  * Managed preference: <key>HardDate</key> <string>YYYY-MM-DD:hh:mm</string>
-  If this date has passed, the computer restarts and udpates without asking the
-  user for approval. However, the user is notified that a restart is pending. At
-  a minimum, you must always specify year-month-day. Hours are represented by a
-  24-hour clock, and any non-specified hours or minutes are rounded to 00. Also
-  see the \$dateFORMAT and \$timeFORMAT parameters for date display options.
-  Note that when used along with the --focus-date or --soft-date options, the
-  --hard-date value must always be the latest in time. Additionally, other
-  maximum deferral count or maximum days deadlines that have passed can overide
-  this option. For testing use a date and time value in the past to simulate
-  being past this date deadline. Finally, use a date value of X to disable this
-  option.
-
-  --delete-dates
-  Delete all locally set date deadlines, thus returning to the default of no
-  date deadline for deferrals. Note that options specified via a managed
-  preference still remain in effect.
-
-  Display Options:
-
-  --display-timeout=seconds | --display-timeout=X
-  * Managed preference: <key>DisplayTimeout</key> <string>seconds</string>
-  Sets an automatic timeout for interactive update restart dialogs in seconds.
-  The countdown of the timeout is displayed in the update restart dialog. Use
-  this option with caution, as once the timeout expires, the restart button is
-  automatically selected for any dialogs showing that a deadline has passed.
-  Finally, use a seconds value of X to disable this option.
-
-  --display-redraw=seconds | --display-redraw=X
-  * Managed preference: <key>DisplayRedraw</key> <string>seconds</string>
-  If a user ignores a notification or dialog (for example, it's moved offscreen)
-  this specifies the number of seconds to wait before closing and then reopening
-  the notification or dialog, thus redrawing the notification or dialog back in
-  it's original open possition. Avoid low numbers as re-centering results in a
-  flash of the notification or dialog. Also note that when --display-redraw
-  is used along with --display-timeout, timeout seconds that are too low are
-  automatically corrected to equal three times the redraw seconds. This results
-  in the notification or dialog redrawing twice before the timeout automatically
-  selects the Restart button. Finally, use a seconds value of X to disable
-  this option.
-
-  --display-icon=/local/path or URL | --display-icon=X
-  * Managed preference: <key>DisplayIcon</key> <string>path</string>
-  Local path or http(s) URL to a file that is the picture to display in
-  notifications or dialogs. If there is a space in the local path, you must use
-  quotes or the escape ( \ ) character. Both local file paths and http(s) URLs
-  are be copied to the path at \$cachedICON. If the path or URL can not be found
-  or this option is not set, then the file at the \$defaultICON path is used.
-  Finally, use a path value of X to return this option to its default.
-
-  --icon-size-ibm=pixels | --icon-size-ibm=X
-  * Managed preference: <key>IconSizeIbm</key> <string>number</string>
-  Number of pixels for the --display-icon in IBM Notifier dialogs. Using this
-  option overrides the default IBM Notifier icon size which is set to 96 pixels
-  via the $ibmNotifierIconSIZE parameter. Any size less than 32 pixles or more
-  than 150 pixles is rounded accordingly. Finally, use a pixels value of X to
-  return this option to its default.
-
-  --icon-size-jamf=pixels | --icon-size-jamf=X
-  * Managed preference: <key>IconSizeJamf</key> <string>number</string>
-  Number of pixels for the --display-icon in jamfHelper dialogs and
-  notifications. Using this option overrides the default jamfHelper icon size
-  which is set to 96 pixels via the $jamfHelperIconSIZE parameter. Any size less
-  than 32 pixles or more than 256 pixles is rounded accordingly. Finally, use a
-  pixels value of X to return this option to its default.
-
-  -J | --prefer-jamf
-  * Managed preference: <key>PreferJamf</key> <true/>
-  Prefer jamfHelpler over IBM Notifier.app for user interactions.
-
-  -j | --no-prefer-jamf
-  * Managed preference: <key>PreferJamf</key> <false/>
-  Disable preferring jamfHelpler over IBM Notifier.app for user interactions.
-
-  Apple Silicon Credential Options:
-
-  --local-account=AccountName
-  Apple Silicon only. A local (standard or admin) user account name with volume
-  ownership privileges. You must also provide the --local-password for this
-  account. The account you provide is used to authenticate the Apple
-  softwareupdate command.
-
-  --local-password=Password
-  Apple Silicon only. The local user password to authenticate the account
-  specified by --local-account. Note that these credentials are stored in the
-  System keychain and can be viewed by any other admin user.
-
-  --admin-account=AccountName
-  Apple Silicon only. A local admin user account name with volume ownership
-  privileges. You must also provide the --admin-password for this account. The
-  account you provide is used to create a new local super service account that
-  authenticatates the Apple softwareupdate command.
-
-  --admin-password=Password
-  Apple Silicon only. The local admin user password to authenticate the account
-  specified by --admin-account. These credentials are never saved to disk.
-
-  --super-account=AccountName
-  Apple Silicon only. Specify a unique account name for the local super service
-  account. You must also provide --admin-account credentials for modifying the
-  super service account. Using this option overrides the default service account
-  name super and full name Super Update Service.
-
-  --super-password=Password
-  Apple Silicon only. Specify a unique password for the local super service
-  account. You must also provide --admin-account credentials for modifying the
-  super service account. Using this option overrides the default service account
-  password which is randomized via the uuidgen command. Note that these
-  credentials are stored in the System keychain and can be viewed by any other
-  admin user.
-
-  --jamf-account=AccountName
-  A Jamf Pro user account that can authorize macOS software update MDM commands.
-  You must also provide the --jamf-password for this account. The default Jamf
-  Pro privileges required for this account are; Computers Create, Compuers Read,
-  and Send Computer Remote Command to Download and Install macOS Update. You can
-  avoid the Compuers Read requirement by providing a Configuratino Profile with
-  the following managed preference: <key>JamfProID</key><string>$JSSID</string>.
-  Note that only computers with macOS 11.5 or later can reliably update via MDM
-  commands. As such, on older systems valid credentials will be saved but the
-  MDM method will not be attempted until the system is at least macOS 11.5.
-  Also, on Apple Silicon, valid local update credentials (local user account or
-  super service account) take precedence over the the MDM update workflow.
-
-  --jamf-password=Password
-  The Jamf Pro user account password to authenticate the account specified by
-  --jamf-account. Note that these credentials are stored in the System keychain
-  and can be viewed by any other local admin user.
-
-  -D | --delete-accounts
-  Delete all previously saved Apple Silicon update credentials. This includes
-  deleting saved local account credentials, and any automatically generated
-  super serivce account and saved credentials, and saved Jamf Pro API account
-  credentials. Additionally you can use the --reset-super option to delete any
-  locally saved options.
-
-  Update/Restart Options:
-
-  --policy-triggers=PolicyTrigger,PolicyTrigger,etc... | --policy-triggers=X
-  * Managed preference: <key>PolicyTriggers</key>
-  <string>PolicyTrigger,PolicyTrigger,etc...</string>
-  One or more Jamf Pro Policy Triggers that are comma separated with no spaces.
-  If there is a space in any of the Policy Trigger names, you must use quotes or
-  the escape ( \ ) character. The super workflow runs this list of Jamf Pro
-  Policy Triggers before any restart required system updates are installed. As a
-  default behavior, these Jamf Pro Policies only run if the system is going to
-  restart for updates. However, this option can be used along with the
-  --skip-updates option so even when there are no updates available you can
-  still take advantage of dialogs, notifications, deferrals, and deadline
-  workflows. Note that if you specify the --skip-updates option, the super
-  workflow does not restart the computer unless you also speicfy the
-  --force-restart option. This is by design as it allows one of your Jamf Pro
-  Policies to restart the computer instead of the super workflow. Finally, use a
-  value of X to disable this option.
-
-  -S | --skip-updates
-  * Managed preference: <key>SkipUpdates</key> <true/>
-  Skip Apple software updates, even if they are available. This option can also
-  be used along with --policy-triggers and/or --force-restart to take advantage
-  of dialogs, notifications, deferrals, and deadline workflows. Alternatley, use
-  this option along with --reset-super to delete any local super preferences,
-  kill any existing super processes, and delete the super LaunchDaemon.
-  Finally, this option can not be used along with the --recheck-defer option.
-
-  -s | --no-skip-updates
-  * Managed preference: <key>SkipUpdates</key> <false/>
-  Resume checking Apple software updates in super workflows.
-
-  -F | --force-restart
-  * Managed preference: <key>ForceRestart</key> <true/>
-  The super workflow forces a restart even if Apple software updates do not
-  require it. Useful when used along with --test-mode or if no restart required
-  system updates are available but you still want to force a restart.
-
-  -f | --no-force-restart
-  * Managed preference: <key>ForceRestart</key> <false/>
-  Disable forced restart in super workflows.
-
-  Special Modes Options:
-
-  -T | --test-mode
-  * Managed preference: <key>TestMode</key> <true/>
-  Mode to validate parameters, credentials, dialogs, notifications, deferrals,
-  and deadline workflows. This mode does not attempt any Apple software updates,
-  Jamf Polices, or restarts. Thus, allowing for quick iteration testing.
-
-  -t | --no-test-mode
-  * Managed preference: <key>TestMode</key> <false/>
-  Disable test mode in super workflows.
-
-  --test-mode-timeout=seconds | --test-mode-timeout=X
-  * Managed preference: <key>TestModeTimeout</key> <string>seconds</string>
-  The amount of time in seconds to leave test notifications and dialogs open
-  before moving on in the workflow. Using this option overrides the default test
-  mode timeout which is set to 10 seconds via the \$testModeTIMEOUT default
-  parameter. Finally, use a seconds value of X to return this option to its
-  default.
-
-  -V | --verbose-mode
-  * Managed preference: <key>VerboseMode</key> <true/>
-  Mode to generate additional log output. Note that with this mode passwords
-  are visible in Terminal but are not saved to \$superLOG.
-
-  -v | --no-verbose-mode
-  * Managed preference: <key>VerboseMode</key> <false/>
-  Disable test mode in super workflows.
-
-  -o | -O | --open-logs
-  As long as someone is logged into the GUI this option opens the \$superLOG,
-  \$updateLOG, and if needed the \$mdmLOG in Console.app.
-
-  -x | -X | --reset-super
-  Delete all locally saved options, thus returning super to it's defaults. Use
-  this option along with --delete-accounts to delete any saved Apple Silicon
-  update credentials. Additionally, you can use the --skip-updates option to
-  also kill any existing super processes and delete any lingering super
-  LaunchDaemons. Finally, note that options specified via a managed preference
-  still remain in effect.
-
-  -u | -U | --usage
-  Display basic usage documentation.
-
-  -h | -H | --help
-  Display this full help documentation.
-
-  [Unrecognized Options]
-  Display usage and specific unrecognized option errors.
-"
+sendToLog "Exit: User chose to view help."
+sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+exit 0
 }
 
 ######## FUNCTIONS - PARAMETERS ########
@@ -765,13 +359,9 @@ while [[ -n $1 ]]; do
 		;;
 		-u|-U|--usage )
 			showUsage
-			echo -e "  Use --help to view detailed usage information.\n"
-			exit 0
 		;;
 		-h|-H|--help )
-			showUsage
 			showHelp
-			exit 0
 		;;
 		*)
 			unrecognizedOptionsARRAY+=("$1")
@@ -782,10 +372,10 @@ done
 
 # Error log any unrecognized options.
 if [[ -n ${unrecognizedOptionsARRAY[*]} ]]; then
-	sendToLog  "Error: Unrecognzied Options: ${unrecognizedOptionsARRAY[*]}"; parameterERROR="TRUE"
+	sendToLog  "Error: Unrecognized Options: ${unrecognizedOptionsARRAY[*]}"; parameterERROR="TRUE"
 	[[ "$jamfPARENT" == "TRUE" ]] && sendToLog  "Error: Note that each Jamf Pro Policy Parameter can only contain a single option."
 	showUsage
-	sendToLog  "Error: Unrecognzied Options: ${unrecognizedOptionsARRAY[*]}" # Logging twice for improved readability.
+	sendToLog  "Error: Unrecognized Options: ${unrecognizedOptionsARRAY[*]}" # Logging twice for improved readability.
 	[[ "$jamfPARENT" == "TRUE" ]] && sendToLog  "Error: Note that each Jamf Pro Policy Parameter can only contain a single option."
 fi
 }
@@ -1273,21 +863,21 @@ elif [[ -n $zeroDayOPTION ]]; then
 		if [[ $extractTIME =~ $regexTIME ]]; then
 			calculatedDEADLINE="$extractDATE:$extractTIME"
 		else
-			sendToLog "Exit: The manual zero day override date time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+			sendToLog "Exit: The manual zero day override date time must be a valid 24-hour time formatted as hh:mm."; parameterERROR="TRUE"
 		fi
 	else
-		sendToLog "Exit: The manual zero day override date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+		sendToLog "Exit: The manual zero day override date must be a valid date formatted as YYYY-MM-DD."; parameterERROR="TRUE"
 	fi
 	if [[ $calculatedDEADLINE =~ $regexDATETIME ]]; then
 		zeroDayOVERRIDE="$calculatedDEADLINE"
 	else
-		sendToLog "Exit: The manual zero day override date must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+		sendToLog "Exit: The manual zero day override date must be a valid and formatted as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
 fi
 
 # Validate that any $zeroDayOVERRIDE also includes a day deadline, if valid save to $superPLIST.
 if { [[ -z $focusDaysMAX ]] && [[ -z $softDaysMAX ]] && [[ -z $hardDaysMAX ]]; } && [[ -n $zeroDayOVERRIDE ]]; then
-	sendToLog "Exit: Specifying a manual zero day date also requres that you set a day deadline."; parameterERROR="TRUE"
+	sendToLog "Exit: Specifying a manual zero day date also requires that you set a day deadline."; parameterERROR="TRUE"
 fi
 if [[ "$parameterERROR" != "TRUE" ]]; then
 	[[ -n $zeroDayOVERRIDE ]] && defaults write "$superPLIST" ZeroDay -string "$zeroDayOVERRIDE"
@@ -1313,16 +903,16 @@ elif [[ -n $focusDateOPTION ]]; then
 		if [[ $extractTIME =~ $regexTIME ]]; then
 			calculatedDEADLINE="$extractDATE:$extractTIME"
 		else
-			sendToLog "Exit: The focus date deadline time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+			sendToLog "Exit: The focus date deadline time must be a valid 24-hour time formatted as hh:mm."; parameterERROR="TRUE"
 		fi
 	else
-		sendToLog "Exit: The focus date deadline date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+		sendToLog "Exit: The focus date deadline date must be a valid date formatted as YYYY-MM-DD."; parameterERROR="TRUE"
 	fi
 	if [[ $calculatedDEADLINE =~ $regexDATETIME ]]; then
 		focusDateMAX="$calculatedDEADLINE"
 		focusDateEPOCH=$(date -j -f "%Y-%m-%d:%H:%M" "$calculatedDEADLINE" +"%s")
 	else
-		sendToLog "Exit: The focus date deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+		sendToLog "Exit: The focus date deadline must be a valid and formatted as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
 fi
 
@@ -1346,16 +936,16 @@ elif [[ -n $softDateOPTION ]]; then
 		if [[ $extractTIME =~ $regexTIME ]]; then
 			calculatedDEADLINE="$extractDATE:$extractTIME"
 		else
-			sendToLog "Exit: The soft date deadline time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+			sendToLog "Exit: The soft date deadline time must be a valid 24-hour time formatted as hh:mm."; parameterERROR="TRUE"
 		fi
 	else
-		sendToLog "Exit: The soft date deadline date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+		sendToLog "Exit: The soft date deadline date must be a valid date formatted as YYYY-MM-DD."; parameterERROR="TRUE"
 	fi
 	if [[ $calculatedDEADLINE =~ $regexDATETIME ]]; then
 		softDateMAX="$calculatedDEADLINE"
 		softDateEPOCH=$(date -j -f "%Y-%m-%d:%H:%M" "$calculatedDEADLINE" +"%s")
 	else
-		sendToLog "Exit: The soft date deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+		sendToLog "Exit: The soft date deadline must be a valid and formatted as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
 fi
 
@@ -1379,16 +969,16 @@ elif [[ -n $hardDateOPTION ]]; then
 		if [[ $extractTIME =~ $regexTIME ]]; then
 			calculatedDEADLINE="$extractDATE:$extractTIME"
 		else
-			sendToLog "Exit: The hard date deadline time must be a valid 24-hour time formated as hh:mm."; parameterERROR="TRUE"
+			sendToLog "Exit: The hard date deadline time must be a valid 24-hour time formatted as hh:mm."; parameterERROR="TRUE"
 		fi
 	else
-		sendToLog "Exit: The hard date deadline date must be a valid date formated as YYYY-MM-DD."; parameterERROR="TRUE"
+		sendToLog "Exit: The hard date deadline date must be a valid date formatted as YYYY-MM-DD."; parameterERROR="TRUE"
 	fi
 	if [[ $calculatedDEADLINE =~ $regexDATETIME ]]; then
 		hardDateMAX="$calculatedDEADLINE"
 		hardDateEPOCH=$(date -j -f "%Y-%m-%d:%H:%M" "$calculatedDEADLINE" +"%s")
 	else
-		sendToLog "Exit: The hard date deadline must be a valid and formated as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
+		sendToLog "Exit: The hard date deadline must be a valid and formatted as YYYY-MM-DD:hh:mm."; parameterERROR="TRUE"
 	fi
 fi
 
@@ -1476,40 +1066,40 @@ fi
 
 # Validate $iconSizeIbmOPTION input and if valid override default $ibmNotifierIconSIZE parameter and save to $superPLIST.
 if [[ "$iconSizeIbmOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for Ibm Notifier icon size."
+	sendToLog "Starter: Deleting local preference for IBM Notifier icon size."
 	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
 elif [[ -n $iconSizeIbmOPTION ]] && [[ $iconSizeIbmOPTION =~ $regexNUMBER ]]; then
 	if [[ $iconSizeIbmOPTION -lt 32 ]]; then
-		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeIbmOPTION pixels is too low, rounding up to 32 pixels."
+		sendToLog "Warning: Specified IBM Notifier icon size of $iconSizeIbmOPTION pixels is too low, rounding up to 32 pixels."
 		ibmNotifierIconSIZE="32"
 	elif [[ $iconSizeIbmOPTION -gt 150 ]]; then
-		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeIbmOPTION pixels is too high, rounding down to 150 pixels."
+		sendToLog "Warning: Specified IBM Notifier icon size of $iconSizeIbmOPTION pixels is too high, rounding down to 150 pixels."
 		ibmNotifierIconSIZE="150"
 	else
 		ibmNotifierIconSIZE="$iconSizeIbmOPTION"
 	fi
 	defaults write "$superPLIST" IconSizeIbm -string "$ibmNotifierIconSIZE"
 elif [[ -n $iconSizeIbmOPTION ]] && ! [[ $iconSizeIbmOPTION =~ $regexNUMBER ]]; then
-	sendToLog "Exit: The Ibm Notifier icon size must only be a number."; parameterERROR="TRUE"
+	sendToLog "Exit: The IBM Notifier icon size must only be a number."; parameterERROR="TRUE"
 fi
 
 # Validate $iconSizeJamfOPTION input and if valid override default $jamfHelperIconSIZE parameter and save to $superPLIST.
 if [[ "$iconSizeJamfOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for Ibm Notifier icon size."
+	sendToLog "Starter: Deleting local preference for IBM Notifier icon size."
 	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
 elif [[ -n $iconSizeJamfOPTION ]] && [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; then
 	if [[ $iconSizeJamfOPTION -lt 32 ]]; then
-		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeJamfOPTION pixels is too low, rounding up to 32 pixels."
+		sendToLog "Warning: Specified IBM Notifier icon size of $iconSizeJamfOPTION pixels is too low, rounding up to 32 pixels."
 		jamfHelperIconSIZE="32"
 	elif [[ $iconSizeJamfOPTION -gt 150 ]]; then
-		sendToLog "Warning: Specified Ibm Notifier icon size of $iconSizeJamfOPTION pixels is too high, rounding down to 150 pixels."
+		sendToLog "Warning: Specified IBM Notifier icon size of $iconSizeJamfOPTION pixels is too high, rounding down to 150 pixels."
 		jamfHelperIconSIZE="150"
 	else
 		jamfHelperIconSIZE="$iconSizeJamfOPTION"
 	fi
 	defaults write "$superPLIST" IconSizeJamf -string "$jamfHelperIconSIZE"
 elif [[ -n $iconSizeJamfOPTION ]] && ! [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; then
-	sendToLog "Exit: The Ibm Notifier icon size must only be a number."; parameterERROR="TRUE"
+	sendToLog "Exit: The IBM Notifier icon size must only be a number."; parameterERROR="TRUE"
 fi
 
 # Manage $preferJamfOPTION and save to $superPLIST.
@@ -1690,7 +1280,7 @@ fi
 
 # If there was a previous $superPROPERTY account and the user specified $adminACCOUNT or $deleteACCOUNTS then delete any previously saved super service account and credentials.
 if [[ -n $superPROPERTY ]] && { [[ -n $adminACCOUNT ]] || [[ "$deleteACCOUNTS" == "TRUE" ]]; } then
-	sendToLog "Starter: Deleting local account and saved cedentials for super service account \"$superPROPERTY\"."
+	sendToLog "Starter: Deleting local account and saved credentials for super service account \"$superPROPERTY\"."
 	sysadminctl -deleteUser "$superPROPERTY" > /dev/null 2>&1
 	defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
 	security delete-generic-password -a "$superPROPERTY" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
@@ -1907,7 +1497,6 @@ else
 fi
 }
 
-
 # Check the IBM Notifier.app for validity.
 checkIbmNotifier() {
 ibmNotifierVALID="FALSE"
@@ -1942,7 +1531,7 @@ if [[ "$macosMAJOR" != "10" ]] || { [[ "$macosMAJOR" == "10" ]] && [[ "$macosMIN
 	if [[ ! -d "$ibmNotifierAPP" ]]; then
 		getIbmNotifier
 		[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
-		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after installation, will attempt fallback to jamfHelper."
+		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after installation, attempting fallback to jamfHelper."
 	else
 		checkIbmNotifier
 		if [[ "$ibmNotifierVALID" == "FALSE" ]]; then
@@ -1952,10 +1541,10 @@ if [[ "$macosMAJOR" != "10" ]] || { [[ "$macosMAJOR" == "10" ]] && [[ "$macosMIN
 			getIbmNotifier
 			[[ -d "$ibmNotifierAPP" ]] && checkIbmNotifier
 		fi
-		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after re-installation, will attempt fallback to jamfHelper."
+		[[ "$ibmNotifierVALID" == "FALSE" ]] && sendToLog "Warning: Unable to validate IBM Notifier.app after re-installation, attempting fallback to jamfHelper."
 	fi
 else
-	sendToLog "Warning: IBM Notifier.app is not compatible with this version of macOS, will attempt fallback to jamfHelper."
+	sendToLog "Warning: IBM Notifier.app is not compatible with this version of macOS, attempting fallback to jamfHelper."
 	ibmNotifierVALID="FALSE"
 fi
 
@@ -2053,19 +1642,19 @@ fi
 
 # Feedback for various alternate workflow modes.
 [[ "$preferJamfOPTION" == "TRUE" ]] && sendToLog "Starter: Prefer jamfHelper mode enabled."
-[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Starter: Skip Apple software udates mode enabled."
+[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Starter: Skip Apple software updates mode enabled."
 [[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Starter: Forced restart mode enabled."
 [[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Starter: Test mode enabled with $testModeTIMEOUT second timeout."
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Starter: Local preference file after validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
 [[ "$verboseModeOPTION" == "TRUE" ]] && logParameters
 
-# If super is running via Jamf, then restsart via LaunchDaemon to release the jamf process.
+# If super is running via Jamf, then restart via LaunchDaemon to release the jamf process.
 # This is late in the starter workflow so as to only create a valid LaunchDaemon after parameter validation and housekeeping.
 if [[ $1 == "/" ]] || [[ $(ps -p "$PPID" | awk '{print $4;}' | grep -c "jamf") -gt 0 ]]; then
 	sendToLog "Starter: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon..."
 	makeLaunchDaemonRestartNow
 fi
-# If super is running from outside the $superFOLDER, then restsart via LaunchDaemon to release any parent installer process.
+# If super is running from outside the $superFOLDER, then restart via LaunchDaemon to release any parent installer process.
 if ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; }; then
 	sendToLog "Starter: Found that super is installing, restarting with new LaunchDaemon..."
 	makeLaunchDaemonRestartNow
@@ -2080,7 +1669,7 @@ while [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/
 	networkTIMEOUT=$((networkTIMEOUT + 5))
 done
 if [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/d' -e '/inet/p' | wc -l) -le 0 ]]; then
-	sendToLog "Starter: Network unavailalbe, trying again in $defaultDeferSECONDS seconds."
+	sendToLog "Starter: Network unavailable, trying again in $defaultDeferSECONDS seconds."
 	makeLaunchDaemonCalendar
 fi
 
@@ -2158,7 +1747,7 @@ if [[ $(echo "$jamfSTATUS" | grep -c "available") -ne 0 ]]; then
 	jamfSERVER=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
 else
 	jamfSERVER="FALSE"
-	sendToLog "Status: Jamf Pro service unavaiable."
+	sendToLog "Status: Jamf Pro service unavailable."
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: jamfSERVER is: $jamfSERVER"
 }
@@ -2249,7 +1838,7 @@ fi
 # Verify that super is running with root privileges.
 checkRoot() {
 if [[ "$(id -u)" -ne 0 ]]; then
-	sendToEcho "Exit: $(basename "$0") must run with root privleges."
+	sendToEcho "Exit: $(basename "$0") must run with root privileges."
 	exit 1
 fi
 }
@@ -2289,7 +1878,7 @@ fi
 
 # Delete the maximum deferral counters in $superPLIST to restart the counters.
 restartZeroDay() {
-sendToLog "Status: Restarting automaticly set zero day date."
+sendToLog "Status: Restarting automatically set zero day date."
 defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null
 }
 
@@ -2305,7 +1894,7 @@ defaults delete "$superPLIST" HardCounter 2> /dev/null
 checkZeroDay() {
 if [[ -n $zeroDayOVERRIDE ]]; then # If there is a $zeroDayOVERRIDE then use that first.
 	zeroDaySTART="$zeroDayOVERRIDE"
-	sendToLog "Status: Using manualy set zero day date of $zeroDaySTART."
+	sendToLog "Status: Using manually set zero day date of $zeroDaySTART."
 else
 	zeroDayPREVIOUS=$(defaults read "$superPLIST" ZeroDayAuto 2> /dev/null)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: zeroDayPREVIOUS: $zeroDayPREVIOUS"
@@ -2389,7 +1978,7 @@ if [[ -n $hardDateMAX ]]; then
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: deadlineDateSTATUS is: $deadlineDateSTATUS"
 
-# For display the $softDateMAX will always result in a sooner date than the $hardDateMAX.
+# For display the $softDateMAX always results in a sooner date than the $hardDateMAX.
 [[ -n $hardDateMAX ]] && deadlineDateEPOCH="$hardDateEPOCH"
 [[ -n $softDateMAX ]] && deadlineDateEPOCH="$softDateEPOCH"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: deadlineDateEPOCH is: $deadlineDateEPOCH"
@@ -2445,7 +2034,7 @@ if [[ -n $hardDaysMAX ]]; then
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: deadlineDaysSTATUS is: $deadlineDaysSTATUS"
 
-# For display the $softDaysMAX will always result in a sooner date than the $hardDaysMAX.
+# For display the $softDaysMAX always results in a sooner date than the $hardDaysMAX.
 [[ -n $hardDaysMAX ]] && deadlineDaysEPOCH="$hardDaysEPOCH"
 [[ -n $softDaysMAX ]] && deadlineDaysEPOCH="$softDaysEPOCH"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: deadlineDaysEPOCH is: $deadlineDaysEPOCH"
@@ -2612,22 +2201,22 @@ else
 	# If any updates are available, send to log and evaluate download status.
 	if [[ -n ${allLABLES[*]} ]]; then
 		if [[ -n ${recommendedLABLES[*]} ]]; then
-			sendToLog "Status: ${#recommendedLABLES[@]} available non-restart \"recommended\" software udpate(s)."
+			sendToLog "Status: ${#recommendedLABLES[@]} available non-restart \"recommended\" software update(s)."
 			for i in "${!recommendedLABLES[@]}"; do
 				sendToLog "Status: Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}"
 			done
 			updatesRECOMMENDED="TRUE"
 		else
-			sendToLog "Status: No available non-restart \"recommended\" software udpate(s). Some may be deferred via MDM."
+			sendToLog "Status: No available non-restart \"recommended\" software update(s). Some may be deferred via MDM."
 		fi
 		if [[ -n ${restartLABLES[*]} ]]; then
-			sendToLog "Status: ${#restartLABLES[@]} available restart required system udpate(s)."
+			sendToLog "Status: ${#restartLABLES[@]} available restart required system update(s)."
 			for i in "${!restartLABLES[@]}"; do
 				sendToLog "Status: Restart Required System Update $((i + 1)): ${restartLABLES[i]}"
 			done
 			updatesRESTART="TRUE"
 		else
-			sendToLog "Status: No available restart required system udpate(s). Some may be deferred via MDM."
+			sendToLog "Status: No available restart required system update(s). Some may be deferred via MDM."
 		fi
 		# Evaluate previously downloaded updates and compare them to currently available updates, setting $downloadREQUIRED accordingly.
 		previousDOWNLOADS=$(defaults read "$superPLIST" UpdateDownloads 2> /dev/null)
@@ -2677,7 +2266,7 @@ if [[ "$updatesRECOMMENDED" == "FALSE" ]]; then
 	if [[ "$jamfVERSION" != "FALSE" ]]; then
 		getJamfProServer
 		if [[ "$jamfSERVER" != "FALSE" ]]; then
-			sendToLog "Status: Submiting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+			sendToLog "Status: Submitting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 			if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 				jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
 				sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
@@ -2704,7 +2293,7 @@ if [[ "$updatesRECOMMENDED" == "FALSE" ]] && [[ "$updatesRESTART" == "FALSE" ]];
 		getJamfProServer
 		if [[ "$jamfSERVER" != "FALSE" ]]; then
 			defaults delete "$superPLIST" UpdateValidate 2> /dev/null
-			sendToLog "Status: Submiting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+			sendToLog "Status: Submitting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 			if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 				jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
 				sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
@@ -2832,7 +2421,7 @@ fi
 oldIFS="$IFS"; IFS=$'\n'
 downloadedTITLES=($(echo "$downloadRESULT" | grep "Downloaded" | cut -d " " -f 2-))
 if [[ ${#downloadedTITLES[@]} -gt 0 ]]; then
-	sendToLog "Status: Downloaded ${#downloadedTITLES[@]} system udpate(s)."
+	sendToLog "Status: Downloaded ${#downloadedTITLES[@]} system update(s)."
 	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 	for i in "${!downloadedTITLES[@]}"; do
 		sendToLog "Status: Downloaded System Update $((i + 1)): ${downloadedTITLES[i]}"
@@ -2848,7 +2437,7 @@ IFS="$oldIFS"
 
 # Download restart-required system update via MDM push command, and also save results to $superLOG, $mdmLOG, $updateLOG, and $superPLIST.
 downloadSystemUpdateMDM() {
-sendToLog "Status: Starting download of system udpate via MDM command..."
+sendToLog "Status: Starting download of system update via MDM command..."
 # This pre-flights the MDM query locally and may also be useful for troubleshooting.
 availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2>&1)
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
@@ -2887,7 +2476,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
 	tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 		if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)'; then
-			sendToLog "Status: Recieved MDM command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
+			sendToLog "Status: Received MDM command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
 			pkill -P $$ tail
 			break
 		fi
@@ -2905,11 +2494,11 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	# Watch $mdmLOG while waiting for the MDM workflow to complete.
 	tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 		if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Idle\]'; then
-			sendToLog "Status: Recieved MDM blank push."
+			sendToLog "Status: Received MDM blank push."
 		elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates)'; then
-			sendToLog "Status: Recieved MDM command \"AvailableOSUpdates\"."
+			sendToLog "Status: Received MDM command \"AvailableOSUpdates\"."
 		elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)'; then
-			sendToLog "Status: Recieved MDM command \"ScheduleOSUpdate\", download should start soon..."
+			sendToLog "Status: Received MDM command \"ScheduleOSUpdate\", download should start soon..."
 			kill -9 "$mdmStreamPID" > /dev/null 2>&1
 			echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD END ****" >> "$mdmLOG"
 			pkill -P $$ tail; break
@@ -2972,7 +2561,7 @@ for trigger in "${triggerARRAY[@]}"; do
 		if [ $jamfRETURN -ne 0 ]; then
 			sendToLog "Error: Jamf Policy with Trigger \"$trigger\" failed!"; jamfERROR="TRUE"
 		else
-			sendToLog "Status: Jamf Policy with Trigger \"$trigger\" was succesfull."
+			sendToLog "Status: Jamf Policy with Trigger \"$trigger\" was successful."
 		fi
 	else
 		sendToLog "Test Mode: Skipping Jamf Policy with Trigger: $trigger."
@@ -3016,7 +2605,7 @@ else # Otherwise, this is the workflow when there are no restart required system
 		if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then # Only when in skip updates mode.
 			runJamfPolicies
 		else
-			sendToLog "Warning: Jamf Policy Triggers only run before a restart required system udpate or you specify the --skip-updates option."
+			sendToLog "Warning: Jamf Policy Triggers only run before a restart required system update or you specify the --skip-updates option."
 		fi
 	fi
 	if [[ "$forceRestartOPTION" == "TRUE" ]]; then # If requested, force the computer to restart.
@@ -3043,7 +2632,7 @@ if [[ "$updatesRESTART" == "TRUE" ]]; then # Install restart required system upd
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies # If needed run Jamf Policy Triggers.
 		installSystemUpdateMDM
 	else # Can only encourage manual self-update if Apple Silicon with no valid update credentials.
-		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update crednetials to ensure a proper workflow."
+		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update credentials to ensure a proper workflow."
 		notifySelfUpdate &
 		disown
 	fi
@@ -3053,7 +2642,7 @@ else # Otherwise, this is the workflow when there are no restart required system
 		if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then # Only when in skip updates mode.
 			runJamfPolicies
 		else
-			sendToLog "Warning: Jamf Policy Triggers only run before a restart required system udpate or you specify the --skip-updates option."
+			sendToLog "Warning: Jamf Policy Triggers only run before a restart required system update or you specify the --skip-updates option."
 		fi
 	fi
 	if [[ "$forceRestartOPTION" == "TRUE" ]]; then # If requested, force the computer to restart.
@@ -3170,9 +2759,9 @@ installSystemUpdateMDM() {
 if [[ "$testModeOPTION" != "TRUE" ]]; then
 	# If no $currentUSER then the sytem update was not pre-downloaded.
 	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
-		sendToLog "Status: Starting download and install of system udpate via MDM command..."
+		sendToLog "Status: Starting download and install of system update via MDM command..."
 	else
-		sendToLog "Status: Starting install of system udpate via MDM command..."
+		sendToLog "Status: Starting install of system update via MDM command..."
 	fi
 
 	# This pre-flights the MDM query locally and may also be useful for troubleshooting.
@@ -3221,7 +2810,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
 		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 			if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)'; then
-				sendToLog "Status: Recieved MDM command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
+				sendToLog "Status: Received MDM command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
 				pkill -P $$ tail
 				break
 			fi
@@ -3246,15 +2835,15 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		# Watch $mdmLOG while waiting for the MDM workflow to complete.
 		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 			if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Idle\]'; then
-				sendToLog "Status: Recieved MDM blank push."
+				sendToLog "Status: Received MDM blank push."
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates)'; then
-				sendToLog "Status: Recieved MDM command \"AvailableOSUpdates\"."
+				sendToLog "Status: Received MDM command \"AvailableOSUpdates\"."
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)'; then
 				if [[ "$downloadREQUIRED" == "TRUE" ]]; then
-					sendToLog "Status: Recieved MDM command \"ScheduleOSUpdate\", download and update should start soon..."
+					sendToLog "Status: Received MDM command \"ScheduleOSUpdate\", download and update should start soon..."
 					echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE END ****" >> "$mdmLOG"
 				else
-					sendToLog "Status: Recieved MDM command \"ScheduleOSUpdate\", restart should be soon..."
+					sendToLog "Status: Received MDM command \"ScheduleOSUpdate\", restart should be soon..."
 					echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE END ****" >> "$mdmLOG"
 				fi
 				kill -9 "$mdmStreamPID" > /dev/null 2>&1
@@ -3587,7 +3176,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 	while [[ -z $dialogRETURN ]] || [[ "$dialogRETURN" -eq 137 ]]; do
 		{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 		{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
 		(sleep "$displayRedrawSECONDS"; killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1) &
 		killerPID=$!
 		dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
@@ -3600,7 +3189,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 else
 	{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 	{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
 	dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 	dialogRETURN="$?"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
@@ -3763,7 +3352,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 	# Create initial $ibmNotifierARRAY[] settings for the notification.
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_left -bar_title "$notifySelfUpdateTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 	ibmNotifierARRAY+=(-subtitle "$notifySelfUpdateBodyIBM")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Ibm Notifier.app options: ${ibmNotifierARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
 else
 	sendToLog "jamfHelper: Opening self-update notification..."
 	# Create initial $jamfHelperARRAY[] settings for the dialog.
@@ -3796,7 +3385,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		killall -9 "System Preferences" > /dev/null 2>&1
 	done
 else
-	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self-update notification will not close until the user restarts the computer."
+	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self-update notification does not close until the user restarts the computer."
 	sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
 		"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
@@ -3947,7 +3536,7 @@ else
 	# Create initial $jamfHelperARRAY[] settings for the dialog.
 	jamfHelperARRAY=(-windowType utility -title "$dialogAskForUpdateTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonTEXT" -button2 "$restartButtonTEXT" -defaultButton 1 -cancelButton 2)
 
-	# Body text variations based on deadline options. Note that any invisible characters (tabs and new line) will be "shown" in the jamfHelper dialog.
+	# Body text variations based on deadline options. Note that any invisible characters (tabs and new line) are "shown" in the jamfHelper dialog.
 	if [[ -n "$deadlineDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
 		jamfHelperARRAY+=(-description "$dialogAskForUpdateBodyDateCountJAMF")
 	elif [[ -n "$deadlineDISPLAY" ]]; then # Show only date deadline.
@@ -3999,7 +3588,7 @@ getPreferences
 superStarter "$@"
 sendToLog "**** S.U.P.E.R.M.A.N. STARTER END ****"
 
-# This logic determines what $updateWORKFLOW will run; JAMF, ASU, or USER
+# This logic determines what $updateWORKFLOW runs; JAMF, ASU, or USER
 if [[ "$macosARCH" == "arm64" ]]; then
 	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
 		sendToLog "**** S.U.P.E.R.M.A.N. UPDATE APPLE SILICON ASU LOCAL ACCOUNT ****"
@@ -4055,7 +3644,7 @@ else # Default super workflow.
 	if [[ "$testModeOPTION" == "TRUE" ]]; then # Test mode logic and logging.
 		if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then
 			if [[ "$forceRestartOPTION" != "TRUE" ]] && [[ -z $policyTRIGGERS ]]; then
-				sendToLog "Test Mode and Skip Update Mode: You need to also use \"--force-restart\" or \"--policy-triggers\" to simulate notificaiton and dialog workflows."
+				sendToLog "Test Mode and Skip Update Mode: You need to also use \"--force-restart\" or \"--policy-triggers\" to simulate notification and dialog workflows."
 			fi
 		else
 			sendToLog "Test Mode: Simulating that restart required system updates are available."
@@ -4093,10 +3682,10 @@ if [[ "$updatesRESTART" == "TRUE" ]] || [[ -n $policyTRIGGERS ]] || [[ "$forceRe
 				elif [[ "$updateWORKFLOW" == "JAMF" ]]; then
 					downloadSystemUpdateMDM
 				else
-					sendToLog "Status: Self-update workflow, unable to automatically download system udpates."
+					sendToLog "Status: Self-update workflow, unable to automatically download system updates."
 				fi
 			else # Updates were previously downloaded.
-				sendToLog "Status: Previously downloaded ${#downloadedTITLES[@]} software udpate(s)."
+				sendToLog "Status: Previously downloaded ${#downloadedTITLES[@]} software update(s)."
 				for i in "${!downloadedTITLES[@]}"; do
 					sendToLog "Previous Download $((i + 1)): ${downloadedTITLES[i]}"
 				done
