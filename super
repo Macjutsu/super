@@ -20,7 +20,7 @@
 #
 ######## FUNCTIONS - DOCUMENTATION ########
 
-# Show usage documentation.
+# Show usage documentation. 
 showUsage() {
 echo "
   S.U.P.E.R.M.A.N.
@@ -98,7 +98,7 @@ echo "
   <key>TestMode</key> <true/> | <false/>
   <key>TestModeTimeout</key> <string>seconds</string>
   <key>VerboseMode</key> <true/> | <false/>
-
+  
   ** For detailed documentation visit: https://github.com/Macjutsu/super/wiki
   ** Or use --help to automatically open the S.U.P.E.R.M.A.N. Wiki.
 "
@@ -1331,14 +1331,14 @@ if [[ "$macosARCH" == "arm64" ]] && [[ -n $adminACCOUNT ]]; then
 		superNEWACCT="super"
 		superNEWFULL="Super Update Service"
 	fi
-
+	
 	# If a custom super service account password is requested via $superPASSWORD.
 	if [[ -n $superPASSWORD ]]; then
 		superNEWPASS="$superPASSWORD"
 	else # Use the default random password for the super service account.
 		superNEWPASS=$(uuidgen)
 	fi
-
+	
 	# Save and validate new super service account credentials, and validate retrieval.
 	sendToLog "Starter: Saving new credentials for super service account \"$superNEWACCT\"..."
 	defaults write "$superPLIST" SuperAccount -string "$superNEWACCT"
@@ -2158,7 +2158,7 @@ if [[ "$macosMAJOR" != "10" ]] && [[ $(echo "$updateRESULT" | grep "No new softw
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
 	updateRESULT=$(softwareupdate --list 2>&1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: updateRESULT is: $updateRESULT"
-
+	
 	# If no updates still reported, but there was a previously downloaded system update... then try again in 15 minutes.
 	if [[ $(echo "$updateRESULT" | grep "No new software available." -c) -eq 1 ]]; then
 		previousDOWNLOADS=$(defaults read "$superPLIST" UpdateDownloads 2> /dev/null)
@@ -2472,7 +2472,7 @@ fi
 if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	sendToLog "Status: Successful MDM download command request."
 	sendBlankPush
-
+	
 	# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
 	tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 		if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)'; then
@@ -2490,7 +2490,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	echo
 	sendToLog "Status: Jamf Pro's mandatory 5 minute delay should be complete, sending Blank Push..."
 	sendBlankPush
-
+	
 	# Watch $mdmLOG while waiting for the MDM workflow to complete.
 	tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 		if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Idle\]'; then
@@ -2504,7 +2504,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 			pkill -P $$ tail; break
 		fi
 	done
-
+	
 	# Watch $updateLOG while waiting for the download workflow to complete.
 	logPROGRESS=""
 	tail -n 0 -f "$updateLOG" | while read -r logLINE ; do
@@ -2682,14 +2682,14 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 			sleep 60
 		fi
 	fi
-
+	
 	# If no $currentUSER then the sytem update was not pre-downloaded.
 	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
 		sendToLog "Status: Starting download and install of system update via softwareupdate command..."
 	else
 		sendToLog "Status: Starting install of system update via softwareupdate command..."
 	fi
-
+	
 	# Start log streaming for softwareupdate install progress and send to $updateLOG.
 	if [[ "$macosMAJOR" != "10" ]]; then
 		if [[ "$downloadREQUIRED" == "TRUE" ]]; then
@@ -2701,7 +2701,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		updateStreamPID=$!
 		disown
 	fi
-
+	
 	# Start the softwareupdate installation in the background, different requirements between macOS versions.
 	if [[ $macosMAJOR -ge 12 ]]; then
 		if [[ "$currentUSER" == "FALSE" ]]; then
@@ -2733,7 +2733,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	else # macOS 10.X
 		softwareupdate --install --all --restart --force --no-scan &
 	fi
-
+	
 	# Reset various items after system update is complete.
 	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 	defaults write "$superPLIST" UpdateValidate -bool true
@@ -2763,14 +2763,14 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	else
 		sendToLog "Status: Starting install of system update via MDM command..."
 	fi
-
+	
 	# This pre-flights the MDM query locally and may also be useful for troubleshooting.
 	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2>&1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: availableOSUPDATES is: \n$availableOSUPDATES"
-
+	
 	# Make sure we still have a valid Jamf Pro API token.
 	checkJamfProServerToken
-
+	
 	# Start log streaming for MDM push acknowledgements and send to $mdmLOG.
 	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
 		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE START ****" >> "$mdmLOG"
@@ -2780,7 +2780,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	log stream --predicate '(subsystem == "com.apple.ManagedClient") && (category == "HTTPUtil")' >> "$mdmLOG" &
 	mdmStreamPID=$!
 	disown
-
+	
 	# Start log streaming for softwareupdate progress and send to $updateLOG.
 	if [[ "$downloadREQUIRED" == "TRUE" ]]; then
 		echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE START ****" >> "$updateLOG"
@@ -2790,7 +2790,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
 	updateStreamPID=$!
 	disown
-
+	
 	# Send the Jamf Pro API command to update and restart via MDM.
 	if [[ $jamfVERSION -ge 1038 ]]; then
 		jamfAPIURL="${jamfSERVER}api/v1/macos-managed-software-updates/send-updates"
@@ -2801,12 +2801,12 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/install/id/${jamfProID}")
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: commandRESULT is: \n$commandRESULT"
-
+	
 	# If the Jamf Pro API command was successfully created, monitor the update progress.
 	if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 		sendToLog "Status: Successful MDM update and restart command request."
 		sendBlankPush
-
+		
 		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay.
 		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 			if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)'; then
@@ -2831,7 +2831,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		sendToLog "Status: Jamf Pro's mandatory 5 minute delay should be complete, sending Blank Push..."
 		sendBlankPush
 		[[ "$currentUSER" != "FALSE" ]] && notifyRestart
-
+		
 		# Watch $mdmLOG while waiting for the MDM workflow to complete.
 		tail -n 0 -f "$mdmLOG" | while read -r logLINE ; do
 			if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Idle\]'; then
@@ -2850,7 +2850,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 				pkill -P $$ tail; break
 			fi
 		done
-
+		
 		# Watch $updateLOG while waiting for the update and restart workflow to complete.
 		if [[ "$downloadREQUIRED" == "TRUE" ]]; then
 			logPROGRESS=""
@@ -2880,7 +2880,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 				fi
 			done
 		fi
-
+		
 		# Reset various items after system update is complete.
 		defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 		defaults write "$superPLIST" UpdateValidate -bool true
@@ -3423,7 +3423,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 		ibmNotifierARRAY+=(-subtitle "$dialogSoftDeadlineBodyCountIBM")
 	fi
 	displayTimeoutTEXT="$dialogSoftDeadlineTimeoutTEXT"
-
+	
 	# Start the dialog.
 	openIbmNotifier
 
@@ -3476,7 +3476,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; t
 		ibmNotifierARRAY+=(-subtitle "$dialogAskForUpdateBodyUnlimitedIBM")
 	fi
 	displayTimeoutTEXT="$dialogAskForUpdateTimeoutTEXT"
-
+	
 	# If needed, add the $menuDeferSECONDS option to the $ibmNotifierARRAY[].
 	if [[ -n $menuDeferSECONDS ]]; then
 		oldIFS="$IFS"; IFS=','
