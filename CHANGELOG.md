@@ -12,12 +12,12 @@
 - New `super` [removal script](https://github.com/Macjutsu/super/blob/3.0b1/Super-Friends/Remove-super.sh) stops any active `super` instance, super helpers, and removes all `super` items (excluding helpers).
 - New local log `/Library/Management/super/check.log` maintains the last `softwareupdate` check results.
 - New local log `/Library/Management/super/asu.log` keeps a history of `softwareupdate` download and installation attempts.
-- Significant internal rearchitecting to support major macOS upgrades (more upgrade workflows coming soon including full installer options).
+- Significant internal rearchitecting to support major macOS upgrades **(more upgrade workflows coming soon including full installer options)**.
 - Significant internal rearchitecting to accommodate update/upgrade workflows that hang. Specifically, if any update/upgrade times out after 600 seconds of inactivity, `super` automatically tries again later. (Thanks to @scriptingosx and #scripting on MacAdmins Slack!)
-- Significant internal rearchitecting to harden `super` against run-time errors. Specifically, `super` only exits due to errors during the initial installation and startup. After installation and startup is complete, if any error occurs `super` automatically restarts later, even if the system is unexpectedly restarted.
+- Significant internal rearchitecting to harden `super` against run-time errors. Specifically, `super` only exits due to errors during the initial installation and startup. After installation and startup is complete, if any error occurs, `super` automatically restarts later, even if the system is unexpectedly restarted.
 - Rebuilt initial installation and startup workflow reports all exit errors to the `super` parent process (Terminal, Jamf Pro, etc.). 
-- Rebuilt initial installation and startup workflow only installs dependencies when required. For example, the `--prefer-jamf` option now prevents the automatic installation of [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
-- Rebuilt update/upgrade checking workflow is now instantaneous if a check has already occurred in the last 6 hours (the default for the built-in automatic `softwareupdate` check). (Thanks to @grahampugh for this suggestion!)
+- Rebuilt initial installation and startup workflow only installs dependencies when required. For example, the `--prefer-jamf` option prevents the automatic installation of [IBM Notifier](https://github.com/IBM/mac-ibm-notifications).
+- Rebuilt update/upgrade checking workflow is instantaneous if a check has already occurred in the last 6 hours (the default for the built-in automatic `softwareupdate` check). (Thanks to @grahampugh for this suggestion!)
 - Rebuilt update/upgrade checking workflow times out after 120 seconds of inactivity, in which case `super` automatically tries again later.
 - Misbehaving `softwareudated` processes are automatically punished with a "kickstart" restart.
 - Improvements to `--verbose-mode` now shows more detail including (when appropriate) the active script function name.
