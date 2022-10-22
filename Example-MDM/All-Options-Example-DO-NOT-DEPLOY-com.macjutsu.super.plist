@@ -42,7 +42,7 @@
 	<string>128</string>
 	<key>IconSizeJamf</key>
 	<string>128</string>
-	<key>PreferJamf</key>
+	<key>PreferJamfHelper</key>
 	<false/>
 	<key>PolicyTriggers</key>
 	<string>trigger1,trigger2</string>

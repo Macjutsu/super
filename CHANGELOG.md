@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [3.0b2]
+
+2022-10-22
+
+- Renamed option to prefer `jamfHelper` dialogs and notifications to `--prefer-jamf-helper`. Likewise, the managed preference key has also been renamed to `PreferJamfHelper`.
+- Resolved issue with invalid logging function reference (Thanks to @iDrewbs!)
+- `super` 3.0b2 SHA-256: a840e6dfeca4ece84b79969e41f2c077fc671f5c71893a23d65030a5c1c77f9c
+
 ## [3.0b1]
 
 2022-10-21

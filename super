@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 3.0b1
-# 2022/10/21
+# Version 3.0b2
+# 2022/10/22
 # https://github.com/Macjutsu/super
 #
 # NOTE: *** Debugging Stuff ***
@@ -28,8 +28,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 3.0b1
-  2022/10/21
+  Version 3.0b2
+  2022/10/22
   https://github.com/Macjutsu/super
 
   Usage:
@@ -55,7 +55,7 @@ echo "
   Display Options:
   [--display-timeout=seconds] [--display-redraw=seconds]
   [--display-icon=/local/path or URL] [--icon-size-ibm=pixels]
-  [--icon-size-jamf=pixels ] [--prefer-jamf] [--no-prefer-jamf]
+  [--icon-size-jamf=pixels ] [--prefer-jamf-helper] [--no-prefer-jamf-helper]
 
   Software Update Credential Options:
   [--local-account=AccountName] [--local-password=Password]
@@ -98,7 +98,7 @@ echo "
   <key>DisplayIcon</key> <string>path</string>
   <key>IconSizeIbm</key> <string>number</string>
   <key>IconSizeJamf</key> <string>number</string>
-  <key>PreferJamf</key> <true/> | <false/>
+  <key>PreferJamfHelper</key> <true/> | <false/>
   <key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>
   <key>SkipUpdates</key> <true/> | <false/>
   <key>InstallMajorUpgrade</key> <true/> | <false/>
@@ -350,11 +350,11 @@ while [[ -n $1 ]]; do
 		--icon-size-jamf* )
 			iconSizeJamfOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
-		-J|--prefer-jamf )
-			preferJamfOPTION="TRUE"
+		-J|--prefer-jamf-helper )
+			preferJamfHelperOPTION="TRUE"
 		;;
-		-j|--no-prefer-jamf )
-			preferJamfOPTION="FALSE"
+		-j|--no-prefer-jamf-helper )
+			preferJamfHelperOPTION="FALSE"
 		;;
 		--local-account* )
 			localOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
@@ -516,7 +516,7 @@ if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
 	rm -r "$cachedICON" > /dev/null 2>&1
 	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
 	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
-	defaults delete "$superPLIST" PreferJamf 2> /dev/null
+	defaults delete "$superPLIST" PreferJamfHelper 2> /dev/null
 	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
 	defaults delete "$superPLIST" SkipUpdates 2> /dev/null
 	defaults delete "$superPLIST" InstallMajorUpgrade 2> /dev/null
@@ -560,7 +560,7 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	displayIconMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayIcon 2> /dev/null)
 	iconSizeIbmMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeJamf 2> /dev/null)
-	preferJamfMANAGED=$(defaults read "$superMANAGEDPLIST" PreferJamf 2> /dev/null)
+	preferJamfHelperMANAGED=$(defaults read "$superMANAGEDPLIST" PreferJamfHelper 2> /dev/null)
 	policyTriggersMANAGED=$(defaults read "$superMANAGEDPLIST" PolicyTriggers 2> /dev/null)
 	skipUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" SkipUpdates 2> /dev/null)
 	forceRestartMANAGED=$(defaults read "$superMANAGEDPLIST" ForceRestart 2> /dev/null)
@@ -593,7 +593,7 @@ if [[ -f "$superPLIST.plist" ]]; then
 	displayRedrawPROPERTY=$(defaults read "$superPLIST" DisplayRedraw 2> /dev/null)
 	iconSizeIbmPROPERTY=$(defaults read "$superPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfPROPERTY=$(defaults read "$superPLIST" IconSizeJamf 2> /dev/null)
-	preferJamfPROPERTY=$(defaults read "$superPLIST" PreferJamf 2> /dev/null)
+	preferJamfHelperPROPERTY=$(defaults read "$superPLIST" PreferJamfHelper 2> /dev/null)
 	policyTriggersPROPERTY=$(defaults read "$superPLIST" PolicyTriggers 2> /dev/null)
 	skipUpdatesPROPERTY=$(defaults read "$superPLIST" SkipUpdates 2> /dev/null)
 	forceRestartPROPERTY=$(defaults read "$superPLIST" ForceRestart 2> /dev/null)
@@ -698,10 +698,10 @@ if [[ -n $iconSizeJamfMANAGED ]]; then
 elif [[ -z $iconSizeJamfOPTION ]] && [[ -n $iconSizeJamfPROPERTY ]]; then
 	iconSizeJamfOPTION="$iconSizeJamfPROPERTY"
 fi
-if [[ -n $preferJamfMANAGED ]]; then
-	preferJamfOPTION="$preferJamfMANAGED"
-elif [[ -z $preferJamfOPTION ]] && [[ -n $preferJamfPROPERTY ]]; then
-	preferJamfOPTION="$preferJamfPROPERTY"
+if [[ -n $preferJamfHelperMANAGED ]]; then
+	preferJamfHelperOPTION="$preferJamfHelperMANAGED"
+elif [[ -z $preferJamfHelperOPTION ]] && [[ -n $preferJamfHelperPROPERTY ]]; then
+	preferJamfHelperOPTION="$preferJamfHelperPROPERTY"
 fi
 if [[ -n $policyTriggersMANAGED ]]; then
 	policyTriggersOPTION="$policyTriggersMANAGED"
@@ -1829,23 +1829,23 @@ else
 	sendToLog "Starter: Unable to locate jamf binary at: $jamfBINARY"
 fi
 
-# Manage $preferJamfOPTION and save to $superPLIST.
-if [[ -n $preferJamfOPTION ]]; then
-	if [[ $preferJamfOPTION -eq 1 ]] || [[ "$preferJamfOPTION" == "TRUE" ]]; then
+# Manage $preferJamfHelperOPTION and save to $superPLIST.
+if [[ -n $preferJamfHelperOPTION ]]; then
+	if [[ $preferJamfHelperOPTION -eq 1 ]] || [[ "$preferJamfHelperOPTION" == "TRUE" ]]; then
 		if [[ "$jamfVERSION" != "FALSE" ]]; then
-			preferJamfOPTION="TRUE"
-			defaults write "$superPLIST" PreferJamf -bool "$preferJamfOPTION"
+			preferJamfHelperOPTION="TRUE"
+			defaults write "$superPLIST" PreferJamfHelper -bool "$preferJamfHelperOPTION"
 		else
 			sendToLog "Helper Error: No local Jamf binary found, thus can not prefer jamfHelper."; helperERROR="TRUE"
 		fi
 	else
-		preferJamfOPTION="FALSE"
-		defaults delete "$superPLIST" PreferJamf 2> /dev/null
+		preferJamfHelperOPTION="FALSE"
+		defaults delete "$superPLIST" PreferJamfHelper 2> /dev/null
 	fi
 fi
 
 # If needed, validate the IBM Notifier.app, if missing or invalid then install and check again.
-if [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	ibmNotifierVALID="FALSE"
 	if [[ $macosMAJOR -ge 11 ]] || { [[ $macosMAJOR -eq 10 ]] && [[ $macosMINOR -ge 15 ]]; }; then
 		if [[ ! -d "$ibmNotifierAPP" ]]; then
@@ -2129,7 +2129,7 @@ sendToLog "Verbose Mode: helperERROR: $helperERROR"
 [[ -n $displayRedrawSECONDS ]] && sendToLog "Verbose Mode: displayRedrawSECONDS: $displayRedrawSECONDS"
 [[ -n $ibmNotifierIconSIZE ]] && sendToLog "Verbose Mode: ibmNotifierIconSIZE: $ibmNotifierIconSIZE"
 [[ -n $jamfHelperIconSIZE ]] && sendToLog "Verbose Mode: jamfHelperIconSIZE: $jamfHelperIconSIZE"
-[[ -n $preferJamfOPTION ]] && sendToLog "Verbose Mode: preferJamfOPTION: $preferJamfOPTION"
+[[ -n $preferJamfHelperOPTION ]] && sendToLog "Verbose Mode: preferJamfHelperOPTION: $preferJamfHelperOPTION"
 [[ -n $localOPTION ]] && sendToLog "Verbose Mode: localOPTION: $localOPTION"
 [[ -n $localPASSWORD ]] && sendToEcho "Verbose Mode: localPASSWORD: $localPASSWORD"
 [[ -n $localACCOUNT ]] && sendToLog "Verbose Mode: localACCOUNT: $localACCOUNT"
@@ -2992,7 +2992,7 @@ fi
 oldIFS="$IFS"; IFS=$'\n'
 for i in "${!recommendedLABLES[@]}"; do
 	sendToLog "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
-	sendToASU "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
+	sendToASULog "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
 	
 	# The update process is backgrounded and will be watched via a while loop later on. Also note the different requirements between macOS versions.
 	if [[ $macosMAJOR -ge 12 ]]; then
@@ -3017,7 +3017,7 @@ for i in "${!recommendedLABLES[@]}"; do
 		if echo "$logLINE" | grep -q -w 'Done with'; then
 			updateRECOMMENDED=$(echo "$logLINE" | cut -c 11-)
 			sendToLog "Status: Installed Recommended Software Update: $updateRECOMMENDED."
-			sendToASU "Status: Installed Recommended Software Update: $updateRECOMMENDED."
+			sendToASULog "Status: Installed Recommended Software Update: $updateRECOMMENDED."
 		elif echo "$logLINE" | grep -q -w 'Done.'; then
 			updateTIMEOUT="FALSE"
 			break
@@ -3352,7 +3352,7 @@ else
 	sendToLog "Test Mode: Killing update restart notification in $testModeTimeoutSECONDS seconds..."
 	sleep "$testModeTimeoutSECONDS"
 	kill -9 "$notifyPID" > /dev/null 2>&1
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 	else
 		killall -9 "jamfHelper" > /dev/null 2>&1
@@ -3431,7 +3431,7 @@ else # Otherwise, this is the workflow when there are no restart required system
 			sendToLog "Test Mode: Skipping forced restart, killing restart notification in $testModeTimeoutSECONDS seconds..."
 			sleep "$testModeTimeoutSECONDS"
 			kill -9 "$notifyPID" > /dev/null 2>&1
-			if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 				killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 			else
 				killall -9 "jamfHelper" > /dev/null 2>&1
@@ -3687,7 +3687,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			done
 			echo
 			kill -9 "$notifyPID" > /dev/null 2>&1
-			if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+			if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 				killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 			else
 				killall -9 "jamfHelper" > /dev/null 2>&1
@@ -3803,7 +3803,7 @@ else # Test mode workflow.
 		sendToLog "Test Mode: Killing MDM preparation notification in $testModeTimeoutSECONDS seconds..."
 		sleep "$testModeTimeoutSECONDS"
 		kill -9 "$notifyPID" > /dev/null 2>&1
-		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 		else
 			killall -9 "jamfHelper" > /dev/null 2>&1
@@ -4175,7 +4175,7 @@ jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyPrep
 
 # Variations for the main body text of the MDM update notification.
 if [[ "$deadlineDateSTATUS" == "HARD" ]]; then # Hard date deadline MDM update notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Hard date deadline MDM update notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyHardDateIBM")
 	else
@@ -4183,7 +4183,7 @@ if [[ "$deadlineDateSTATUS" == "HARD" ]]; then # Hard date deadline MDM update n
 		jamfHelperARRAY+=(-description "$notifyPrepBodyHardDateJAMF")
 	fi
 elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then # Hard days deadline MDM update notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Hard days deadline MDM update notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyHardDaysIBM")
 	else
@@ -4191,7 +4191,7 @@ elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then # Hard days deadline MDM update
 		jamfHelperARRAY+=(-description "$notifyPrepBodyHardDaysJAMF")
 	fi
 elif [[ "$deadlineCountSTATUS" == "HARD" ]]; then # Hard count deadline MDM update notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Hard count deadline MDM update notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyHardCountIBM")
 	else
@@ -4199,7 +4199,7 @@ elif [[ "$deadlineCountSTATUS" == "HARD" ]]; then # Hard count deadline MDM upda
 		jamfHelperARRAY+=(-description "$notifyPrepBodyHardCountJAMF")
 	fi
 else # No deadlines, this is the default MDM update notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Default MDM update notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyDefaultIBM")
 	else
@@ -4213,7 +4213,7 @@ unset displayRedrawSECONDS
 unset displayTimeoutSECONDS
 
 # Open notification in the background allowing super to continue.
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	openIbmNotifier &
 	notifyPID=$!
 else
@@ -4226,7 +4226,7 @@ fi
 # This is used for both non-deadline and hard deadline workflows.
 notifyRestart() {
 # Kill any previous notifications so new ones can take its place.
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 else
 	killall -9 "jamfHelper" > /dev/null 2>&1
@@ -4240,7 +4240,7 @@ jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyRest
 
 # Variations for the main body text of the restart notification.
 if [[ "$deadlineDateSTATUS" == "HARD" ]]; then # Hard date deadline restart notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Hard date deadline restart soon notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyRestartBodyHardDateIBM")
 	else
@@ -4248,7 +4248,7 @@ if [[ "$deadlineDateSTATUS" == "HARD" ]]; then # Hard date deadline restart noti
 		jamfHelperARRAY+=(-description "$notifyRestartBodyHardDateJAMF")
 	fi
 elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then # Hard days deadline restart notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Hard days deadline restart soon notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyRestartBodyHardDaysIBM")
 	else
@@ -4256,7 +4256,7 @@ elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then # Hard days deadline restart no
 		jamfHelperARRAY+=(-description "$notifyRestartBodyHardDaysJAMF")
 	fi
 elif [[ "$deadlineCountSTATUS" == "HARD" ]]; then # Hard count deadline restart notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Hard count deadline restart soon notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyRestartBodyHardCountIBM")
 	else
@@ -4264,7 +4264,7 @@ elif [[ "$deadlineCountSTATUS" == "HARD" ]]; then # Hard count deadline restart 
 		jamfHelperARRAY+=(-description "$notifyRestartBodyHardCountJAMF")
 	fi
 else # No deadlines, this is the default restart notification.
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "IBM Notifier: Default restart soon notification."
 		ibmNotifierARRAY+=(-subtitle "$notifyRestartBodyDefaultIBM")
 	else
@@ -4278,7 +4278,7 @@ unset displayRedrawSECONDS
 unset displayTimeoutSECONDS
 
 # Open notification in the background allowing super to continue.
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	openIbmNotifier &
 	notifyPID=$!
 	disown -h
@@ -4292,7 +4292,7 @@ fi
 # Display a non-interactive notification informing the user that update process has failed.
 notifyFailure() {
 # Kill any previous notifications so new ones can take its place.
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 else
 	killall -9 "jamfHelper" > /dev/null 2>&1
@@ -4303,7 +4303,7 @@ unset displayRedrawSECONDS
 unset displayTimeoutSECONDS
 
 # Open notification in the background allowing super to continue.
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Opening update failure notification..."
 	# Create initial $ibmNotifierARRAY[] settings for the notification.
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "$notifyFailureTITLE" -subtitle "$notifyFailureBodyIBM" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonTEXT")
@@ -4324,7 +4324,7 @@ fi
 
 # Open both a non-interactive notification and the Software Update System Setting/Preference in the case where there is no valid system update enforcement workflow possible.
 notifySelfUpdate() {
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Opening self-update notification..."
 	# Create initial $ibmNotifierARRAY[] settings for the notification.
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_left -bar_title "$notifySelfUpdateTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -4356,14 +4356,14 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		else
 			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
 		fi
-		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
 		else
 			"$jamfHELPER" "${jamfHelperARRAY[@]}" &
 		fi
 		sleep "$displayRedrawSECONDS"
 		[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=$((redrawCOUNTER + 1))
-		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 		else
 			killall -9 "jamfHelper" > /dev/null 2>&1
@@ -4377,7 +4377,7 @@ else
 	else
 		sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
 	fi
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
 	else
 		"$jamfHELPER" "${jamfHelperARRAY[@]}" &
@@ -4385,7 +4385,7 @@ else
 	if [[ "$testModeOPTION" == "TRUE" ]]; then
 		sendToLog "Test Mode: Killing self-update notification in $testModeTimeoutSECONDS seconds..."
 		sleep "$testModeTimeoutSECONDS"
-		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 		else
 			killall -9 "jamfHelper" > /dev/null 2>&1
@@ -4402,7 +4402,7 @@ fi
 # Display an interactive dialog when a soft deadline has passed, giving the user only one button to continue the workflow.
 dialogSoftDeadline() {
 sendToStatus "Running: Dialog soft deadline..."
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	# The initial $ibmNotifierARRAY[] settings for the soft deadline dialog.
 	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogSoftDeadlineTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$restartButtonTEXT")
 
@@ -4456,7 +4456,7 @@ fi
 # Generate the $jamfHelperARRAY[] to display an interactive dialog with deferral options. This sets $choiceINSTALL and if $menuDeferSECONDS then also sets $defaultDeferSECONDS.
 dialogAskForUpdate() {
 sendToStatus "Running: Dialog ask for update..."
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfOPTION" != "TRUE" ]]; then
+if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Ask for restart or defer dialog..."
 	# Create initial $ibmNotifierARRAY[] settings for the dialog.
 	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogAskForUpdateTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonTEXT" -secondary_button_label "$restartButtonTEXT")

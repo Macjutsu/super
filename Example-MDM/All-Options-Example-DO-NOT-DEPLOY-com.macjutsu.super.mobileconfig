@@ -80,7 +80,7 @@
                   <string>120,200,300</string>
                   <key>PolicyTriggers</key>
                   <string>trigger1,trigger2</string>
-                  <key>PreferJamf</key>
+                  <key>PreferJamfHelper</key>
                   <false/>
                   <key>RecheckDefer</key>
                   <string>120</string>
