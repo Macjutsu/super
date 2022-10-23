@@ -48,6 +48,8 @@
 	<string>trigger1,trigger2</string>
 	<key>SkipUpdates</key>
 	<true/>
+	<key>PushMajorUpgrade</key>
+	<false/>
 	<key>ForceRestart</key>
 	<true/>
 	<key>TestMode</key>

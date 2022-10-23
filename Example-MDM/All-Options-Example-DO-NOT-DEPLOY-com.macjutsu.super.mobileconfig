@@ -82,6 +82,8 @@
                   <string>trigger1,trigger2</string>
                   <key>PreferJamfHelper</key>
                   <false/>
+                  <key>PushMajorUpgrade</key>
+                  <false/>
                   <key>RecheckDefer</key>
                   <string>120</string>
                   <key>SkipUpdates</key>
