@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS software update experience.
 # by Kevin M. White
 #
-# Version 3.0b2
-# 2022/10/22
+# Version 3.0b3
+# 2022/11/03
 # https://github.com/Macjutsu/super
 #
 # NOTE: *** Debugging Stuff ***
@@ -28,8 +28,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 3.0b2
-  2022/10/22
+  Version 3.0b3
+  2022/11/03
   https://github.com/Macjutsu/super
 
   Usage:
@@ -251,11 +251,26 @@ timeFORMAT="+%l:%M %p" # Formatting options can be found in the man page for the
 # The default amount of time in seconds to leave test notifications and dialogs open before moving on in the workflow.
 testModeTimeoutSECONDS=10
 
-# The number of seconds to timeout a check process if no progress is reported.
+# The number of seconds to timeout the check for updates process if no progress is reported.
 checkTimeoutSECONDS=120
 
-# The number of seconds to timeout a download/update/upgrade process if no progress is reported.
-defaultTimeoutSECONDS=300
+# The number of seconds to timeout the recommended (non-restart) download/update process if no progress is reported.
+recommendedTimeoutSECONDS=300
+
+# The number of seconds to timeout the mdm push process if no progress is reported.
+mdmTimeoutSECONDS=120
+
+# The number of seconds to timeout the download update/upgrade process if no progress is reported.
+downloadTimeoutSECONDS=120
+
+# The number of seconds to timeout the preparing update process if no progress is reported.
+prepareTimeoutSECONDS=600
+
+# The number of seconds to timeout the applying update process if no progress is reported.
+applyTimeoutSECONDS=60
+
+# The number of seconds to timeout the legacy (macOS 10.x) system update process if no progress is reported.
+asuTimeoutSECONDS=300
 
 # These parameters identify the macOS version and architecture.
 macosMAJOR=$(sw_vers -productVersion | cut -d'.' -f1) # Expected output: 10, 11, 12
@@ -1137,10 +1152,10 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 	if [[ $(echo "$displayIconOPTION" | grep '^http://\|^https://' -c) -eq 1 ]]; then
 		sendToLog "Starter: Attempting to download requested icon from: $displayIconOPTION"
 		downloadRESULT=$(curl "$displayIconOPTION" -L -o "/tmp/cachedICON" 2>&1)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  downloadRESULT: \n$downloadRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
 		if [[ -f "/tmp/cachedICON" ]]; then
 			sipsRESULT=$(sips -s format png "/tmp/cachedICON" --out "$cachedICON" 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  sipsRESULT: \n$sipsRESULT"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
 			defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
 		else
 			sendToLog "Warning: Unable to download specified icon from: $displayIconOPTION"
@@ -1148,7 +1163,7 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 	elif [[ -e "$displayIconOPTION" ]]; then
 		sendToLog "Starter: Copying requested icon from: $displayIconOPTION"
 		sipsRESULT=$(sips -s format png "$displayIconOPTION" --out "$cachedICON" 2>&1)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  sipsRESULT: \n$sipsRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
 		defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
 	else
 		sendToLog "Warning: Unable to locate specified icon from: $displayIconOPTION"
@@ -1157,7 +1172,7 @@ fi
 if [[ ! -f "$cachedICON" ]]; then
 	sendToLog "Starter: No custom display icon found, copying default icon from: $defaultICON"
 	sipsRESULT=$(sips -s format png "$defaultICON" --out "$cachedICON" 2>&1)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  sipsRESULT: \n$sipsRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
 	defaults write "$superPLIST" DisplayIconCache -string "$defaultICON"
 fi
 
@@ -1488,7 +1503,7 @@ if [[ "$macosARCH" == "arm64" ]] && [[ -n $adminACCOUNT ]]; then
 			done
 			sendToLog "Starter: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
 			addRESULT=$(sysadminctl -addUser "$superNEWACCT" -fullName "$superNEWFULL" -password "$superNEWPASS" -UID $newUID -GID 20 -shell /dev/null -home /dev/null -picture "$cachedICON" -adminUser "$adminACCOUNT" -adminPassword "$adminPASSWORD" 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  addRESULT: \n$addRESULT"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: addRESULT: \n$addRESULT"
 			dscl . create /Users/"$superNEWACCT" IsHidden 1
 			updateACCOUNT="$superACCOUNT"
 			updateKEYCHAIN="$superKEYCHAIN"
@@ -1660,7 +1675,7 @@ if [[ "$macosARCH" == "arm64" ]]; then
 		[[ "$pushMajorUpgradeOPTION" == "TRUE" ]] && sendToLog "Warning: System updates via MDM require Jamf Pro API credentials."
 	fi
 else # Mac computers with Intel.
-	sendToLog "Starter: Intel Mac computer running $(sw_vers -productName) $(sw_vers -productVersion) build $(sw_vers -buildVersion)."
+	sendToLog "Starter: Intel Mac computer running macOS $(sw_vers -productVersion) build $(sw_vers -buildVersion)."
 	if [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
 		if [[ "$macosVERSION" -ge 1105 ]]; then
 			sendToLog "Starter: S.U.P.E.R.M.A.N. workflow authenticated via Jamf Pro API."
@@ -1697,10 +1712,10 @@ else # Mac computers with Intel.
 		[[ "$pushMajorUpgradeOPTION" == "TRUE" ]] && sendToLog "Warning: System updates via MDM require Jamf Pro API credentials."
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  minorUpdateWORKFLOW: $minorUpdateWORKFLOW"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  majorUpgradeWORKFLOW: $majorUpgradeWORKFLOW"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: minorUpdateWORKFLOW: $minorUpdateWORKFLOW"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: majorUpgradeWORKFLOW: $majorUpgradeWORKFLOW"
 
-# !!!: Future super v3 beta will remove this limitation.
+# !!!: Future super v3.0 beta will remove this limitation.
 if [[ "$majorUpgradeWORKFLOW" == "APP" ]] || [[ "$majorUpgradeWORKFLOW" == "USER" ]] || [[ "$minorUpdateWORKFLOW" == "APP" ]]; then
 	sendToLog "Warning: Update/upgrade workflows via macOS Installer are not supported with this version of super... https://github.com/Macjutsu/super/releases"
 	betaERROR="TRUE"
@@ -1723,11 +1738,11 @@ if [[ -f "/tmp/IBM.Notifier.zip" ]]; then
 		rm -Rf "/tmp/IBM.Notifier.zip"
 	else
 		sendToLog "Error: Unable to install IBM Notifier.app."
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  unzipRESULT: \n$unzipRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: unzipRESULT: \n$unzipRESULT"
 	fi
 else
 	sendToLog "Error: Unable to download IBM Notifier.app from: $ibmNotifierURL"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  downloadRESULT: \n$downloadRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
 fi
 }
 
@@ -1744,7 +1759,7 @@ if [[ $(echo "$ibmNotifierCODESIGN" | grep -c "valid on disk") -eq 1 ]]; then
 	fi
 else
 	sendToLog "Warning: unable validate signature for IBM Notifier at path: $ibmNotifierAPP."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  ibmNotifierCODESIGN: \n$ibmNotifierCODESIGN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierCODESIGN: \n$ibmNotifierCODESIGN"
 fi
 }
 
@@ -1759,11 +1774,11 @@ if [[ -f "/tmp/erase-install.pkg" ]]; then
 		rm -Rf "/tmp/erase-install.pkg"
 	else
 		sendToLog "Error: Unable to install erase-install.pkg."
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  installRESULT: \n$installRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: installRESULT: \n$installRESULT"
 	fi
 else
 	sendToLog "Error: Unable to download erase-install.pkg from: $eraseInstallURL."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  downloadRESULT: \n$downloadRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
 fi
 }
 
@@ -1781,7 +1796,7 @@ if [[ "$eraseInstallVERSION" == "$eraseInstallRESULT" ]]; then
 	fi
 else
 	sendToLog "Warning: erase-install.sh at path: $eraseInstallSCRIPT is version $eraseInstallRESULT, this does not match target version $eraseInstallVERSION."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  eraseInstallRESULT: \n$eraseInstallRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: eraseInstallRESULT: \n$eraseInstallRESULT"
 fi
 if [[ "$eraseInstallVALID" == "TRUE" ]] && [[ ! -e "$installInstallMacOS" ]]; then
 	sendToLog "Warning: Unable to locate installinstallmacos.py at path: $installInstallMacOS"
@@ -1798,7 +1813,7 @@ if [[ "$eraseInstallVALID" == "TRUE" ]]; then
 			sendToLog "Warning: Unable validate signature for DEPNotify at path: $depNotifyAPP."
 			eraseInstallVALID="FALSE"
 		fi
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  depNotifyCODESIGN: \n$depNotifyCODESIGN"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: depNotifyCODESIGN: \n$depNotifyCODESIGN"
 	else
 		sendToLog "Warning: Unable to locate DEPNotify.app at path: $depNotifyAPP"
 		eraseInstallVALID="FALSE"
@@ -2167,25 +2182,25 @@ sendToLog "Verbose Mode: helperERROR: $helperERROR"
 # Validate the connection to a managed computer's Jamf Pro service and set $jamfSERVER accordingly.
 getJamfProServer() {
 jamfSTATUS=$("$jamfBINARY" checkJSSConnection -retry 1)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  jamfSTATUS is: $jamfSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSTATUS is: $jamfSTATUS"
 if [[ $(echo "$jamfSTATUS" | grep -c "available") -ne 0 ]]; then
 	jamfSERVER=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
 else
 	sendToLog "Status: Jamf Pro service unavailable."; jamfSERVER="FALSE"; jamfERROR="TRUE"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  jamfSTATUS is: $jamfSTATUS"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSTATUS is: $jamfSTATUS"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  jamfSERVER is: $jamfSERVER"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSERVER is: $jamfSERVER"
 }
 
 # Attempt to acquire a Jamf Pro $jamfProTOKEN via $jamfACCOUNT and $jamfKEYCHAIN credentials.
 getJamfProToken() {
 getJamfProServer
 if [[ "$jamfSERVER" != "FALSE" ]]; then
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  Attempting Jamf Pro API authentication with username: $jamfACCOUNT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Attempting Jamf Pro API authentication with username: $jamfACCOUNT"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToEcho "Verbose Mode: Attempting Jamf Pro API authentication with password: $jamfKEYCHAIN"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  Attempting Jamf Pro API via service URL: $jamfSERVER"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Attempting Jamf Pro API via service URL: $jamfSERVER"
 	commandRESULT=$(curl -X POST -u "$jamfACCOUNT:$jamfKEYCHAIN" -s "${jamfSERVER}api/v1/auth/token")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  commandRESULT is: \n$commandRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: \n$commandRESULT"
 	if [[ $(echo "$commandRESULT" | grep "token" -c) -eq 1 ]]; then
 		if [[ $macosMAJOR -ge 12 ]]; then
 			jamfProTOKEN=$(echo "$commandRESULT" | plutil -extract token raw -)
@@ -2195,7 +2210,7 @@ if [[ "$jamfSERVER" != "FALSE" ]]; then
 	else
 		sendToLog "Error: Response from Jamf Pro API token request did not contain a token."; jamfERROR="TRUE"
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  jamfProTOKEN is: \n$jamfProTOKEN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfProTOKEN is: \n$jamfProTOKEN"
 fi
 }
 
@@ -2221,30 +2236,30 @@ fi
 # Use $jamfProIdMANAGED or $jamfProTOKEN to find the computer's Jamf Pro ID and set $jamfProID.
 getJamfProComputerID() {
 computerUDID=$(system_profiler SPHardwareDataType | awk '/UUID/ { print $3; }')
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  computerUDID is: $computerUDID"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: computerUDID is: $computerUDID"
 if [[ -n $jamfProIdMANAGED ]]; then
 	jamfProID="$jamfProIdMANAGED"
 else
 	sendToLog "Warning: Using a Jamf Pro API account with \"Computers > Read\" privileges to collect the computer ID is a security risk. Instead use a custom Configuration Profile with the following; Preference Domain \"com.macjutsu.super\", Key \"JamfProID\", String \"\$JSSID\"."
 	jamfProID=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --header "Accept: application/xml" --request GET --url "${jamfSERVER}JSSResource/computers/udid/${computerUDID}/subset/General" 2> /dev/null | xpath -e /computer/general/id 2>&1 | awk -F'<id>|</id>' '{print $2}' | xargs)
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  jamfProID is: $jamfProID"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfProID is: $jamfProID"
 }
 
 # Attempt to send a Blank Push to Jamf Pro.
 sendBlankPush() {
 commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/BlankPush/id/${jamfProID}")
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  commandRESULT is: \n$commandRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: \n$commandRESULT"
 }
 
 # Validate existing $jamfProTOKEN and if found invalid, a new token is requested and again validated.
 checkJamfProServerToken() {
 tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  tokenCHECK is: $tokenCHECK"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: tokenCHECK is: $tokenCHECK"
 if [[ $tokenCHECK -ne 200 ]]; then
 	getJamfProToken
 	tokenCHECK=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request GET --url "${jamfSERVER}api/v1/auth")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  tokenCHECK is: $tokenCHECK"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: tokenCHECK is: $tokenCHECK"
 	if [[ $tokenCHECK -ne 200 ]]; then
 		sendToLog "Error: Could not request Jamf Pro API token for account \"$jamfACCOUNT\", trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Pending: Could not request Jamf Pro API token for account \"$jamfACCOUNT\", trying again in $defaultDeferSECONDS seconds."
@@ -2257,14 +2272,14 @@ fi
 deleteJamfProServerToken() {
 invalidateTOKEN=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}api/v1/auth/invalidate-token")
 if [[ $invalidateTOKEN -eq 204 ]]; then
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  Jamf Pro API token successfully invalidated."
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Jamf Pro API token successfully invalidated."
 	unset jamfProTOKEN
 elif [[ $invalidateTOKEN -eq 401 ]]; then
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  Jamf Pro API token already invalid."
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Jamf Pro API token already invalid."
 	unset jamfProTOKEN
 else
 	sendToLog "Error: Invalidating Jamf Pro API token."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  invalidateTOKEN is: $invalidateTOKEN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: invalidateTOKEN is: $invalidateTOKEN"
 fi
 }
 
@@ -2336,7 +2351,7 @@ if [[ -n $zeroDayOVERRIDE ]]; then # If there is a $zeroDayOVERRIDE then use tha
 	sendToLog "Status: Using manually set zero day date of $zeroDaySTART."
 else
 	zeroDayPREVIOUS=$(defaults read "$superPLIST" ZeroDayAuto 2> /dev/null)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  zeroDayPREVIOUS: $zeroDayPREVIOUS"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: zeroDayPREVIOUS: $zeroDayPREVIOUS"
 	if [[ -n $zeroDayPREVIOUS ]]; then # If there was a previously saved zero day date then use that.
 		zeroDaySTART="$zeroDayPREVIOUS"
 		sendToLog "Status: Using previously set automatic zero day date of $zeroDaySTART."
@@ -2354,10 +2369,10 @@ if [[ $(date -r "$zeroDayEPOCH" "+%H:%M") == "00:00" ]]; then
 else
 	zeroDayDISPLAY="$zeroDayDATE - $zeroDayTIME"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  zeroDayEPOCH: $zeroDayEPOCH"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  zeroDayDATE: $zeroDayDATE"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  zeroDayTIME: $zeroDayTIME"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  zeroDayDISPLAY: $zeroDayDISPLAY"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: zeroDayEPOCH: $zeroDayEPOCH"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: zeroDayDATE: $zeroDayDATE"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: zeroDayTIME: $zeroDayTIME"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: zeroDayDISPLAY: $zeroDayDISPLAY"
 }
 
 # Evaluate if a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb, and set $focusDEFER accordingly.
@@ -2385,7 +2400,7 @@ if [[ -n $focusDeferSECONDS ]]; then
 	fi
 	IFS="$oldIFS"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  focusDEFER is: $focusDEFER"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDEFER is: $focusDEFER"
 }
 
 # Evaluate $focusDateMAX, $softDateMAX, and $hardDateMAX, then set $deadlineDateSTATUS, $deadlineDateEPOCH, and $deadlineDateDISPLAY accordingly.
@@ -2415,12 +2430,12 @@ if [[ -n $hardDateMAX ]]; then
 		sendToLog "Status: Hard date deadline of $hardDateMAX NOT passed."
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDateSTATUS is: $deadlineDateSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDateSTATUS is: $deadlineDateSTATUS"
 
 # For display the $softDateMAX always results in a sooner date than the $hardDateMAX.
 [[ -n $hardDateMAX ]] && deadlineDateEPOCH="$hardDateEPOCH"
 [[ -n $softDateMAX ]] && deadlineDateEPOCH="$softDateEPOCH"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDateEPOCH is: $deadlineDateEPOCH"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDateEPOCH is: $deadlineDateEPOCH"
 if [[ -n $deadlineDateEPOCH ]]; then
 	deadlineDateDATE=$(date -r "$deadlineDateEPOCH" "$dateFORMAT")
 	deadlineDateTIME=$(date -r "$deadlineDateEPOCH" "$timeFORMAT" | sed 's/^ *//g')
@@ -2429,9 +2444,9 @@ if [[ -n $deadlineDateEPOCH ]]; then
 	else
 		deadlineDateDISPLAY="$deadlineDateDATE - $deadlineDateTIME"
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDateDATE is: $deadlineDateDATE"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDateTIME is: $deadlineDateTIME"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDateDISPLAY is: $deadlineDateDISPLAY"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDateDATE is: $deadlineDateDATE"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDateTIME is: $deadlineDateTIME"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDateDISPLAY is: $deadlineDateDISPLAY"
 fi
 }
 
@@ -2441,7 +2456,7 @@ deadlineDaysSTATUS="FALSE"
 if [[ -n $focusDaysMAX ]]; then
 	focusDaysEPOCH=$((zeroDayEPOCH + focusDaysSECONDS))
 	focusDaysDATE=$(date -r "$focusDaysEPOCH" +%Y-%m-%d:%H:%M)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  focusDaysEPOCH: $focusDaysEPOCH"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDaysEPOCH: $focusDaysEPOCH"
 	if [[ $focusDaysEPOCH -lt $(date +%s) ]]; then
 		sendToLog "Status: Focus days deadline of $focusDaysDATE ($focusDaysMAX day(s) after $zeroDaySTART) HAS passed."
 		deadlineDaysSTATUS="FOCUS"
@@ -2452,7 +2467,7 @@ fi
 if [[ -n $softDaysMAX ]]; then
 	softDaysEPOCH=$((zeroDayEPOCH + softDaysSECONDS))
 	softDaysDATE=$(date -r "$softDaysEPOCH" +%Y-%m-%d:%H:%M)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  softDaysEPOCH: $softDaysEPOCH"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softDaysEPOCH: $softDaysEPOCH"
 	if [[ $softDaysEPOCH -lt $(date +%s) ]]; then
 		sendToLog "Status: Soft days deadline of $softDaysDATE ($softDaysMAX day(s) after $zeroDaySTART) HAS passed."
 		deadlineDaysSTATUS="SOFT"
@@ -2463,7 +2478,7 @@ fi
 if [[ -n $hardDaysMAX ]]; then
 	hardDaysEPOCH=$((zeroDayEPOCH + hardDaysSECONDS))
 	hardDaysDATE=$(date -r "$hardDaysEPOCH" +%Y-%m-%d:%H:%M)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  hardDaysEPOCH: $hardDaysEPOCH"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: hardDaysEPOCH: $hardDaysEPOCH"
 	if [[ $hardDaysEPOCH -lt $(date +%s) ]]; then
 		sendToLog "Status: Hard days deadline of $hardDaysDATE ($hardDaysMAX day(s) after $zeroDaySTART) HAS passed."
 		deadlineDaysSTATUS="HARD"
@@ -2471,12 +2486,12 @@ if [[ -n $hardDaysMAX ]]; then
 		sendToLog "Status: Hard days deadline of $hardDaysDATE ($hardDaysMAX day(s) after $zeroDaySTART) NOT passed."
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDaysSTATUS is: $deadlineDaysSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDaysSTATUS is: $deadlineDaysSTATUS"
 
 # For display the $softDaysMAX always results in a sooner date than the $hardDaysMAX.
 [[ -n $hardDaysMAX ]] && deadlineDaysEPOCH="$hardDaysEPOCH"
 [[ -n $softDaysMAX ]] && deadlineDaysEPOCH="$softDaysEPOCH"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDaysEPOCH is: $deadlineDaysEPOCH"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDaysEPOCH is: $deadlineDaysEPOCH"
 if [[ -n $deadlineDaysEPOCH ]]; then
 	deadlineDaysDATE=$(date -r "$deadlineDaysEPOCH" "$dateFORMAT")
 	deadlineDaysTIME=$(date -r "$deadlineDaysEPOCH" "$timeFORMAT" | sed 's/^ *//g')
@@ -2485,9 +2500,9 @@ if [[ -n $deadlineDaysEPOCH ]]; then
 	else
 		deadlineDaysDISPLAY="$deadlineDaysDATE - $deadlineDaysTIME"
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDaysDATE is: $deadlineDaysDATE"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDaysTIME is: $deadlineDaysTIME"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDaysDISPLAY is: $deadlineDaysDISPLAY"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDaysDATE is: $deadlineDaysDATE"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDaysTIME is: $deadlineDaysTIME"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDaysDISPLAY is: $deadlineDaysDISPLAY"
 fi
 
 # For display this sets $deadlineDISPLAY based on the soonest available date or days deadline.
@@ -2502,7 +2517,7 @@ elif [[ -n $deadlineDateDISPLAY ]]; then
 elif [[ -n $deadlineDaysDISPLAY ]]; then
 	deadlineDISPLAY="$deadlineDaysDISPLAY"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineDISPLAY is: $deadlineDISPLAY"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineDISPLAY is: $deadlineDISPLAY"
 }
 
 # Evaluate $focusCountMAX, $softCountMAX, and $hardCountMAX, then set $focusDEFER, $deadlineCountSTATUS, $countDISPLAY, and $countMaxDISPLAY accordingly.
@@ -2573,8 +2588,8 @@ if [[ "$focusDEFER" == "FALSE" ]]; then
 		countMaxDISPLAY="$hardCountMAX"
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  deadlineCountSTATUS is: $deadlineCountSTATUS"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  focusDEFER is: $focusDEFER"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deadlineCountSTATUS is: $deadlineCountSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDEFER is: $focusDEFER"
 }
 
 # MARK: *** Apple Software Update ***
@@ -2619,19 +2634,19 @@ checkPID=$!
 
 # Watch $checkLOG while waiting for the softwareupdate check workflow to complete. Note this while read loop has a timeout based on $checkTimeoutSECONDS.
 while read -t $checkTimeoutSECONDS -r logLINE ; do
-	if echo "$logLINE" | grep -q -w 'Finding available software'; then
+	if echo "$logLINE" | grep -w 'Finding available software'; then
 		sendToLog "Status: Waiting for softwareupdate check..."
-	elif echo "$logLINE" | grep -q -w 'Software Update found'; then
+	elif echo "$logLINE" | grep -w 'Software Update found'; then
 		updatesAVAILABLE="TRUE"
 		checkTIMEOUT="FALSE"
 		wait $checkPID
 		break
-	elif echo "$logLINE" | grep -q -w 'No new software available.'; then
+	elif echo "$logLINE" | grep -w 'No new software available.'; then
 		updatesAVAILABLE="FALSE"
 		checkTIMEOUT="FALSE"
 		break
 	fi
-done < <(tail -n 0 -f "$checkLOG")
+done < <(tail -n 0 -F "$checkLOG")
 
 # If the softwareupdate check completed, then collect information. However, if the softwareupdate check did not complete after $checkTimeoutSECONDS seconds, then clean-up.
 if [[ "$checkTIMEOUT" == "FALSE" ]]; then
@@ -2642,8 +2657,8 @@ else # The softwareupdate check timed out so clean-up and try again later.
 	kickAppleSoftwareUpdate
 	sleep 10
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  $checkLOG is:\n$(cat "$checkLOG")"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updatesAVAILABLE is: $updatesAVAILABLE"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: $checkLOG is:\n$(cat "$checkLOG")"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updatesAVAILABLE is: $updatesAVAILABLE"
 }
 
 # Collect all available Apple software and set $minorUpdatesRECOMMENDED, $recommendedLABLES[], $minorUpdatesRESTART, majorUpgradeTARGET, $minorUpdatesDownloadREQUIRED, $majorUpgradeDownloadREQUIRED accordingly.
@@ -2660,15 +2675,15 @@ majorUpgradeDownloadREQUIRED="FALSE"
 if [[ "$fullCheckREQUIRED" != "TRUE" ]]; then
 	asuCheckDATE=$(defaults read "$asuPLIST" LastSuccessfulDate 2> /dev/null)
 	[[ -n $asuCheckDATE ]] && asuCheckEPOCH=$(date -j -u -f "%Y-%m-%d %H:%M:%S %z" "$asuCheckDATE" "+%s")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  asuCheckDATE is: $asuCheckDATE"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  asuCheckEPOCH is: $asuCheckEPOCH"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: asuCheckDATE is: $asuCheckDATE"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: asuCheckEPOCH is: $asuCheckEPOCH"
 	if [[ $asuCheckEPOCH -gt $(($(date "+%s")-21600)) ]]; then
-		sendToLog "Status: Last software update check was less than 6 hours ago."
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  $asuPLIST is:\n$(defaults read "$asuPLIST"  2> /dev/null)"
+		sendToLog "Status: Last softwareupdate check was less than 6 hours ago."
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: $asuPLIST is:\n$(defaults read "$asuPLIST"  2> /dev/null)"
 		propertyUpdatesAVAILABLE=$(defaults read "$asuPLIST" LastUpdatesAvailable 2> /dev/null)
 		propertySystemUpdateAVAILABLE=$(defaults read "$asuPLIST" RecommendedUpdates 2> /dev/null | awk '/MobileSoftwareUpdate/ { print $3 }' | sed 's/;//g')
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertyUpdatesAVAILABLE is: $propertyUpdatesAVAILABLE"
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertySystemUpdateAVAILABLE is: $propertySystemUpdateAVAILABLE"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpdatesAVAILABLE is: $propertyUpdatesAVAILABLE"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertySystemUpdateAVAILABLE is: $propertySystemUpdateAVAILABLE"
 		if [[ $propertyUpdatesAVAILABLE -eq 0 ]]; then # No updates available.
 			fullCheckREQUIRED="FALSE"
 			updatesAVAILABLE="FALSE"
@@ -2676,22 +2691,23 @@ if [[ "$fullCheckREQUIRED" != "TRUE" ]]; then
 			previousUpdatesLIST=$(defaults read "$superPLIST" UpdatesList 2> /dev/null)
 			if [[ -n $previousUpdatesLIST ]]; then
 				previousUpdatesLIST=$(echo "$previousUpdatesLIST" | tail -n +2 | sed -e 's/    //g' -e 's/"//g' -e 's/",//g' -e 's/,//g' -e '$d')
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  previousUpdatesLIST is: \n$previousUpdatesLIST"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousUpdatesLIST is: \n$previousUpdatesLIST"
 				propertyUpdatesLIST=$(defaults read "$asuPLIST" RecommendedUpdates | grep "Identifier" | sed -e 's/        Identifier = //g' -e 's/"//g' -e 's/;//g')
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertyUpdatesLIST is: \n$propertyUpdatesLIST"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpdatesLIST is: \n$propertyUpdatesLIST"
 				if [[ "$previousUpdatesLIST" == "$propertyUpdatesLIST" ]]; then # Previous update list matches current update list.
 					updatesRESULT=$(<"$checkLOG")
-					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  $checkLOG is:\n$(cat "$checkLOG")"
+					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: $checkLOG is:\n$(cat "$checkLOG")"
 					if [[ $(echo "$updatesRESULT" | grep -c 'Software Update found') -eq 0 ]] || [[ $(echo "$updatesRESULT" | grep -c 'No new software available.') -eq 1 ]]; then # Previous update list has updates but the $checkLOG does not.
 						sendToLog "Status: Previously saved $checkLOG does not contain any updates, checking for Apple software updates via softwareupdate..."
 						fullCheckREQUIRED="TRUE"
 					else
-						sendToLog "Status: Previously saved softwareudpate list matches the current softwareupdate list."
+						sendToLog "Status: Previously saved softwareudpate list matches the current list."
 						fullCheckREQUIRED="FALSE"
 						updatesAVAILABLE="TRUE"
 					fi
 				else
-					sendToLog "Status: Previously saved softwareudpate list does not match the current softwareupdate list, checking for Apple software updates via softwareupdate..."
+					sendToLog "Status: Previously saved softwareudpate list does not match the current list, checking for Apple software updates via softwareupdate..."
+					kickAppleSoftwareUpdate
 					fullCheckREQUIRED="TRUE"
 				fi
 			else # No previously saved $propertyUpdatesLIST to compare.
@@ -2703,9 +2719,10 @@ if [[ "$fullCheckREQUIRED" != "TRUE" ]]; then
 		sendToLog "Status: Last software update check is older than 6 hours, checking for Apple software updates via softwareupdate..."
 		fullCheckREQUIRED="TRUE"
 	fi
+	[[ "$updatesAVAILABLE" == "FALSE" ]] && sendToLog "Status: No available Apple software updates. Some may be deferred via MDM."
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  fullCheckREQUIRED is: $fullCheckREQUIRED"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updatesAVAILABLE is: $updatesAVAILABLE"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: fullCheckREQUIRED is: $fullCheckREQUIRED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updatesAVAILABLE is: $updatesAVAILABLE"
 
 # If a full softwareupdate check is required.
 if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
@@ -2716,7 +2733,7 @@ if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
 		sendToLog "Status: Re-checking for Apple software updates via softwareupdate..."
 		checkSoftwareUpdate
 	elif [[ $macosMAJOR -ge 11 ]] && [[ "$updatesAVAILABLE" == "FALSE" ]]; then
-		sendToLog "Status: macOS 11 or later, double-checking available Apple software updates..."
+		sendToLog "Status: macOS 11 or later, double-checking Apple software updates via softwareupdate..."
 		kickAppleSoftwareUpdate
 		sleep 10
 		checkSoftwareUpdate
@@ -2730,6 +2747,8 @@ if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
 				sendToStatus "Pending: A system update/upgrade was previously downloaded but softwareupdate is not finding any available updates, trying again in $defaultDeferSECONDS seconds."
 				kickAppleSoftwareUpdate
 				makeLaunchDaemonCalendar
+			else
+				sendToLog "Status: No available Apple software updates. Some may be deferred via MDM."
 			fi
 		fi
 	else
@@ -2743,20 +2762,20 @@ fi
 if [[ "$updatesAVAILABLE" == "TRUE" ]]; then
 	# Extract relevant information from $asuPLIST and save to $superPLIST.
 	propertyUpdatesAVAILABLE=$(defaults read "$asuPLIST" LastUpdatesAvailable 2> /dev/null)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertyUpdatesAVAILABLE is: $propertyUpdatesAVAILABLE"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpdatesAVAILABLE is: $propertyUpdatesAVAILABLE"
 	defaults delete "$superPLIST" UpdatesAvailable 2> /dev/null
 	defaults write "$superPLIST" UpdatesAvailable -string "$propertyUpdatesAVAILABLE"
 	
 	if [[ $macosMAJOR -ge 11 ]]; then
 		propertySystemUpdateAVAILABLE=$(defaults read "$asuPLIST" RecommendedUpdates 2> /dev/null | awk '/MobileSoftwareUpdate/ { print $3 }' | sed 's/;//g')
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertySystemUpdateAVAILABLE is: $propertySystemUpdateAVAILABLE"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertySystemUpdateAVAILABLE is: $propertySystemUpdateAVAILABLE"
 		defaults delete "$superPLIST" SystemUpdateAvailable 2> /dev/null
 		defaults write "$superPLIST" SystemUpdateAvailable -string "$propertySystemUpdateAVAILABLE"
 	fi
 	
 	oldIFS="$IFS"; IFS=$'\n'
 	propertyUpdatesARRAY=($(defaults read "$asuPLIST" RecommendedUpdates | grep "Identifier" | sed -e 's/        Identifier = //g' -e 's/"//g' -e 's/;//g'))
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertyUpdatesARRAY[] is: \n${propertyUpdatesARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpdatesARRAY[] is: \n${propertyUpdatesARRAY[*]}"
 	defaults delete "$superPLIST" UpdatesList 2> /dev/null
 	for i in "${!propertyUpdatesARRAY[@]}"; do
 		defaults write "$superPLIST" UpdatesList -array-add "${propertyUpdatesARRAY[i]}"
@@ -2776,40 +2795,38 @@ if [[ "$updatesAVAILABLE" == "TRUE" ]]; then
 		allTITLES=($(echo "$updatesRESULT" | awk -F'(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//'))
 		restartLABLES=($(echo "$updatesRESULT" | grep -B 1 "restart" | awk -F'*' '/\*/{print $2}' | sed 's/^ //'))
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  allLABLES[] is: \n${allLABLES[*]}"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  allTITLES[] is: \n${allTITLES[*]}"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  restartLABLES[] is: \n${restartLABLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allLABLES[] is: \n${allLABLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allTITLES[] is: \n${allTITLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: restartLABLES[] is: \n${restartLABLES[*]}"
 	[[ "${allLABLES[*]}" != "${restartLABLES[*]}" ]] && recommendedLABLES=($(echo -e "${allLABLES[*]}\n${restartLABLES[*]}" | sort | uniq -u))
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  recommendedLABLES[] is: \n${recommendedLABLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedLABLES[] is: \n${recommendedLABLES[*]}"
 	if [[ -n ${allLABLES[*]} ]]; then
 		if [[ -n ${recommendedLABLES[*]} ]]; then
-			sendToLog "Status: ${#recommendedLABLES[@]} available non-restart \"recommended\" software update(s)."
+			sendToLog "Status: ${#recommendedLABLES[@]} available recommended (non-system) Apple software update(s)."
 			for i in "${!recommendedLABLES[@]}"; do
-				sendToLog "Status: Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}"
+				sendToLog "Status: Recommended (non-system) Apple software update $((i + 1)): ${recommendedLABLES[i]}"
 			done
 			minorUpdatesRECOMMENDED="TRUE"
 		else
-			sendToLog "Status: No available non-restart \"recommended\" software update(s). Some may be deferred via MDM."
+			sendToLog "Status: No available recommended (non-system) Apple software update(s). Some may be deferred via MDM."
 		fi
 		if [[ -n ${restartLABLES[*]} ]]; then
 			sendToLog "Status: ${#restartLABLES[@]} available minor system update(s)."
 			for i in "${!restartLABLES[@]}"; do
-				sendToLog "Status: Minor System Update $((i + 1)): ${restartLABLES[i]}"
+				sendToLog "Status: Minor system update $((i + 1)): ${restartLABLES[i]}"
 			done
 			minorUpdatesRESTART="TRUE"
-		else
-			sendToLog "Status: No available minor system update(s). Some may be deferred via MDM."
 		fi
 		# Evaluate previously downloaded minor system updates and compare them to currently available, setting $minorUpdatesDownloadREQUIRED accordingly.
 		previousMinorUpdateDOWNLOADS=$(defaults read "$superPLIST" UpdateDownloads 2> /dev/null)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  previousMinorUpdateDOWNLOADS is: \n$previousMinorUpdateDOWNLOADS"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousMinorUpdateDOWNLOADS is: \n$previousMinorUpdateDOWNLOADS"
 		if [[ -n $previousMinorUpdateDOWNLOADS ]]; then
 			downloadedTITLES=($(echo "$previousMinorUpdateDOWNLOADS" | grep -wv -e '(' -e ')' | sed -e 's/    //g' -e 's/"//g' -e 's/,//g'))
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  downloadedTITLES is: \n${downloadedTITLES[*]}"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadedTITLES is: \n${downloadedTITLES[*]}"
 			if [[ ! $(echo -e "${downloadedTITLES[*]}\n${allTITLES[*]}" | sort | uniq -u) ]]; then
-				sendToLog "Status: Previously downloaded update title(s) match currently available updates."
+				sendToLog "Status: Previously downloaded Apple softwareupdate title(s) match currently available updates."
 			else
-				sendToLog "Status: Previously downloaded update title(s) do not match currently available updates."
+				sendToLog "Status: Previously downloaded Apple softwareupdate title(s) do not match currently available updates."
 				minorUpdatesDownloadREQUIRED="TRUE"
 				defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 				restartZeroDay
@@ -2824,83 +2841,125 @@ if [[ "$updatesAVAILABLE" == "TRUE" ]]; then
 		makeLaunchDaemonCalendar
 	fi
 	IFS="$oldIFS"
+else # No minor system updates, so clean-up any potential $superPLIST leftovers.
+	defaults delete "$superPLIST" UpdatesAvailable 2> /dev/null
+	defaults delete "$superPLIST" UpdatesList 2> /dev/null
+	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  minorUpdatesRECOMMENDED is: $minorUpdatesRECOMMENDED"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  minorUpdatesRESTART is: $minorUpdatesRESTART"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  minorUpdatesDownloadREQUIRED is: $minorUpdatesDownloadREQUIRED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: minorUpdatesRECOMMENDED is: $minorUpdatesRECOMMENDED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: minorUpdatesRESTART is: $minorUpdatesRESTART"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: minorUpdatesDownloadREQUIRED is: $minorUpdatesDownloadREQUIRED"
 
 # At this point we can reliably check for major system upgrades, evaluate $targetMajorUpgradeOPTION, and set $majorUpgradeTARGET.
-propertyMajorUpgradeAVAILABLE=$(defaults read "$asuPLIST" LastRecommendedMajorOSBundleIdentifier 2> /dev/null)
-if [[ -n $propertyMajorUpgradeAVAILABLE ]]; then
-	propertyMajorUpgradeNAME=$(echo "$propertyMajorUpgradeAVAILABLE" | sed -e 's/com.apple.InstallAssistant.//' -e 's/macOS/macOS /')
-	if [[ "$propertyMajorUpgradeNAME" == "macOS Big Sur" ]]; then
-		propertyMajorUpgradeVERSION=11
-	elif [[ "$propertyMajorUpgradeNAME" == "macOS Monterey" ]]; then
-		propertyMajorUpgradeVERSION=12
-	elif [[ "$propertyMajorUpgradeNAME" == "macOS Ventura" ]]; then
-		propertyMajorUpgradeVERSION=13
+# First check to see if there was any previously available major upgrade information saved.
+if [[ "$fullCheckREQUIRED" != "TRUE" ]]; then
+	previousMajorUpgradeVERSION=$(defaults read "$superPLIST" MajorUpgradeVersion 2> /dev/null)
+	previousMajorUpgradeNAME=$(defaults read "$superPLIST" MajorUpgradeName 2> /dev/null)
+	if [[ -n $previousMajorUpgradeVERSION ]] && [[ -n $previousMajorUpgradeNAME ]]; then
+		majorUpgradeVERSION="$previousMajorUpgradeVERSION"
+		majorUpgradeNAME="$previousMajorUpgradeNAME"
+		sendToLog "Status: Major system upgrade available: $majorUpgradeNAME $majorUpgradeVERSION"
 	else
-		sendToLog "Warning: Unable to resolve macOS major upgrade version number based on the currently availalbe macOS major upgrade name of $propertyMajorUpgradeNAME."
-		propertyMajorUpgradeVERSION="$propertyMajorUpgradeNAME"
-	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertyMajorUpgradeNAME is: $propertyMajorUpgradeNAME"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  propertyMajorUpgradeVERSION is: $propertyMajorUpgradeVERSION"
-	sendToLog "Status: Major System Upgrade Available: $propertyMajorUpgradeNAME $propertyMajorUpgradeVERSION."
-	
-	# If the user has selected an option to perform a major system upgrade, then resolve the appropriate target $majorUpgradeTARGET.
-	if [[ "$majorUpgradeWORKFLOW" != "FALSE" ]]; then
-		if [[ -n $targetMajorUpgradeOPTION ]]; then
-			if [[ $propertyMajorUpgradeVERSION =~ $regexMACOSMAJORVERSION ]]; then
-				if [[ $targetMajorUpgradeOPTION -lt $macosMAJOR ]]; then
-					sendToLog "Warning: Target macOS upgrade version of $targetMajorUpgradeOPTION is less than current macOS version of $macosMAJOR."
-					majorUpgradeTARGET="FALSE"
-				elif [[ $targetMajorUpgradeOPTION -eq $macosMAJOR ]]; then
-					sendToLog "Status: Target macOS upgrade version of $targetMajorUpgradeOPTION is the same as current macOS version of $macosMAJOR."
-					majorUpgradeTARGET="FALSE"
-				else # Major upgrade target is greater than current macOS version, so this is the only time it would matter.
-					if [[ $targetMajorUpgradeOPTION -gt $propertyMajorUpgradeVERSION ]]; then
-						sendToLog "Warning: Requested target macOS major upgrade version of $targetMajorUpgradeOPTION is greater than the currently availalbe macOS major upgrade version of $propertyMajorUpgradeVERSION."
-						majorUpgradeTARGET=$propertyMajorUpgradeVERSION
-					else # Major upgrade target is greater than available macOS upgrade.
-						sendToLog "Status: Targeting specific macOS major upgrade version: $targetMajorUpgradeOPTION."
-						majorUpgradeTARGET=$targetMajorUpgradeOPTION
-					fi
-				fi
-			else
-				sendToLog "Warning: Unable set target macOS major upgrade version based on the currently availalbe macOS major upgrade version of $propertyMajorUpgradeVERSION."
-				majorUpgradeTARGET="$propertyMajorUpgradeVERSION"
-			fi
-		else
-			if [[ $propertyMajorUpgradeVERSION =~ $regexMACOSMAJORVERSION ]]; then
-				majorUpgradeTARGET=$propertyMajorUpgradeVERSION
-			else
-				majorUpgradeTARGET="$propertyMajorUpgradeVERSION"
-			fi
-		fi
-	else
-		majorUpgradeTARGET="FALSE"
-	fi
-	
-	# Evaluate previously downloaded major system upgrade and compare it to $majorUpgradeTARGET, setting $minorUpdatesDownloadREQUIRED accordingly.
-	if [[ "$majorUpgradeTARGET" != "FALSE" ]]; then
-		previousMajorUpgradeDOWNLOAD=$(defaults read "$superPLIST" MajorUpgradeDownload 2> /dev/null)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  previousMajorUpgradeDOWNLOAD is: \n$previousMajorUpgradeDOWNLOAD"
-		if [[ -n $previousMajorUpgradeDOWNLOAD ]]; then
-			if [[ $previousMajorUpgradeDOWNLOAD -eq $majorUpgradeTARGET ]]; then
-				sendToLog "Status: Previously downloaded macOS major upgrade version matches current target macOS major upgrade version."
-			else
-				sendToLog "Status: Previously downloaded macOS major upgrade version does not match current target macOS major upgrade version."
-				majorUpgradeDownloadREQUIRED="TRUE"
-				defaults delete "$superPLIST" MajorUpgradeDownload 2> /dev/null
-				restartZeroDay
-			fi
-		else
-			majorUpgradeDownloadREQUIRED="TRUE"
-		fi
+		fullCheckREQUIRED="TRUE"
 	fi
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  majorUpgradeTARGET is: $majorUpgradeTARGET"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  majorUpgradeDownloadREQUIRED is: $majorUpgradeDownloadREQUIRED"
+if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
+	sendToLog "Status: Waiting for major system upgrade check..."
+	if [[ $macosMAJOR -ge 11 ]]; then
+		availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2> /dev/null)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: availableOSUPDATES is: $availableOSUPDATES"
+		majorUpgradeNAMES=$(echo "$availableOSUPDATES" | grep "Major BundleID:" | sed -e 's/  Major BundleID:          com.apple.InstallAssistant.//' -e 's/macOS/macOS /' | sort | uniq)
+	elif [[ $macosMAJOR -eq 10 ]] && [[ $macosMINOR -ge 15 ]]; then
+		availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2> /dev/null)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: availableOSUPDATES is: $availableOSUPDATES"
+		majorUpgradeNAMES=$(echo "$availableOSUPDATES" | grep -v 'Security\|Supplemental\|Installer' | grep 'HumanReadableName = "macOS' | sed -e 's/        HumanReadableName = "//' -e 's/[0-9]*//g' -e 's/\.//g' -e 's/";//' -e 's/ $//' | sort | uniq)
+	else
+		propertyMajorUpgradeAVAILABLE=$(defaults read "$asuPLIST" LastRecommendedMajorOSBundleIdentifier 2> /dev/null)
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyMajorUpgradeAVAILABLE is: $propertyMajorUpgradeAVAILABLE"
+		majorUpgradeNAMES=$(echo "$propertyMajorUpgradeAVAILABLE" | sed -e 's/com.apple.InstallAssistant.//' -e 's/macOS/macOS /')
+	fi
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: majorUpgradeNAMES is: $majorUpgradeNAMES"
+
+	if [[ -n $majorUpgradeNAMES ]]; then
+		if [[ $(echo "$majorUpgradeNAMES" | grep -c "Ventura") -ge 1 ]]; then
+			majorUpgradeVERSION=13
+			majorUpgradeNAME="macOS Ventura"
+		elif [[ $(echo "$majorUpgradeNAMES" | grep -c "Monterey") -ge 1 ]]; then
+			majorUpgradeVERSION=12
+			majorUpgradeNAME="macOS Monterey"
+		elif [[ $(echo "$majorUpgradeNAMES" | grep -c "Big Sur") -ge 1 ]]; then
+			majorUpgradeVERSION=11
+			majorUpgradeNAME="macOS Big Sur"
+		else
+			sendToLog "Warning: Unable to resolve macOS major upgrade version number based on the currently availalbe macOS major upgrade names: \n$majorUpgradeNAMES."
+			majorUpgradeVERSION="FALSE"
+		fi
+		sendToLog "Status: Major system upgrade available: $majorUpgradeNAME $majorUpgradeVERSION"
+		[[ "$majorUpgradeVERSION" != "FALSE" ]] && defaults write "$superPLIST" MajorUpgradeVersion -string "$majorUpgradeVERSION"
+		[[ "$majorUpgradeVERSION" != "FALSE" ]] && defaults write "$superPLIST" MajorUpgradeName -string "$majorUpgradeNAME"
+	else # No major system upgrades, so clean-up any potential $superPLIST leftovers.
+		sendToLog "Status: No available major system upgrade. May be deferred via MDM."
+		majorUpgradeVERSION="FALSE"
+		defaults delete "$superPLIST" MajorUpgradeVersion 2> /dev/null
+		defaults delete "$superPLIST" MajorUpgradeName 2> /dev/null
+	fi
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: majorUpgradeVERSION is: $majorUpgradeVERSION"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: majorUpgradeNAME is: $majorUpgradeNAME"
+
+# If the user has selected an option to perform a major system upgrade, then resolve the appropriate target $majorUpgradeTARGET.
+if [[ "$majorUpgradeWORKFLOW" != "FALSE" ]] && [[ "$majorUpgradeVERSION" != "FALSE" ]]; then
+	if [[ -n $targetMajorUpgradeOPTION ]]; then
+		if [[ $majorUpgradeVERSION =~ $regexMACOSMAJORVERSION ]]; then
+			if [[ $targetMajorUpgradeOPTION -lt $macosMAJOR ]]; then
+				sendToLog "Warning: Target macOS upgrade version of $targetMajorUpgradeOPTION is less than current macOS version of $macosMAJOR."
+				majorUpgradeTARGET="FALSE"
+			elif [[ $targetMajorUpgradeOPTION -eq $macosMAJOR ]]; then
+				sendToLog "Status: Target macOS upgrade version of $targetMajorUpgradeOPTION is the same as current macOS version of $macosMAJOR."
+				majorUpgradeTARGET="FALSE"
+			else # Major upgrade target is greater than current macOS version, so this is the only time it would matter.
+				if [[ $targetMajorUpgradeOPTION -gt $majorUpgradeVERSION ]]; then
+					sendToLog "Warning: Requested target macOS major upgrade version of $targetMajorUpgradeOPTION is greater than the currently availalbe macOS major upgrade version of $majorUpgradeVERSION."
+					majorUpgradeTARGET=$majorUpgradeVERSION
+				else # Major upgrade target is greater than available macOS upgrade.
+					sendToLog "Status: Targeting specific macOS major upgrade version: $targetMajorUpgradeOPTION."
+					majorUpgradeTARGET=$targetMajorUpgradeOPTION
+				fi
+			fi
+		else
+			sendToLog "Warning: Unable set target macOS major upgrade version based on the currently availalbe macOS major upgrade version of $majorUpgradeVERSION."
+			majorUpgradeTARGET="$majorUpgradeVERSION"
+		fi
+	else
+		if [[ $majorUpgradeVERSION =~ $regexMACOSMAJORVERSION ]]; then
+			majorUpgradeTARGET=$majorUpgradeVERSION
+		else
+			majorUpgradeTARGET="$majorUpgradeVERSION"
+		fi
+	fi
+else
+	majorUpgradeTARGET="FALSE"
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: majorUpgradeTARGET is: $majorUpgradeTARGET"
+
+# Evaluate previously downloaded major system upgrade and compare it to $majorUpgradeTARGET, setting $majorUpgradeDownloadREQUIRED accordingly.
+if [[ "$majorUpgradeTARGET" != "FALSE" ]]; then
+	previousMajorUpgradeDOWNLOAD=$(defaults read "$superPLIST" MajorUpgradeDownload 2> /dev/null)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousMajorUpgradeDOWNLOAD is: \n$previousMajorUpgradeDOWNLOAD"
+	if [[ -n $previousMajorUpgradeDOWNLOAD ]]; then
+		if [[ $previousMajorUpgradeDOWNLOAD -eq $majorUpgradeTARGET ]]; then
+			sendToLog "Status: Previously downloaded macOS major upgrade version matches current target macOS major upgrade version."
+		else
+			sendToLog "Status: Previously downloaded macOS major upgrade version does not match current target macOS major upgrade version."
+			majorUpgradeDownloadREQUIRED="TRUE"
+			defaults delete "$superPLIST" MajorUpgradeDownload 2> /dev/null
+			restartZeroDay
+		fi
+	else
+		majorUpgradeDownloadREQUIRED="TRUE"
+	fi
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: majorUpgradeDownloadREQUIRED is: $majorUpgradeDownloadREQUIRED"
 }
 
 # This function checks the update status after recommended/non-restart software updates are installed.
@@ -2933,12 +2992,12 @@ fi
 
 # This function checks the system upgrade/update status after a previous super system update.
 checkAfterRestart() {
+defaults delete "$superPLIST" UpdateValidate 2> /dev/null
 fullCheckREQUIRED="TRUE"
 checkAllAvailableSoftware
 if [[ "$minorUpdatesRECOMMENDED" == "FALSE" ]] && [[ "$minorUpdatesRESTART" == "FALSE" ]] && [[ "$majorUpgradeTARGET" == "FALSE" ]]; then
 	if [[ "$jamfVERSION" != "FALSE" ]]; then
 		if [[ "$jamfSERVER" != "FALSE" ]]; then
-			defaults delete "$superPLIST" UpdateValidate 2> /dev/null
 			sendToLog "Status: Submitting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 			if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 				jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
@@ -2960,12 +3019,10 @@ if [[ "$minorUpdatesRECOMMENDED" == "FALSE" ]] && [[ "$minorUpdatesRESTART" == "
 			makeLaunchDaemonCalendar
 		fi
 	else
-		defaults delete "$superPLIST" UpdateValidate 2> /dev/null
-		sendToLog "Status: All system updates/upgrades complete, but Jamf binary not present."
+		sendToLog "Status: All Apple software updates complete, but Jamf binary not present."
 	fi
 else
-	sendToLog "Status: System updates/upgrades did not complete after last restart, continuing update workflow."
-	defaults delete "$superPLIST" UpdatesList 2> /dev/null
+	sendToLog "Status: All Apple software updates did not complete after last restart, continuing update workflow."
 fi
 }
 
@@ -2974,8 +3031,8 @@ fi
 
 # Install only recommended (non-restart) updates via the softwareupdate command, and also save results to $superLOG, $asuLOG, and $updateLOG.
 installRecommendedUpdatesASU() {
-sendToLog "Status: Starting softwareupdate workflow to install recommended (non-system) updates..."
-sendToStatus "Running: Starting softwareupdate workflow to install recommended (non-system) updates..."
+sendToLog "Status: Starting softwareupdate workflow to install recommended (non-system) Apple software updates..."
+sendToStatus "Running: Starting softwareupdate workflow to install recommended (non-system) Apple software updates..."
 sendToASULog "**** S.U.P.E.R.M.A.N. ASU RECOMMENDED UPDATES START ****"
 
 # For macOS 11 or later, start log streaming for softwareupdate progress and send to $updateLOG.
@@ -2991,61 +3048,70 @@ fi
 # Loop through and install only recommended/non-restart updates.
 oldIFS="$IFS"; IFS=$'\n'
 for i in "${!recommendedLABLES[@]}"; do
-	sendToLog "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
-	sendToASULog "Status: Installing Recommended Software Update $((i + 1)): ${recommendedLABLES[i]}..."
+	sendToLog "Status: Installing Apple software update $((i + 1)): ${recommendedLABLES[i]}..."
+	sendToASULog "Status: Installing Apple software update $((i + 1)): ${recommendedLABLES[i]}..."
 	
 	# The update process is backgrounded and will be watched via a while loop later on. Also note the different requirements between macOS versions.
 	if [[ $macosMAJOR -ge 12 ]]; then
 			if [[ "$currentUSER" == "FALSE" ]]; then
-				sudo -i softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a "$asuLOG" &
+				sudo -i softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 				asuPID=$!
 			else # Local user is logged in.
-				launchctl asuser "$currentUID" sudo -i softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a "$asuLOG" &
+				launchctl asuser "$currentUID" sudo -i softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 				asuPID=$!
 			fi
 	elif [[ $macosMAJOR -eq 11 ]]; then
-		softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license --verbose 2>&1 | tee -a "$asuLOG" &
+		softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 		asuPID=$!
 	else # macOS 10.X
-		softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --verbose 2>&1 | tee -a "$asuLOG" &
+		softwareupdate --install "${recommendedLABLES[i]}" --force --no-scan --verbose >> "$asuLOG" 2>&1 &
 		asuPID=$!
 	fi
-	updateTIMEOUT="TRUE"
+	recommendedTIMEOUT="TRUE"
 	
-	# Watch $asuLOG while waiting for the update workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-	while read -t $defaultTimeoutSECONDS -r logLINE ; do
-		if echo "$logLINE" | grep -q -w 'Done with'; then
+	# Watch $asuLOG while waiting for the update workflow to complete. Note this while read loop has a timeout based on $recommendedTimeoutSECONDS.
+	while read -t $recommendedTimeoutSECONDS -r logLINE ; do
+		if echo "$logLINE" | grep -w 'Done with'; then
 			updateRECOMMENDED=$(echo "$logLINE" | cut -c 11-)
-			sendToLog "Status: Installed Recommended Software Update: $updateRECOMMENDED."
-			sendToASULog "Status: Installed Recommended Software Update: $updateRECOMMENDED."
-		elif echo "$logLINE" | grep -q -w 'Done.'; then
-			updateTIMEOUT="FALSE"
+			sendToLog "Status: Installed Apple software update: $updateRECOMMENDED."
+			sendToASULog "Status: Installed Apple software update: $updateRECOMMENDED."
+		elif echo "$logLINE" | grep -w 'Done.'; then
+			sendToASULog "Status: Recommended software update done."
+			recommendedTIMEOUT="FALSE"
 			break
 		fi
-	done < <(tail -n 0 -f "$asuLOG")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updateTIMEOUT: $updateTIMEOUT"
+	done < <(tail -n 0 -F "$asuLOG")
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedTIMEOUT: $recommendedTIMEOUT"
 	
-	# If the ASU update did not complete after $defaultTimeoutSECONDS seconds, then clean-up and record error.
-	if [[ "$updateTIMEOUT" == "TRUE" ]] || [[ -z $updateRECOMMENDED ]]; then
-		[[ "$updateTIMEOUT" == "TRUE" ]] && sendToLog "Error: Apple softwareupdate timed out after $defaultTimeoutSECONDS seconds while trying to install recommended software update: ${recommendedLABLES[i]}"; updateERROR="TRUE"
-		[[ -z $updateRECOMMENDED ]] && sendToLog "Error: Apple softwareupdate failed to install recommended software update: ${recommendedLABLES[i]}."; updateERROR="TRUE"
+	# If the update workflow did not complete after $recommendedTimeoutSECONDS seconds, then clean-up and record error.
+	if [[ "$recommendedTIMEOUT" == "TRUE" ]] || [[ -z $updateRECOMMENDED ]]; then
+		if [[ "$recommendedTIMEOUT" == "TRUE" ]]; then 
+			sendToLog "Error: Apple softwareupdate timed out after $recommendedTimeoutSECONDS seconds while trying to install Apple software update: ${recommendedLABLES[i]}"
+			sendToASULog "Error: Apple softwareupdate timed out after $recommendedTimeoutSECONDS seconds while trying to install Apple software update: ${recommendedLABLES[i]}"
+			updateERROR="TRUE"
+		fi
+		if [[ -z $updateRECOMMENDED ]]; then
+			sendToLog "Error: Apple softwareupdate failed to install Apple software update: ${recommendedLABLES[i]}."
+			sendToASULog "Error: Apple softwareupdate failed to install Apple software update: ${recommendedLABLES[i]}."
+			updateERROR="TRUE"
+		fi
 		kill -9 "$asuPID" > /dev/null 2>&1
 		kickAppleSoftwareUpdate
 	fi
 done
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updateERROR: $updateERROR"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateERROR: $updateERROR"
 
 # Wrap-up logging.
 if [[ "$updateERROR" != "TRUE" ]]; then
 	sendToASULog "**** S.U.P.E.R.M.A.N. ASU RECOMMENDED UPDATES COMPLETED ****"
 	if [[ $macosMAJOR -ge 11 ]]; then
-		kill -9 $updateStreamPID > /dev/null 2>&1
+		kill -9 "$updateStreamPID" > /dev/null 2>&1
 		sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU RECOMMENDED UPDATES COMPLETED ****"
 	fi
 else
 	sendToASULog "**** S.U.P.E.R.M.A.N. ASU RECOMMENDED UPDATES FAILURE ****"
 	if [[ $macosMAJOR -ge 11 ]]; then
-		kill -9 $updateStreamPID > /dev/null 2>&1
+		kill -9 "$updateStreamPID" > /dev/null 2>&1
 		sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU RECOMMENDED UPDATES FAILURE ****"
 	fi
 fi
@@ -3068,20 +3134,20 @@ else
 	sendToLog "Status: Check $asuLOG or /var/log/install.log for more detail."
 fi
 
-# The download process is backgrounded and will be watched via a while loop later on. Also note the different requirements between macOS versions.
+# The download process is backgrounded and will be watched via while loops later on. Also note the different requirements between macOS versions.
 if [[ $macosMAJOR -ge 12 ]]; then
 	if [[ "$macosARCH" == "arm64" ]]; then
-		launchctl asuser "$currentUID" sudo -u root softwareupdate --download --all --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" --verbose 2>&1 | sudo tee -a "$asuLOG" &
+		launchctl asuser "$currentUID" sudo -u root softwareupdate --download --all --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" --verbose >> "$asuLOG" 2>&1 &
 		asuPID=$!
 	else # Intel.
-		launchctl asuser "$currentUID" sudo -u root softwareupdate --download --all --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a "$asuLOG" &
+		launchctl asuser "$currentUID" sudo -u root softwareupdate --download --all --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 		asuPID=$!
 	fi
 elif [[ $macosMAJOR -eq 11 ]]; then
 	if [[ "$macosARCH" == "arm64" ]]; then
 		expect -c "
 		set timeout -1
-		spawn softwareupdate --download --all --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a ${asuLOG}
+		spawn softwareupdate --download --all --force --no-scan --agree-to-license --verbose >> ${asuLOG} 2>&1
 		expect \"Password:\"
 		send {${asuPASSWORD}}
 		send \r
@@ -3090,46 +3156,72 @@ elif [[ $macosMAJOR -eq 11 ]]; then
 		" &
 		asuPID=$!
 	else # Intel.
-		softwareupdate --download --all --force --no-scan --agree-to-license --verbose 2>&1 | tee -a "$asuLOG" &
+		softwareupdate --download --all --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 		asuPID=$!
 	fi
 else # macOS 10.X
-	softwareupdate --download --all --force --no-scan --verbose 2>&1 | tee -a "$asuLOG" &
+	softwareupdate --download --all --force --no-scan --verbose >> "$asuLOG" 2>&1 &
 	asuPID=$!
 fi
-updateTIMEOUT="TRUE"
 
-# For macOS 11 or later, watch $updateLOG while waiting for the download workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
+# For macOS 11 or later, watch $updateLOG while waiting for the download workflow to complete.
 if [[ $macosMAJOR -ge 11 ]]; then
 	logPROGRESS=""
-	while read -t $defaultTimeoutSECONDS -r logLINE ; do
+	downloadTIMEOUT="TRUE"
+	# Note this while read loop has a timeout based on $downloadTimeoutSECONDS.
+	while read -t $downloadTimeoutSECONDS -r logLINE ; do
 		if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE stalled:NO'; then
 			[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading minor system update..."
+			[[ "$logPROGRESS" != "Downloading" ]] && sendToUpdateLog "Status: Downloading minor system update..."
 			logPROGRESS="Downloading"
 		elif echo "$logLINE" | grep -q -w '(start): phase:PREPARING_UPDATE stalled:NO'; then
 			[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, now preparing minor system update, should be done in a few minutes..."
+			[[ "$logPROGRESS" != "Preparing" ]] && sendToUpdateLog "Status: Download complete, now preparing minor system update, should be done in a few minutes..."
 			logPROGRESS="Preparing"
-		elif echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
-			sendToLog "Status: Minor system update is downloaded and prepared."
+			downloadTIMEOUT="FALSE"
+			break
+		fi
+	done < <(tail -n 0 -F "$updateLOG")
+	
+	# If the preparing process did not start after $downloadTimeoutSECONDS seconds, then clean-up and try again later.
+	if [[ "$downloadTIMEOUT" == "TRUE" ]]; then
+		sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+		sendToASULog "Error: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		kill -9 "$updateStreamPID" > /dev/null 2>&1
+		sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+		sendToUpdateLog "Error: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		kill -9 "$asuPID" > /dev/null 2>&1
+		kickAppleSoftwareUpdate
+		makeLaunchDaemonCalendar
+	fi
+	
+	workflowTIMEOUT="TRUE"
+	# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
+	while read -t $prepareTimeoutSECONDS -r logLINE ; do
+		if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
 			kill -9 "$updateStreamPID" > /dev/null 2>&1
-			sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD COMPLETED ****"
-			updateTIMEOUT="FALSE"
-			break
-		fi
-	done < <(tail -n 0 -f "$updateLOG")
-else # For macOS 10.x, watch $asuLOG while waiting for the update workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-	while read -t $defaultTimeoutSECONDS -r logLINE ; do
-		if echo "$logLINE" | grep -q -w 'Done.'; then
 			sendToLog "Status: Minor system update is downloaded and prepared."
-			updateTIMEOUT="FALSE"
+			sendToUpdateLog "Status: Minor system update is downloaded and prepared."
+			workflowTIMEOUT="FALSE"
 			break
 		fi
-	done < <(tail -n 0 -f "$asuLOG")
+	done < <(tail -n 0 -F "$updateLOG")
+else # For macOS 10.x, watch $asuLOG while waiting for the download workflow to complete. Note this while read loop has a timeout based on $asuTimeoutSECONDS.
+	while read -t $asuTimeoutSECONDS -r logLINE ; do
+		if echo "$logLINE" | grep -w 'Downloaded'; then
+			sendToLog "Status: Minor system update is downloaded and prepared."
+			sendToASULog "Status: Minor system update is downloaded and prepared."
+			workflowTIMEOUT="FALSE"
+			break
+		fi
+	done < <(tail -n 0 -F "$asuLOG")
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updateTIMEOUT: $updateTIMEOUT"
 
-# If the download completed, then collect information. However, if the download did not complete after $defaultTimeoutSECONDS seconds, then clean-up and try again later.
-if [[ "$updateTIMEOUT" == "FALSE" ]]; then
+# If the system download workflow completed, then collect information.
+if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
+	[[ $macosMAJOR -ge 11 ]] && sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD COMPLETED ****"
 	sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD COMPLETED ****"
 	defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 	oldIFS="$IFS"; IFS=$'\n'
@@ -3139,13 +3231,20 @@ if [[ "$updateTIMEOUT" == "FALSE" ]]; then
 	done
 	IFS="$oldIFS"
 	minorUpdatesDownloadREQUIRED="FALSE"
-else # The download timed out so clean-up and try again later.
-	kill -9 "$updateStreamPID" > /dev/null 2>&1
-	kill -9 "$asuPID" > /dev/null 2>&1
-	[[ $macosMAJOR -ge 11 ]] && sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+else # The system download workflow timed out so clean-up and try again later.
 	sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
-	sendToLog "Error: Download of minor system update via softwareupdate timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-	sendToStatus "Pending: Download of minor system update via softwareupdate timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+	sendToASULog "Error: Download/preparation of minor system update via softwareupdate timed out after $asuTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+	if [[ $macosMAJOR -ge 11 ]]; then
+		kill -9 "$updateStreamPID" > /dev/null 2>&1
+		sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+		sendToUpdateLog "Error: Preparation of minor system update via softwareupdate timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Preparation of minor system update via softwareupdate timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Preparation of minor system update via softwareupdate timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+	else
+		sendToLog "Error: Download/preparation of minor system update via softwareupdate timed out after $asuTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Download/preparation of minor system update via softwareupdate timed out after $asuTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+	fi
+	kill -9 "$asuPID" > /dev/null 2>&1
 	kickAppleSoftwareUpdate
 	makeLaunchDaemonCalendar
 fi
@@ -3166,8 +3265,8 @@ sendToLog "Status: Check $mdmLOG, $updateLOG, or /var/log/install.log for more d
 kickAppleSoftwareUpdate
 
 # This pre-flights the MDM query locally and may also be useful for troubleshooting.
-availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2>&1)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  availableOSUPDATES is: \n$availableOSUPDATES"
+availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2> /dev/null)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: availableOSUPDATES is: \n$availableOSUPDATES"
 
 # Make sure we still have a valid Jamf Pro API token.
 checkJamfProServerToken
@@ -3195,7 +3294,7 @@ else
 	sendToLog "Warning: Using legacy Jamf Pro Classic API. You should upgrade your Jamf Pro instance to 10.38 or later."
 	commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/download/id/${jamfProID}")
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  commandRESULT is: \n$commandRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: \n$commandRESULT"
 
 # If the Jamf Pro API command was successfully created, monitor the download progress.
 if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
@@ -3203,16 +3302,15 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	sendBlankPush
 	mdmTIMEOUT="TRUE"
 	
-	# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-	while read -t $defaultTimeoutSECONDS -r logLINE ; do
+	# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on $mdmTimeoutSECONDS.
+	while read -t $mdmTimeoutSECONDS -r logLINE ; do
 		if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)'; then
 			sendToLog "Status: Received MDM push command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
 			mdmTIMEOUT="FALSE"
 			pkill -P $$ tail
 			break
 		fi
-	done < <(tail -n 0 -f "$mdmLOG")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  mdmTIMEOUT: $mdmTIMEOUT"
+	done < <(tail -n 0 -F "$mdmLOG")
 	
 	# Only continue workflow if it did not timeout.
 	if [[ "$mdmTIMEOUT" == "FALSE" ]]; then
@@ -3227,8 +3325,8 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 		sendBlankPush
 		mdmTIMEOUT="TRUE"
 	
-		# Watch $mdmLOG while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-		while read -t $defaultTimeoutSECONDS -r logLINE ; do
+		# Watch $mdmLOG while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on $mdmTimeoutSECONDS.
+		while read -t $mdmTimeoutSECONDS -r logLINE ; do
 			if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Error'; then
 				sendToLog "Warning: Received MDM workflow error."
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Idle\]'; then
@@ -3236,75 +3334,99 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates)'; then
 				sendToLog "Status: Received MDM push command \"AvailableOSUpdates\"."
 			elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)'; then
-				sendToLog "Status: Received MDM push command \"ScheduleOSUpdate\", download should start soon..."
 				kill -9 "$mdmStreamPID" > /dev/null 2>&1
-				sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD COMPLETED ****"
+				sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD PUSH WORKFLOW COMPLETED ****"
+				sendToLog "Status: Received MDM push command \"ScheduleOSUpdate\", download should start soon..."
 				mdmTIMEOUT="FALSE"
 				break
 			fi
-		done < <(tail -n 0 -f "$mdmLOG")
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  mdmTIMEOUT: $mdmTIMEOUT"
+		done < <(tail -n 0 -F "$mdmLOG")
 	fi
 	
-	# If the MDM push commands did not complete after $defaultTimeoutSECONDS seconds, then clean-up and try again later. FAILURE
+	# If the MDM push commands did not complete after $mdmTimeoutSECONDS seconds, then clean-up and try again later.
 	if [[ "$mdmTIMEOUT" == "TRUE" ]]; then
-		sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
-		sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
 		kill -9 "$mdmStreamPID" > /dev/null 2>&1
+		sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
+		sendToMDMLog "Error: Push workflow for download of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		kill -9 "$updateStreamPID" > /dev/null 2>&1
-		sendToLog "Error: Push workflow for download of system update/upgrade via MDM timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToStatus "Pending: Push workflow for download of system update/upgrade via MDM timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
+		sendToUpdateLog "Error: Push workflow for download of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Push workflow for download of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Push workflow for download of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		kickAppleSoftwareUpdate
 		makeLaunchDaemonCalendar
 	fi
 	
-	# Watch $updateLOG while waiting for the download workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
 	logPROGRESS=""
-	updateTIMEOUT="TRUE"
-	while read -t $defaultTimeoutSECONDS -r logLINE ; do
+	downloadTIMEOUT="TRUE"
+	# Note this while read loop has a timeout based on $downloadTimeoutSECONDS.
+	while read -t $downloadTimeoutSECONDS -r logLINE ; do
 		if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE stalled:NO'; then
 			[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading system update/upgrade..."
 			logPROGRESS="Downloading"
 		elif echo "$logLINE" | grep -q -w '(start): phase:PREPARING_UPDATE stalled:NO'; then
 			[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, now preparing system update/upgrade, should be done in a few minutes..."
 			logPROGRESS="Preparing"
-		elif echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
-			sendToLog "Status: System update/upgrade is downloaded and prepared."
-			kill -9 "$updateStreamPID" > /dev/null 2>&1
-			sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD COMPLETED ****"
-			if [[ "$majorUpgradeWORKFLOW" == "JAMF" ]]; then
-				defaults write "$superPLIST" MajorUpgradeDownload -string "$majorUpgradeTARGET"
-				sendToLog "Status: Downloaded Major System Upgrade: $propertyMajorUpgradeNAME $propertyMajorUpgradeVERSION."
-				majorUpgradeDownloadREQUIRED="FALSE"
-			else # Minor system update.
-				defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
-				oldIFS="$IFS"; IFS=$'\n'
-				for i in "${!allTITLES[@]}"; do
-					sendToLog "Status: Downloaded Minor System Update $((i + 1)): ${allTITLES[i]}"
-					defaults write "$superPLIST" UpdateDownloads -array-add "${allTITLES[i]}"
-				done
-				IFS="$oldIFS"
-				minorUpdatesDownloadREQUIRED="FALSE"
-			fi
-			updateTIMEOUT="FALSE"
+			downloadTIMEOUT="FALSE"
 			break
 		fi
-	done < <(tail -n 0 -f "$updateLOG")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updateTIMEOUT: $updateTIMEOUT"
+	done < <(tail -n 0 -F "$updateLOG")
 	
-	# If the download did not complete after $defaultTimeoutSECONDS seconds, then clean-up and try again later.
-	if [[ "$updateTIMEOUT" == "TRUE" ]]; then
+	# If the preparing process did not start after $downloadTimeoutSECONDS seconds, then clean-up and try again later.
+	if [[ "$downloadTIMEOUT" == "TRUE" ]]; then
 		kill -9 "$updateStreamPID" > /dev/null 2>&1
-		sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD FAILURE ****"
-		sendToLog "Error: Download of system update/upgrade via MDM push command timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToStatus "Pending: Download of system update/upgrade via MDM push command timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+		sendToUpdateLog "Error: Download of system update/upgrade via MDM timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Download of system update/upgrade via MDM timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Download of system update/upgrade via MDM timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		kickAppleSoftwareUpdate
 		makeLaunchDaemonCalendar
 	fi
-else
-	kill -9 "$updateStreamPID" > /dev/null 2>&1
+	
+	workflowTIMEOUT="TRUE"
+	# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
+	while read -t $prepareTimeoutSECONDS -r logLINE ; do
+		if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
+			kill -9 "$updateStreamPID" > /dev/null 2>&1
+			sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD COMPLETED ****"
+			sendToLog "Status: System update/upgrade is downloaded and prepared."
+			workflowTIMEOUT="FALSE"
+			break
+		fi
+	done < <(tail -n 0 -F "$updateLOG")
+	
+	# If the system download completed.
+	if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
+		if [[ "$majorUpgradeWORKFLOW" == "JAMF" ]]; then
+			defaults write "$superPLIST" MajorUpgradeDownload -string "$majorUpgradeTARGET"
+			sendToLog "Status: Downloaded major system upgrade: $majorUpgradeNAME $majorUpgradeVERSION."
+			majorUpgradeDownloadREQUIRED="FALSE"
+		else # Minor system update.
+			defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
+			oldIFS="$IFS"; IFS=$'\n'
+			for i in "${!allTITLES[@]}"; do
+				sendToLog "Status: Downloaded minor system update $((i + 1)): ${allTITLES[i]}"
+				defaults write "$superPLIST" UpdateDownloads -array-add "${allTITLES[i]}"
+			done
+			IFS="$oldIFS"
+			minorUpdatesDownloadREQUIRED="FALSE"
+		fi
+	else # The system download workflow timed out so clean-up and try again later.
+		kill -9 "$updateStreamPID" > /dev/null 2>&1
+		sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD FAILURE ****"
+		sendToUpdateLog "Error: Preparation of system update/upgrade via MDM push command timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Preparation of system update/upgrade via MDM push command timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Preparation of system update/upgrade via MDM push command timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		kickAppleSoftwareUpdate
+		makeLaunchDaemonCalendar
+	fi
+else # The MDM push workflow failed so clean-up and try again later.
+	kill -9 "$mdmStreamPID" > /dev/null 2>&1
 	sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW FAILURE ****"
+	sendToMDMLog "Error: Failed to send MDM download request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
+	kill -9 "$updateStreamPID" > /dev/null 2>&1
 	sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW FAILURE ****"
+	sendToUpdateLog "Error: Failed to send MDM download request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 	sendToLog "Error: Failed to send MDM download request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 	sendToLog "Error: Push workflow for download of system update/upgrade via MDM failed, trying again in $defaultDeferSECONDS seconds."
 	sendToStatus "Pending: Push workflow for download of system update/upgrade via MDM failed, trying again in $defaultDeferSECONDS seconds."
@@ -3467,25 +3589,25 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		sendToLog "Status: Check $asuLOG or /var/log/install.log for more detail."
 	fi
 	
-	# The update process is backgrounded and will be watched via a while loop later on. Also note the different requirements between macOS versions.
+	# The update process is backgrounded and will be watched via while loops later on. Also note the different requirements between macOS versions.
 	if [[ $macosMAJOR -ge 12 ]]; then
 		if [[ "$currentUSER" == "FALSE" ]]; then
 			if [[ "$macosARCH" == "arm64" ]]; then
-				sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" --verbose 2>&1 | sudo tee -a "$asuLOG" &
+				sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" --verbose >> "$asuLOG" 2>&1 &
 				asuPID=$!
 				disown -h
 			else # Intel.
-				sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a "$asuLOG" &
+				sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 				asuPID=$!
 				disown -h
 			fi
 		else # Local user is logged in.
 			if [[ "$macosARCH" == "arm64" ]]; then
-				launchctl asuser "$currentUID" sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" --verbose 2>&1 | sudo tee -a "$asuLOG" &
+				launchctl asuser "$currentUID" sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --user "$asuACCOUNT" --stdinpass "$asuPASSWORD" --verbose >> "$asuLOG" 2>&1 &
 				asuPID=$!
 				disown -h
 			else # Intel.
-				launchctl asuser "$currentUID" sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a "$asuLOG" &
+				launchctl asuser "$currentUID" sudo -u root softwareupdate --install --all --restart --force --no-scan --agree-to-license --verbose >> "$asuLOG" 2>&1 &
 				asuPID=$!
 				disown -h
 			fi
@@ -3494,7 +3616,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		if [[ "$macosARCH" == "arm64" ]]; then
 			expect -c "
 			set timeout -1
-			spawn softwareupdate --install --all --restart --force --no-scan --agree-to-license --verbose 2>&1 | sudo tee -a ${asuLOG}
+			spawn softwareupdate --install --all --restart --force --no-scan --agree-to-license --verbose >> ${asuLOG} 2>&1
 			expect \"Password:\"
 			send {${asuPASSWORD}}
 			expect eof
@@ -3503,80 +3625,122 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			asuPID=$!
 			disown -h
 		else # Intel.
-			softwareupdate --install --all --restart --force --no-scan --verbose 2>&1 | tee -a "$asuLOG" &
+			softwareupdate --install --all --restart --force --no-scan --verbose >> "$asuLOG" 2>&1 &
 			asuPID=$!
 			disown -h
 		fi
 	else # macOS 10.X
-		softwareupdate --install --all --restart --force --no-scan --verbose 2>&1 | tee -a "$asuLOG" &
+		softwareupdate --install --all --restart --force --no-scan --verbose >> "$asuLOG" 2>&1 &
 		asuPID=$!
 		disown -h
 	fi
-	updateTIMEOUT="TRUE"
+	workflowTIMEOUT="TRUE"
 	
-	# For macOS 11 or later, watch $updateLOG while waiting for the install workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
+	# For macOS 11 or later, watch $updateLOG while waiting for the download/install workflow to complete.
 	if [[ $macosMAJOR -ge 11 ]]; then
-		logPROGRESS=""
+		# This is the workflow if the download/prepare is still required.
 		if [[ "$minorUpdatesDownloadREQUIRED" == "TRUE" ]]; then
-			while read -t $defaultTimeoutSECONDS -r logLINE ; do
+			logPROGRESS=""
+			downloadTIMEOUT="TRUE"
+			# Note this while read loop has a timeout based on $downloadTimeoutSECONDS.
+			while read -t $downloadTimeoutSECONDS -r logLINE ; do
 				if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE stalled:NO'; then
 					[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading minor system update..."
 					logPROGRESS="Downloading"
 				elif echo "$logLINE" | grep -q -w '(start): phase:PREPARING_UPDATE stalled:NO'; then
 					[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, now preparing minor system update, should be done in a few minutes..."
 					logPROGRESS="Preparing"
-				elif echo "$logLINE" | grep -q -w '(start): phase:APPLYING stalled:NO'; then
-					sendToLog "Status: Minor system update process is complete, restart is imminent..."
-					kill -9 "$updateStreamPID" > /dev/null 2>&1
-					sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD AND UPDATE COMPLETED ****"
-					updateTIMEOUT="FALSE"
+					downloadTIMEOUT="FALSE"
 					break
 				fi
-			done < <(tail -n 0 -f "$updateLOG")
-		else
-			while read -t $defaultTimeoutSECONDS -r logLINE ; do
-				if echo "$logLINE" | grep -q -w '(start): phase:APPLYING stalled:NO'; then
-					sendToLog "Status: Minor system update process is complete, restart is imminent..."
+			done < <(tail -n 0 -F "$updateLOG")
+			
+			# If the preparing process did not start after $downloadTimeoutSECONDS seconds, then clean-up and try again later.
+			if [[ "$downloadTIMEOUT" == "TRUE" ]]; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+				sendToUpdateLog "Error: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToLog "Error: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToStatus "Pending: Download of minor system update via softwareupdate timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				kickAppleSoftwareUpdate
+				makeLaunchDaemonCalendar
+			fi
+			
+			# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
+			prepareTIMEOUT="TRUE"
+			while read -t $prepareTimeoutSECONDS -r logLINE ; do
+				if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
 					kill -9 "$updateStreamPID" > /dev/null 2>&1
-					sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM UPDATE COMPLETED ****"
-					updateTIMEOUT="FALSE"
+					sendToLog "Status: Minor system update is downloaded and prepared."
+					prepareTIMEOUT="FALSE"
 					break
 				fi
-			done < <(tail -n 0 -f "$updateLOG")
+			done < <(tail -n 0 -F "$updateLOG")
+			
+			# If the preparing process did not complete after $prepareTimeoutSECONDS seconds, then clean-up and try again later.
+			if [[ "$prepareTIMEOUT" == "TRUE" ]]; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM PREPARE TIMEOUT FAILURE ****"
+				sendToUpdateLog "Error: Preparation of minor system update via softwareupdate timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToLog "Error: Preparation of minor system update via softwareupdate timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToStatus "Pending: Preparation of minor system update via softwareupdate timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				kickAppleSoftwareUpdate
+				makeLaunchDaemonCalendar
+			fi
 		fi
-	else # For macOS 10.x, watch $asuLOG while waiting for the update workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-		while read -t $defaultTimeoutSECONDS -r logLINE ; do
-			if echo "$logLINE" | grep -q -w 'Done.'; then
-				sendToLog "Status: Software update process is complete, restart is imminent..."
-				updateTIMEOUT="FALSE"
+		
+		# This is the workflow once the download/prepare has been completed. Note this while read loop has a timeout based on $applyTimeoutSECONDS.
+		while read -t $applyTimeoutSECONDS -r logLINE ; do
+			if echo "$logLINE" | grep -q -w '(start): phase:APPLYING stalled:NO'; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM UPDATE COMPLETED ****"
+				sendToLog "Status: Minor system update is applying, restart is imminent..."
+				workflowTIMEOUT="FALSE"
 				break
 			fi
-		done < <(tail -n 0 -f "$asuLOG")
+		done < <(tail -n 0 -F "$updateLOG")
+	else # For macOS 10.x, watch $asuLOG while waiting for the download/install workflow to complete. Note this while read loop has a timeout based on $asuTimeoutSECONDS.
+		while read -t $asuTimeoutSECONDS -r logLINE ; do
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Evaluating asu.log line: $logLINE"
+			if echo "$logLINE" | grep -w 'Downloaded'; then
+				sendToLog "Status: Minor system update is installing, restart is imminent..."
+				sendToASULog "Status: Minor system update is installing, restart is imminent..."
+				workflowTIMEOUT="FALSE"
+				break
+			fi
+		done < <(tail -n 0 -F "$asuLOG")
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updateTIMEOUT: $updateTIMEOUT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTIMEOUT: $workflowTIMEOUT"
 	
-	# If the update completed, then prepare for restart. However, if the update did not complete after $defaultTimeoutSECONDS seconds, then clean-up and try again later.
-	if [[ "$updateTIMEOUT" == "FALSE" ]]; then
+	# If the minor system update workflow completed, then prepare for restart.
+	if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
 		[[ "$minorUpdatesDownloadREQUIRED" == "TRUE" ]] && sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD AND UPDATE COMPLETED ****"
-		[[ "$minorUpdatesDownloadREQUIRED" == "FALSE" ]] && sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD COMPLETED ****"
+		[[ "$minorUpdatesDownloadREQUIRED" == "FALSE" ]] && sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM UPDATE COMPLETED ****"
+		sendToLog "Status: Resetting update/upgrade cached settings."
+		defaults write "$superPLIST" UpdateValidate -bool true
+		unset recheckDeferSECONDS
 		defaults delete "$superPLIST" UpdatesAvailable 2> /dev/null
 		defaults delete "$superPLIST" UpdatesList 2> /dev/null
 		defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
-		defaults write "$superPLIST" UpdateValidate -bool true
-		
 		restartZeroDay
 		restartDeferralCounters
-		unset recheckDeferSECONDS
 		sendToStatus "Pending: At next system startup."
 		makeLaunchDaemonOnStartup
-	else # The update timed out so clean-up and try again later.
-		kill -9 "$updateStreamPID" > /dev/null 2>&1
-		kill -9 "$asuPID" > /dev/null 2>&1
-		[[ $macosMAJOR -ge 11 ]] && sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM UPDATE TIMEOUT FAILURE ****"
+	else # The minor system update workflow timed out so clean-up and try again later.
 		sendToASULog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM UPDATE TIMEOUT FAILURE ****"
-		sendToLog "Error: Minor system update via ASU timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToStatus "Pending: Minor system update via ASU timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToASULog "Error: Minor system update via softwareupdate timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		if [[ $macosMAJOR -ge 11 ]]; then
+			kill -9 "$updateStreamPID" > /dev/null 2>&1
+			sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM UPDATE TIMEOUT FAILURE ****"
+			sendToUpdateLog "Error: Minor system update via softwareupdate timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToLog "Error: Minor system update via softwareupdate timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToStatus "Pending: Minor system update via softwareupdate timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		else
+			sendToLog "Error: Minor system update via softwareupdate timed out after $asuTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToStatus "Pending: Minor system update via softwareupdate timed out after $asuTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		fi
 		[[ "$currentUSER" != "FALSE" ]] && notifyFailure
+		kill -9 "$asuPID" > /dev/null 2>&1
 		kickAppleSoftwareUpdate
 		makeLaunchDaemonCalendar
 	fi
@@ -3620,8 +3784,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	kickAppleSoftwareUpdate
 	
 	# This pre-flights the MDM query locally and may also be useful for troubleshooting.
-	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2>&1)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  availableOSUPDATES is: $availableOSUPDATES"
+	availableOSUPDATES=$(/usr/libexec/mdmclient AvailableOSUpdates 2> /dev/null)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: availableOSUPDATES is: $availableOSUPDATES"
 	
 	# Make sure we still have a valid Jamf Pro API token.
 	checkJamfProServerToken
@@ -3658,7 +3822,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		sendToLog "Warning: Using legacy Jamf Pro Classic API. You should upgrade your Jamf Pro instance to 10.38 or later."
 		commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/ScheduleOSUpdate/action/install/id/${jamfProID}")
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  commandRESULT is: \n$commandRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: \n$commandRESULT"
 	
 	# If the Jamf Pro API command was successfully created, monitor the update progress.
 	if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
@@ -3666,16 +3830,15 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		sendBlankPush
 		mdmTIMEOUT="TRUE"
 		
-		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-		while read -t $defaultTimeoutSECONDS -r logLINE ; do
+		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on $mdmTimeoutSECONDS.
+		while read -t $mdmTimeoutSECONDS -r logLINE ; do
 			if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)'; then
 				sendToLog "Status: Received MDM push command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
 				mdmTIMEOUT="FALSE"
 				pkill -P $$ tail
 				break
 			fi
-		done < <(tail -n 0 -f "$mdmLOG")
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  mdmTIMEOUT: $mdmTIMEOUT"
+		done < <(tail -n 0 -F "$mdmLOG")
 		
 		# Only continue workflow if it did not timeout.
 		if [[ "$mdmTIMEOUT" == "FALSE" ]]; then
@@ -3697,8 +3860,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			mdmTIMEOUT="TRUE"
 			[[ "$currentUSER" != "FALSE" ]] && notifyRestart
 		
-			# Watch $mdmLOG while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-			while read -t $defaultTimeoutSECONDS -r logLINE ; do
+			# Watch $mdmLOG while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on $mdmTimeoutSECONDS.
+			while read -t $mdmTimeoutSECONDS -r logLINE ; do
 				if echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Error'; then
 					sendToLog "Warning: Received MDM workflow error."
 				elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Idle\]'; then
@@ -3708,88 +3871,126 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 				elif echo "$logLINE" | grep -q -w 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)'; then
 					kill -9 "$mdmStreamPID" > /dev/null 2>&1
 					if [[ "$minorUpdatesDownloadREQUIRED" == "TRUE" ]]; then
+						sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE/UPGRADE PUSH WORKFLOW COMPLETED ****"
 						sendToLog "Status: Received MDM push command \"ScheduleOSUpdate\", download and update/upgrade should start soon..."
-						sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE/UPGRADE COMPLETED ****"
 					else
+						sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE/UPGRADE PUSH WORKFLOW COMPLETED ****"
 						sendToLog "Status: Received MDM push command \"ScheduleOSUpdate\", restart should be soon..."
-						sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE/UPGRADE COMPLETED ****"
 					fi
 					mdmTIMEOUT="FALSE"
 					break
 				fi
-			done < <(tail -n 0 -f "$mdmLOG")
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  mdmTIMEOUT: $mdmTIMEOUT"
+			done < <(tail -n 0 -F "$mdmLOG")
 		fi
 		
-		# If the MDM push commands did not complete after $defaultTimeoutSECONDS seconds, then clean-up and try again later.
+		# If the MDM push commands did not complete after $mdmTimeoutSECONDS seconds, then clean-up and try again later.
 		if [[ "$mdmTIMEOUT" == "TRUE" ]]; then
-			sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
-			sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
 			kill -9 "$mdmStreamPID" > /dev/null 2>&1
+			sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
+			sendToMDMLog "Error: Push workflow for install of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 			kill -9 "$updateStreamPID" > /dev/null 2>&1
-			sendToLog "Error: Push workflow for install of system update/upgrade via MDM timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-			sendToStatus "Pending: Push workflow for install of system update/upgrade via MDM timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW TIMEOUT FAILURE ****"
+			sendToUpdateLog "Error: Push workflow for install of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToLog "Error: Push workflow for install of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToStatus "Pending: Push workflow for install of system update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 			[[ "$currentUSER" != "FALSE" ]] && notifyFailure
 			kickAppleSoftwareUpdate
 			makeLaunchDaemonCalendar
 		fi
 		
-		# Watch $updateLOG while waiting for the update and restart workflow to complete. Note this while read loop has a timeout based on $defaultTimeoutSECONDS.
-		logPROGRESS=""
-		updateTIMEOUT="TRUE"
+		# This is the workflow if the download/prepare is still required.
 		if [[ "$minorUpdatesDownloadREQUIRED" == "TRUE" ]]; then
-			while read -t $defaultTimeoutSECONDS -r logLINE ; do
-				if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE/UPGRADE stalled:NO'; then
+			logPROGRESS=""
+			downloadTIMEOUT="TRUE"
+			# Note this while read loop has a timeout based on $downloadTimeoutSECONDS.
+			while read -t $downloadTimeoutSECONDS -r logLINE ; do
+				if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE stalled:NO'; then
 					[[ "$logPROGRESS" != "Downloading" ]] && sendToLog "Status: Downloading system update/upgrade..."
 					logPROGRESS="Downloading"
-				elif echo "$logLINE" | grep -q -w '(start): phase:PREPARING_UPDATE/UPGRADE stalled:NO'; then
+				elif echo "$logLINE" | grep -q -w '(start): phase:PREPARING_UPDATE stalled:NO'; then
 					[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, now preparing system update/upgrade, should be done in a few minutes..."
 					logPROGRESS="Preparing"
-				elif echo "$logLINE" | grep -q -w '(start): phase:APPLYING stalled:NO'; then
-					sendToLog "Status: Software update/upgrade process is complete, restart is imminent..."
-					kill -9 "$updateStreamPID" > /dev/null 2>&1
-					sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD AND UPDATE/UPGRADE COMPLETED ****"
-					updateTIMEOUT="FALSE"
+					downloadTIMEOUT="FALSE"
 					break
 				fi
-			done < <(tail -n 0 -f "$updateLOG")
-		else
-			while read -t $defaultTimeoutSECONDS -r logLINE ; do
-				if echo "$logLINE" | grep -q -w '(start): phase:APPLYING stalled:NO'; then
-					sendToLog "Status: Software update/upgrade process is complete, restart is imminent..."
+			done < <(tail -n 0 -F "$updateLOG")
+	
+			# If the preparing process did not start after $downloadTimeoutSECONDS seconds, then clean-up and try again later.
+			if [[ "$downloadTIMEOUT" == "TRUE" ]]; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD TIMEOUT FAILURE ****"
+				sendToUpdateLog "Error: Download of system update/upgrade via MDM timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToLog "Error: Download of system update/upgrade via MDM timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToStatus "Pending: Download of system update/upgrade via MDM timed out after $downloadTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				kickAppleSoftwareUpdate
+				makeLaunchDaemonCalendar
+			fi
+			
+			# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
+			prepareTIMEOUT="TRUE"
+			while read -t $prepareTimeoutSECONDS -r logLINE ; do
+				if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
 					kill -9 "$updateStreamPID" > /dev/null 2>&1
-					sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE/UPGRADE COMPLETED ****"
-					updateTIMEOUT="FALSE"
+					sendToLog "Status: System update/upgrade is downloaded and prepared."
+					prepareTIMEOUT="FALSE"
 					break
 				fi
-			done < <(tail -n 0 -f "$updateLOG")
+			done < <(tail -n 0 -F "$updateLOG")
+			
+			# If the preparing process did not complete after $prepareTimeoutSECONDS seconds, then clean-up and try again later.
+			if [[ "$prepareTIMEOUT" == "TRUE" ]]; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM PREPARE TIMEOUT FAILURE ****"
+				sendToUpdateLog "Error: Preparation of system update/upgrade via mdm timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToLog "Error: Preparation of system update/upgrade via mdm timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				sendToStatus "Pending: Preparation of system update/upgrade via mdm timed out after $prepareTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+				kickAppleSoftwareUpdate
+				makeLaunchDaemonCalendar
+			fi
 		fi
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}:  updateTIMEOUT: $updateTIMEOUT"
 		
-		# If the update completed, then prepare for restart. However, if the update did not complete after $defaultTimeoutSECONDS seconds, then clean-up and try again later.
-		if [[ "$updateTIMEOUT" == "FALSE" ]]; then
+		workflowTIMEOUT="TRUE"
+		# This is the workflow once the download/prepare has been completed. Note this while read loop has a timeout based on $applyTimeoutSECONDS.
+		while read -t $applyTimeoutSECONDS -r logLINE ; do
+			if echo "$logLINE" | grep -q -w '(start): phase:APPLYING stalled:NO'; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE/UPGRADE COMPLETED ****"
+				sendToLog "Status: System update/upgrade is applying, restart is imminent..."
+				workflowTIMEOUT="FALSE"
+				break
+			fi
+		done < <(tail -n 0 -F "$updateLOG")
+		
+		# If the system update/upgrade completed, then prepare for restart.
+		if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
+			sendToLog "Status: Resetting update/upgrade cached settings."
+			defaults write "$superPLIST" UpdateValidate -bool true
+			unset recheckDeferSECONDS
 			defaults delete "$superPLIST" UpdatesAvailable 2> /dev/null
 			defaults delete "$superPLIST" UpdatesList 2> /dev/null
 			defaults delete "$superPLIST" UpdateDownloads 2> /dev/null
 			[[ "$majorUpgradeWORKFLOW" == "JAMF" ]] && defaults delete "$superPLIST" MajorUpgradeDownload 2> /dev/null
-			defaults write "$superPLIST" UpdateValidate -bool true
 			restartZeroDay
 			restartDeferralCounters
-			unset recheckDeferSECONDS
 			sendToStatus "Pending: At next system startup."
 			makeLaunchDaemonOnStartup
-		else # The update timed out so clean-up and try again later.
+		else # The system update/upgrade workflow timed out so clean-up and try again later.
 			kill -9 "$updateStreamPID" > /dev/null 2>&1
 			sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM UPDATE/UPGRADE TIMEOUT FAILURE ****"
-			sendToLog "Error: System update/upgrade via MDM push command timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-			sendToStatus "Pending: System update/upgrade via MDM push command timed out after $defaultTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToUpdateLog "Error: Applying update/upgrade via MDM timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToLog "Error: Applying update/upgrade via MDM timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+			sendToStatus "Pending: Applying update/upgrade via MDM timed out after $applyTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 			[[ "$currentUSER" != "FALSE" ]] && notifyFailure
 			kickAppleSoftwareUpdate
 			makeLaunchDaemonCalendar
 		fi
-	else # The MDM push workflow timed out so clean-up and try again later.
+	else # The MDM push workflow failed so clean-up and try again later.
+		kill -9 "$mdmStreamPID" > /dev/null 2>&1
+		sendToMDMLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW FAILURE ****"
+		sendToMDMLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		kill -9 "$updateStreamPID" > /dev/null 2>&1
 		sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM PUSH WORKFLOW FAILURE ****"
+		sendToUpdateLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		sendToLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		sendToLog "Error: Push workflow for install of system update/upgrade via MDM failed, trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Pending: Push workflow for install of system update/upgrade via MDM failed, trying again in $defaultDeferSECONDS seconds."
@@ -4120,7 +4321,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		killerPID=$!
 		dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 		dialogRETURN="$?"
-		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
+		kill -0 "$killerPID" && kill -9 "$killerPID" > /dev/null 2>&1
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
@@ -4149,7 +4350,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		killerPID=$!
 		dialogRESULT=$("$jamfHELPER" "${jamfHelperARRAY[@]}")
 		dialogRETURN="$?"
-		kill -0 $killerPID && kill -9 $killerPID > /dev/null 2>&1
+		kill -0 "$killerPID" && kill -9 "$killerPID" > /dev/null 2>&1
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
@@ -4595,8 +4796,8 @@ sendToStatus "Running: Main workflow..."
 
 # Check for available updates and upgrades. This sets $minorUpdatesRECOMMENDED, $minorUpdatesRESTART, $minorUpdatesDownloadREQUIRED, and $majorUpgradeTARGET.
 if [[ "$updateVALIDATE" == "TRUE" ]]; then # Checking after previous super system update, if successful, submit inventory to Jamf and check for Jamf Policies.
-	sendToLog "Status: System restart validation..."
-	sendToStatus "Running: System restart validation..."
+	sendToLog "Status: System update/upgrade restart validation workflow enabled."
+	sendToStatus "Running: System update/upgrade restart validation workflow enabled."
 	checkAfterRestart
 else # Default super workflow.
 	if [[ "$testModeOPTION" == "TRUE" ]]; then # Test mode...
@@ -4613,6 +4814,8 @@ else # Default super workflow.
 		minorUpdatesRECOMMENDED="FALSE"
 		minorUpdatesRESTART="FALSE"
 		minorUpdatesDownloadREQUIRED="FALSE"
+		majorUpgradeVERSION="FALSE"
+		majorUpgradeNAME="FALSE"
 		majorUpgradeTARGET="FALSE"
 		majorUpgradeDownloadREQUIRED="FALSE"
 	else # Not $testModeOPTION, $skipUpdatesOPTION, or $updateVALIDATE, so it's time for the regular softwareupdate check.
@@ -4634,6 +4837,11 @@ elif [[ "$minorUpdatesRECOMMENDED" == "TRUE" ]]; then
 	sendToLog "**** S.U.P.E.R.M.A.N. MINOR UPDATES ONLY ASU ****"
 else
 	sendToLog "Status: No Apple software updates/upgrades available. Some may be deferred via MDM."
+	# Clean up any leftover deferral counters.
+	defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null
+	defaults delete "$superPLIST" FocusCounter 2> /dev/null
+	defaults delete "$superPLIST" SoftCounter 2> /dev/null
+	defaults delete "$superPLIST" HardCounter 2> /dev/null
 fi
 
 # If non-restart required "recommended" Apple software updates are available, then install all available recommended (non-system) updates.
@@ -4705,18 +4913,28 @@ if [[ "$majorUpgradeTARGET" != "FALSE" ]] || [[ "$minorUpdatesRESTART" == "TRUE"
 	fi
 fi
 
-# Logically, at this point there are no required restarts, so check for $recheckDeferSECONDS.
+# Logically, at this point there are no minor system updates and no enabled major system upgrades, so check for $recheckDeferSECONDS.
 if [[ $(defaults read "$superPLIST" UpdateValidate 2> /dev/null) ]]; then
 	sendToLog "Exit: System update/upgrade restart is imminent, super is scheduled to run at next startup."
 	sendToStatus "Pending: System update/upgrade restart is imminent, super is scheduled to run at next startup."
 elif [[ -n "$recheckDeferSECONDS" ]]; then
-	sendToLog "Status: Recheck deferral should restart super in $recheckDeferSECONDS seconds."
-	sendToStatus "Pending: Recheck deferral should restart super in $recheckDeferSECONDS seconds."
+	if [[ "$majorUpgradeVERSION" != "FALSE" ]]; then
+		sendToLog "Status: A major system upgrade is available but not enabled. Recheck deferral should restart super in $recheckDeferSECONDS seconds."
+		sendToStatus "Inactive: A major system upgrade is available but not enabled. Recheck deferral should restart super in $recheckDeferSECONDS seconds."
+	else
+		sendToLog "Status: No available system updates/upgrades. Recheck deferral should restart super in $recheckDeferSECONDS seconds."
+		sendToStatus "Pending: No available system updates/upgrades. Recheck deferral should restart super in $recheckDeferSECONDS seconds."
+	fi
 	defaultDeferSECONDS="$recheckDeferSECONDS"
 	makeLaunchDaemonCalendar
 else
-	sendToLog "Status: No available updates/upgrades and --recheck-defer is inactive or --skip-updates is enabled."
-	sendToStatus "Inactive: No available updates/upgrades and --recheck-defer is inactive or --skip-updates is enabled."
+	if [[ "$majorUpgradeVERSION" != "FALSE" ]]; then
+		sendToLog "Status: A major system upgrade is available but not enabled, and no available minor system updates, and --recheck-defer is inactive."
+		sendToStatus "Inactive: A major system upgrade is available but not enabled, and no available minor system updates, and --recheck-defer is inactive."
+	else
+		sendToLog "Status: Recheck deferral is inactive."
+		sendToStatus "Inactive: Recheck deferral is inactive."
+	fi
 	sendToPending "Inactive."
 	removeLaunchDaemon
 fi

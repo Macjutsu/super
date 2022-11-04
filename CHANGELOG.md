@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [3.0b3]
+
+2022-11-03
+
+- New timeouts for each distinct update phase. These timeouts can be customized in the `setDefaults()` function of the script; `checkTimeoutSECONDS=120`, `recommendedTimeoutSECONDS=300`, `mdmTimeoutSECONDS=120`, `downloadTimeoutSECONDS=120`, `prepareTimeoutSECONDS=600`, `applyTimeoutSECONDS=60`, and `asuTimeoutSECONDS=300`.
+- Optimizations to the major system upgrade detection that improve reliability and performance.
+- Fixed issues that prevented the post-restart validation workflow from running and completing after installing a minor system update via `softwareupdate`.
+- A wide variety of general and `--verbose-mode` logging improvements.
+- `super` 3.0b3 SHA-256: e845729d8227d5c71e25971464e99ad477aaca7f1b6970fec6aeb05c4beb6948
+
 ## [3.0b2]
 
 2022-10-22
