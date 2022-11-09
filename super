@@ -3128,7 +3128,7 @@ if [[ $macosMAJOR -ge 11 ]]; then
 	sendToLog "Status: Check $asuLOG, $updateLOG, or /var/log/install.log for more detail."
 	[[ $macosMAJOR -ge 11 ]] && kickAppleSoftwareUpdate # For macOS 11 or later restarting the softwareupdate processes helps to prevent system updates from hanging.
 	sendToUpdateLog "**** S.U.P.E.R.M.A.N. ASU MINOR SYSTEM DOWNLOAD START ****"
-	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+	log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress" || eventMessage CONTAINS[c] "SUMacControllerCommandDownloadAndPrepareUpdate | SUCCESS")' >> "$updateLOG" &
 	updateStreamPID=$!
 else
 	sendToLog "Status: Check $asuLOG or /var/log/install.log for more detail."
@@ -3168,6 +3168,7 @@ fi
 if [[ $macosMAJOR -ge 11 ]]; then
 	logPROGRESS=""
 	downloadTIMEOUT="TRUE"
+	alreadyDownloaded="FALSE"
 	# Note this while read loop has a timeout based on $downloadTimeoutSECONDS.
 	while read -t $downloadTimeoutSECONDS -r logLINE ; do
 		if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE stalled:NO'; then
@@ -3179,6 +3180,13 @@ if [[ $macosMAJOR -ge 11 ]]; then
 			[[ "$logPROGRESS" != "Preparing" ]] && sendToUpdateLog "Status: Download complete, now preparing minor system update, should be done in a few minutes..."
 			logPROGRESS="Preparing"
 			downloadTIMEOUT="FALSE"
+			break
+		fi
+		if echo "$logLINE" | grep -q -w '\[SUMacController\]SUMacControllerCommandDownloadAndPrepareUpdate | SUCCESS'; then
+			sendToLog "Status: SUMacControllerCommandDownloadAndPrepareUpdate success, skipping prep step..."
+			downloadTIMEOUT="FALSE"
+			workflowTIMEOUT="FALSE"
+			alreadyDownloaded="TRUE"
 			break
 		fi
 	done < <(tail -n 0 -F "$updateLOG")
@@ -3197,17 +3205,19 @@ if [[ $macosMAJOR -ge 11 ]]; then
 		makeLaunchDaemonCalendar
 	fi
 	
-	workflowTIMEOUT="TRUE"
-	# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
-	while read -t $prepareTimeoutSECONDS -r logLINE ; do
-		if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
-			kill -9 "$updateStreamPID" > /dev/null 2>&1
-			sendToLog "Status: Minor system update is downloaded and prepared."
-			sendToUpdateLog "Status: Minor system update is downloaded and prepared."
-			workflowTIMEOUT="FALSE"
-			break
-		fi
-	done < <(tail -n 0 -F "$updateLOG")
+	if [[ "$alreadyDownloaded" == "FALSE" ]]; then
+		workflowTIMEOUT="TRUE"
+		# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
+		while read -t $prepareTimeoutSECONDS -r logLINE ; do
+			if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToLog "Status: Minor system update is downloaded and prepared."
+				sendToUpdateLog "Status: Minor system update is downloaded and prepared."
+				workflowTIMEOUT="FALSE"
+				break
+			fi
+		done < <(tail -n 0 -F "$updateLOG")
+  fi
 else # For macOS 10.x, watch $asuLOG while waiting for the download workflow to complete. Note this while read loop has a timeout based on $asuTimeoutSECONDS.
 	while read -t $asuTimeoutSECONDS -r logLINE ; do
 		if echo "$logLINE" | grep -w 'Downloaded'; then
@@ -3278,7 +3288,7 @@ mdmStreamPID=$!
 
 # Start log streaming for softwareupdate progress and send to $updateLOG.
 sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD START ****"
-log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress")' >> "$updateLOG" &
+log stream --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress" || eventMessage CONTAINS[c] "SUMacControllerCommandDownloadAndPrepareUpdate | SUCCESS")' >> "$updateLOG" &
 updateStreamPID=$!
 
 # Send the Jamf Pro API command to download via MDM.
@@ -3359,6 +3369,7 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 	
 	logPROGRESS=""
 	downloadTIMEOUT="TRUE"
+	alreadyDownloaded="FALSE"
 	# Note this while read loop has a timeout based on $downloadTimeoutSECONDS.
 	while read -t $downloadTimeoutSECONDS -r logLINE ; do
 		if echo "$logLINE" | grep -q -w '(start): phase:DOWNLOADING_UPDATE stalled:NO'; then
@@ -3368,6 +3379,13 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 			[[ "$logPROGRESS" != "Preparing" ]] && sendToLog "Status: Download complete, now preparing system update/upgrade, should be done in a few minutes..."
 			logPROGRESS="Preparing"
 			downloadTIMEOUT="FALSE"
+			break
+		fi
+		if echo "$logLINE" | grep -q -w '\[SUMacController\]SUMacControllerCommandDownloadAndPrepareUpdate | SUCCESS'; then
+			sendToLog "Status: SUMacControllerCommandDownloadAndPrepareUpdate success, skipping prep step..."
+			downloadTIMEOUT="FALSE"
+			workflowTIMEOUT="FALSE"
+			alreadyDownloaded="TRUE"
 			break
 		fi
 	done < <(tail -n 0 -F "$updateLOG")
@@ -3382,19 +3400,20 @@ if [[ $commandRESULT -eq 200 ]] || [[ $commandRESULT -eq 201 ]]; then
 		kickAppleSoftwareUpdate
 		makeLaunchDaemonCalendar
 	fi
-	
-	workflowTIMEOUT="TRUE"
-	# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
-	while read -t $prepareTimeoutSECONDS -r logLINE ; do
-		if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
-			kill -9 "$updateStreamPID" > /dev/null 2>&1
-			sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD COMPLETED ****"
-			sendToLog "Status: System update/upgrade is downloaded and prepared."
-			workflowTIMEOUT="FALSE"
-			break
-		fi
-	done < <(tail -n 0 -F "$updateLOG")
-	
+	if [[ "$alreadyDownloaded" == "FALSE" ]]; then
+		workflowTIMEOUT="TRUE"
+		# Note this while read loop has a timeout based on $prepareTimeoutSECONDS.
+		while read -t $prepareTimeoutSECONDS -r logLINE ; do
+			if echo "$logLINE" | grep -q -w '(end): phase:PREPARED stalled:NO'; then
+				kill -9 "$updateStreamPID" > /dev/null 2>&1
+				sendToUpdateLog "**** S.U.P.E.R.M.A.N. MDM SYSTEM DOWNLOAD COMPLETED ****"
+				sendToLog "Status: System update/upgrade is downloaded and prepared."
+				workflowTIMEOUT="FALSE"
+				break
+			fi
+		done < <(tail -n 0 -F "$updateLOG")
+	fi
+
 	# If the system download completed.
 	if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
 		if [[ "$majorUpgradeWORKFLOW" == "JAMF" ]]; then
