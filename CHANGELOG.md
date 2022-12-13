@@ -4,7 +4,7 @@
 
 2022-12-12
 
-- UPGRADE NOTICE: Versions of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.1 to macOS 13.1. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.
+- __UPGRADE NOTICE: Versions of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.1 to macOS 13.1. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
 - New `--allow-upgrade` option can automatically enforce all contemporary macOS upgrade workflows from macOS 10.14 (older macOS versions may work but are not tested) to macOS 13.X. This includes support for Intel, Apple Silicon via local authentication, Apple Silicon via Jamf Pro API authentication, and Apple Silicon user request (similar to Nudge).
 - New `--target-upgrade=version` option allows you to specify a major macOS version (11, 12, or 13) as the maximum allowed macOS upgrade.
 - The previously introduced `--push-major-upgrade` option has been removed as it's no longer necessary because `super` automatically selects the most appropriate upgrade workflow.
