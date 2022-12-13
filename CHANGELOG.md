@@ -15,7 +15,7 @@
 - Significantly improved download validation and caching mechanisms further enhance download reliability and performance.
 - All recommended (non-macOS) software updates now install immediately after the system is restarted. This is to avoid interrupting the user (when updating things like Safari) and to avoid unnecessary installations if performing a macOS upgrade.
 - Boolean options (on/off) can now be specified using a more uniform "on" or "off" in the option's name. For example, test mode can now be enabled with the original `--test-mode` or the new `--test-mode-on` and toggled off with the original `--no-test-mode` or the new `--test-mode-off`.
-- For macOS 13 or later, there is now a [Managed Login Item Configuration Profile](https://github.com/Macjutsu/super/blob/3.0b1/Super-Friends/Managed-Login-Item.mobileconfig) example for use when deploying `super` to managed systems.
+- For macOS 13 or later, there is now a [Managed Login Item Configuration Profile](https://github.com/Macjutsu/super/blob/main/Example-MDM/Managed-Login-Item.mobileconfig) example for use when deploying `super` to managed systems.
 - The logs maintained by `super` have (once again) been renamed to facilitate the new update/upgrade workflows. As always, the log descriptions and locations can be found in the internal `setDefaults()` function.
 - Significantly improved logging now identifies more failure modes and also includes live macOS update/upgrade download progress status when watching `super` via command line.
 - Countless log text changes, comment text clarification, and internal object renaming to facilitate new update/upgrade workflows.
