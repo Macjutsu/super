@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [3.0b4]
+
+2022-12-12
+
+- UPGRADE NOTICE: Versions of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.1 to macOS 13.1. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.
+- New `--allow-upgrade` option can automatically enforce all contemporary macOS upgrade workflows from macOS 10.14 (older macOS versions may work but are not tested) to macOS 13.X. This includes support for Intel, Apple Silicon via local authentication, Apple Silicon via Jamf Pro API authentication, and Apple Silicon user request (similar to Nudge).
+- New `--target-upgrade=version` option allows you to specify a major macOS version (11, 12, or 13) as the maximum allowed macOS upgrade.
+- The previously introduced `--push-major-upgrade` option has been removed as it's no longer necessary because `super` automatically selects the most appropriate upgrade workflow.
+- New support for the "softwareupdate-based" upgrade workflow from macOS 12.3 or later to macOS 13.x. This upgrade workflow is much faster than traditional macOS installation-based upgrades.
+- New automatic installation of [erase-install.sh](https://github.com/grahampugh/erase-install) to facilitate downloading the full system installer that is required for upgrading older macOS versions.
+- To reliably support all macOS upgrade workflows, the minimum supported version of Jamf Pro is now 10.38 or later.
+- Completely re-written download workflow always downloads the appropriate macOS update or upgrade locally (no more failed MDM downloads!) before prompting the user to restart.
+- Significantly improved download validation and caching mechanisms further enhance download reliability and performance.
+- All recommended (non-macOS) software updates now install immediately after the system is restarted. This is to avoid interrupting the user (when updating things like Safari) and to avoid unnecessary installations if performing a macOS upgrade.
+- Boolean options (on/off) can now be specified using a more uniform "on" or "off" in the option's name. For example, test mode can now be enabled with the original `--test-mode` or the new `--test-mode-on` and toggled off with the original `--no-test-mode` or the new `--test-mode-off`.
+- For macOS 13 or later, there is now a [Managed Login Item Configuration Profile](https://github.com/Macjutsu/super/blob/3.0b1/Super-Friends/Managed-Login-Item.mobileconfig) example for use when deploying `super` to managed systems.
+- The logs maintained by `super` have (once again) been renamed to facilitate the new update/upgrade workflows. As always, the log descriptions and locations can be found in the internal `setDefaults()` function.
+- Significantly improved logging now identifies more failure modes and also includes live macOS update/upgrade download progress status when watching `super` via command line.
+- Countless log text changes, comment text clarification, and internal object renaming to facilitate new update/upgrade workflows.
+- It's no longer necessary to specify the `--skip-updates-on` option with the `--policy-triggers` option to run Jamf Pro Policies when there are no macOS updates/upgrades available.
+- `super` 3.0b4 SHA-256: 4e62e721266ccb4e93fad48c9e928f3a29eb2ab62e10a83950a7728a59863fb6
+
 ## [3.0b3]
 
 2022-11-03

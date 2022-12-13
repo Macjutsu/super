@@ -78,6 +78,10 @@
                   <string>$JSSID</string>
                   <key>MenuDefer</key>
                   <string>120,200,300</string>
+                  <key>AllowUpgrade</key>
+                  <true/>
+                  <key>TargetUpgrade</key>
+                  <string>12</string>
                   <key>PolicyTriggers</key>
                   <string>trigger1,trigger2</string>
                   <key>PreferJamfHelper</key>

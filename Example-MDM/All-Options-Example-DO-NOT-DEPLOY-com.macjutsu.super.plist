@@ -44,6 +44,10 @@
 	<string>128</string>
 	<key>PreferJamfHelper</key>
 	<false/>
+	<key>AllowUpgrade</key>
+	<true/>
+	<key>TargetUpgrade</key>
+	<string>12</string>
 	<key>PolicyTriggers</key>
 	<string>trigger1,trigger2</string>
 	<key>SkipUpdates</key>
