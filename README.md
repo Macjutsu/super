@@ -14,6 +14,8 @@ S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides admini
 
 Please visit the [S.U.P.E.R.M.A.N. Wiki](https://github.com/Macjutsu/super/wiki) for detailed documentation!
 
+__UPGRADE NOTICE: Versions of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.1 to macOS 13.1. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+
 Detailed update information can be found on both the [Change Log](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) and [Releases ](https://github.com/Macjutsu/super/releases) pages.
 
 You can also join the conversation at the [Mac Admins Foundation Slack](https://www.macadmins.org) in channel [#super](https://macadmins.slack.com/archives/C03LKQ8EN2C).
