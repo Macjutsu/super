@@ -11,6 +11,7 @@
 - All Apple Silicon computers using Jamf Pro API authentication now always upgrade macOS via the traditional installer workflow. (This is due to a limitation in the macOS MDM upgrade workflow, not in Jamf Pro or `super`.)
 - All Intel computers now ignore the MDM update/upgrade workflow as it provides no benefit over standard local system (root) authentication.
 - Resolved software update list cache validation issues on macOS 13.x.
+- Resolved software update download issue on macOS 13.x. (Huge thanks to @PicoMitchell for helping with this one!)
 - A variety of logging and timeout improvements including live macOS installer download progress status when watching `super` via command line.
 - `super` 3.0b5 SHA-256: 84023c8ccff2f22e5000fd35588935e5923b236cfc982b4686bc750f7908c2fc
 
