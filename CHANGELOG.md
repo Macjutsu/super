@@ -1,21 +1,35 @@
 # CHANGELOG
 
+## [3.0b5]
+
+2022-12-22
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- Dialog and Notification title bars now show the macOS update/upgrade version. For example, "macOS 13.1 Upgrade Requires Restart".
+- Re-organized (yet again) the macOS upgrade list workflow to better accommodate macOS 12.3 or newer systems, as such...
+- All macOS 12.3 or newer Intel computers and Apple Silicon computers using a local authentication workflow now always upgrade macOS via the much faster `softwareupdate` workflow. However...
+- All Apple Silicon computers using Jamf Pro API authentication now always upgrade macOS via the traditional installer workflow. (This is due to a limitation in the macOS MDM upgrade workflow, not in Jamf Pro or `super`.)
+- All Intel computers now ignore the MDM update/upgrade workflow as it provides no benefit over standard local system (root) authentication.
+- Resolved software update list cache validation issues on macOS 13.x.
+- A variety of logging and timeout improvements including live macOS installer download progress status when watching `super` via command line.
+- `super` 3.0b5 SHA-256: 84023c8ccff2f22e5000fd35588935e5923b236cfc982b4686bc750f7908c2fc
+
 ## [3.0b4]
 
 2022-12-12
 
-- __UPGRADE NOTICE: Versions of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.1 to macOS 13.1. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
-- New `--allow-upgrade` option can automatically enforce all contemporary macOS upgrade workflows from macOS 10.14 (older macOS versions may work but are not tested) to macOS 13.X. This includes support for Intel, Apple Silicon via local authentication, Apple Silicon via Jamf Pro API authentication, and Apple Silicon user request (similar to Nudge).
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New `--allow-upgrade` option can automatically enforce all contemporary macOS upgrade workflows from macOS 10.14 (older macOS versions may work but are not tested) to macOS 13.x. This includes support for Intel, Apple Silicon via local authentication, Apple Silicon via Jamf Pro API authentication, and Apple Silicon user request (similar to Nudge).
 - New `--target-upgrade=version` option allows you to specify a major macOS version (11, 12, or 13) as the maximum allowed macOS upgrade.
 - The previously introduced `--push-major-upgrade` option has been removed as it's no longer necessary because `super` automatically selects the most appropriate upgrade workflow.
-- New support for the "softwareupdate-based" upgrade workflow from macOS 12.3 or later to macOS 13.x. This upgrade workflow is much faster than traditional macOS installation-based upgrades.
+- New support for the "softwareupdate-based" upgrade workflow from macOS 12.3 or newer to macOS 13.x. This upgrade workflow is much faster than traditional macOS installation-based upgrades.
 - New automatic installation of [erase-install.sh](https://github.com/grahampugh/erase-install) to facilitate downloading the full system installer that is required for upgrading older macOS versions.
-- To reliably support all macOS upgrade workflows, the minimum supported version of Jamf Pro is now 10.38 or later.
+- To reliably support all macOS upgrade workflows, the minimum supported version of Jamf Pro is now 10.38 or newer.
 - Completely re-written download workflow always downloads the appropriate macOS update or upgrade locally (no more failed MDM downloads!) before prompting the user to restart.
 - Significantly improved download validation and caching mechanisms further enhance download reliability and performance.
 - All recommended (non-macOS) software updates now install immediately after the system is restarted. This is to avoid interrupting the user (when updating things like Safari) and to avoid unnecessary installations if performing a macOS upgrade.
 - Boolean options (on/off) can now be specified using a more uniform "on" or "off" in the option's name. For example, test mode can now be enabled with the original `--test-mode` or the new `--test-mode-on` and toggled off with the original `--no-test-mode` or the new `--test-mode-off`.
-- For macOS 13 or later, there is now a [Managed Login Item Configuration Profile](https://github.com/Macjutsu/super/blob/main/Example-MDM/Managed-Login-Item.mobileconfig) example for use when deploying `super` to managed systems.
+- For macOS 13 or newer, there is now a [Managed Login Item Configuration Profile](https://github.com/Macjutsu/super/blob/main/Example-MDM/Managed-Login-Item.mobileconfig) example for use when deploying `super` to managed systems.
 - The logs maintained by `super` have (once again) been renamed to facilitate the new update/upgrade workflows. As always, the log descriptions and locations can be found in the internal `setDefaults()` function.
 - Significantly improved logging now identifies more failure modes and also includes live macOS update/upgrade download progress status when watching `super` via command line.
 - Countless log text changes, comment text clarification, and internal object renaming to facilitate new update/upgrade workflows.
@@ -46,7 +60,7 @@
 2022-10-21
 
 - New support for macOS Ventura 13.
-- New `--push-major-upgrade` option (macOS 11.5 or later and managed by Jamf Pro) attempts to perform a major macOS upgrade via MDM command.
+- New `--push-major-upgrade` option (macOS 11.5 or newer and managed by Jamf Pro) attempts to perform a major macOS upgrade via MDM command.
 - New "Software Update Failed" notification when for when things go wrong after the user has already been notified to expect a restart... keep reading for further explanation...
 - New `SuperStauts` key in the `/Library/Management/super/com.macjutsu.super.plist` maintains the current status of `super`. This allows for easy querying of the genreral `super` status without viewing the entire `super.log`. Here is a [Jamf Pro Extension Attribute script](https://github.com/Macjutsu/super/blob/3.0b1/Super-Friends/super-Status-Jamf-Pro-EA.sh) to collect this when inventory is updated.
 - New `SuperPending` key in the `/Library/Management/super/com.macjutsu.super.plist` maintains the pending restart date of `super`. This allows for easy querying of the genreral `super` pending restart date without viewing the entire `super.log`. Here is a [Jamf Pro Extension Attribute script](https://github.com/Macjutsu/super/blob/3.0b1/Super-Friends/super-Pending-Date-Jamf-Pro-EA.sh) to collect this when inventory is updated.
@@ -94,9 +108,9 @@
 2022-08-01
 
 - Re-arranged the main workflow so that if there is no current user then the system update is attempted immediately, thus skipping the pre-download functions. This prevents an issue where in some cases `softwareupdate` was re-downloading the system update.
-- Significant rewrite of the `softwarupdate` workflows to fully support macOS 11 and later on both Intel and Apple Silicon computers. The previous "macOS Monterey Notification Fix" is no longer necessary. (Huge thanks to @StephenGrall for help on this!)
-- The MDM update workflow via Jamf Pro is now supported on both Intel and Apple Silicon computers running macOS 11.5 and later.
-- Credentials for the MDM update workflow via Jamf Pro are now validated and saved on all versions of macOS, thus allowing for use of the MDM update workflow once the system has reached macOS 11.5 or later.
+- Significant rewrite of the `softwarupdate` workflows to fully support macOS 11 and newer on both Intel and Apple Silicon computers. The previous "macOS Monterey Notification Fix" is no longer necessary. (Huge thanks to @StephenGrall for help on this!)
+- The MDM update workflow via Jamf Pro is now supported on both Intel and Apple Silicon computers running macOS 11.5 and newer.
+- Credentials for the MDM update workflow via Jamf Pro are now validated and saved on all versions of macOS, thus allowing for use of the MDM update workflow once the system has reached macOS 11.5 or newer.
 - Updated the `checkCurrentUser()` function with more resilient code that now also collects the current UID.
 - Resolved an issue when validating the maximum seconds for the `--recheck-defer` option.
 
@@ -140,8 +154,8 @@
 
 2022-05-16
 
-- When used with Jamf Pro 10.38 or later, all MDM software update commands now use the Jamf Pro API (as opposed to the Classic API).
-- When used with Jamf Pro 10.38 or later, system updates via MDM now forces a restart by killing any apps that don't quit when requested.
+- When used with Jamf Pro 10.38 or newer, all MDM software update commands now use the Jamf Pro API (as opposed to the Classic API).
+- When used with Jamf Pro 10.38 or newer, system updates via MDM now forces a restart by killing any apps that don't quit when requested.
 - More reliable logging when downloading and preparing updates via MDM.
 - The `--verbose-mode` option now shows the percentage complete when downloading and preparing updates via MDM.
 - The `--policy-triggers` option now detects when Jamf Pro Policies complete with success or failure. If all Jamf Pro Policies completed, then the `--policy-triggers` option is automatically cleared.
@@ -158,7 +172,7 @@
 - The `--policy-triggers` option no longer requires the `--force-restart` option to take advantage of dialogs, notifications, deferrals, and deadline workflows. This allows Jamf Pro Policies to control when the computer restarts.
 - The `--policy-triggers` option now requires a local Jamf binary.
 - The `--force-restart` option no longer requires a local Jamf binary. Now using `shutdown -o -r +1` instead.
-- The `--open-logs` option now works with older versions of macOS. However, detailed MDM and `softwareupdate` logs are still only available for macOS 11 or later.
+- The `--open-logs` option now works with older versions of macOS. However, detailed MDM and `softwareupdate` logs are still only available for macOS 11 or newer.
 - Startup workflow now kills any previous IBM Notifier instance.
 - Jamf Pro Policies now called via `-event` instead of legacy `-trigger` ([#5](https://github.com/Macjutsu/super/pull/5), thanks to @kenchan0130).
 - Resolved text encoding issue causing "?" to appear in notifications and dialogs ([#6](https://github.com/Macjutsu/super/pull/6), thanks to @kenchan0130).
