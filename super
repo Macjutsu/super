@@ -6,8 +6,8 @@
 # S.U.P.E.R.M.A.N. optimizes the macOS update/upgrade experience.
 # by Kevin M. White
 #
-# Version 3.0b5
-# 2022/12/22
+superVERSION="3.0b6"
+superDATE="2023/01/06"
 # https://github.com/Macjutsu/super
 #
 # NOTE *** Debugging Stuff ***
@@ -28,8 +28,8 @@ echo "
   S.U.P.E.R.M.A.N.
   Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-  Version 3.0b5
-  2022/12/22
+  Version $superVERSION
+  $superDATE
   https://github.com/Macjutsu/super
 
   Usage:
@@ -116,7 +116,7 @@ if [[ -n ${unrecognizedOptionsARRAY[*]} ]]; then
 fi
 
 sendToLog "Exit: Show usage."
-sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 exit 0
 }
 
@@ -124,14 +124,14 @@ exit 0
 showHelp() {
 checkCurrentUser
 if [[ "$currentUSER" != "FALSE" ]]; then
-	sendToLog "Starter: Opening S.U.P.E.R.M.A.N. Wiki for user $currentUSER..."
+	sendToLog "Startup: Opening S.U.P.E.R.M.A.N. Wiki for user $currentUSER..."
 	sudo -u "$currentUSER" open "https://github.com/Macjutsu/super/wiki" &
 else
 	showUsage
 fi
 
 sendToLog "Exit: Show help."
-sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 exit 0
 }
 
@@ -208,6 +208,8 @@ eraseInstallCHECKSUM="e00faa05211144af49eadf350e2a3e94095754fa"
 
 # Path to the local erase-install folder:
 eraseInstallFOLDER="/Library/Management/erase-install"
+# IMPORTANT DETAIL: super will NOT move the default erase-install folder content to another custom location.
+# Changing this folder path to anything besides "/Library/Management/erase-install" requires that you must also deploy the erase-install folder to the custom location prior to using super.
 
 # Path to the local copy of erase-install.sh:
 eraseInstallSCRIPT="$eraseInstallFOLDER/erase-install.sh"
@@ -462,7 +464,7 @@ done
 getPreferences() {
 # If $deleteDEFFERALS is specified, then delete all local deferral preferences.
 if [[ "$deleteDEFFERALS" == "TRUE" ]]; then
-	sendToLog "Starter: Deleting all local deferral preferences."
+	sendToLog "Startup: Deleting all local deferral preferences."
 	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
 	defaults delete "$superPLIST" FocusDefer 2> /dev/null
 	defaults delete "$superPLIST" MenuDefer 2> /dev/null
@@ -471,7 +473,7 @@ fi
 
 # If $deleteCOUNTS is specified, then delete all local maximum deferral count deadline preferences.
 if [[ "$deleteCOUNTS" == "TRUE" ]]; then
-	sendToLog "Starter: Deleting all local maximum deferral count deadline preferences."
+	sendToLog "Startup: Deleting all local maximum deferral count deadline preferences."
 	defaults delete "$superPLIST" FocusCount 2> /dev/null
 	defaults delete "$superPLIST" SoftCount 2> /dev/null
 	defaults delete "$superPLIST" HardCount 2> /dev/null
@@ -479,7 +481,7 @@ fi
 
 # If $deleteDAYS is specified, then delete all local maximum day deadline preferences.
 if [[ "$deleteDAYS" == "TRUE" ]]; then
-	sendToLog "Starter: Deleting all local maximum day deadline preferences."
+	sendToLog "Startup: Deleting all local maximum day deadline preferences."
 	defaults delete "$superPLIST" FocusDays 2> /dev/null
 	defaults delete "$superPLIST" SoftDays 2> /dev/null
 	defaults delete "$superPLIST" HardDays 2> /dev/null
@@ -488,7 +490,7 @@ fi
 
 # If $deleteDATES is specified, then delete all local date deadline preferences.
 if [[ "$deleteDATES" == "TRUE" ]]; then
-	sendToLog "Starter: Deleting all local date deadline preferences."
+	sendToLog "Startup: Deleting all local date deadline preferences."
 	defaults delete "$superPLIST" FocusDate 2> /dev/null
 	defaults delete "$superPLIST" SoftDate 2> /dev/null
 	defaults delete "$superPLIST" HardDate 2> /dev/null
@@ -496,7 +498,7 @@ fi
 
 # If $resetLocalPROPERTIES is specified, then delete all local non-account preferences.
 if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
-	sendToLog "Starter: Deleting all local non-account preferences."
+	sendToLog "Startup: Deleting all local non-account preferences."
 	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
 	defaults delete "$superPLIST" FocusDefer 2> /dev/null
 	defaults delete "$superPLIST" MenuDefer 2> /dev/null
@@ -762,7 +764,7 @@ regexMACOSMAJORVERSION="^([1][1-9])$"
 
 # Validate $defaultDeferOPTION input and if valid override default $defaultDeferSECONDS parameter and save to $superPLIST.
 if [[ "$defaultDeferOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for default deferral."
+	sendToLog "Startup: Deleting local preference for default deferral."
 	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
 elif [[ -n $defaultDeferOPTION ]] && [[ $defaultDeferOPTION =~ $regexNUMBER ]]; then
 	if [[ $defaultDeferOPTION -lt 120 ]]; then
@@ -781,7 +783,7 @@ fi
 
 # Validate $focusDeferOPTION input and if valid set $focusDeferSECONDS and save to $superPLIST.
 if [[ "$focusDeferOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for Focus deferral."
+	sendToLog "Startup: Deleting local preference for Focus deferral."
 	defaults delete "$superPLIST" FocusDefer 2> /dev/null
 elif [[ -n $focusDeferOPTION ]] && [[ $focusDeferOPTION =~ $regexNUMBER ]]; then
 	if [[ $focusDeferOPTION -lt 120 ]]; then
@@ -800,7 +802,7 @@ fi
 
 # Validate $menuDeferOPTION input and if valid set $menuDeferSECONDS and save to $superPLIST.
 if [[ "$menuDeferOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for menu deferral."
+	sendToLog "Startup: Deleting local preference for menu deferral."
 	defaults delete "$superPLIST" MenuDefer 2> /dev/null
 elif [[ -n $menuDeferOPTION ]] && [[ $menuDeferOPTION =~ $regexMENU ]]; then
 	oldIFS="$IFS"; IFS=','
@@ -823,7 +825,7 @@ fi
 
 # Validate $recheckDeferOPTION input and if valid set $recheckDeferSECONDS and save to $superPLIST.
 if [[ "$recheckDeferOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for recheck deferral."
+	sendToLog "Startup: Deleting local preference for recheck deferral."
 	defaults delete "$superPLIST" RecheckDefer 2> /dev/null
 elif [[ -n $recheckDeferOPTION ]] && [[ $recheckDeferOPTION =~ $regexNUMBER ]]; then
 	if [[ $recheckDeferOPTION -lt 120 ]]; then
@@ -847,7 +849,7 @@ fi
 
 # Validate $focusCountOPTION input and if valid set $focusCountMAX and save to $superPLIST.
 if [[ "$focusCountOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for focus count deadline."
+	sendToLog "Startup: Deleting local preference for focus count deadline."
 	defaults delete "$superPLIST" FocusCount 2> /dev/null
 elif [[ -n $focusCountOPTION ]] && [[ $focusCountOPTION =~ $regexNUMBER ]]; then
 	focusCountMAX="$focusCountOPTION"
@@ -858,7 +860,7 @@ fi
 
 # Validate $softCountOPTION input and if valid set $softCountMAX.
 if [[ "$softCountOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for soft count deadline."
+	sendToLog "Startup: Deleting local preference for soft count deadline."
 	defaults delete "$superPLIST" SoftCount 2> /dev/null
 elif [[ -n $softCountOPTION ]] && [[ $softCountOPTION =~ $regexNUMBER ]]; then
 	softCountMAX="$softCountOPTION"
@@ -868,7 +870,7 @@ fi
 
 # Validate $hardCountOPTION input and if valid set $hardCountMAX.
 if [[ "$hardCountOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for hard count deadline."
+	sendToLog "Startup: Deleting local preference for hard count deadline."
 	defaults delete "$superPLIST" HardCount 2> /dev/null
 elif [[ -n $hardCountOPTION ]] && [[ $hardCountOPTION =~ $regexNUMBER ]]; then
 	hardCountMAX="$hardCountOPTION"
@@ -886,7 +888,7 @@ fi
 
 # Validate $focusDaysOPTION input and if valid set $focusDaysMAX and $focusDaysSECONDS.
 if [[ "$focusDaysOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for focus days deadline."
+	sendToLog "Startup: Deleting local preference for focus days deadline."
 	defaults delete "$superPLIST" FocusDays 2> /dev/null
 elif [[ -n $focusDaysOPTION ]] && [[ $focusDaysOPTION =~ $regexNUMBER ]]; then
 	focusDaysMAX="$focusDaysOPTION"
@@ -897,7 +899,7 @@ fi
 
 # Validate $softDaysOPTION input and if valid set $softDaysMAX and $softDaysSECONDS.
 if [[ "$softDaysOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for soft days deadline."
+	sendToLog "Startup: Deleting local preference for soft days deadline."
 	defaults delete "$superPLIST" SoftDays 2> /dev/null
 elif [[ -n $softDaysOPTION ]] && [[ $softDaysOPTION =~ $regexNUMBER ]]; then
 	softDaysMAX="$softDaysOPTION"
@@ -908,7 +910,7 @@ fi
 
 # Validate $hardDaysOPTION input and if valid set $hardDaysMAX and $hardDaysSECONDS.
 if [[ "$hardDaysOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for hard days deadline."
+	sendToLog "Startup: Deleting local preference for hard days deadline."
 	defaults delete "$superPLIST" HardDays 2> /dev/null
 elif [[ -n $hardDaysOPTION ]] && [[ $hardDaysOPTION =~ $regexNUMBER ]]; then
 	hardDaysMAX="$hardDaysOPTION"
@@ -935,7 +937,7 @@ fi
 
 # Validate $zeroDayOPTION, and if valid set $zeroDayOVERRIDE.
 if [[ "$zeroDayOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for manual zero day override date."
+	sendToLog "Startup: Deleting local preference for manual zero day override date."
 	defaults delete "$superPLIST" ZeroDay 2> /dev/null
 elif [[ -n $zeroDayOPTION ]]; then
 	extractDATE=$(echo "$zeroDayOPTION" | cut -c-10 )
@@ -975,7 +977,7 @@ fi
 
 # Validate $focusDateOPTION, if valid set $focusDateMAX and $focusDateEPOCH.
 if [[ "$focusDateOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for focus date deadline."
+	sendToLog "Startup: Deleting local preference for focus date deadline."
 	defaults delete "$superPLIST" FocusDate 2> /dev/null
 elif [[ -n $focusDateOPTION ]]; then
 	extractDATE=$(echo "$focusDateOPTION" | cut -c-10 )
@@ -1008,7 +1010,7 @@ fi
 
 # Validate $softDateOPTION, if valid set $softDateMAX and $softDateEPOCH.
 if [[ "$softDateOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for soft date deadline."
+	sendToLog "Startup: Deleting local preference for soft date deadline."
 	defaults delete "$superPLIST" SoftDate 2> /dev/null
 elif [[ -n $softDateOPTION ]]; then
 	extractDATE=$(echo "$softDateOPTION" | cut -c-10 )
@@ -1041,7 +1043,7 @@ fi
 
 # Validate $hardDateOPTION, if valid set $hardDateMAX and $hardDateEPOCH.
 if [[ "$hardDateOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for hard date deadline."
+	sendToLog "Startup: Deleting local preference for hard date deadline."
 	defaults delete "$superPLIST" HardDate 2> /dev/null
 elif [[ -n $hardDateOPTION ]]; then
 	extractDATE=$(echo "$hardDateOPTION" | cut -c-10 )
@@ -1096,7 +1098,7 @@ fi
 
 # Validate $displayTimeoutOPTION and $displayRedrawOPTION inputs and if valid set $displayTimeoutSECONDS and $displayRedrawSECONDS and save to $superPLIST.
 if [[ "$displayTimeoutOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for display timeout."
+	sendToLog "Startup: Deleting local preference for display timeout."
 	defaults delete "$superPLIST" DisplayTimeout 2> /dev/null
 elif [[ -n $displayTimeoutOPTION ]] && [[ $displayTimeoutOPTION =~ $regexNUMBER ]]; then
 	displayTimeoutSECONDS="$displayTimeoutOPTION"
@@ -1105,7 +1107,7 @@ elif [[ -n $displayTimeoutOPTION ]] && ! [[ $displayTimeoutOPTION =~ $regexNUMBE
 	sendToLog "Parameter Error: The display timeout must only be a number."; parameterERROR="TRUE"
 fi
 if [[ "$displayRedrawOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for display redraw."
+	sendToLog "Startup: Deleting local preference for display redraw."
 	defaults delete "$superPLIST" DisplayRedraw 2> /dev/null
 elif [[ -n $displayRedrawOPTION ]] && [[ $displayRedrawOPTION =~ $regexNUMBER ]]; then
 	displayRedrawSECONDS="$displayRedrawOPTION"
@@ -1124,11 +1126,11 @@ fi
 
 # Verify the $displayIconOPTION to be used for the super service account and in notifications and dialogs, and if valid copy and set $cachedICON and save to $superPLIST.
 if [[ "$displayIconOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting cached display icon."
+	sendToLog "Startup: Deleting cached display icon."
 	[[ -f "$cachedICON" ]] && rm -f "$cachedICON"
 elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults read "$superPLIST" DisplayIconCache 2> /dev/null)" ]]; then
 	if [[ $(echo "$displayIconOPTION" | grep -c '^http://\|^https://') -gt 0 ]]; then
-		sendToLog "Starter: Attempting to download requested icon from: $displayIconOPTION"
+		sendToLog "Startup: Attempting to download requested icon from: $displayIconOPTION"
 		downloadRESULT=$(curl "$displayIconOPTION" -L -o "/tmp/cachedICON" 2>&1)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
 		if [[ -f "/tmp/cachedICON" ]]; then
@@ -1139,7 +1141,7 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 			sendToLog "Warning: Unable to download specified icon from: $displayIconOPTION"
 		fi
 	elif [[ -e "$displayIconOPTION" ]]; then
-		sendToLog "Starter: Copying requested icon from: $displayIconOPTION"
+		sendToLog "Startup: Copying requested icon from: $displayIconOPTION"
 		sipsRESULT=$(sips -s format png "$displayIconOPTION" --out "$cachedICON" 2>&1)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
 		defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
@@ -1148,7 +1150,7 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 	fi
 fi
 if [[ ! -f "$cachedICON" ]]; then
-	sendToLog "Starter: No custom display icon found, copying default icon from: $defaultICON"
+	sendToLog "Startup: No custom display icon found, copying default icon from: $defaultICON"
 	sipsRESULT=$(sips -s format png "$defaultICON" --out "$cachedICON" 2>&1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
 	defaults write "$superPLIST" DisplayIconCache -string "$defaultICON"
@@ -1156,7 +1158,7 @@ fi
 
 # Validate $iconSizeIbmOPTION input and if valid override default $ibmNotifierIconSIZE parameter and save to $superPLIST.
 if [[ "$iconSizeIbmOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for IBM Notifier icon size."
+	sendToLog "Startup: Deleting local preference for IBM Notifier icon size."
 	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
 elif [[ -n $iconSizeIbmOPTION ]] && [[ $iconSizeIbmOPTION =~ $regexNUMBER ]]; then
 	if [[ $iconSizeIbmOPTION -lt 32 ]]; then
@@ -1175,7 +1177,7 @@ fi
 
 # Validate $iconSizeJamfOPTION input and if valid override default $jamfHelperIconSIZE parameter and save to $superPLIST.
 if [[ "$iconSizeJamfOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for IBM Notifier icon size."
+	sendToLog "Startup: Deleting local preference for IBM Notifier icon size."
 	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
 elif [[ -n $iconSizeJamfOPTION ]] && [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]; then
 	if [[ $iconSizeJamfOPTION -lt 32 ]]; then
@@ -1194,7 +1196,7 @@ fi
 
 # Validate $policyTriggersOPTION input and if valid set $policyTRIGGERS and save to $superPLIST.
 if [[ "$policyTriggersOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for Jamf Pro Policy triggers."
+	sendToLog "Startup: Deleting local preference for Jamf Pro Policy triggers."
 	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
 elif [[ -n $policyTriggersOPTION ]]; then
 	policyTRIGGERS="$policyTriggersOPTION"
@@ -1233,7 +1235,7 @@ fi
 
 # Manage $targetUpgradeOPTION and if a valid macOS version then save to $superPLIST.
 if [[ "$targetUpgradeOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for macOS target upgrade version."
+	sendToLog "Startup: Deleting local preference for macOS target upgrade version."
 	defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
 	unset targetUpgradeOPTION
 elif [[ -n $targetUpgradeOPTION ]] && ! [[ $targetUpgradeOPTION =~ $regexMACOSMAJORVERSION ]]; then
@@ -1262,7 +1264,7 @@ fi
 
 # Validate $testModeTimeoutOPTION input and if valid set $testModeTimeoutSECONDS and save to $superPLIST.
 if [[ "$testModeTimeoutOPTION" == "X" ]]; then
-	sendToLog "Starter: Deleting local preference for test mode timeout."
+	sendToLog "Startup: Deleting local preference for test mode timeout."
 	defaults delete "$superPLIST" TestModeTimeout 2> /dev/null
 elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBER ]]; then
 	testModeTimeoutSECONDS="$testModeTimeoutOPTION"
@@ -1365,11 +1367,11 @@ superPROPERTY=$(defaults read "$superPLIST" SuperAccount 2> /dev/null)
 jamfPROPERTY=$(defaults read "$superPLIST" JamfAccount 2> /dev/null)
 
 # Some messaging to indicate if there are no saved accounts when a delete is requested.
-{ [[ -z $localPROPERTY ]] && [[ -z $superPROPERTY ]] && [[ -z $jamfPROPERTY ]] && [[ -n $deleteACCOUNTS ]]; } && sendToLog "Starter: No saved accounts to delete."
+{ [[ -z $localPROPERTY ]] && [[ -z $superPROPERTY ]] && [[ -z $jamfPROPERTY ]] && [[ -n $deleteACCOUNTS ]]; } && sendToLog "Startup: No saved accounts to delete."
 
 # If there was a previous $localPROPERTY account and the user specified $localOPTION or $deleteACCOUNTS then delete any previously saved local account credentials.
 if [[ -n $localPROPERTY ]] && { [[ -n $localOPTION ]] || [[ "$deleteACCOUNTS" == "TRUE" ]]; }; then
-	sendToLog "Starter: Deleting saved credentials for local account \"$localPROPERTY\"."
+	sendToLog "Startup: Deleting saved credentials for local account \"$localPROPERTY\"."
 	defaults delete "$superPLIST" LocalAccount > /dev/null 2>&1
 	security delete-generic-password -a "$localPROPERTY" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	unset localPROPERTY
@@ -1378,7 +1380,7 @@ fi
 
 # If there was a previous $superPROPERTY account and the user specified $adminACCOUNT or $deleteACCOUNTS then delete any previously saved super service account and credentials.
 if [[ -n $superPROPERTY ]] && { [[ -n $adminACCOUNT ]] || [[ "$deleteACCOUNTS" == "TRUE" ]]; } then
-	sendToLog "Starter: Deleting local account and saved credentials for super service account \"$superPROPERTY\"."
+	sendToLog "Startup: Deleting local account and saved credentials for super service account \"$superPROPERTY\"."
 	sysadminctl -deleteUser "$superPROPERTY" > /dev/null 2>&1
 	defaults delete "$superPLIST" SuperAccount > /dev/null 2>&1
 	security delete-generic-password -a "$superPROPERTY" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
@@ -1388,7 +1390,7 @@ fi
 
 # If there was a previous $jamfPROPERTY account and the user specified $jamfOPTION or $deleteACCOUNTS then delete any previously saved Jamf Pro API credentials.
 if [[ -n $jamfPROPERTY ]] && { [[ -n $jamfOPTION ]] || [[ "$deleteACCOUNTS" == "TRUE" ]]; } then
-	sendToLog "Starter: Deleting saved credentials for Jamf Pro API account \"$jamfPROPERTY\"."
+	sendToLog "Startup: Deleting saved credentials for Jamf Pro API account \"$jamfPROPERTY\"."
 	defaults delete "$superPLIST" JamfAccount > /dev/null 2>&1
 	security delete-generic-password -a "$jamfPROPERTY" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	unset jamfPROPERTY
@@ -1400,14 +1402,14 @@ fi
 
 # If a new local account was specified, save $localOPTION and $localPASSWORD credentials and then validate retrieval.
 if [[ -n $localOPTION ]]; then
-	sendToLog "Starter: Saving new credentials for local account \"$localOPTION\"..."
+	sendToLog "Startup: Saving new credentials for local account \"$localOPTION\"..."
 	defaults write "$superPLIST" LocalAccount -string "$localOPTION"
 	localACCOUNT=$(defaults read "$superPLIST" LocalAccount 2> /dev/null)
 	if [[ "$localOPTION" == "$localACCOUNT" ]]; then
 		security add-generic-password -a "$localACCOUNT" -s "Super Local Account" -w "$localPASSWORD" -T /usr/bin/security /Library/Keychains/System.keychain
 		localKEYCHAIN=$(security find-generic-password -w -a "$localACCOUNT" -s "Super Local Account" /Library/Keychains/System.keychain 2> /dev/null)
 		if [[ "$localPASSWORD" == "$localKEYCHAIN" ]]; then
-			sendToLog "Starter: Validated saved credentials for local account \"$localACCOUNT\"."
+			sendToLog "Startup: Validated saved credentials for local account \"$localACCOUNT\"."
 			localCREDENTIAL="TRUE"
 		else
 			sendToLog "Credential Error: Unable to validate saved password for local account \"$localACCOUNT\", deleting saved password."; credentialERROR="TRUE"
@@ -1438,16 +1440,16 @@ if [[ -n $adminACCOUNT ]]; then
 	fi
 	
 	# Save and validate new super service account credentials, and validate retrieval.
-	sendToLog "Starter: Saving new credentials for super service account \"$superNEWACCT\"..."
+	sendToLog "Startup: Saving new credentials for super service account \"$superNEWACCT\"..."
 	defaults write "$superPLIST" SuperAccount -string "$superNEWACCT"
 	superACCOUNT=$(defaults read "$superPLIST" SuperAccount 2> /dev/null)
 	if [[ "$superNEWACCT" == "$superACCOUNT" ]]; then
 		security add-generic-password -a "$superACCOUNT" -s "Super Service Account" -w "$superNEWPASS" -T /usr/bin/security /Library/Keychains/System.keychain
 		superKEYCHAIN=$(security find-generic-password -w -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain 2> /dev/null)
 		if [[ "$superNEWPASS" == "$superKEYCHAIN" ]]; then # If saved credentials are valid then create the new super service account.
-			sendToLog "Starter: Validated saved credentials for new super service account \"$superACCOUNT\"."
+			sendToLog "Startup: Validated saved credentials for new super service account \"$superACCOUNT\"."
 			if [[ $(id "$superACCOUNT" 2>&1 | grep -c 'no such user') -gt 0 ]]; then
-				sendToLog "Starter: Deleting existing super service account \"$superACCOUNT\" in preparation for new account."
+				sendToLog "Startup: Deleting existing super service account \"$superACCOUNT\" in preparation for new account."
 				sysadminctl -deleteUser "$superACCOUNT" > /dev/null 2>&1
 			fi
 			# Loop through local IDs to find the first vacant id after 500.
@@ -1455,7 +1457,7 @@ if [[ -n $adminACCOUNT ]]; then
 			while [[ $(id $newUID 2>&1 | grep -c 'no such user') -eq 0 ]]; do
 				newUID=$((newUID + 1))
 			done
-			sendToLog "Starter: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
+			sendToLog "Startup: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
 			addRESULT=$(sysadminctl -addUser "$superNEWACCT" -fullName "$superNEWFULL" -password "$superNEWPASS" -UID $newUID -GID 20 -shell /dev/null -home /dev/null -picture "$cachedICON" -adminUser "$adminACCOUNT" -adminPassword "$adminPASSWORD" 2>&1)
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: addRESULT: \n$addRESULT"
 			dscl . create /Users/"$superNEWACCT" IsHidden 1
@@ -1463,7 +1465,7 @@ if [[ -n $adminACCOUNT ]]; then
 			updateKEYCHAIN="$superKEYCHAIN"
 			checkLocalUpdateAccount
 			if [[ "$accountERROR" != "TRUE" ]]; then
-				sendToLog "Starter: Validated the creation of new super service account \"$superACCOUNT\"."
+				sendToLog "Startup: Validated the creation of new super service account \"$superACCOUNT\"."
 				superCREDENTIAL="TRUE"
 			else
 				sendToLog "Credential Error: Unable to validate newly created super service account \"$superACCOUNT\", deleting account"; credentialERROR="TRUE"
@@ -1484,14 +1486,14 @@ fi
 
 # If a new Jamf Pro API account was specified, save $jamfOPTION and $jamfPASSWORD credentials and then validate retrieval.
 if [[ -n $jamfOPTION ]]; then
-	sendToLog "Starter: Saving new credentials for Jamf Pro API account \"$jamfOPTION\"..."
+	sendToLog "Startup: Saving new credentials for Jamf Pro API account \"$jamfOPTION\"..."
 	defaults write "$superPLIST" JamfAccount -string "$jamfOPTION"
 	jamfACCOUNT=$(defaults read "$superPLIST" JamfAccount 2> /dev/null)
 	if [[ "$jamfOPTION" == "$jamfACCOUNT" ]]; then
 		security add-generic-password -a "$jamfACCOUNT" -s "Super MDM Account" -w "$jamfPASSWORD" -T /usr/bin/security /Library/Keychains/System.keychain
 		jamfKEYCHAIN=$(security find-generic-password -w -a "$jamfACCOUNT" -s "Super MDM Account" /Library/Keychains/System.keychain 2> /dev/null)
 		if [[ "$jamfPASSWORD" == "$jamfKEYCHAIN" ]]; then
-			sendToLog "Starter: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
+			sendToLog "Startup: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
 			jamfCREDENTIAL="TRUE"
 		else
 			sendToLog "Credential Error: Unable to validate saved password for Jamf Pro API account \"$jamfACCOUNT\", deleting saved password."; credentialERROR="TRUE"
@@ -1508,12 +1510,12 @@ if [[ -n $localPROPERTY ]]; then
 	localACCOUNT="$localPROPERTY"
 	localKEYCHAIN=$(security find-generic-password -w -a "$localACCOUNT" -s "Super Local Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n $localKEYCHAIN ]]; then
-		sendToLog "Starter: Found saved credentials for local account \"$localACCOUNT\"."
+		sendToLog "Startup: Found saved credentials for local account \"$localACCOUNT\"."
 		updateACCOUNT="$localACCOUNT"
 		updateKEYCHAIN="$localKEYCHAIN"
 		checkLocalUpdateAccount
 		if [[ "$accountERROR" != "TRUE" ]]; then
-			sendToLog "Starter: Validated saved credentials for local account \"$localACCOUNT\"."
+			sendToLog "Startup: Validated saved credentials for local account \"$localACCOUNT\"."
 			localCREDENTIAL="TRUE"
 		else
 			sendToLog "Credential Error: Unable to validate saved credentials for local account \"$localACCOUNT\"."; credentialERROR="TRUE"
@@ -1528,12 +1530,12 @@ if [[ -n $superPROPERTY ]]; then
 	superACCOUNT="$superPROPERTY"
 	superKEYCHAIN=$(security find-generic-password -w -a "$superACCOUNT" -s "Super Service Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n $superKEYCHAIN ]]; then
-		sendToLog "Starter: Found saved credentials for super service account \"$superACCOUNT\"."
+		sendToLog "Startup: Found saved credentials for super service account \"$superACCOUNT\"."
 		updateACCOUNT="$superACCOUNT"
 		updateKEYCHAIN="$superKEYCHAIN"
 		checkLocalUpdateAccount
 		if [[ "$accountERROR" != "TRUE" ]]; then
-			sendToLog "Starter: Validated saved credentials for super service account \"$superACCOUNT\"."
+			sendToLog "Startup: Validated saved credentials for super service account \"$superACCOUNT\"."
 			superCREDENTIAL="TRUE"
 		else
 			sendToLog "Credential Error: Unable to validate saved credentials for super service account \"$superACCOUNT\"."; credentialERROR="TRUE"
@@ -1548,13 +1550,13 @@ if [[ -n $jamfPROPERTY ]]; then
 	jamfACCOUNT="$jamfPROPERTY"
 	jamfKEYCHAIN=$(security find-generic-password -w -a "$jamfACCOUNT" -s "Super MDM Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n $jamfKEYCHAIN ]]; then
-		sendToLog "Starter: Found saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
+		sendToLog "Startup: Found saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
 		if [[ "$jamfSERVER" != "FALSE" ]]; then
 			getJamfProAccount
 			if [[ "$jamfERROR" != "TRUE" ]]; then
-				sendToLog "Starter: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
+				sendToLog "Startup: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
 				if [[ $(profiles status -type bootstraptoken | grep -i 'escrowed' | grep -ic 'yes') -ne 0 ]]; then
-					sendToLog "Starter: Bootstrap token escrow validated."
+					sendToLog "Startup: Bootstrap token escrow validated."
 					jamfCREDENTIAL="TRUE"
 				else
 					sendToLog "Credential Error: Can not use MDM workflow because this computer's Bootstrap token is not escrowed."; credentialERROR="TRUE"
@@ -1575,54 +1577,66 @@ if [[ -n $jamfPROPERTY ]]; then
 fi
 }
 
-# This function determines what $updateWORKFLOW and $upgradeWORKFLOW are possible given the architecture and authentication options.
+# This function determines what $updateWORKFLOW, $upgradeWORKFLOW, and betaWORKFLOW modes are possible given the architecture and authentication options.
 manageWorkflowOptions() {
 workflowERROR="FALSE"
 # Update/upgrade workflow modes: FALSE, JAMF, LOCAL, or USER
 updateWORKFLOW="FALSE"
 upgradeWORKFLOW="FALSE"
+# Beta workflow modes: FALSE, PublicSeed, CustomerSeed, or DeveloperSeed
+betaWORKFLOW="FALSE"
 
+# Logic to determin update/upgrade workflow.
 if [[ "$macOSARCH" == "arm64" ]]; then  # Mac computers with Apple Silicon.
-	sendToLog "Starter: Apple Silicon Mac computer running $(sw_vers -productName) $(sw_vers -productVersion)-$(sw_vers -buildVersion)."
-	sendToLog "Starter: Last macOS startup was $lastREBOOT."
+	sendToLog "Startup: Apple Silicon Mac computer running $(sw_vers -productName) $(sw_vers -productVersion)-$(sw_vers -buildVersion)."
+	sendToLog "Startup: Last macOS startup was $lastREBOOT."
 	if [[ "$localCREDENTIAL" == "TRUE" ]]; then
-		sendToLog "Starter: macOS update/upgrade workflows authenticated via local account."
+		sendToLog "Startup: macOS update/upgrade workflows authenticated via local account."
 		installACCOUNT="$localACCOUNT"
 		installPASSWORD="$localKEYCHAIN"
 		updateWORKFLOW="LOCAL"
 		[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="LOCAL"
 	elif [[ "$superCREDENTIAL" == "TRUE" ]]; then
-		sendToLog "Starter: macOS update/upgrade workflows authenticated via super service account."
+		sendToLog "Startup: macOS update/upgrade workflows authenticated via super service account."
 		installACCOUNT="$superACCOUNT"
 		installPASSWORD="$superKEYCHAIN"
 		updateWORKFLOW="LOCAL"
 		[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="LOCAL"
 	elif [[ "$jamfCREDENTIAL" == "TRUE" ]]; then
 		if [[ $macOSVERSION -ge 1103 ]]; then
-			sendToLog "Starter: macOS update/upgrade workflows authenticated via Jamf Pro API."
+			sendToLog "Startup: macOS update/upgrade workflows authenticated via Jamf Pro API."
 			updateWORKFLOW="JAMF"
 			[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="JAMF"
 		else
 			sendToLog "Warning: macOS update/upgrade enforcement via MDM is only available on macOS 11.3 or newer."
-			sendToLog "Starter: macOS update/upgrade workflows via user request."
+			sendToLog "Startup: macOS update/upgrade workflows via user request."
 			updateWORKFLOW="USER"
 			[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="USER"
 		fi
 	else
 		sendToLog "Warning: macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials."
-		sendToLog "Starter: macOS update/upgrade workflows via user request."
+		sendToLog "Startup: macOS update/upgrade workflows via user request."
 		updateWORKFLOW="USER"
 		[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="USER"
 	fi
 else # Mac computers with Intel.
-	sendToLog "Starter: Intel Mac computer running macOS $(sw_vers -productVersion)-$(sw_vers -buildVersion)."
-	sendToLog "Starter: Last macOS startup was $lastREBOOT."
-	sendToLog "Starter: macOS update/upgrade workflows via system account (root)."
+	sendToLog "Startup: Intel Mac computer running macOS $(sw_vers -productVersion)-$(sw_vers -buildVersion)."
+	sendToLog "Startup: Last macOS startup was $lastREBOOT."
+	sendToLog "Startup: macOS update/upgrade workflows via system account (root)."
 	updateWORKFLOW="LOCAL"
 	[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="LOCAL"
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateWORKFLOW: $updateWORKFLOW"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW: $upgradeWORKFLOW"
+
+# Check for beta program enrollment.
+seedutilSTATUS=$(/System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil current)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: seedutilSTATUS:\n$seedutilSTATUS"
+if [[ $(echo "$seedutilSTATUS" | grep -c 'Is Enrolled: YES') -gt 0 ]]; then
+	betaWORKFLOW=$(echo "$seedutilSTATUS" | awk '/Currently enrolled in:/ {print $4;}')
+	sendToLog "Startup: This system is currently enrolled in beta access program: $betaWORKFLOW"
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: betaWORKFLOW: $betaWORKFLOW"
 }
 
 # MARK: *** Installation & Startup ***
@@ -1630,7 +1644,7 @@ fi
 
 # Download and install the IBM Notifier.app.
 getIbmNotifier() {
-sendToLog "Starter: Attempting to download and install IBM Notifier.app..."
+sendToLog "Startup: Attempting to download and install IBM Notifier.app..."
 downloadRESULT=$(curl "$ibmNotifierURL" -L -o "/tmp/IBM.Notifier.zip" 2>&1)
 if [[ -f "/tmp/IBM.Notifier.zip" ]]; then
 	unzipRESULT=$(unzip "/tmp/IBM.Notifier.zip" -d "$superFOLDER/" 2>&1)
@@ -1668,7 +1682,7 @@ fi
 
 # Download and install the erase-install.pkg.
 getEraseInstall() {
-sendToLog "Starter: Attempting to download and install erase-install.pkg..."
+sendToLog "Startup: Attempting to download and install erase-install.pkg..."
 downloadRESULT=$(curl "$eraseInstallURL" -L -o "/tmp/erase-install.pkg" 2>&1)
 if [[ -f "/tmp/erase-install.pkg" ]]; then
 	installRESULT=$(installer -verboseR -pkg "/tmp/erase-install.pkg" -target / 2>&1)
@@ -1728,7 +1742,7 @@ if [[ -e "$jamfBINARY" ]]; then
 		sendToLog "Helper Error: Jamf Pro $jamfVERSION is not supported."; helperERROR="TRUE"
 	fi
 else
-	sendToLog "Starter: Unable to locate jamf binary at: $jamfBINARY"
+	sendToLog "Startup: Unable to locate jamf binary at: $jamfBINARY"
 fi
 
 # Manage $preferJamfHelperOPTION and save to $superPLIST.
@@ -1757,7 +1771,7 @@ if [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		else
 			checkIbmNotifier
 			if [[ "$ibmNotifierVALID" == "FALSE" ]]; then
-				sendToLog "Starter: Removing existing IBM Notifier.app."
+				sendToLog "Startup: Removing existing IBM Notifier.app."
 				rm -Rf "$ibmNotifierAPP" > /dev/null 2>&1
 				[[ -d "$superFOLDER/__MACOSX" ]] && rm -Rf "$superFOLDER/__MACOSX" > /dev/null 2>&1
 				getIbmNotifier
@@ -1769,7 +1783,7 @@ if [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		sendToLog "Warning: IBM Notifier.app is not compatible with this version of macOS, attempting fallback to jamfHelper."
 	fi
 else
-	[[ "$helperERROR" == "FALSE" ]] && sendToLog "Starter: Prefer jamfHelper mode enabled."
+	[[ "$helperERROR" == "FALSE" ]] && sendToLog "Startup: Prefer jamfHelper mode enabled."
 fi
 
 # If there is no IBM Notifier.app, then validate $jamfHelper.
@@ -1789,7 +1803,7 @@ if [[ "$upgradeWORKFLOW" != "FALSE" ]]; then
 	else
 		checkEraseInstall
 		if [[ "$eraseInstallVALID" == "FALSE" ]]; then
-			sendToLog "Starter: Removing existing erase-install items."
+			sendToLog "Startup: Removing existing erase-install items."
 			rm -Rf "$eraseInstallFOLDER" > /dev/null 2>&1
 			getEraseInstall
 			[[ -d "$eraseInstallFOLDER" ]] && checkEraseInstall
@@ -1801,27 +1815,27 @@ fi
 }
 
 # Install items required by super.
-superInstaller() {
-# Figure out where super is running from and start Installer log if anything needs to be installed.
+superInstallation() {
+# Figure out where super is running from and start Installation log if anything needs to be installed.
 superPATH="$(dirname "$0")"
-{ [[ ! -d "$superFOLDER" ]] || ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; } } && sendToLog "**** S.U.P.E.R.M.A.N. INSTALLER ****"
+{ [[ ! -d "$superFOLDER" ]] || ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; } } && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALLATION ****"
 
 # Make sure the $superFOLDER exists.
 if [[ ! -d "$superFOLDER" ]]; then
 	mkdir -p "$superFOLDER"
-	sendToLog "Installer: Made working folder: $superFOLDER"
+	sendToLog "Installation: Made working folder: $superFOLDER"
 fi
 
 # Install super if it's running from any location that is not in the $superFOLDER or from the $superLINK.
 if ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; }; then
-	sendToLog "Installer: Copying file: $superFOLDER/super"
+	sendToLog "Installation: Copying file: $superFOLDER/super"
 	cp "$0" "$superFOLDER/super" > /dev/null 2>&1
-	sendToLog "Installer: Creating default path link: $superLINK"
+	sendToLog "Installation: Creating default path link: $superLINK"
 	ln -s "$superFOLDER/super" "$superLINK" > /dev/null 2>&1
-	sendToLog "Installer: Creating file: $superFOLDER/super-starter"
+	sendToLog "Installation: Creating file: $superFOLDER/super-starter"
 /bin/cat <<EOSS > "$superFOLDER/super-starter"
 #!/bin/sh
-echo "\$(date +"%a %b %d %T") \$(hostname -s) \$(basename "\$0")[\$\$]: **** S.U.P.E.R.M.A.N. LAUNCHDAEMON ****" | tee -a "$superLOG"
+echo "\$(date +"%a %b %d %T") \$(hostname -s) \$(basename "\$0")[\$\$]: **** S.U.P.E.R.M.A.N. $superVERSION LAUNCHDAEMON ****" | tee -a "$superLOG"
 "$superFOLDER/super" "\$@" &
 disown -a -h
 exit 0
@@ -1832,7 +1846,7 @@ EOSS
 	touch "$installerLOG"
 	touch "$mdmCommandLOG"
 	touch "$mdmWorkflowLOG"
-	sendToLog "Installer: Setting permissions in: $superFOLDER"
+	sendToLog "Installation: Setting permissions in: $superFOLDER"
 	chown -R root:wheel "$superFOLDER"
 	chown root:wheel "$superLINK"
 	chmod -R a+r "$superFOLDER"
@@ -1844,15 +1858,18 @@ fi
 }
 
 # Prepare super by cleaning after previous super runs, record various maintenance modes, validate parameters, and liberate super from Jamf Policy runs.
-superStarter() {
-sendToLog "**** S.U.P.E.R.M.A.N. STARTER ****"
+superStartup() {
+sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION STARTUP ****"
 sendToStatus "Running: Startup workflow..."
 sendToPending "Currently running."
+
+# Collect any locally cached or managed preferences.
+getPreferences
 
 # Check for any previous super process still running, if so kill it.
 if [[ -f "$superPIDFILE" ]]; then
 	previousPID=$(cat "$superPIDFILE")
-	sendToLog "Starter: Found previous super instance running with PID $previousPID, killing..."
+	sendToLog "Startup: Found previous super instance running with PID $previousPID, killing..."
 	kill -9 "$previousPID" > /dev/null 2>&1
 fi
 
@@ -1866,7 +1883,7 @@ echo $$ > "$superPIDFILE"
 
 # This unloads and deletes any previous LaunchDaemons.
 if [[ -f "/Library/LaunchDaemons/$launchDaemonNAME.plist" ]]; then
-	sendToLog "Starter: Removing previous LaunchDaemon $launchDaemonNAME.plist."
+	sendToLog "Startup: Removing previous LaunchDaemon $launchDaemonNAME.plist."
 	launchctl bootout system "/Library/LaunchDaemons/$launchDaemonNAME.plist" 2> /dev/null
 	rm -f "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 fi
@@ -1880,10 +1897,10 @@ else
 	defaults delete "$superPLIST" VerboseMode 2> /dev/null
 fi
 if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-	sendToLog "Starter: Verbose mode enabled."
-	sendToLog "Starter: Uptime: $(uptime)"
-	sendToLog "Starter: Managed preference file $superMANAGEDPLIST:\n$(defaults read "$superMANAGEDPLIST" 2> /dev/null)"
-	sendToLog "Starter: Local preference file before validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
+	sendToLog "Startup: Verbose mode enabled."
+	sendToLog "Startup: Uptime: $(uptime)"
+	sendToLog "Startup: Managed preference file $superMANAGEDPLIST:\n$(defaults read "$superMANAGEDPLIST" 2> /dev/null)"
+	sendToLog "Startup: Local preference file before validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
 fi
 
 # Main parameter validation and management.
@@ -1893,7 +1910,7 @@ manageParameters
 # Workflow for for $openLOGS.
 if [[ "$openLOGS" == "TRUE" ]]; then
 	if [[ "$currentUSER" != "FALSE" ]]; then
-		sendToLog "Starter: Opening logs for user $currentUSER..."
+		sendToLog "Startup: Opening logs for user $currentUSER..."
 		if [[ "$macOSARCH" == "arm64" ]]; then
 			sudo -u "$currentUSER" open "$mdmWorkflowLOG"
 			sudo -u "$currentUSER" open "$mdmCommandLOG"
@@ -1904,15 +1921,15 @@ if [[ "$openLOGS" == "TRUE" ]]; then
 		sudo -u "$currentUSER" open "$asuListLOG"
 		sudo -u "$currentUSER" open "$superLOG"
 	else
-		sendToLog "Starter: Open logs request denied because there is currently no local user logged into the GUI."
+		sendToLog "Startup: Open logs request denied because there is currently no local user logged into the GUI."
 	fi
 fi
 
 # Feedback for various alternate workflow modes.
-[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Starter: Skip software updates/upgrade mode enabled."
-[[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Starter: Forced restart mode enabled."
-[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Starter: Test mode enabled with $testModeTimeoutSECONDS second timeout."
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Starter: Local preference file after validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
+[[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Startup: Skip software updates/upgrade mode enabled."
+[[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Startup: Forced restart mode enabled."
+[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Startup: Test mode enabled with $testModeTimeoutSECONDS second timeout."
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Startup: Local preference file after validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
 
 # Additional validation and management.
 [[ "$macOSARCH" == "arm64" ]] && manageUpdateCredentials
@@ -1924,21 +1941,21 @@ if [[ "$parameterERROR" == "TRUE" ]] || [[ "$credentialERROR" == "TRUE" ]] || [[
 	sendToStatus "Inactive Error: Startup validation failed."
 	[[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 	rm -f "$superPIDFILE"
-	sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+	sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 	exit 1
 fi
 
 # If super is running via Jamf, then restart via LaunchDaemon to release the jamf process.
-# This is late in the starter workflow so as to only create a valid LaunchDaemon after parameter validation and housekeeping.
+# This is late in the startup workflow so as to only create a valid LaunchDaemon after parameter validation and housekeeping.
 if [[ $1 == "/" ]] || [[ $(ps -p "$PPID" | awk '{print $4;}' | grep -c 'jamf') -gt 0 ]]; then
-	sendToLog "Starter: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon..."
+	sendToLog "Startup: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon..."
 	sendToStatus "Pending: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon."
 	makeLaunchDaemonRestartNow
 fi
 
 # If super is running from outside the $superFOLDER, then restart via LaunchDaemon to release any parent installer process.
 if ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$superLINK")" ]]; }; then
-	sendToLog "Starter: Found that super is installing, restarting with new LaunchDaemon..."
+	sendToLog "Startup: Found that super is installing, restarting with new LaunchDaemon..."
 	sendToStatus "Pending: Found that super is installing, restarting with new LaunchDaemon."
 	makeLaunchDaemonRestartNow
 fi
@@ -1946,7 +1963,7 @@ fi
 # Wait for a valid network connection. If there is still no network after two minutes, an automatic deferral is started.
 networkTIMEOUT=0
 while [[ $(ifconfig -a inet 2>/dev/null | sed -n -e '/127.0.0.1/d' -e '/0.0.0.0/d' -e '/inet/p' | wc -l) -le 0 ]] && [[ $networkTIMEOUT -lt 120 ]]; do
-	sendToLog "Starter: Waiting for network..."
+	sendToLog "Startup: Waiting for network..."
 	sleep 5
 	networkTIMEOUT=$((networkTIMEOUT + 5))
 done
@@ -1960,7 +1977,7 @@ fi
 [[ $(defaults read "$superPLIST" RestartValidate 2> /dev/null) ]] && restartVALIDATE="TRUE"
 
 # With startup complete, create a fail-safe startup LaunchDaemon in case the system is restarted (via the user or something else) wile super is active.
-sendToLog "Starter: Creating fail-safe startup LaunchDaemon."
+sendToLog "Startup: Creating fail-safe startup LaunchDaemon."
 makeLaunchDaemonOnStartup
 defaults write "$superPLIST" FailSafeActive -bool true
 }
@@ -2015,6 +2032,8 @@ defaults write "$superPLIST" SuperPending -string "$*"
 
 # Log any parameters that have values.
 logParameters() {
+sendToLog "Verbose Mode: superVERSION: $superVERSION"
+sendToLog "Verbose Mode: superDATE: $superDATE"
 sendToLog "Verbose Mode: macOSMAJOR: $macOSMAJOR"
 sendToLog "Verbose Mode: macOSMINOR: $macOSMINOR"
 sendToLog "Verbose Mode: macOSVERSION: $macOSVERSION"
@@ -2809,7 +2828,7 @@ fi
 }
 
 # This function checks for available macOS upgrades for systems older than macOS 12.3 and sets $macOSUpgradeAVAILABLE accordingly. This is in a separate function to facilitate list caching and multiple run workflows.
-# Also sets $macOSUpgradeNAME, $macOSUpgradeVERSION, and $macOSInstallerLIST.
+# Also sets $macOSUpgradeNAME, $macOSUpgradeVERSION, $macOSUpgradeMajorVERSION, and $macOSInstallerLIST.
 listMacOSUpgrades() {
 macOSUpgradeAVAILABLE="FALSE"
 
@@ -2822,23 +2841,31 @@ if [[ $macOSVERSION -ge 1015 ]]; then # For macOS 10.15 or newer parse results f
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUPGRADE is: $macOSUPGRADE"
 	macOSUpgradeNAME=$(echo "$macOSUPGRADE"| awk -F ':' '{print $1}' | sed -e 's/[0-9]*//g' -e 's/ \.//')
 	macOSUpgradeVERSION=$(echo "$macOSUPGRADE"| awk -F ':' '{print $2}')
+	macOSUpgradeMajorVERSION=$(echo "$macOSUpgradeVERSION" | cut -d '.' -f1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeNAME is: $macOSUpgradeNAME"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVERSION is: $macOSUpgradeVERSION"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeMajorVERSION is: $macOSUpgradeMajorVERSION"
+	{ [[ -n $macOSUpgradeNAME ]] && [[ -n $macOSUpgradeVERSION ]] && [[ $macOSUpgradeMajorVERSION -gt $macOSMAJOR ]]; } && macOSUpgradeAVAILABLE="TRUE"
 else # Older versions of macOS collect this from $asuPLIST.
 	propertyUpgradeAVAILABLE=$(defaults read "$asuPLIST" LastRecommendedMajorOSBundleIdentifier 2> /dev/null)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpgradeAVAILABLE is: $propertyUpgradeAVAILABLE"
 	macOSUpgradeNAME=$(echo "$propertyUpgradeAVAILABLE" | sed -e 's/com.apple.InstallAssistant.//' -e 's/macOS/macOS /')
 	macOSUpgradeVERSION="" # Not necessary (or easy) to collect for systems this old.
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeNAME is: $macOSUpgradeNAME"
+	[[ -n $macOSUpgradeNAME ]] && macOSUpgradeAVAILABLE="TRUE"
 fi
-[[ -n $macOSUpgradeNAME ]] && macOSUpgradeAVAILABLE="TRUE"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeAVAILABLE is: $macOSUpgradeAVAILABLE"
 
 # Only collect available macOS installer names if a $upgradeWORKFLOW is requested.
 if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]] && [[ "$upgradeWORKFLOW" != "FALSE" ]]; then
 	# Background the erase-install list process and send to $installerListLOG.
-	"$eraseInstallSCRIPT" --list > "$installerListLOG" 2>&1 &
-	eraseInstallPID=$!
+	if [[ "$betaWORKFLOW" != "FALSE" ]]; then
+		"$eraseInstallSCRIPT" --list --seed "$betaWORKFLOW" > "$installerListLOG" 2>&1 &
+		eraseInstallPID=$!
+	else # Standard non-beta workflow.
+		"$eraseInstallSCRIPT" --list > "$installerListLOG" 2>&1 &
+		eraseInstallPID=$!
+	fi
 	
 	# Watch $installerListLOG while waiting for the erase-install.sh list process to complete. Note this while read loop has a timeout based on $initialStartTimeoutSECONDS.
 	workflowStartTIMEOUT="TRUE"
@@ -2849,7 +2876,11 @@ if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]] && [[ "$upgradeWORKFLOW" != "FALSE" 
 			workflowStartTIMEOUT="FALSE"
 			break
 		elif [[ $(echo "$logLINE" | grep -c 'script execution started') -gt 0 ]]; then
-			sendToLog "erase-install.sh: Waiting for macOS installer list..."
+			if [[ "$betaWORKFLOW" != "FALSE" ]]; then
+				sendToLog "erase-install.sh: Waiting for macOS installer beta $betaWORKFLOW list..."
+			else # Standard non-beta workflow.
+				sendToLog "erase-install.sh: Waiting for macOS installer list..."
+			fi
 		elif [[ $(echo "$logLINE" | grep -c 'finish') -gt 0 ]]; then
 			workflowStartTIMEOUT="FALSE"
 			workflowStartFAIL="FALSE"
@@ -2931,7 +2962,7 @@ if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
 		# Parse results from $macOSInstallerLIST.
 		if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerLIST is:\n$macOSInstallerLIST"
-			macOSInstallerCompatibleLIST=($(echo "$macOSInstallerLIST" | grep 'macOS' | grep -v -e 'Unsupported macOS version' -e 'macOS installers' -e 'check_installer_is_valid' | sed -E 's/  +/:/g'))
+			macOSInstallerCompatibleLIST=($(echo "$macOSInstallerLIST" | grep 'macOS' | grep -v -e 'Unsupported macOS version' -e 'macOS installers' -e 'check_installer_is_valid' | sed -E -e 's/  +/:/g' -e 's/ 20/:20/g'))
 			macOSInstallersARRAY=($(sort -t: -k3 -r -V <<<"${macOSInstallerCompatibleLIST[*]}"))
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallersARRAY is:\n${macOSInstallersARRAY[*]}"
 			if [[ -n ${macOSInstallersARRAY[*]} ]]; then
@@ -3045,9 +3076,9 @@ fi
 IFS="$oldIFS"
 }
 
-# This function checks previous downloads to set $macOSInstallerDownloadREQUIRED and $softwareUpdateDownloadREQUIRED accordingly.
-# This also creates $softwareUpdateLabelTARGETS[] and $softwareUpdateTitleTARGETS[] to facilitate the macOS 12.3 or later softwareupdate workflow.
-checkPreviousDownloads() {
+# This function determines which updates/upgrades should be downloaded and validates any previously downloaded updates/upgrades and sets $macOSInstallerDownloadREQUIRED and $softwareUpdateDownloadREQUIRED accordingly.
+# This also creates $softwareUpdateLabelTARGETS[] and $softwareUpdateTitleTARGETS[] to facilitate the macOS 12 or later softwareupdate workflow.
+checkDownloads() {
 macOSInstallerDownloadREQUIRED="FALSE"
 softwareUpdateDownloadREQUIRED="FALSE"
 softwareUpdateLabelTARGETS=()
@@ -3102,10 +3133,12 @@ else # Not preparing for a macOS installer workflow.
 					done
 				fi
 			fi
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGETS[] is: \n${softwareUpdateLabelTARGETS[*]}"
-		else # Older than macOS 12, so simply download all softwareupdates.
+		else # Older than macOS 12.3, so simply download all softwareupdates.
+			softwareUpdateLabelTARGETS+=("${allSoftwareUpdateLABELS[@]}")
 			softwareUpdateTitleTARGETS=("${allSoftwareUpdateTITLES[@]}")
 		fi
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGETS[] is: \n${softwareUpdateLabelTARGETS[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is: \n${softwareUpdateTitleTARGETS[*]}"
 		previousSoftwareUpdateDOWNLOADS=$(defaults read "$superPLIST" SoftwareUpdateDownloads 2> /dev/null)
 		previousLastREBOOT=$(defaults read "$superPLIST" LastReboot 2> /dev/null)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousSoftwareUpdateDOWNLOADS is: \n$previousSoftwareUpdateDOWNLOADS"
@@ -3163,7 +3196,7 @@ defaults delete "$superPLIST" RestartValidate 2> /dev/null
 fullCheckREQUIRED="TRUE"
 checkSoftwareUpdates
 checkMacOSUpgrades
-checkPreviousDownloads
+checkDownloads
 
 # Install any recommended (non-macOS) software updates.
 if [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then
@@ -3176,7 +3209,7 @@ if [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then
 	fullCheckREQUIRED="TRUE"
 	checkSoftwareUpdates
 	checkMacOSUpgrades
-	checkPreviousDownloads
+	checkDownloads
 fi
 
 # Log status of updates/upgrade completion.
@@ -3221,11 +3254,11 @@ downloadSoftwareUpdates() {
 if [[ $macOSVERSION -ge 1203 ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # macOS 12.3 or newer upgrade via softwareupdate.
 	sendToLog "softwareupdate: Starting $macOSSoftwareUpgradeLabelTARGET download workflow, check $asuLOG for more detail."
 	sendToStatus "Running: softwareupdate: Starting $macOSSoftwareUpgradeLabelTARGET download workflow."
-	sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD $macOSSoftwareUpgradeLabelTARGET SOFTWAREUPDATE START ****"
+	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD $macOSSoftwareUpgradeLabelTARGET SOFTWAREUPDATE START ****"
 else # # Systems older than macOS 12.3 and/or only macOS updates available.
 	sendToLog "softwareupdate: Starting download of all available updates, check $asuLOG for more detail."
 	sendToStatus "Running: softwareupdate: Starting download of all available updates."
-	sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD ALL SOFTWAREUPDATE START ****"
+	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD ALL SOFTWAREUPDATE START ****"
 fi
 oldIFS="$IFS"; IFS=$'\n'
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGETS[] is:\n${softwareUpdateLabelTARGETS[*]}"
@@ -3250,7 +3283,7 @@ elif [[ $macOSMAJOR -ge 12 ]]; then # macOS 12
 	fi
 elif [[ $macOSMAJOR -eq 11 ]]; then # macOS 11
 	if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
-		echo ' ' | softwareupdate --download "${softwareUpdateLabelTARGETS[@]}" --agree-to-license >> "$asuLOG" 2>&1 &
+		echo ' ' | softwareupdate --download --all --agree-to-license >> "$asuLOG" 2>&1 &
 	else # Intel.
 		softwareupdate --download --all --agree-to-license >> "$asuLOG" 2>&1 &
 		softwareupdatePID=$!
@@ -3279,6 +3312,16 @@ while read -t $workflowTimeoutSECONDS -r logLINE ; do
 		break
 	elif [[ $(echo "$logLINE" | grep -c 'No such update' ) -gt 0 ]]; then
 		workflowStartFAIL="NOUPDATE"
+		workflowStartTIMEOUT="FALSE"
+		workflowTIMEOUT="FALSE"
+		break
+	elif [[ $(echo "$logLINE" | grep -c 'Not enough free disk space' ) -gt 0 ]]; then
+		workflowStartFAIL="SPACE"
+		workflowStartTIMEOUT="FALSE"
+		workflowTIMEOUT="FALSE"
+		break
+	elif [[ $(echo "$logLINE" | grep -c 'Failed to download & prepare' ) -gt 0 ]]; then
+		workflowStartFAIL="FAILED"
 		workflowStartTIMEOUT="FALSE"
 		workflowTIMEOUT="FALSE"
 		break
@@ -3349,7 +3392,7 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdateVERSION is: $macOSSoftwareUpdateVERSION"
 		if { [[ $macOSVERSION -ge 1203 ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; } && [[ "$preparedMacOSUpdateVERSION" != "$macOSUpgradeVersionTARGET" ]]; then
-			sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD SOFTWAREUPDATE FAILED ****"
+			sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE FAILED ****"
 			sendToASULog "Error: Downloaded macOS upgrade version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSUpgradeVersionTARGET, trying again in $defaultDeferSECONDS seconds."
 			sendToLog "Error: Downloaded macOS upgrade version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSUpgradeVersionTARGET, trying again in $defaultDeferSECONDS seconds."
 			sendToStatus "Pending: Downloaded macOS upgrade version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSUpgradeVersionTARGET, trying again in $defaultDeferSECONDS seconds."
@@ -3357,14 +3400,14 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 			makeLaunchDaemonCalendar
 		fi
 		if { [[ $macOSMAJOR -ge 11 ]] && [[ "$macOSUpgradeVersionTARGET" == "FALSE" ]]; } && [[ "$preparedMacOSUpdateVERSION" != "$macOSSoftwareUpdateVERSION" ]]; then
-			sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD SOFTWAREUPDATE FAILED ****"
+			sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE FAILED ****"
 			sendToASULog "Error: Downloaded macOS update version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSSoftwareUpdateVERSION, trying again in $defaultDeferSECONDS seconds."
 			sendToLog "Error: Downloaded macOS update version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSSoftwareUpdateVERSION, trying again in $defaultDeferSECONDS seconds."
 			sendToStatus "Pending: Downloaded macOS update version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSSoftwareUpdateVERSION, trying again in $defaultDeferSECONDS seconds."
 			kickSoftwareUpdateD
 			makeLaunchDaemonCalendar
 		fi
-		sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD SOFTWAREUPDATE COMPLETED ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE COMPLETED ****"
 		defaults delete "$superPLIST" SoftwareUpdateDownloads 2> /dev/null
 		for i in "${!softwareUpdateDownloadedTITLES[@]}"; do
 			defaults write "$superPLIST" SoftwareUpdateDownloads -array-add "${softwareUpdateDownloadedTITLES[i]}"
@@ -3372,7 +3415,7 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 		defaults write "$superPLIST" LastReboot -string "$lastREBOOT"
 		softwareUpdateDownloadREQUIRED="FALSE"
 	else # The expected $softwareUpdateTitleTARGETS[] did not match the $softwareUpdateDownloadedTITLES[].
-		sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD SOFTWAREUPDATE INCOMPLETE ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE INCOMPLETE ****"
 		sendToASULog "Error: Download of software udpates did not complete, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: Download of software udpates did not complete, trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Pending: Download of software udpates did not complete, trying again in $defaultDeferSECONDS seconds."
@@ -3380,7 +3423,7 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 		makeLaunchDaemonCalendar
 	fi
 else # The softwareupdate download workflow failed so clean-up and try again later.
-	sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD SOFTWAREUPDATE FAILED ****"
+	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE FAILED ****"
 	if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 		sendToASULog "Error: Download of software udpates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: Download of software udpates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -3393,6 +3436,14 @@ else # The softwareupdate download workflow failed so clean-up and try again lat
 		sendToASULog "Error: Unable to find requested software updates, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: Unable to find requested software updates, trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Error: Unable to find requested software updates, trying again in $defaultDeferSECONDS seconds."
+	elif [[ "$workflowStartFAIL" == "SPACE" ]]; then
+		sendToASULog "Error: Not enough free disk space to download software updates, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Not enough free disk space to download software updates, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Error: Not enough free disk space to download software updates, trying again in $defaultDeferSECONDS seconds."
+	elif [[ "$workflowStartFAIL" == "FAILED" ]]; then
+		sendToASULog "Error: Failed to download & prepare updates, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Failed to download & prepare updates, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Error: Failed to download & prepare updates, trying again in $defaultDeferSECONDS seconds."
 	elif [[ "$workflowTIMEOUT" == "TRUE" ]]; then
 		sendToASULog "Error: Download of software udpates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: Download of software udpates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -3409,13 +3460,16 @@ IFS="$oldIFS"
 downloadMacOSInstaller() {
 sendToLog "erase-install.sh: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET download instaler workflow, check $installerLOG for more detail."
 sendToStatus "Running: erase-install.sh: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET download instaler workflow."
-sendToInstallerLog "**** S.U.P.E.R.M.A.N. DOWNLOAD $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET INSTALLER START ****"
+sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET INSTALLER START ****"
 
 # Background the erase-install download process and send to $installerLOG.
-macOSInstallerVersionMajorTARGET=$(echo "$macOSInstallerVersionTARGET" | cut -d '.' -f1 )
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerVersionMajorTARGET is: $macOSInstallerVersionMajorTARGET"
-"$eraseInstallSCRIPT" --update --os="$macOSInstallerVersionMajorTARGET" --move >> "$installerLOG" 2>&1 &
-eraseInstallPID=$!
+if [[ "$betaWORKFLOW" != "FALSE" ]]; then
+	"$eraseInstallSCRIPT" --update --seed "$betaWORKFLOW" --build "$macOSInstallerBuildTARGET" --move >> "$installerLOG" 2>&1 &
+	eraseInstallPID=$!
+else # Standard non-beta workflow.
+	"$eraseInstallSCRIPT" --update --build "$macOSInstallerBuildTARGET" --move >> "$installerLOG" 2>&1 &
+	eraseInstallPID=$!
+fi
 
 # Watch $installerLOG while waiting for the erase-install download process to complete.
 # Note this while read loop has a timeout based on $initialStartTimeoutSECONDS then changes to $macOSInstallerDownloadTimeoutSECONDS.
@@ -3456,7 +3510,7 @@ while read -t $workflowTimeoutSECONDS -r logLINE ; do
 		sendToInstallerLog "**** TIMESTAMP ****"
 		workflowStartTIMEOUT="FALSE"
 		workflowStartFAIL="FALSE"
-	elif [[ $(echo "$logLINE" | grep -c 'Installer moved') -gt 0 ]]; then
+	elif [[ $(echo "$logLINE" | grep -c 'Installation moved') -gt 0 ]]; then
 		sendToLog "erase-install.sh: Install $macOSInstallerNameTARGET.app moved to /Applications."
 		sendToInstallerLog "**** TIMESTAMP ****"
 		workflowStartTIMEOUT="FALSE"
@@ -3480,20 +3534,20 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 		sendToInstallerLog "Status: Install $macOSInstallerNameTARGET.app Gatekeeper validation."
 		startosinstallRESULTS=$("/Applications/Install $macOSInstallerNameTARGET.app/Contents/Resources/startosinstall --usage" --usage 2>&1)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: startosinstallRESULTS is:\n$startosinstallRESULTS"
-		sendToInstallerLog "**** S.U.P.E.R.M.A.N. DOWNLOAD MACOS INSTALLER COMPLETE ****"
+		sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD MACOS INSTALLER COMPLETE ****"
 		sendToLog "Status: macOS installer is now available at: /Applications/Install $macOSInstallerNameTARGET.app"
 		defaults write "$superPLIST" macOSInstallerDownloadVersion -string "$macOSInstallerVersionTARGET"
 		defaults write "$superPLIST" macOSInstallerDownloadName -string "$macOSInstallerNameTARGET"
 		macOSInstallerDownloadREQUIRED="FALSE"
 	else # The installer can't be found, so clean-up and try again later.
-		sendToInstallerLog "**** S.U.P.E.R.M.A.N. DOWNLOAD MACOS INSTALLER FAILURE ****"
+		sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD MACOS INSTALLER FAILURE ****"
 		sendToInstallerLog "Error: macOS installer download could not be verified, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: macOS installer download could not be verified, trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Pending: macOS installer download could not be verified, trying again in $defaultDeferSECONDS seconds."
 		makeLaunchDaemonCalendar
 	fi
 else # The erase-install download workflow failed so clean-up and try again later.
-	sendToInstallerLog "**** S.U.P.E.R.M.A.N. DOWNLOAD MACOS INSTALLER FAILED ****"
+	sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD MACOS INSTALLER FAILED ****"
 	if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 		sendToInstallerLog "Error: macOS installer download failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: macOS installer download failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -3597,7 +3651,7 @@ fi
 installRecommendedSoftwareUpdates() {
 sendToLog "softwareupdate: Starting recommended (non-macOS) software installation workflow, check $asuLOG for more detail."
 sendToStatus "Running: softwareupdate: Starting recommended (non-macOS) software installation workflow."
-sendToASULog "**** S.U.P.E.R.M.A.N. INSTALL RECOMMENDED UPDATES SOFTWAREUPDATE START ****"
+sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL RECOMMENDED UPDATES SOFTWAREUPDATE START ****"
 oldIFS="$IFS"; IFS=$' '
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is: ${recommendedSoftwareUpdateLABELS[*]}"
 
@@ -3667,15 +3721,15 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateTITLES[] is: \n${recommendedSoftwareUpdateTITLES[*]}"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateInstalledTITLES is:\n${softwareUpdateInstalledTITLES[*]}"
 	if [[ ! $(echo -e "${recommendedSoftwareUpdateTITLES[*]}\n${softwareUpdateInstalledTITLES[*]}" | sort | uniq -u) ]]; then
-		sendToASULog "**** S.U.P.E.R.M.A.N. RECOMMENDED UPDATES SOFTWAREUPDATE COMPLETED ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE COMPLETED ****"
 		softwareUpdateERROR="FALSE"
 	else # The expected $recommendedSoftwareUpdateTITLES[] did not match the $softwareUpdateInstalledTITLES[].
-		sendToASULog "**** S.U.P.E.R.M.A.N. RECOMMENDED UPDATES SOFTWAREUPDATE INCOMPLETE ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE INCOMPLETE ****"
 		sendToASULog "Error: Installation of recommended (non-macOS) software updates did not complete."
 		sendToLog "Error: Installation of recommended (non-macOS) software updates did not complete."
 	fi
 else # The softwareupdate installation workflow failed.
-	sendToASULog "**** S.U.P.E.R.M.A.N. RECOMMENDED UPDATES SOFTWAREUPDATE FAILED ****"
+	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE FAILED ****"
 	if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 		sendToASULog "Error: Installation of recommended (non-macOS) software updates failed to start after $workflowTimeoutSECONDS seconds."
 		sendToLog "Error: Installation of recommended (non-macOS) software updates failed to start after $workflowTimeoutSECONDS seconds."
@@ -3700,22 +3754,22 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		if [[ "$softwareUpdateDownloadREQUIRED" == "TRUE" ]]; then # If no $currentUSER then the sytem update was not pre-downloaded.
 			sendToLog "softwareupdate: Starting $macOSSoftwareUpgradeLabelTARGET download and upgrade workflow, check $asuLOG for more detail."
 			sendToStatus "Running: softwareupdate: Starting $macOSSoftwareUpgradeLabelTARGET download and upgrade workflow."
-			sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD AND UPGRADE $macOSSoftwareUpgradeLabelTARGET SOFTWAREUPDATE START ****"
+			sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD AND UPGRADE $macOSSoftwareUpgradeLabelTARGET SOFTWAREUPDATE START ****"
 		else
 			sendToLog "softwareupdate: Starting $macOSSoftwareUpgradeLabelTARGET upgrade workflow, check $asuLOG for more detail."
 			sendToStatus "Running: softwareupdate: Starting $macOSSoftwareUpgradeLabelTARGET upgrade workflow."
-			sendToASULog "**** S.U.P.E.R.M.A.N. UPGRADE $macOSSoftwareUpgradeLabelTARGET SOFTWAREUPDATE START ****"
+			sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION UPGRADE $macOSSoftwareUpgradeLabelTARGET SOFTWAREUPDATE START ****"
 		fi
 	else # Older than macOS 12 and/or only macOS updates available.
 		softwareUpdateLabelTARGET="$macOSSoftwareUpdateLABEL"
 		if [[ "$softwareUpdateDownloadREQUIRED" == "TRUE" ]]; then # If no $currentUSER then the sytem update was not pre-downloaded.
 			sendToLog "softwareupdate: Starting $macOSSoftwareUpdateLABEL download and update workflow, check $asuLOG for more detail."
 			sendToStatus "Running: softwareupdate: Starting $macOSSoftwareUpdateLABEL download and update workflow."
-			sendToASULog "**** S.U.P.E.R.M.A.N. DOWNLOAD AND UPDATE $macOSSoftwareUpdateLABEL SOFTWAREUPDATE START ****"
+			sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD AND UPDATE $macOSSoftwareUpdateLABEL SOFTWAREUPDATE START ****"
 		else
 			sendToLog "softwareupdate: Starting $macOSSoftwareUpdateLABEL update workflow, check $asuLOG for more detail."
 			sendToStatus "Running: softwareupdate: Starting $macOSSoftwareUpdateLABEL update workflow."
-			sendToASULog "**** S.U.P.E.R.M.A.N. UPDATE $macOSSoftwareUpdateLABEL SOFTWAREUPDATE START ****"
+			sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE $macOSSoftwareUpdateLABEL SOFTWAREUPDATE START ****"
 		fi
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGET is: $softwareUpdateLabelTARGET"
@@ -3800,7 +3854,6 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			sendToLog "softwareupdate: The download workflow has started but detailed progress is not available for systems older than macOS 11..."
 			workflowTimeoutSECONDS=$softwareUpdateLegacyTimeoutSECONDS
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-			workflowStartTIMEOUT="FALSE"
 			workflowStartFAIL="FALSE"
 		elif [[ $macOSMAJOR -ge 11 ]] && [[ $(echo "$logLINE" | grep -c 'Downloading') -gt 0 ]] && [[ $(echo "$logLINE" | grep -c 'Downloading:') -eq 0 ]]; then
 			softwareUpdateDownloadTITLE=$(echo "$logLINE" | sed -e 's/Downloading //')
@@ -3808,7 +3861,6 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			sendToASULog "**** TIMESTAMP ****"
 			workflowTimeoutSECONDS=$softwareUpdateTimeoutSECONDS
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-			workflowStartTIMEOUT="FALSE"
 			workflowStartFAIL="FALSE"
 			[[ $(echo "$softwareUpdateDownloadTITLE" | grep -c 'macOS') -gt 0 ]] && workflowPHASE="DOWNLOADING"
 		elif [[ $macOSMAJOR -ge 11 ]] && [[ $(echo "$logLINE" | grep -c 'Downloading:') -gt 0 ]] && [[ "$workflowPHASE" == "DOWNLOADING" ]]; then
@@ -3852,7 +3904,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	# If the softwareupdate installation workflow completed, then prepare for restart.
 	if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE" ]] && [[ "$workflowTIMEOUT" == "FALSE" ]]; then
 		sendToLog "softwareupdate: macOS update/upgrade is prepared and ready for restart."
-		sendToASULog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS SOFTWAREUPDATE COMPLETED ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS SOFTWAREUPDATE COMPLETED ****"
 		defaults write "$superPLIST" RestartValidate -bool true
 		unset recheckDeferSECONDS
 		defaults delete "$superPLIST" SoftwareUpdatesList 2> /dev/null
@@ -3865,7 +3917,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		sendToStatus "Pending: At next startup."
 		makeLaunchDaemonOnStartup
 	else # The softwareupdate download workflow failed so clean-up and try again later.
-		sendToASULog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS SOFTWAREUPDATE FAILED ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS SOFTWAREUPDATE FAILED ****"
 		if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 			sendToASULog "Error: Installation of macOS update/upgrade failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 			sendToLog "Error: Installation of macOS update/upgrade failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -3904,8 +3956,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # macOS upgrade via installer, further the installer is always pre-downloaded.
 		sendToLog "MDM: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET install workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
 		sendToStatus "Running: MDM: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET install workflow."
-		sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET MDM START ****"
-		sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET MDM START ****"
+		sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET MDM START ****"
+		sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET MDM START ****"
 	else # macOS update.
 		if [[ "$softwareUpdateDownloadREQUIRED" == "TRUE" ]]; then
 			sendToLog "MDM: Starting $macOSSoftwareUpdateLABEL download and update workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
@@ -3915,8 +3967,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		else
 			sendToLog "MDM: Starting $macOSSoftwareUpdateLABEL update workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
 			sendToStatus "Running: MDM: Starting $macOSSoftwareUpdateLABEL update workflow."
-			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. UPDATE $macOSSoftwareUpdateLABEL MDM START ****"
-			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. UPDATE $macOSSoftwareUpdateLABEL MDM START ****"
+			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE $macOSSoftwareUpdateLABEL MDM START ****"
+			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE $macOSSoftwareUpdateLABEL MDM START ****"
 		fi
 	fi
 	
@@ -3942,10 +3994,18 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	jamfAPIURL="${jamfSERVER}api/v1/macos-managed-software-updates/send-updates"
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # macOS upgrade.
 		mdmWorkflowTYPE="INSTALLER"
-		jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSInstallerVersionTARGET}'", "updateAction": "DOWNLOAD_AND_INSTALL" }'
+		if [[ "$betaWORKFLOW" != "FALSE" ]]; then
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSInstallerVersionTARGET}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
+		else # Standard non-beta workflow.
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSInstallerVersionTARGET}'", "updateAction": "DOWNLOAD_AND_INSTALL" }'
+		fi
 	else # macOS update.
 		mdmWorkflowTYPE="UPDATE"
-		jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSSoftwareUpdateVERSION}'", "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+		if [[ "$betaWORKFLOW" != "FALSE" ]]; then
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSSoftwareUpdateVERSION}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+		else # Standard non-beta workflow.
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSSoftwareUpdateVERSION}'", "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+		fi
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmWorkflowTYPE is: $mdmWorkflowTYPE"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfAPIURL is: $jamfAPIURL"
@@ -4014,7 +4074,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToMDMCommandLog "**** TIMESTAMP ****"
 				elif [[ $(echo "$logLINE" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)') -gt 0 ]]; then
 					kill -9 "$mdmStartStreamPID" > /dev/null 2>&1
-					sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM PUSH COMPLETED ****"
+					sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH COMPLETED ****"
 					sendToLog "MDM: Received push command \"ScheduleOSUpdate\", local update/upgrade workflow should start soon..."
 					mdmTIMEOUT="FALSE"
 					mdmFAIL="FALSE"
@@ -4025,9 +4085,9 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		
 		# If the MDM push commands did not complete after $mdmTimeoutSECONDS seconds, then clean-up and try again later.
 		if [[ "$mdmTIMEOUT" == "TRUE" ]] && [[ "$mdmFAIL" == "TRUE" ]]; then
-			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
+			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 			kill -9 "$mdmStartStreamPID" > /dev/null 2>&1
-			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
+			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
 			if [[ "$mdmTIMEOUT" == "TRUE" ]]; then
 				sendToMDMCommandLog "Error: Push workflow for macOS update/upgrade via MDM timed out after $mdmTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -4060,7 +4120,6 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update preflight..."
 					[[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preflight..."
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowTIMEOUT="FALSE"
 					workflowPHASE="PREFLIGHT"
 				fi
 			elif { [[ "$mdmWorkflowTYPE" == "UPGRADE" ]] || [[ "$mdmWorkflowTYPE" == "UPDATE" ]]; } && [[ $(echo "$logLINE" | grep -c 'phase:DOWNLOADING_UPDATE stalled:NO') -gt 0 ]]; then
@@ -4070,7 +4129,6 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
 					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
 					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-					workflowTIMEOUT="FALSE"
 					workflowPHASE="DOWNLOADING"
 				fi
 				workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
@@ -4091,7 +4149,6 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
 					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
 					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-					workflowTIMEOUT="FALSE"
 					workflowPHASE="PREPARING"
 				fi
 				workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
@@ -4114,7 +4171,6 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
 					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
 					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-					workflowTIMEOUT="FALSE"
 					workflowPHASE="PREPARING"
 				fi
 				workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
@@ -4123,6 +4179,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToEchoReplaceLine "$macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET preparing progress: 100%\n"
 					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared, system restart is soon..."
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					workflowTIMEOUT="FALSE"
 					workflowPHASE="DONE"
 				elif [[ $workflowCompletePERCENT -gt $workflowPreviousCompletePERCENT ]] && [[ "$workflowPHASE" != "DONE" ]]; then
 					sendToEchoReplaceLine "$macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET preparing progress: $workflowCompletePERCENT%"
@@ -4142,7 +4199,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			[[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared and ready for restart."
 			{ [[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && [[ "$currentUSER" != "FALSE" ]]; } && notifyRestart
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
-			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM COMPLETED ****"
+			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM COMPLETED ****"
 			defaults write "$superPLIST" RestartValidate -bool true
 			unset recheckDeferSECONDS
 			defaults delete "$superPLIST" SoftwareUpdatesList 2> /dev/null
@@ -4156,7 +4213,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			makeLaunchDaemonOnStartup
 		else # The macOS update/upgrade workflow timed out so clean-up and try again later.
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
-			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM FAILED ****"
+			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM FAILED ****"
 			sendToMDMWorkflowLog "Error: Installation of macOS update/upgrade timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 			sendToLog "Error: Installation of macOS update/upgrade timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 			sendToStatus "Pending: Installation of macOS update/upgrade timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -4166,10 +4223,10 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		fi
 	else # The MDM push workflow failed so clean-up and try again later.
 		kill -9 "$mdmStartStreamPID" > /dev/null 2>&1
-		sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
+		sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 		sendToMDMCommandLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
-		sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
+		sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 		sendToMDMWorkflowLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		sendToLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		sendToLog "Error: Push workflow for macOS update/upgrade via MDM failed, trying again in $defaultDeferSECONDS seconds."
@@ -4199,7 +4256,7 @@ fi
 installMacOSAPP() {
 sendToLog "startosinstall: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET install upgrade workflow, check $installerLOG for more detail."
 sendToStatus "Running: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET install upgrade workflow."
-sendToInstallerLog "**** S.U.P.E.R.M.A.N. INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET START ****"
+sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET START ****"
 
 # Background the startosinstall process and send to $installerLOG.
 if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
@@ -4256,7 +4313,7 @@ done < <(tail -n1 -F "$installerLOG" | tr -u '%' '\n')
 
 # If the startosinstall workflow completed, then prepare for restart.
 if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE" ]] && [[ "$workflowTIMEOUT" == "FALSE" ]]; then
-	sendToInstallerLog "**** S.U.P.E.R.M.A.N. INSTALL MACOS COMPLETED ****"
+	sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL MACOS COMPLETED ****"
 	sendToLog "Status: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET is prepared and ready for restart."
 	defaults write "$superPLIST" RestartValidate -bool true
 	unset recheckDeferSECONDS
@@ -4270,7 +4327,7 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 	sendToStatus "Pending: At next startup."
 	makeLaunchDaemonOnStartup
 else # The startosinstall workflow failed so clean-up and try again later.
-	sendToInstallerLog "**** S.U.P.E.R.M.A.N. INSTALL MACOS FAILED ****"
+	sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL MACOS FAILED ****"
 	if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 		sendToInstallerLog "Error: macOS installer failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: macOS installer failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
@@ -4459,7 +4516,7 @@ sendToPending "Right Now."
 launchctl bootstrap system "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 [[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 rm -f "$superPIDFILE"
-sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 exit 0
 }
 
@@ -4556,7 +4613,7 @@ sendToPending "$(date -j -f "%s" "$deferCALC" "+%F %T" | xargs)"
 launchctl bootstrap system "/Library/LaunchDaemons/$launchDaemonNAME.plist"
 [[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 rm -f "$superPIDFILE"
-sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 exit 0
 }
 
@@ -4574,9 +4631,9 @@ deferButtonTEXT="Defer"
 #### This code generates the $titleWorkflowDISPLAY variable to include the appropriate macOS update or upgrade.
 if [[ "$testModeOPTION" != "TRUE" ]]; then # Test mode option.
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-		if [[ $macOSVERSION -ge 1203 ]]; then # macOS 12.3 or newer can upgrade via softwareupdate.
+		if [[ $macOSVERSION -ge 1203 ]] && [[ "$upgradeWORKFLOW" != "JAMF" ]]; then # Newer systems upgrade via softwareupdate unless via MDM workflow.
 			titleWorkflowDISPLAY="macOS $macOSSoftwareUpgradeVersionTARGET Upgrade"
-		else # Older versions of macOS upgrade via installer.
+		else # Systems older than macOS 12.3 or using MDM workflow upgrade via installer.
 			titleWorkflowDISPLAY="macOS $macOSInstallerVersionTARGET Upgrade"
 		fi
 	else # macOS updates are available.
@@ -4628,8 +4685,8 @@ dialogSoftDeadlineBodyCountIBM="You have deferred the maximum number of $countMa
 dialogSoftDeadlineBodyCountJAMF="You have deferred the maximum number of $countMaxDISPLAY times."
 dialogSoftDeadlineBodyDaysIBM="You have deferred the maximum number of $softDaysMAX days."
 dialogSoftDeadlineBodyDaysJAMF="You have deferred the maximum number of $softDaysMAX days."
-dialogSoftDeadlineBodyDateIBM="The deferrment deadline has passed:\n$deadlineDateDISPLAY."
-dialogSoftDeadlineBodyDateJAMF="The deferrment deadline has passed:
+dialogSoftDeadlineBodyDateIBM="The deferment deadline has passed:\n$deadlineDateDISPLAY."
+dialogSoftDeadlineBodyDateJAMF="The deferment deadline has passed:
 
 $deadlineDateDISPLAY."
 
@@ -4653,8 +4710,8 @@ notifyPrepBodyHardDaysJAMF="You have deferred the maximum number of $hardDaysMAX
 A required software update will automatically restart this computer in about $prepareTimeEstimateDISPLAY minutes.
 
 During this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
-notifyPrepBodyHardDateIBM="The deferrment deadline of $deadlineDateDISPLAY has passed.\n\nA required software update will automatically restart this computer in about $prepareTimeEstimateDISPLAY minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
-notifyPrepBodyHardDateJAMF="The deferrment deadline of $deadlineDateDISPLAY has passed.
+notifyPrepBodyHardDateIBM="The deferment deadline of $deadlineDateDISPLAY has passed.\n\nA required software update will automatically restart this computer in about $prepareTimeEstimateDISPLAY minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
+notifyPrepBodyHardDateJAMF="The deferment deadline of $deadlineDateDISPLAY has passed.
 
 A required software update will automatically restart this computer in about $prepareTimeEstimateDISPLAY minutes.
 
@@ -4675,8 +4732,8 @@ notifySelfInstallTITLE="$titleWorkflowDISPLAY Requires Restart"
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 notifySelfUpdateBodyIBM="You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update."
 notifySelfUpdateBodyJAMF="You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update."
-notifySelfUpgradeBodyIBM="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET Installer."
-notifySelfUpgradeBodyJAMF="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET Installer."
+notifySelfUpgradeBodyIBM="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET Installation."
+notifySelfUpgradeBodyJAMF="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET Installation."
 
 #### Language for notifyRestart(), a non-interactive notification informing the user that the computer is going to restart very soon.
 # This is used for all softwareupdate workflows and near the end of the MDM workflow.
@@ -4699,8 +4756,8 @@ notifyRestartBodyHardDaysJAMF="You have deferred the maximum number of $hardDays
 This computer will automatically restart very soon.
 
 Save any open documents now."
-notifyRestartBodyHardDateIBM="The deferrment deadline of $deadlineDateDISPLAY has passed.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now."
-notifyRestartBodyHardDateJAMF="The deferrment deadline of $deadlineDateDISPLAY has passed.
+notifyRestartBodyHardDateIBM="The deferment deadline of $deadlineDateDISPLAY has passed.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now."
+notifyRestartBodyHardDateJAMF="The deferment deadline of $deadlineDateDISPLAY has passed.
 
 This computer will automatically restart very soon.
 
@@ -4986,7 +5043,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 				sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app"
 				installerPID=$!
 			else
-				sendToLog "Warning: Test mode does not downlaod the macOS insatller, thus cannot open it."
+				sendToLog "Warning: Test mode does not downlaod the macOS installer, thus cannot open it."
 			fi
 		else # macOS updates are available.
 			if [[ $macOSMAJOR -ge 13 ]]; then
@@ -5017,7 +5074,7 @@ else # No $displayRedrawOPTION.
 			sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app"
 			installerPID=$!
 		else
-			sendToLog "Warning: Test mode does not downlaod the macOS insatller, thus cannot open it."
+			sendToLog "Warning: Test mode does not downlaod the macOS installer, thus cannot open it."
 		fi
 	else # macOS updates are available.
 		if [[ $macOSMAJOR -ge 13 ]]; then
@@ -5228,10 +5285,9 @@ mainWorkflow(){
 # Initial super workflow preparations.
 checkRoot
 setDefaults
-superInstaller
+superInstallation
 getOptions "$@"
-getPreferences
-superStarter "$@"
+superStartup "$@"
 
 # If requested then restart counters.
 [[ "$restartDAYS" == "TRUE" ]] && restartZeroDay
@@ -5239,7 +5295,7 @@ superStarter "$@"
 
 # Alternate workflow after previous super macOS update/upgrade.
 if [[ "$restartVALIDATE" == "TRUE" ]]; then 
-	sendToLog "**** S.U.P.E.R.M.A.N. RESTART VALIDATION ****"
+	sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION RESTART VALIDATION ****"
 	sendToStatus "Running: macOS update/upgrade restart validation."
 	checkAfterRestart
 fi
@@ -5251,42 +5307,42 @@ if [[ "$testModeOPTION" == "TRUE" ]]; then # Test mode option.
 		softwareUpdateRECOMMENDED="FALSE"
 		macOSUpgradeVersionTARGET="FALSE"
 		if [[ "$forceRestartOPTION" != "TRUE" ]] && [[ -z $policyTRIGGERS ]]; then
-			sendToLog "**** S.U.P.E.R.M.A.N. TEST AND SKIP SOFTWARE UPDATES/UPGRADE MODE ****"
+			sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION TEST AND SKIP SOFTWARE UPDATES/UPGRADE MODE ****"
 			sendToStatus "Running: Test and skip software updates/upgrade mode."
 			sendToLog "Warning: You need to also use \"--force-restart\" or \"--policy-triggers\" to simulate notification and dialog workflows."
 		fi
 	else
-		sendToLog "**** S.U.P.E.R.M.A.N. TEST MODE ****"
+		sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION TEST MODE ****"
 		sendToStatus "Running: Test mode."
 		softwareUpdateRESTART="TRUE"
 	fi
 elif [[ "$skipUpdatesOPTION" == "TRUE" ]]; then # Skip software updates/upgrade mode option.
-	sendToLog "**** S.U.P.E.R.M.A.N. SKIP SOFTWARE UPDATES/UPGRADE MODE ****"
+	sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION SKIP SOFTWARE UPDATES/UPGRADE MODE ****"
 	softwareUpdateRESTART="FALSE"
 	softwareUpdateRECOMMENDED="FALSE"
 	macOSUpgradeVersionTARGET="FALSE"
 else # Default software update/upgrade workflow.
-	sendToLog "**** S.U.P.E.R.M.A.N. CHECK SOFTWARE UPDATES/UPGRADE ****"
+	sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION CHECK SOFTWARE UPDATES/UPGRADE ****"
 	[[ "$fullCheckREQUIRED" != "TRUE" ]] && checkSoftwareListCache
 	checkSoftwareUpdates
 	checkMacOSUpgrades
-	checkPreviousDownloads
+	checkDownloads
 	# At this point all available updates/upgrades have been evaluated.
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		if [[ $macOSVERSION -ge 1203 ]] && [[ "$upgradeWORKFLOW" != "JAMF" ]]; then # macOS 12.3 or newer can upgrade via softwareupdate, unless using MDM workflow.
-			[[ "$upgradeWORKFLOW" == "LOCAL" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPGRADE MACOS $macOSSoftwareUpgradeVersionTARGET SOFTWAREUPDATE ****"
-			[[ "$upgradeWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPGRADE MACOS $macOSSoftwareUpgradeVersionTARGET USER REQUEST ****"
+			[[ "$upgradeWORKFLOW" == "LOCAL" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPGRADE MACOS $macOSSoftwareUpgradeVersionTARGET SOFTWAREUPDATE ****"
+			[[ "$upgradeWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPGRADE MACOS $macOSSoftwareUpgradeVersionTARGET USER REQUEST ****"
 		else # Systems older than macOS 12.3 or using the MDM workflow upgrade via installer.
-			[[ "$upgradeWORKFLOW" == "LOCAL" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPGRADE MACOS $macOSInstallerVersionTARGET INSTALLER ****"
-			[[ "$upgradeWORKFLOW" == "JAMF" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPGRADE MACOS $macOSInstallerVersionTARGET MDM PUSH ****"
-			[[ "$upgradeWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPGRADE MACOS $macOSInstallerVersionTARGET USER REQUEST ****"
+			[[ "$upgradeWORKFLOW" == "LOCAL" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPGRADE MACOS $macOSInstallerVersionTARGET INSTALLER ****"
+			[[ "$upgradeWORKFLOW" == "JAMF" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPGRADE MACOS $macOSInstallerVersionTARGET MDM PUSH ****"
+			[[ "$upgradeWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPGRADE MACOS $macOSInstallerVersionTARGET USER REQUEST ****"
 		fi
 	elif [[ "$softwareUpdateRESTART" == "TRUE" ]]; then # macOS updates are available.
-		[[ "$updateWORKFLOW" == "LOCAL" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPDATE MACOS $macOSSoftwareUpdateVERSION SOFTWAREUPDATE ****"
-		[[ "$updateWORKFLOW" == "JAMF" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPDATE MACOS $macOSSoftwareUpdateVERSION MDM PUSH ****"
-		[[ "$updateWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. UPDATE MACOS $macOSSoftwareUpdateVERSION USER REQUEST ****"
+		[[ "$updateWORKFLOW" == "LOCAL" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION SOFTWAREUPDATE ****"
+		[[ "$updateWORKFLOW" == "JAMF" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION MDM PUSH ****"
+		[[ "$updateWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION USER REQUEST ****"
 	elif [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then # Only recommended (non-macOS) updates are available.
-		sendToLog "**** S.U.P.E.R.M.A.N. DOWNLOAD RECOMMENDED SOFTWAREUPDATE ****"
+		sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD RECOMMENDED SOFTWAREUPDATE ****"
 		[[ "$testModeOPTION" != "TRUE" ]] && downloadWorkflow
 	else # No software updates/upgrade needed so clean up any leftover deferral counters.
 		defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null
@@ -5366,5 +5422,5 @@ fi
 mainWorkflow "$@"
 rm -f "$superPIDFILE"
 [[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
-sendToLog "**** S.U.P.E.R.M.A.N. EXIT ****"
+sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 exit 0

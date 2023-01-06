@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [3.0b6]
+
+2022-01-05
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New support for macOS updates/upgrades when a system is enrolled in a beta seed program, as such `super` now properly detects and installs available macOS betas.
+- All logs now show the version of `super` that is running.
+- New Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Installed-Version-Jamf-Pro-EA.sh) collects the currently installed `super` version.
+- macOS upgrade installers are now always downloaded and validated via specific build number (as opposed to version number).
+- Resolved an issue that prevented software updates from downloading on macOS 12.0 - 12.2.
+- Resolved an issue that prevented update/upgrade version numbers from displaying for MDM workflow dialogs on macOS 12.3 or nerwer.
+- Improved failure detection, some logging refinements, and fixed a few typos for good measure.
+- Updated `super` [removal script](https://github.com/Macjutsu/super/blob/main/Super-Friends/Remove-super.sh) now removes erase-install items and any update credentials previously saved by `super`.
+- `super` 3.0b6 SHA-256: b7bae8e206e6af5b3368a032853926830914a1ee9f6b66cc5e46b60b26d19cd3
+
 ## [3.0b5]
 
 2022-12-22

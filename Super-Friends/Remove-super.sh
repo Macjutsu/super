@@ -14,10 +14,23 @@ superPIDFILE="/var/run/super.pid"
 # This is the name for the LaunchDaemon.
 launchDaemonNAME="com.macjutsu.super" # No trailing ".plist"
 
+# Installation folder:
+superFOLDER="/Library/Management/super"
+
+# Path to the local erase-install folder:
+eraseInstallFOLDER="/Library/Management/erase-install"
+# Comment out the previous line if you don't want to remove erase-install.sh.
+
 # Make sure the script is running with root privileges.
 if [[ "$(id -u)" -ne 0 ]]; then
 	echo "Exit: $(basename "$0") must run with root privileges."
 	exit 1
+fi
+
+# If super is still installed normally, use it to reset all settings and delete accounts.
+if [[ -f "$superFOLDER/super" ]]; then
+	echo "Running super one last time to clean up and delete accounts..."
+	"$superFOLDER/super" --reset-super --skip-updates --delete-accounts
 fi
 
 # Check for any previous super process still running, if so kill it.
@@ -41,10 +54,16 @@ fi
 
 # This removes super folder items.
 if [[ -d "$superFOLDER" ]]; then
-	echo "Removing installed super items."
+	echo "Removing super items."
 	rm -Rf "$superFOLDER" > /dev/null 2>&1
 	rm -f "$superLINK" > /dev/null 2>&1
 	rm -f "$superPIDFILE" > /dev/null 2>&1
+fi
+
+# This removes erase-install folder items.
+if [[ -d "$eraseInstallFOLDER" ]]; then
+	echo "Removing erase-install.sh items."
+	rm -Rf "$eraseInstallFOLDER" > /dev/null 2>&1
 fi
 
 exit 0
