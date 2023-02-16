@@ -3,13 +3,13 @@
 <plist version="1">
   <dict>
     <key>PayloadUUID</key>
-    <string>FB94ECBE-26E5-4408-AB95-5A94D71F8158</string>
+    <string>D819E6B3-72BA-4202-874D-FE7C6783C984</string>
     <key>PayloadType</key>
     <string>Configuration</string>
     <key>PayloadOrganization</key>
     <string>Macjutsu</string>
     <key>PayloadIdentifier</key>
-    <string>FB94ECBE-26E5-4408-AB95-5A94D71F8158</string>
+    <string>D819E6B3-72BA-4202-874D-FE7C6783C984</string>
     <key>PayloadDisplayName</key>
     <string>S.U.P.E.R.M.A.N. All Settings Example</string>
     <key>PayloadDescription</key>
@@ -28,13 +28,13 @@
         <key>PayloadDisplayName</key>
         <string>Custom Settings</string>
         <key>PayloadIdentifier</key>
-        <string>48FAD646-0792-4724-9167-6C1FE182F33A</string>
+        <string>22539B64-64B4-4973-AA52-B6B105B4C014</string>
         <key>PayloadOrganization</key>
-        <string>Macjutsu</string>
+        <string>JAMF Software</string>
         <key>PayloadType</key>
         <string>com.apple.ManagedClient.preferences</string>
         <key>PayloadUUID</key>
-        <string>48FAD646-0792-4724-9167-6C1FE182F33A</string>
+        <string>22539B64-64B4-4973-AA52-B6B105B4C014</string>
         <key>PayloadVersion</key>
         <integer>1</integer>
         <key>PayloadContent</key>
@@ -46,6 +46,10 @@
               <dict>
                 <key>mcx_preference_settings</key>
                 <dict>
+                  <key>AllowUpgrade</key>
+                  <true/>
+                  <key>BatteryLevel</key>
+                  <string>75</string>
                   <key>DefaultDefer</key>
                   <string>120</string>
                   <key>DisplayIcon</key>
@@ -54,6 +58,8 @@
                   <string>20</string>
                   <key>DisplayTimeout</key>
                   <string>60</string>
+                  <key>EnforceAllUpdates</key>
+                  <true/>
                   <key>FocusCount</key>
                   <string>5</string>
                   <key>FocusDate</key>
@@ -78,15 +84,9 @@
                   <string>$JSSID</string>
                   <key>MenuDefer</key>
                   <string>120,200,300</string>
-                  <key>AllowUpgrade</key>
-                  <true/>
-                  <key>TargetUpgrade</key>
-                  <string>12</string>
                   <key>PolicyTriggers</key>
                   <string>trigger1,trigger2</string>
                   <key>PreferJamfHelper</key>
-                  <false/>
-                  <key>PushMajorUpgrade</key>
                   <false/>
                   <key>RecheckDefer</key>
                   <string>120</string>
@@ -98,6 +98,8 @@
                   <string>2022-07-02:02</string>
                   <key>SoftDays</key>
                   <string>4</string>
+                  <key>TargetUpgrade</key>
+                  <string>12</string>
                   <key>TestMode</key>
                   <true/>
                   <key>TestModeTimeout</key>

@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [3.0b7]
+
+2022-02-16
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New `--enforce-all-updates` option will install all recommended (non-macOS) updates silently in the background even if there is no macOS update or upgrade required. Without using this option, the default behavior for `super` is to install recommended updates only after a macOS update/upgrade restart.
+- The macOS upgrade via MDM workflow now automatically logs out an active user moments before the system attempts to restart the computer. Thus, now all update and upgrade workflows (Intel, local authenticated, and MDM authenticated) will successfully force a restart.
+- Improved notifications for the macOS upgrade via MDM workflow now show restart estimates more often and also warn the user before they are forcibly logged out before restarting.
+- If needed, erase-install.sh is automatically updated to [version 27.3](https://github.com/grahampugh/erase-install/releases/tag/v27.3). For compatibility with older systems, `super` will remain using versions of erase-install.sh prior to version 28.
+- Resolved issues that caused download workflows to fail when only a single recommended (non-macOS) update was available.
+- Resolved an issue that prevented `super` from downlading the latest macOS upgrade installer. Now the latest version is calculated via the macOS installer build number.
+- Resolved an issue that prevented `super` from completing the gatekeeper validation for the macOS upgrade installer. This was making macOS upgrades take longer than they should.
+- Improved `--test-mode` behavior.
+- As always, countless logging refinements.
+- Updated Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Installed-Version-Jamf-Pro-EA.sh) now collects older versions of `super` as well. (Thanks to @wakco for this one!)
+- Updated [example MDM profiles for `super` 3.0b7](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- `super` 3.0b6 SHA-256: 23c6402379154f249d8ff6e1182bf500960fb118bdf16b4ccb01d6df26a91e85
+
 ## [3.0b6]
 
 2022-01-05

@@ -1,24 +1,16 @@
 #!/bin/bash
-#
+# The next line disables specific ShellCheck codes for the entire script.
+# https://github.com/koalaman/shellcheck
+# shellcheck disable=SC2001,SC2207,SC2024
+
 # S.U.P.E.R.M.A.N.
 # Software Update/Upgrade Policy Enforcement (with) Recursive Messaging And Notification
-#
-# S.U.P.E.R.M.A.N. optimizes the macOS update/upgrade experience.
-# by Kevin M. White
-#
-superVERSION="3.0b6"
-superDATE="2023/01/06"
 # https://github.com/Macjutsu/super
-#
-# NOTE *** Debugging Stuff ***
-################################################################################
-#
-# The next line disables specific ShellCheck codes for the entire script. https://github.com/koalaman/shellcheck
-# shellcheck disable=SC2001,SC2207,SC2024
-#
-# Uncomment the next line for debugging code.
-# set -x
-#
+# by Kevin M. White
+
+superVERSION="3.0b7"
+superDATE="2023/02/16"
+
 # MARK: *** Usage & Help ***
 ################################################################################
 
@@ -65,14 +57,15 @@ echo "
   [--delete-accounts]
 
   macOS Update, Upgrade, and Restart Options:
+  [--enforce-all-updates] [--enforce-all-updates-off]
   [--allow-upgrade] [--allow-upgrade-off] [--target-upgrade=version]
   [--policy-triggers=PolicyTrigger,PolicyTrigger,etc...]
   [--skip-updates] [--skip-updates-off] [--force-restart] [--force-restart-off]
 
   Special Modes Options:
   [--test-mode] [--test-mode-off] [--test-mode-timeout=seconds]
-  [--verbose-mode] [--verbose-mode-off] [--open-logs] [--reset-super] [--usage]
-  [--help]
+  [--verbose-mode] [--verbose-mode-off]
+  [--open-logs] [--reset-super] [--usage] [--help]
 
   * Managed preferences override local options via domain: com.macjutsu.super
   <key>DefaultDefer</key> <string>seconds</string>
@@ -95,6 +88,7 @@ echo "
   <key>IconSizeIbm</key> <string>number</string>
   <key>IconSizeJamf</key> <string>number</string>
   <key>PreferJamfHelper</key> <true/> | <false/>
+  <key>EnforceAllUpdates</key> <true/> | <false/>
   <key>AllowUpgrade</key> <true/> | <false/>
   <key>TargetUpgrade</key> <string>version</string>
   <key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>
@@ -198,13 +192,13 @@ ibmNotifierAPP="$superFOLDER/IBM Notifier.app"
 ibmNotifierBINARY="$ibmNotifierAPP/Contents/MacOS/IBM Notifier"
 
 # URL to the erase-install package installer:
-eraseInstallURL="https://github.com/grahampugh/erase-install/releases/download/v27.1/erase-install-27.1.pkg"
+eraseInstallURL="https://github.com/grahampugh/erase-install/releases/download/v27.3/erase-install-27.3.pkg"
 
 # Target version for erase-install.sh:
-eraseInstallVERSION="27.1"
+eraseInstallVERSION="27.3"
 
 # Target checksum for erase-install.sh:
-eraseInstallCHECKSUM="e00faa05211144af49eadf350e2a3e94095754fa"
+eraseInstallCHECKSUM="890f3ec8fe0e2efa7b33d407eee96358d8a44ca4"
 
 # Path to the local erase-install folder:
 eraseInstallFOLDER="/Library/Management/erase-install"
@@ -398,6 +392,21 @@ while [[ -n $1 ]]; do
 		-D|--delete-accounts )
 			deleteACCOUNTS="TRUE"
 		;;
+		-A|--enforce-all-updates|--enforce-all-updates-on )
+			enforceAllUpdatesOPTION="TRUE"
+		;;
+		-a|--enforce-all-updates-off|--no-enforce-all-updates )
+			enforceAllUpdatesOPTION="FALSE"
+		;;
+		-M|--allow-upgrade|--allow-upgrade-on )
+			allowUpgradeOPTION="TRUE"
+		;;
+		-m|--allow-upgrade-off|--no-allow-upgrade )
+			allowUpgradeOPTION="FALSE"
+		;;
+		--target-upgrade* )
+			targetUpgradeOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
 		--policy-triggers* )
 			policyTriggersOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
@@ -412,15 +421,6 @@ while [[ -n $1 ]]; do
 		;;
 		-f|--force-restart-off|--no-force-restart )
 			forceRestartOPTION="FALSE"
-		;;
-		-M|--allow-upgrade|--allow-upgrade-on )
-			allowUpgradeOPTION="TRUE"
-		;;
-		-m|--allow-upgrade-off|--no-allow-upgrade )
-			allowUpgradeOPTION="FALSE"
-		;;
-		--target-upgrade* )
-			targetUpgradeOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
 		-T|--test-mode|--test-mode-on )
 			testModeOPTION="TRUE"
@@ -520,10 +520,11 @@ if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
 	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
 	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
 	defaults delete "$superPLIST" PreferJamfHelper 2> /dev/null
-	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
-	defaults delete "$superPLIST" SkipUpdates 2> /dev/null
+	defaults delete "$superPLIST" EnforceAllUpdates 2> /dev/null
 	defaults delete "$superPLIST" AllowUpgrade 2> /dev/null
 	defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
+	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
+	defaults delete "$superPLIST" SkipUpdates 2> /dev/null
 	defaults delete "$superPLIST" ForceRestart 2> /dev/null
 	defaults delete "$superPLIST" TestMode 2> /dev/null
 	defaults delete "$superPLIST" TestModeTimeout 2> /dev/null
@@ -570,11 +571,12 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	iconSizeIbmMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeJamf 2> /dev/null)
 	preferJamfHelperMANAGED=$(defaults read "$superMANAGEDPLIST" PreferJamfHelper 2> /dev/null)
+	enforceAllUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" EnforceAllUpdates 2> /dev/null)
+	allowUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" AllowUpgrade 2> /dev/null)
+	targetUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" TargetUpgrade 2> /dev/null)
 	policyTriggersMANAGED=$(defaults read "$superMANAGEDPLIST" PolicyTriggers 2> /dev/null)
 	skipUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" SkipUpdates 2> /dev/null)
 	forceRestartMANAGED=$(defaults read "$superMANAGEDPLIST" ForceRestart 2> /dev/null)
-	allowUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" AllowUpgrade 2> /dev/null)
-	targetUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" TargetUpgrade 2> /dev/null)
 	testModeMANAGED=$(defaults read "$superMANAGEDPLIST" TestMode 2> /dev/null)
 	testModeTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" TestModeTimeout 2> /dev/null)
 	verboseModeMANAGED=$(defaults read "$superMANAGEDPLIST" VerboseMode 2> /dev/null)
@@ -601,11 +603,12 @@ if [[ -f "$superPLIST.plist" ]]; then
 	iconSizeIbmPROPERTY=$(defaults read "$superPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfPROPERTY=$(defaults read "$superPLIST" IconSizeJamf 2> /dev/null)
 	preferJamfHelperPROPERTY=$(defaults read "$superPLIST" PreferJamfHelper 2> /dev/null)
+	enforceAllUpdatesPROPERTY=$(defaults read "$superPLIST" EnforceAllUpdates 2> /dev/null)
+	allowUpgradePROPERTY=$(defaults read "$superPLIST" AllowUpgrade 2> /dev/null)
+	targetUpgradePROPERTY=$(defaults read "$superPLIST" TargetUpgrade 2> /dev/null)
 	policyTriggersPROPERTY=$(defaults read "$superPLIST" PolicyTriggers 2> /dev/null)
 	skipUpdatesPROPERTY=$(defaults read "$superPLIST" SkipUpdates 2> /dev/null)
 	forceRestartPROPERTY=$(defaults read "$superPLIST" ForceRestart 2> /dev/null)
-	allowUpgradePROPERTY=$(defaults read "$superPLIST" AllowUpgrade 2> /dev/null)
-	targetUpgradePROPERTY=$(defaults read "$superPLIST" TargetUpgrade 2> /dev/null)
 	testModePROPERTY=$(defaults read "$superPLIST" TestMode 2> /dev/null)
 	testModeTimeoutPROPERTY=$(defaults read "$superPLIST" TestModeTimeout 2> /dev/null)
 	verboseModePROPERTY=$(defaults read "$superPLIST" VerboseMode 2> /dev/null)
@@ -708,6 +711,21 @@ if [[ -n $preferJamfHelperMANAGED ]]; then
 elif [[ -z $preferJamfHelperOPTION ]] && [[ -n $preferJamfHelperPROPERTY ]]; then
 	preferJamfHelperOPTION="$preferJamfHelperPROPERTY"
 fi
+if [[ -n $enforceAllUpdatesMANAGED ]]; then
+	enforceAllUpdatesOPTION="$enforceAllUpdatesMANAGED"
+elif [[ -z $enforceAllUpdatesOPTION ]] && [[ -n $enforceAllUpdatesPROPERTY ]]; then
+	enforceAllUpdatesOPTION="$enforceAllUpdatesPROPERTY"
+fi
+if [[ -n $allowUpgradeMANAGED ]]; then
+	allowUpgradeOPTION="$allowUpgradeMANAGED"
+elif [[ -z $allowUpgradeOPTION ]] && [[ -n $allowUpgradePROPERTY ]]; then
+	allowUpgradeOPTION="$allowUpgradePROPERTY"
+fi
+if [[ -n $targetUpgradeMANAGED ]]; then
+	targetUpgradeOPTION="$targetUpgradeMANAGED"
+elif [[ -z $targetUpgradeOPTION ]] && [[ -n $targetUpgradePROPERTY ]]; then
+	targetUpgradeOPTION="$targetUpgradePROPERTY"
+fi
 if [[ -n $policyTriggersMANAGED ]]; then
 	policyTriggersOPTION="$policyTriggersMANAGED"
 elif [[ -z $policyTriggersOPTION ]] && [[ -n $policyTriggersPROPERTY ]]; then
@@ -722,16 +740,6 @@ if [[ -n $forceRestartMANAGED ]]; then
 	forceRestartOPTION="$forceRestartMANAGED"
 elif [[ -z $forceRestartOPTION ]] && [[ -n $forceRestartPROPERTY ]]; then
 	forceRestartOPTION="$forceRestartPROPERTY"
-fi
-if [[ -n $allowUpgradeMANAGED ]]; then
-	allowUpgradeOPTION="$allowUpgradeMANAGED"
-elif [[ -z $allowUpgradeOPTION ]] && [[ -n $allowUpgradePROPERTY ]]; then
-	allowUpgradeOPTION="$allowUpgradePROPERTY"
-fi
-if [[ -n $targetUpgradeMANAGED ]]; then
-	targetUpgradeOPTION="$targetUpgradeMANAGED"
-elif [[ -z $targetUpgradeOPTION ]] && [[ -n $targetUpgradePROPERTY ]]; then
-	targetUpgradeOPTION="$targetUpgradePROPERTY"
 fi
 if [[ -n $testModeMANAGED ]]; then
 	testModeOPTION="$testModeMANAGED"
@@ -1132,10 +1140,10 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 	if [[ $(echo "$displayIconOPTION" | grep -c '^http://\|^https://') -gt 0 ]]; then
 		sendToLog "Startup: Attempting to download requested icon from: $displayIconOPTION"
 		downloadRESULT=$(curl "$displayIconOPTION" -L -o "/tmp/cachedICON" 2>&1)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT is:\n$downloadRESULT"
 		if [[ -f "/tmp/cachedICON" ]]; then
 			sipsRESULT=$(sips -s format png "/tmp/cachedICON" --out "$cachedICON" 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT is:\n$sipsRESULT"
 			defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
 		else
 			sendToLog "Warning: Unable to download specified icon from: $displayIconOPTION"
@@ -1143,7 +1151,7 @@ elif [[ -n "$displayIconOPTION" ]] && [[ "$displayIconOPTION" != "$(defaults rea
 	elif [[ -e "$displayIconOPTION" ]]; then
 		sendToLog "Startup: Copying requested icon from: $displayIconOPTION"
 		sipsRESULT=$(sips -s format png "$displayIconOPTION" --out "$cachedICON" 2>&1)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT is:\n$sipsRESULT"
 		defaults write "$superPLIST" DisplayIconCache -string "$displayIconOPTION"
 	else
 		sendToLog "Warning: Unable to locate specified icon from: $displayIconOPTION"
@@ -1152,7 +1160,7 @@ fi
 if [[ ! -f "$cachedICON" ]]; then
 	sendToLog "Startup: No custom display icon found, copying default icon from: $defaultICON"
 	sipsRESULT=$(sips -s format png "$defaultICON" --out "$cachedICON" 2>&1)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT: \n$sipsRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: sipsRESULT is:\n$sipsRESULT"
 	defaults write "$superPLIST" DisplayIconCache -string "$defaultICON"
 fi
 
@@ -1194,6 +1202,41 @@ elif [[ -n $iconSizeJamfOPTION ]] && ! [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]
 	sendToLog "Parameter Error: The IBM Notifier icon size must only be a number."; parameterERROR="TRUE"
 fi
 
+# Manage $enforceAllUpdatesOPTION and save to $superPLIST.
+if [[ $enforceAllUpdatesOPTION -eq 1 ]] || [[ "$enforceAllUpdatesOPTION" == "TRUE" ]]; then
+	enforceAllUpdatesOPTION="TRUE"
+	defaults write "$superPLIST" EnforceAllUpdates -bool "$enforceAllUpdatesOPTION"
+else
+	enforceAllUpdatesOPTION="FALSE"
+	defaults delete "$superPLIST" EnforceAllUpdates 2> /dev/null
+fi
+
+# Manage $allowUpgradeOPTION and save to $superPLIST.
+if [[ $allowUpgradeOPTION -eq 1 ]] || [[ "$allowUpgradeOPTION" == "TRUE" ]]; then
+	allowUpgradeOPTION="TRUE"
+	defaults write "$superPLIST" AllowUpgrade -bool "$allowUpgradeOPTION"
+else
+	allowUpgradeOPTION="FALSE"
+	defaults delete "$superPLIST" AllowUpgrade 2> /dev/null
+fi
+
+# Manage $targetUpgradeOPTION and if a valid macOS version then save to $superPLIST.
+if [[ "$targetUpgradeOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for macOS target upgrade version."
+	defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
+	unset targetUpgradeOPTION
+elif [[ -n $targetUpgradeOPTION ]] && ! [[ $targetUpgradeOPTION =~ $regexMACOSMAJORVERSION ]]; then
+	sendToLog "Parameter Error: The upgrade target version must be a contemporary macOS version number (11,12,etc.)."; parameterERROR="TRUE"
+elif [[ -n $targetUpgradeOPTION ]] && [[ $targetUpgradeOPTION =~ $regexMACOSMAJORVERSION ]]; then
+	if [[ "$allowUpgradeOPTION" == "TRUE" ]]; then
+		targetUpgradeVERSION="$targetUpgradeOPTION"
+		defaults write "$superPLIST" TargetUpgrade -string "$targetUpgradeOPTION"
+	else
+		sendToLog "Parameter Error: To specify a target upgrade version you must also use --allow-upgrade."; parameterERROR="TRUE"
+		defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
+	fi
+fi
+
 # Validate $policyTriggersOPTION input and if valid set $policyTRIGGERS and save to $superPLIST.
 if [[ "$policyTriggersOPTION" == "X" ]]; then
 	sendToLog "Startup: Deleting local preference for Jamf Pro Policy triggers."
@@ -1222,32 +1265,6 @@ if [[ $forceRestartOPTION -eq 1 ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; the
 else
 	forceRestartOPTION="FALSE"
 	defaults delete "$superPLIST" ForceRestart 2> /dev/null
-fi
-
-# Manage $allowUpgradeOPTION and save to $superPLIST.
-if [[ $allowUpgradeOPTION -eq 1 ]] || [[ "$allowUpgradeOPTION" == "TRUE" ]]; then
-	allowUpgradeOPTION="TRUE"
-	defaults write "$superPLIST" AllowUpgrade -bool "$allowUpgradeOPTION"
-else
-	allowUpgradeOPTION="FALSE"
-	defaults delete "$superPLIST" AllowUpgrade 2> /dev/null
-fi
-
-# Manage $targetUpgradeOPTION and if a valid macOS version then save to $superPLIST.
-if [[ "$targetUpgradeOPTION" == "X" ]]; then
-	sendToLog "Startup: Deleting local preference for macOS target upgrade version."
-	defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
-	unset targetUpgradeOPTION
-elif [[ -n $targetUpgradeOPTION ]] && ! [[ $targetUpgradeOPTION =~ $regexMACOSMAJORVERSION ]]; then
-	sendToLog "Parameter Error: The upgrade target version must be a contemporary macOS version number (11,12,etc.)."; parameterERROR="TRUE"
-elif [[ -n $targetUpgradeOPTION ]] && [[ $targetUpgradeOPTION =~ $regexMACOSMAJORVERSION ]]; then
-	if [[ "$allowUpgradeOPTION" == "TRUE" ]]; then
-		targetUpgradeVERSION="$targetUpgradeOPTION"
-		defaults write "$superPLIST" TargetUpgrade -string "$targetUpgradeOPTION"
-	else
-		sendToLog "Parameter Error: To specify a target upgrade version you must also use --allow-upgrade."; parameterERROR="TRUE"
-		defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
-	fi
 fi
 
 # Manage $testModeOPTION and save to $superPLIST.
@@ -1459,7 +1476,7 @@ if [[ -n $adminACCOUNT ]]; then
 			done
 			sendToLog "Startup: Creating new super service account \"$superNEWACCT\" with full name \"$superNEWFULL\" and UID $newUID..."
 			addRESULT=$(sysadminctl -addUser "$superNEWACCT" -fullName "$superNEWFULL" -password "$superNEWPASS" -UID $newUID -GID 20 -shell /dev/null -home /dev/null -picture "$cachedICON" -adminUser "$adminACCOUNT" -adminPassword "$adminPASSWORD" 2>&1)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: addRESULT: \n$addRESULT"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: addRESULT is:\n$addRESULT"
 			dscl . create /Users/"$superNEWACCT" IsHidden 1
 			updateACCOUNT="$superACCOUNT"
 			updateKEYCHAIN="$superKEYCHAIN"
@@ -1626,17 +1643,17 @@ else # Mac computers with Intel.
 	updateWORKFLOW="LOCAL"
 	[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="LOCAL"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateWORKFLOW: $updateWORKFLOW"
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW: $upgradeWORKFLOW"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateWORKFLOW is: $updateWORKFLOW"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW is: $upgradeWORKFLOW"
 
 # Check for beta program enrollment.
 seedutilSTATUS=$(/System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil current)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: seedutilSTATUS:\n$seedutilSTATUS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: seedutilSTATUS is:\n$seedutilSTATUS"
 if [[ $(echo "$seedutilSTATUS" | grep -c 'Is Enrolled: YES') -gt 0 ]]; then
 	betaWORKFLOW=$(echo "$seedutilSTATUS" | awk '/Currently enrolled in:/ {print $4;}')
 	sendToLog "Startup: This system is currently enrolled in beta access program: $betaWORKFLOW"
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: betaWORKFLOW: $betaWORKFLOW"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: betaWORKFLOW is: $betaWORKFLOW"
 }
 
 # MARK: *** Installation & Startup ***
@@ -1655,11 +1672,11 @@ if [[ -f "/tmp/IBM.Notifier.zip" ]]; then
 		rm -Rf "/tmp/IBM.Notifier.zip"
 	else
 		sendToLog "Error: Unable to install IBM Notifier.app."
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: unzipRESULT: \n$unzipRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: unzipRESULT is:\n$unzipRESULT"
 	fi
 else
 	sendToLog "Error: Unable to download IBM Notifier.app from: $ibmNotifierURL"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT is:\n$downloadRESULT"
 fi
 }
 
@@ -1676,7 +1693,7 @@ if [[ $(echo "$ibmNotifierCODESIGN" | grep -c 'valid on disk') -gt 0 ]]; then
 	fi
 else
 	sendToLog "Warning: unable validate signature for IBM Notifier at path: $ibmNotifierAPP."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierCODESIGN: \n$ibmNotifierCODESIGN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierCODESIGN is:\n$ibmNotifierCODESIGN"
 fi
 }
 
@@ -1691,11 +1708,11 @@ if [[ -f "/tmp/erase-install.pkg" ]]; then
 		rm -Rf "/tmp/erase-install.pkg"
 	else
 		sendToLog "Error: Unable to install erase-install.pkg."
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: installRESULT: \n$installRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: installRESULT is:\n$installRESULT"
 	fi
 else
 	sendToLog "Error: Unable to download erase-install.pkg from: $eraseInstallURL."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT: \n$downloadRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: downloadRESULT is:\n$downloadRESULT"
 fi
 }
 
@@ -1709,11 +1726,11 @@ if [[ "$eraseInstallVERSION" == "$eraseInstallRESULT" ]]; then
 		eraseInstallVALID="TRUE"
 	else
 		sendToLog "Warning: Unable validate checksum for erase-install.sh at path: $eraseInstallSCRIPT."
-		[[ "$eraseInstallSHASUM" == "TRUE" ]] && sendToLog "Verbose Mode: eraseInstallSHASUM: \n$eraseInstallSHASUM"
+		[[ "$eraseInstallSHASUM" == "TRUE" ]] && sendToLog "Verbose Mode: eraseInstallSHASUM is:\n$eraseInstallSHASUM"
 	fi
 else
 	sendToLog "Warning: erase-install.sh at path: $eraseInstallSCRIPT is version $eraseInstallRESULT, this does not match target version $eraseInstallVERSION."
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: eraseInstallRESULT: \n$eraseInstallRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: eraseInstallRESULT is:\n$eraseInstallRESULT"
 fi
 if [[ "$eraseInstallVALID" == "TRUE" ]] && [[ ! -e "$installInstallMacOS" ]]; then
 	sendToLog "Warning: Unable to locate installinstallmacOS.py at path: $installInstallMacOS"
@@ -1737,9 +1754,9 @@ if [[ -e "$jamfBINARY" ]]; then
 	jamfMINOR=$("$jamfBINARY" -version | cut -c 9- | cut -d'.' -f2) # Expected output: 30, 31, 32, etc.
 	jamfVERSION=${jamfMAJOR}$(printf "%02d" "$jamfMINOR") # Expected output: 1030, 1031, 1032, etc.
 	if [[ $macOSVERSION -ge 1103 ]] && [[ $jamfVERSION -lt 1038 ]]; then
-		sendToLog "Helper Error: Jamf Pro $jamfVERSION is not supported on macOS 11.3 or newer."; helperERROR="TRUE"
+		sendToLog "Helper Error: super requires Jamf Pro version 10.38 or later, the currently installed version of Jamf Pro $jamfVERSION is not supported."; helperERROR="TRUE"
 	elif [[ "$jamfVERSION" -lt 1000 ]]; then
-		sendToLog "Helper Error: Jamf Pro $jamfVERSION is not supported."; helperERROR="TRUE"
+		sendToLog "Helper Error: super requires Jamf Pro version 10.00 or later, the currently installed version of Jamf Pro $jamfVERSION is not supported."; helperERROR="TRUE"
 	fi
 else
 	sendToLog "Startup: Unable to locate jamf binary at: $jamfBINARY"
@@ -1837,7 +1854,7 @@ if ! { [[ "$superPATH" == "$superFOLDER" ]] || [[ "$superPATH" == "$(dirname "$s
 #!/bin/sh
 echo "\$(date +"%a %b %d %T") \$(hostname -s) \$(basename "\$0")[\$\$]: **** S.U.P.E.R.M.A.N. $superVERSION LAUNCHDAEMON ****" | tee -a "$superLOG"
 "$superFOLDER/super" "\$@" &
-disown -a -h
+disown -a
 exit 0
 EOSS
 	touch "$asuListLOG"
@@ -1897,10 +1914,10 @@ else
 	defaults delete "$superPLIST" VerboseMode 2> /dev/null
 fi
 if [[ "$verboseModeOPTION" == "TRUE" ]]; then
-	sendToLog "Startup: Verbose mode enabled."
-	sendToLog "Startup: Uptime: $(uptime)"
-	sendToLog "Startup: Managed preference file $superMANAGEDPLIST:\n$(defaults read "$superMANAGEDPLIST" 2> /dev/null)"
-	sendToLog "Startup: Local preference file before validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
+	sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Verbose mode enabled."
+	sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Uptime is: $(uptime)"
+	sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Managed preference file $superMANAGEDPLIST is:\n$(defaults read "$superMANAGEDPLIST" 2> /dev/null)"
+	sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file before validation $superPLIST is:\n$(defaults read "$superPLIST" 2> /dev/null)"
 fi
 
 # Main parameter validation and management.
@@ -1929,7 +1946,7 @@ fi
 [[ "$skipUpdatesOPTION" == "TRUE" ]] && sendToLog "Startup: Skip software updates/upgrade mode enabled."
 [[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Startup: Forced restart mode enabled."
 [[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Startup: Test mode enabled with $testModeTimeoutSECONDS second timeout."
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Startup: Local preference file after validation $superPLIST:\n$(defaults read "$superPLIST" 2> /dev/null)"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file after validation $superPLIST is:\n$(defaults read "$superPLIST" 2> /dev/null)"
 
 # Additional validation and management.
 [[ "$macOSARCH" == "arm64" ]] && manageUpdateCredentials
@@ -2032,66 +2049,66 @@ defaults write "$superPLIST" SuperPending -string "$*"
 
 # Log any parameters that have values.
 logParameters() {
-sendToLog "Verbose Mode: superVERSION: $superVERSION"
-sendToLog "Verbose Mode: superDATE: $superDATE"
-sendToLog "Verbose Mode: macOSMAJOR: $macOSMAJOR"
-sendToLog "Verbose Mode: macOSMINOR: $macOSMINOR"
-sendToLog "Verbose Mode: macOSVERSION: $macOSVERSION"
-sendToLog "Verbose Mode: macOSARCH: $macOSARCH"
-sendToLog "Verbose Mode: parameterERROR: $parameterERROR"
-sendToLog "Verbose Mode: credentialERROR: $credentialERROR"
-sendToLog "Verbose Mode: workflowERROR: $workflowERROR"
-sendToLog "Verbose Mode: helperERROR: $helperERROR"
-[[ -n $jamfVERSION ]] && sendToLog "Verbose Mode: jamfVERSION: $jamfVERSION"
-[[ -n $jamfSERVER ]] && sendToLog "Verbose Mode: jamfSERVER: $jamfSERVER"
-[[ -n $ibmNotifierVALID ]] && sendToLog "Verbose Mode: ibmNotifierVALID: $ibmNotifierVALID"
-[[ -n $eraseInstallVALID ]] && sendToLog "Verbose Mode: eraseInstallVALID: $eraseInstallVALID"
-[[ -n $defaultDeferSECONDS ]] && sendToLog "Verbose Mode: defaultDeferSECONDS: $defaultDeferSECONDS"
-[[ -n $focusDeferSECONDS ]] && sendToLog "Verbose Mode: focusDeferSECONDS: $focusDeferSECONDS"
-[[ -n $menuDeferSECONDS ]] && sendToLog "Verbose Mode: menuDeferSECONDS: $menuDeferSECONDS"
-[[ -n $recheckDeferSECONDS ]] && sendToLog "Verbose Mode: recheckDeferSECONDS: $recheckDeferSECONDS"
-[[ -n $focusCountMAX ]] && sendToLog "Verbose Mode: focusCountMAX: $focusCountMAX"
-[[ -n $softCountMAX ]] && sendToLog "Verbose Mode: softCountMAX: $softCountMAX"
-[[ -n $hardCountMAX ]] && sendToLog "Verbose Mode: hardCountMAX: $hardCountMAX"
-[[ -n $focusDaysMAX ]] && sendToLog "Verbose Mode: focusDaysMAX: $focusDaysMAX"
-[[ -n $softDaysMAX ]] && sendToLog "Verbose Mode: softDaysMAX: $softDaysMAX"
-[[ -n $hardDaysMAX ]] && sendToLog "Verbose Mode: hardDaysMAX: $hardDaysMAX"
-[[ -n $zeroDayOVERRIDE ]] && sendToLog "Verbose Mode: zeroDayOVERRIDE: $zeroDayOVERRIDE"
-[[ -n $focusDateMAX ]] && sendToLog "Verbose Mode: focusDateMAX: $focusDateMAX"
-[[ -n $softDateMAX ]] && sendToLog "Verbose Mode: softDateMAX: $softDateMAX"
-[[ -n $hardDateMAX ]] && sendToLog "Verbose Mode: hardDateMAX: $hardDateMAX"
-[[ -n $displayTimeoutSECONDS ]] && sendToLog "Verbose Mode: displayTimeoutSECONDS: $displayTimeoutSECONDS"
-[[ -n $displayRedrawSECONDS ]] && sendToLog "Verbose Mode: displayRedrawSECONDS: $displayRedrawSECONDS"
-[[ -n $ibmNotifierIconSIZE ]] && sendToLog "Verbose Mode: ibmNotifierIconSIZE: $ibmNotifierIconSIZE"
-[[ -n $jamfHelperIconSIZE ]] && sendToLog "Verbose Mode: jamfHelperIconSIZE: $jamfHelperIconSIZE"
-[[ -n $preferJamfHelperOPTION ]] && sendToLog "Verbose Mode: preferJamfHelperOPTION: $preferJamfHelperOPTION"
-[[ -n $localOPTION ]] && sendToLog "Verbose Mode: localOPTION: $localOPTION"
-[[ -n $localPASSWORD ]] && sendToEcho "Verbose Mode: localPASSWORD: $localPASSWORD"
-[[ -n $localACCOUNT ]] && sendToLog "Verbose Mode: localACCOUNT: $localACCOUNT"
-[[ -n $localKEYCHAIN ]] && sendToEcho "Verbose Mode: localKEYCHAIN: $localKEYCHAIN"
-[[ -n $localCREDENTIAL ]] && sendToLog "Verbose Mode: localCREDENTIAL: $localCREDENTIAL"
-[[ -n $adminACCOUNT ]] && sendToLog "Verbose Mode: adminACCOUNT: $adminACCOUNT"
-[[ -n $adminPASSWORD ]] && sendToEcho "Verbose Mode: adminPASSWORD: $adminPASSWORD"
-[[ -n $superOPTION ]] && sendToLog "Verbose Mode: superOPTION: $superOPTION"
-[[ -n $superPASSWORD ]] && sendToEcho "Verbose Mode: superPASSWORD: $superPASSWORD"
-[[ -n $superACCOUNT ]] && sendToLog "Verbose Mode: superACCOUNT: $superACCOUNT"
-[[ -n $superKEYCHAIN ]] && sendToEcho "Verbose Mode: superKEYCHAIN: $superKEYCHAIN"
-[[ -n $superCREDENTIAL ]] && sendToLog "Verbose Mode: superCREDENTIAL: $superCREDENTIAL"
-[[ -n $JamfProID ]] && sendToLog "Verbose Mode: JamfProID: $JamfProID"
-[[ -n $jamfOPTION ]] && sendToLog "Verbose Mode: jamfOPTION: $jamfOPTION"
-[[ -n $jamfPASSWORD ]] && sendToEcho "Verbose Mode: jamfPASSWORD: $jamfPASSWORD"
-[[ -n $jamfACCOUNT ]] && sendToLog "Verbose Mode: jamfACCOUNT: $jamfACCOUNT"
-[[ -n $jamfKEYCHAIN ]] && sendToEcho "Verbose Mode: jamfKEYCHAIN: $jamfKEYCHAIN"
-[[ -n $jamfCREDENTIAL ]] && sendToLog "Verbose Mode: jamfCREDENTIAL: $jamfCREDENTIAL"
-[[ -n $deleteACCOUNTS ]] && sendToLog "Verbose Mode: deleteACCOUNTS: $deleteACCOUNTS"
-[[ -n $policyTRIGGERS ]] && sendToLog "Verbose Mode: policyTRIGGERS: $policyTRIGGERS"
-[[ -n $skipUpdatesOPTION ]] && sendToLog "Verbose Mode: skipUpdatesOPTION: $skipUpdatesOPTION"
-[[ -n $allowUpgradeOPTION ]] && sendToLog "Verbose Mode: allowUpgradeOPTION: $allowUpgradeOPTION"
-[[ -n $targetUpgradeVERSION ]] && sendToLog "Verbose Mode: targetUpgradeVERSION: $targetUpgradeVERSION"
-[[ -n $forceRestartOPTION ]] && sendToLog "Verbose Mode: forceRestartOPTION: $forceRestartOPTION"
-[[ -n $testModeOPTION ]] && sendToLog "Verbose Mode: testModeOPTION: $testModeOPTION"
-[[ -n $testModeTimeoutSECONDS ]] && sendToLog "Verbose Mode: testModeTimeoutSECONDS: $testModeTimeoutSECONDS"
-[[ -n $verboseModeOPTION ]] && sendToLog "Verbose Mode: verboseModeOPTION: $verboseModeOPTION"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: superVERSION is: $superVERSION"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: superDATE is: $superDATE"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSMAJOR is: $macOSMAJOR"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSMINOR is: $macOSMINOR"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSVERSION is: $macOSVERSION"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSARCH is: $macOSARCH"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: parameterERROR is: $parameterERROR"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: credentialERROR is: $credentialERROR"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowERROR is: $workflowERROR"
+sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: helperERROR is: $helperERROR"
+[[ -n $jamfVERSION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfVERSION is: $jamfVERSION"
+[[ -n $jamfSERVER ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSERVER is: $jamfSERVER"
+[[ -n $ibmNotifierVALID ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierVALID is: $ibmNotifierVALID"
+[[ -n $eraseInstallVALID ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: eraseInstallVALID is: $eraseInstallVALID"
+[[ -n $defaultDeferSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: defaultDeferSECONDS is: $defaultDeferSECONDS"
+[[ -n $focusDeferSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDeferSECONDS is: $focusDeferSECONDS"
+[[ -n $menuDeferSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: menuDeferSECONDS is: $menuDeferSECONDS"
+[[ -n $recheckDeferSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recheckDeferSECONDS is: $recheckDeferSECONDS"
+[[ -n $focusCountMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusCountMAX is: $focusCountMAX"
+[[ -n $softCountMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softCountMAX is: $softCountMAX"
+[[ -n $hardCountMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: hardCountMAX is: $hardCountMAX"
+[[ -n $focusDaysMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDaysMAX is: $focusDaysMAX"
+[[ -n $softDaysMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softDaysMAX is: $softDaysMAX"
+[[ -n $hardDaysMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: hardDaysMAX is: $hardDaysMAX"
+[[ -n $zeroDayOVERRIDE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: zeroDayOVERRIDE is: $zeroDayOVERRIDE"
+[[ -n $focusDateMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDateMAX is: $focusDateMAX"
+[[ -n $softDateMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softDateMAX is: $softDateMAX"
+[[ -n $hardDateMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: hardDateMAX is: $hardDateMAX"
+[[ -n $displayTimeoutSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayTimeoutSECONDS is: $displayTimeoutSECONDS"
+[[ -n $displayRedrawSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayRedrawSECONDS is: $displayRedrawSECONDS"
+[[ -n $ibmNotifierIconSIZE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierIconSIZE is: $ibmNotifierIconSIZE"
+[[ -n $jamfHelperIconSIZE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperIconSIZE is: $jamfHelperIconSIZE"
+[[ -n $preferJamfHelperOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preferJamfHelperOPTION is: $preferJamfHelperOPTION"
+[[ -n $localOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: localOPTION is: $localOPTION"
+[[ -n $localPASSWORD ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: localPASSWORD is: $localPASSWORD"
+[[ -n $localACCOUNT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: localACCOUNT is: $localACCOUNT"
+[[ -n $localKEYCHAIN ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: localKEYCHAIN is: $localKEYCHAIN"
+[[ -n $localCREDENTIAL ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: localCREDENTIAL is: $localCREDENTIAL"
+[[ -n $adminACCOUNT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: adminACCOUNT is: $adminACCOUNT"
+[[ -n $adminPASSWORD ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: adminPASSWORD is: $adminPASSWORD"
+[[ -n $superOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: superOPTION is: $superOPTION"
+[[ -n $superPASSWORD ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: superPASSWORD is: $superPASSWORD"
+[[ -n $superACCOUNT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: superACCOUNT is: $superACCOUNT"
+[[ -n $superKEYCHAIN ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: superKEYCHAIN is: $superKEYCHAIN"
+[[ -n $superCREDENTIAL ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: superCREDENTIAL is: $superCREDENTIAL"
+[[ -n $JamfProID ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: JamfProID is: $JamfProID"
+[[ -n $jamfOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfOPTION is: $jamfOPTION"
+[[ -n $jamfPASSWORD ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: jamfPASSWORD is: $jamfPASSWORD"
+[[ -n $jamfACCOUNT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfACCOUNT is: $jamfACCOUNT"
+[[ -n $jamfKEYCHAIN ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: jamfKEYCHAIN is: $jamfKEYCHAIN"
+[[ -n $jamfCREDENTIAL ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfCREDENTIAL is: $jamfCREDENTIAL"
+[[ -n $deleteACCOUNTS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deleteACCOUNTS is: $deleteACCOUNTS"
+[[ -n $enforceAllUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: enforceAllUpdatesOPTION is: $enforceAllUpdatesOPTION"
+[[ -n $allowUpgradeOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allowUpgradeOPTION is: $allowUpgradeOPTION"
+[[ -n $targetUpgradeVERSION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: targetUpgradeVERSION is: $targetUpgradeVERSION"
+[[ -n $policyTRIGGERS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: policyTRIGGERS is: $policyTRIGGERS"
+[[ -n $skipUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: skipUpdatesOPTION is: $skipUpdatesOPTION"
+[[ -n $forceRestartOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: forceRestartOPTION is: $forceRestartOPTION"
+[[ -n $testModeOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: testModeOPTION is: $testModeOPTION"
+[[ -n $testModeTimeoutSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: testModeTimeoutSECONDS is: $testModeTimeoutSECONDS"
 }
 
 # MARK: *** Jamf Pro API ***
@@ -2114,11 +2131,11 @@ fi
 getJamfProToken() {
 getJamfProServer
 if [[ "$jamfSERVER" != "FALSE" ]]; then
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Attempting Jamf Pro API authentication with username: $jamfACCOUNT"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToEcho "Verbose Mode: Attempting Jamf Pro API authentication with password: $jamfKEYCHAIN"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Attempting Jamf Pro API via service URL: $jamfSERVER"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfACCOUNT is: $jamfACCOUNT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: jamfKEYCHAIN is: $jamfKEYCHAIN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSERVER is: $jamfSERVER"
 	commandRESULT=$(curl -X POST -u "$jamfACCOUNT:$jamfKEYCHAIN" -s "${jamfSERVER}api/v1/auth/token")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: \n$commandRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is:\n$commandRESULT"
 	if [[ $(echo "$commandRESULT" | grep -c 'token') -gt 0 ]]; then
 		if [[ $macOSMAJOR -ge 12 ]]; then
 			jamfProTOKEN=$(echo "$commandRESULT" | plutil -extract token raw -)
@@ -2128,7 +2145,7 @@ if [[ "$jamfSERVER" != "FALSE" ]]; then
 	else
 		sendToLog "Error: Response from Jamf Pro API token request did not contain a token."; jamfERROR="TRUE"
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfProTOKEN is: \n$jamfProTOKEN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfProTOKEN is:\n$jamfProTOKEN"
 fi
 }
 
@@ -2167,7 +2184,7 @@ fi
 # Attempt to send a Blank Push to Jamf Pro.
 sendBlankPush() {
 commandRESULT=$(curl --header "Authorization: Bearer ${jamfProTOKEN}" --write-out "%{http_code}" --silent --output /dev/null --request POST --url "${jamfSERVER}JSSResource/computercommands/command/BlankPush/id/${jamfProID}")
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: \n$commandRESULT"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is:\n$commandRESULT"
 }
 
 # Validate existing $jamfProTOKEN and if found invalid, a new token is requested and again validated.
@@ -2526,7 +2543,7 @@ asuCheckDATE=$(defaults read "$asuPLIST" LastSuccessfulDate 2> /dev/null)
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: asuCheckDATE is: $asuCheckDATE"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: asuCheckEPOCH is: $asuCheckEPOCH"
 if [[ $asuCheckEPOCH -gt $(($(date "+%s")-21600)) ]]; then
-	sendToLog "Status: Last software update check was less than 6 hours ago."
+	sendToLog "Status: Last automatic software update check was less than 6 hours ago."
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: $asuPLIST is:\n$(defaults read "$asuPLIST"  2> /dev/null)"
 	cacheSoftwareUpdatesAVAILABLE=$(defaults read "$asuPLIST" LastUpdatesAvailable 2> /dev/null)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: cacheSoftwareUpdatesAVAILABLE is: $cacheSoftwareUpdatesAVAILABLE"
@@ -2537,7 +2554,7 @@ if [[ $asuCheckEPOCH -gt $(($(date "+%s")-21600)) ]]; then
 			previousSoftwareUpdatesLIST=$(echo "$previousSoftwareUpdatesPROPERTY" | tail -n +2 | sed -e 's/    //g' -e 's/"//g' -e 's/",//g' -e 's/,//g' -e '$d' | sort)
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousSoftwareUpdatesLIST is:\n$previousSoftwareUpdatesLIST"
 			cacheSoftwareUpdatesLIST=$(defaults read "$asuPLIST" RecommendedUpdates | grep 'Identifier' | sed -e 's/        Identifier = //g' -e 's/"//g' -e 's/;//g' | sort)
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: cacheSoftwareUpdatesLIST is: \n$cacheSoftwareUpdatesLIST"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: cacheSoftwareUpdatesLIST is:\n$cacheSoftwareUpdatesLIST"
 			if [[ "$previousSoftwareUpdatesLIST" == "$cacheSoftwareUpdatesLIST" ]]; then # Previous update list matches current update list.
 				softwareUpdateLIST=$(<"$asuListLOG") 2> /dev/null
 				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLIST is:\n$softwareUpdateLIST"
@@ -2558,7 +2575,7 @@ if [[ $asuCheckEPOCH -gt $(($(date "+%s")-21600)) ]]; then
 		fi
 	fi
 else
-	sendToLog "Status: Last software update check is older than 6 hours, full update/upgrade check required."
+	sendToLog "Status: Last automatic software update check is older than 6 hours, full update/upgrade check required."
 	fullCheckREQUIRED="TRUE"
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdatesAVAILABLE is: $softwareUpdatesAVAILABLE"
@@ -2666,6 +2683,7 @@ workflowStartFAIL="TRUE"
 workflowTimeoutSECONDS=$initialStartTimeoutSECONDS
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowStartTIMEOUT is: $workflowStartTIMEOUT"
 while read -t $workflowTimeoutSECONDS -r logLINE ; do
+	# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 	if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]]; then
 		workflowStartTIMEOUT="FALSE"
 		break
@@ -2725,7 +2743,7 @@ if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
 	fi
 	
 	# Software update check failed, try again later.
-	if [[ "$workflowStartFAIL" == "TRUE" ]] && [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
+	if [[ "$workflowStartFAIL" == "TRUE" ]] || [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 		sendToLog "Error: Checking for updates via softwareupdate did not complete after multiple attempts, trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Pending: Checking for updates via softwareupdate did not complete after multiple attempts, trying again in $defaultDeferSECONDS seconds."
 		makeLaunchDaemonCalendar
@@ -2739,7 +2757,7 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: cacheSoftwareUpdatesAVAILABLE is: $cacheSoftwareUpdatesAVAILABLE"
 	oldIFS="$IFS"; IFS=$'\n'
 	propertyUpdatesARRAY=($(defaults read "$asuPLIST" RecommendedUpdates | grep 'Identifier' | sed -e 's/        Identifier = //g' -e 's/"//g' -e 's/;//g'))
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpdatesARRAY[] is: \n${propertyUpdatesARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: propertyUpdatesARRAY[] is:\n${propertyUpdatesARRAY[*]}"
 	defaults delete "$superPLIST" SoftwareUpdatesList 2> /dev/null
 	for i in "${!propertyUpdatesARRAY[@]}"; do
 		defaults write "$superPLIST" SoftwareUpdatesList -array-add "${propertyUpdatesARRAY[i]}"
@@ -2783,8 +2801,8 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdateVERSION is: $macOSSoftwareUpdateVERSION"
 	[[ "${allSoftwareUpdateLABELS[*]}" != "$macOSSoftwareUpdateLABEL" ]] && recommendedSoftwareUpdateLABELS=($(echo "${allSoftwareUpdateLABELS[*]}" | grep -v 'macOS'))
 	[[ "${allSoftwareUpdateTITLES[*]}" != "$macOSSoftwareUpdateTITLE" ]] && recommendedSoftwareUpdateTITLES=($(echo "${allSoftwareUpdateTITLES[*]}" | grep -v 'macOS'))
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is: \n${recommendedSoftwareUpdateLABELS[*]}"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateTITLES[] is: \n${recommendedSoftwareUpdateTITLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is:\n${recommendedSoftwareUpdateLABELS[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateTITLES[] is:\n${recommendedSoftwareUpdateTITLES[*]}"
 	
 	# If software updates were found then output to log and set $softwareUpdateRESTART and $softwareUpdateRECOMMENDED accordingly.
 	if [[ -n ${allSoftwareUpdateLABELS[*]} ]]; then
@@ -2872,6 +2890,7 @@ if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]] && [[ "$upgradeWORKFLOW" != "FALSE" 
 	workflowStartFAIL="TRUE"
 	workflowTimeoutSECONDS=$initialStartTimeoutSECONDS
 	while read -t $workflowTimeoutSECONDS -r logLINE ; do
+		# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 		if [[ $(echo "$logLINE" | grep -c 'Cannot continue.' ) -gt 0 ]] || [[ $(echo "$macOSInstallerLIST" | grep -c 'exit code: 1') -gt 0 ]]; then
 			workflowStartTIMEOUT="FALSE"
 			break
@@ -2963,17 +2982,17 @@ if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
 		if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerLIST is:\n$macOSInstallerLIST"
 			macOSInstallerCompatibleLIST=($(echo "$macOSInstallerLIST" | grep 'macOS' | grep -v -e 'Unsupported macOS version' -e 'macOS installers' -e 'check_installer_is_valid' | sed -E -e 's/  +/:/g' -e 's/ 20/:20/g'))
-			macOSInstallersARRAY=($(sort -t: -k3 -r -V <<<"${macOSInstallerCompatibleLIST[*]}"))
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallersARRAY is:\n${macOSInstallersARRAY[*]}"
+			macOSInstallersARRAY=($(sort -t: -k4 -r <<<"${macOSInstallerCompatibleLIST[*]}"))
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallersARRAY[] is:\n${macOSInstallersARRAY[*]}"
 			if [[ -n ${macOSInstallersARRAY[*]} ]]; then
 				for macOSInstallerLINE in "${macOSInstallersARRAY[@]}"; do
 					macOSInstallerNAMES+=($(echo "$macOSInstallerLINE" | awk -F ':' '{print $6;}'))
 					macOSInstallerVERSIONS+=($(echo "$macOSInstallerLINE" | awk -F ':' '{print $3;}'))
 					macOSInstallerBUILDS+=($(echo "$macOSInstallerLINE" | awk -F ':' '{print $4;}'))
 				done
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerNAMES is:\n${macOSInstallerNAMES[*]}"
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerVERSIONS is:\n${macOSInstallerVERSIONS[*]}"
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerBUILDS is:\n${macOSInstallerBUILDS[*]}"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerNAMES[] is:\n${macOSInstallerNAMES[*]}"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerVERSIONS[] is:\n${macOSInstallerVERSIONS[*]}"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSInstallerBUILDS[] is:\n${macOSInstallerBUILDS[*]}"
 			else
 				sendToLog "Error: Unable to find compatible macOS installers, trying again in $defaultDeferSECONDS seconds."
 				sendToStatus "Pending: Unable to find compatible macOS installers, trying again in $defaultDeferSECONDS seconds."
@@ -3137,17 +3156,18 @@ else # Not preparing for a macOS installer workflow.
 			softwareUpdateLabelTARGETS+=("${allSoftwareUpdateLABELS[@]}")
 			softwareUpdateTitleTARGETS=("${allSoftwareUpdateTITLES[@]}")
 		fi
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGETS[] is: \n${softwareUpdateLabelTARGETS[*]}"
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is: \n${softwareUpdateTitleTARGETS[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGETS[] is:\n${softwareUpdateLabelTARGETS[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is:\n${softwareUpdateTitleTARGETS[*]}"
 		previousSoftwareUpdateDOWNLOADS=$(defaults read "$superPLIST" SoftwareUpdateDownloads 2> /dev/null)
 		previousLastREBOOT=$(defaults read "$superPLIST" LastReboot 2> /dev/null)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousSoftwareUpdateDOWNLOADS is: \n$previousSoftwareUpdateDOWNLOADS"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousLastREBOOT is: $previousLastREBOOT"
+		# Only validate if we know the list of previous downloads and last reboot time.
 		if [[ -n $previousSoftwareUpdateDOWNLOADS ]] && [[ -n $previousLastREBOOT ]]; then
 			previousDownloadFAILURE="FALSE"
 			previousSoftwareUpdateDownloadTITLES=($(echo "$previousSoftwareUpdateDOWNLOADS" | grep -v -e '(' -e ')' | sed -e 's/    //g' -e 's/"//g' -e 's/,//g'))
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is: \n${softwareUpdateTitleTARGETS[*]}"
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousSoftwareUpdateDownloadTITLES is:\n${previousSoftwareUpdateDownloadTITLES[*]}"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is:\n${softwareUpdateTitleTARGETS[*]}"
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: previousSoftwareUpdateDownloadTITLES[] is:\n${previousSoftwareUpdateDownloadTITLES[*]}"
 			if [[ $(echo -e "${softwareUpdateTitleTARGETS[*]}\n${previousSoftwareUpdateDownloadTITLES[*]}" | sort | uniq -u) ]]; then
 				sendToLog "Warning: Previously downloaded software update(s) do not match expected software update(s), download workflow needs to run again."
 				previousDownloadFAILURE="TRUE"
@@ -3158,27 +3178,30 @@ else # Not preparing for a macOS installer workflow.
 				sendToLog "Warning: The system has been restarted without applying the prevously downloaded macOS update/upgarade, download workflow needs to run again."
 				previousDownloadFAILURE="TRUE"
 			fi
-			[[ $macOSMAJOR -ge 11 ]] && preparedMacOSUpdateVERSION=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null | grep -w 'OSVersion' | sed -e 's/    OSVersion = "//' -e 's/";//')
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSUpdateVERSION is: $preparedMacOSUpdateVERSION"
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
-			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdateVERSION is: $macOSSoftwareUpdateVERSION"
-			if [[ $macOSMAJOR -ge 11 ]] && [[ -z $preparedMacOSUpdateVERSION ]]; then
-				sendToLog "Warning: Previously downloaded macOS update is no longer valid, download workflow needs to run again."
-				previousDownloadFAILURE="TRUE"
-			else
-				if { [[ $macOSVERSION -ge 1203 ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; } && [[ "$preparedMacOSUpdateVERSION" != "$macOSUpgradeVersionTARGET" ]]; then
-					sendToLog "Warning: Previously downloaded macOS upgrade version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSUpgradeVersionTARGET, download workflow needs to run again."
+			# Only validate prepared macOS update/upgrade if needed.
+			if { [[ $macOSVERSION -ge 1203 ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; } || { [[ $macOSMAJOR -ge 11 ]] && [[ "$softwareUpdateRESTART" == "TRUE" ]]; }; then
+				preparedMacOSUpdateVERSION=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null | grep -w 'OSVersion' | sed -e 's/    OSVersion = "//' -e 's/";//')
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSUpdateVERSION is: $preparedMacOSUpdateVERSION"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdateVERSION is: $macOSSoftwareUpdateVERSION"
+				if [[ -z $preparedMacOSUpdateVERSION ]]; then
+					sendToLog "Warning: Previously downloaded macOS update is no longer valid, download workflow needs to run again."
 					previousDownloadFAILURE="TRUE"
+				else
+					if { [[ $macOSVERSION -ge 1203 ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; } && [[ "$preparedMacOSUpdateVERSION" != "$macOSUpgradeVersionTARGET" ]]; then
+						sendToLog "Warning: Previously downloaded macOS upgrade version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSUpgradeVersionTARGET, download workflow needs to run again."
+						previousDownloadFAILURE="TRUE"
+					fi
+					if { [[ $macOSMAJOR -ge 11 ]] && [[ "$macOSUpgradeVersionTARGET" == "FALSE" ]]; } && [[ "$preparedMacOSUpdateVERSION" != "$macOSSoftwareUpdateVERSION" ]]; then
+						sendToLog "Warning: Previously downloaded macOS update version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSSoftwareUpdateVERSION, download workflow needs to run again."
+						previousDownloadFAILURE="TRUE"
+					fi
 				fi
-				if { [[ $macOSMAJOR -ge 11 ]] && [[ "$macOSUpgradeVersionTARGET" == "FALSE" ]]; } && [[ "$preparedMacOSUpdateVERSION" != "$macOSSoftwareUpdateVERSION" ]]; then
-					sendToLog "Warning: Previously downloaded macOS update version of $preparedMacOSUpdateVERSION doesn't match expected version $macOSSoftwareUpdateVERSION, download workflow needs to run again."
-					previousDownloadFAILURE="TRUE"
+				if [[ "$previousDownloadFAILURE" == "TRUE" ]]; then
+					softwareUpdateDownloadREQUIRED="TRUE"
+					defaults delete "$superPLIST" SoftwareUpdateDownloads 2> /dev/null
+					defaults delete "$superPLIST" LastReboot 2> /dev/null
 				fi
-			fi
-			if [[ "$previousDownloadFAILURE" == "TRUE" ]]; then
-				softwareUpdateDownloadREQUIRED="TRUE"
-				defaults delete "$superPLIST" SoftwareUpdateDownloads 2> /dev/null
-				defaults delete "$superPLIST" LastReboot 2> /dev/null
 			fi
 		else
 			softwareUpdateDownloadREQUIRED="TRUE"
@@ -3226,7 +3249,9 @@ if [[ "$jamfVERSION" != "FALSE" ]]; then
 		sendToLog "Status: Submitting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
-			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
+			jamfRETURN=$?
+			sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRESULT is:\n$jamfRESULT"
+			sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRETURN is: $jamfRETURN"
 		else
 			"$jamfBINARY" recon > /dev/null 2>&1
 		fi
@@ -3234,7 +3259,9 @@ if [[ "$jamfVERSION" != "FALSE" ]]; then
 		sendToLog "Status: Running Jamf Pro check-in policies. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" policy -verbose 2>&1)
-			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
+			jamfRETURN=$?
+			sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRESULT is:\n$jamfRESULT"
+			sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRETURN is: $jamfRETURN"
 		else
 			"$jamfBINARY" policy > /dev/null 2>&1
 		fi
@@ -3261,6 +3288,7 @@ else # # Systems older than macOS 12.3 and/or only macOS updates available.
 	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD ALL SOFTWAREUPDATE START ****"
 fi
 oldIFS="$IFS"; IFS=$'\n'
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: #softwareUpdateLabelTARGETS[] is: ${#softwareUpdateLabelTARGETS[@]}"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGETS[] is:\n${softwareUpdateLabelTARGETS[*]}"
 oldIFS="$IFS"; IFS=$' '
 
@@ -3305,6 +3333,7 @@ workflowPreviousCompletePERCENT=0
 softwareUpdateDownloadedTITLES=()
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 while read -t $workflowTimeoutSECONDS -r logLINE ; do
+	# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 	if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]]; then
 		workflowStartFAIL="CONNECT"
 		workflowStartTIMEOUT="FALSE"
@@ -3370,12 +3399,17 @@ while read -t $workflowTimeoutSECONDS -r logLINE ; do
 		sendToLog "softwareupdate: $softwareUpdateDownloadTITLE download and preparation complete."
 		softwareUpdateDownloadedTITLES+=("${softwareUpdateDownloadTITLE}")
 		sendToASULog "**** TIMESTAMP ****"
-		if [[ $macOSMAJOR -ge 12 ]] && [[ ${#softwareUpdateLabelTARGETS[@]} -eq 1 ]]; then
+		if [[ ${#softwareUpdateLabelTARGETS[@]} -eq 1 ]]; then
+			workflowStartTIMEOUT="FALSE"
+			workflowStartFAIL="FALSE"
 			workflowTIMEOUT="FALSE"
 			break
 		fi
 	elif [[ $(echo "$logLINE" | grep -c 'Done.') -gt 0 ]]; then
 		sendToASULog "**** TIMESTAMP ****"
+		workflowTIMEOUT="FALSE"
+		workflowStartTIMEOUT="FALSE"
+		workflowStartFAIL="FALSE"
 		workflowTIMEOUT="FALSE"
 		break
 	fi
@@ -3384,8 +3418,8 @@ done < <(tail -n1 -F "$asuLOG" | tr -u '%' '\n')
 # If the softwareupdate download workflow completed, then validate and collect information.
 if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE" ]] && [[ "$workflowTIMEOUT" == "FALSE" ]]; then
 	oldIFS="$IFS"; IFS=$'\n'
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is: \n${softwareUpdateTitleTARGETS[*]}"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateDownloadedTITLES is:\n${softwareUpdateDownloadedTITLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGETS[] is:\n${softwareUpdateTitleTARGETS[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateDownloadedTITLES[] is:\n${softwareUpdateDownloadedTITLES[*]}"
 	if [[ ! $(echo -e "${softwareUpdateTitleTARGETS[*]}\n${softwareUpdateDownloadedTITLES[*]}" | sort | uniq -u) ]]; then
 		[[ $macOSMAJOR -ge 11 ]] && preparedMacOSUpdateVERSION=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null | grep -w 'OSVersion' | sed -e 's/    OSVersion = "//' -e 's/";//')
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSUpdateVERSION is: $preparedMacOSUpdateVERSION"
@@ -3408,6 +3442,7 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 			makeLaunchDaemonCalendar
 		fi
 		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE COMPLETED ****"
+		sendToLog "Status: All available software updates are downloaded."
 		defaults delete "$superPLIST" SoftwareUpdateDownloads 2> /dev/null
 		for i in "${!softwareUpdateDownloadedTITLES[@]}"; do
 			defaults write "$superPLIST" SoftwareUpdateDownloads -array-add "${softwareUpdateDownloadedTITLES[i]}"
@@ -3482,6 +3517,7 @@ workflowCompletePERCENT=0
 workflowPreviousCompletePERCENT=0
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 while read -t $workflowTimeoutSECONDS -r logLINE ; do
+	# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 	if [[ $(echo "$logLINE" | grep -c 'Cannot continue.' ) -gt 0 ]] || [[ $(echo "$macOSInstallerLIST" | grep -c 'exit code: 1') -gt 0 ]]; then
 		workflowStartTIMEOUT="FALSE"
 		break
@@ -3532,7 +3568,7 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 	if [[ -d "/Applications/Install $macOSInstallerNameTARGET.app" ]]; then
 		sendToLog "Status: Install $macOSInstallerNameTARGET.app Gatekeeper validation..."
 		sendToInstallerLog "Status: Install $macOSInstallerNameTARGET.app Gatekeeper validation."
-		startosinstallRESULTS=$("/Applications/Install $macOSInstallerNameTARGET.app/Contents/Resources/startosinstall --usage" --usage 2>&1)
+		startosinstallRESULTS=$("/Applications/Install $macOSInstallerNameTARGET.app/Contents/Resources/startosinstall" --usage 2>&1)
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: startosinstallRESULTS is:\n$startosinstallRESULTS"
 		sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD MACOS INSTALLER COMPLETE ****"
 		sendToLog "Status: macOS installer is now available at: /Applications/Install $macOSInstallerNameTARGET.app"
@@ -3609,8 +3645,8 @@ for trigger in "${triggerARRAY[@]}"; do
 		if [[ "$verboseModeOPTION" == "TRUE" ]]; then
 			jamfRESULT=$("$jamfBINARY" policy -event "$trigger" -verbose 2>&1)
 			jamfRETURN=$?
-			sendToLog "Verbose Mode: jamfRESULT is: \n$jamfRESULT"
-			sendToLog "Verbose Mode: jamfRETURN is: $jamfRETURN"
+			sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRESULT is:\n$jamfRESULT"
+			sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRETURN is: $jamfRETURN"
 		else
 			"$jamfBINARY" policy -event "$trigger" > /dev/null 2>&1
 			jamfRETURN=$?
@@ -3653,7 +3689,7 @@ sendToLog "softwareupdate: Starting recommended (non-macOS) software installatio
 sendToStatus "Running: softwareupdate: Starting recommended (non-macOS) software installation workflow."
 sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL RECOMMENDED UPDATES SOFTWAREUPDATE START ****"
 oldIFS="$IFS"; IFS=$' '
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is: ${recommendedSoftwareUpdateLABELS[*]}"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is:\n${recommendedSoftwareUpdateLABELS[*]}"
 
 # The update process is backgrounded and will be watched via a while loop later on. Also note the different requirements between macOS versions.
 if [[ $macOSMAJOR -ge 12 ]]; then
@@ -3682,6 +3718,7 @@ softwareUpdateInstalledTITLES=()
 softwareUpdateERROR="TRUE"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 while read -t $workflowTimeoutSECONDS -r logLINE ; do
+	# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 	if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'No such update' ) -gt 0 ]]; then
 		workflowStartTIMEOUT="FALSE"
 		break
@@ -3718,8 +3755,8 @@ done < <(tail -n1 -F "$asuLOG")
 # If the softwareupdate installation workflow completed, then validate and collect information.
 if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE" ]] && [[ "$workflowTIMEOUT" == "FALSE" ]]; then
 	oldIFS="$IFS"; IFS=$'\n'
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateTITLES[] is: \n${recommendedSoftwareUpdateTITLES[*]}"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateInstalledTITLES is:\n${softwareUpdateInstalledTITLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateTITLES[] is:\n${recommendedSoftwareUpdateTITLES[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateInstalledTITLES[] is:\n${softwareUpdateInstalledTITLES[*]}"
 	if [[ ! $(echo -e "${recommendedSoftwareUpdateTITLES[*]}\n${softwareUpdateInstalledTITLES[*]}" | sort | uniq -u) ]]; then
 		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE COMPLETED ****"
 		softwareUpdateERROR="FALSE"
@@ -3780,21 +3817,17 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
 				echo "$installPASSWORD" | sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license --user "$installACCOUNT" --stdinpass >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			else # Intel.
 				sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			fi
 		else # Local user is logged in.
 			if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
 				echo "$installPASSWORD" | launchctl asuser "$currentUID" sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license --user "$installACCOUNT" --stdinpass >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			else # Intel.
 				launchctl asuser "$currentUID" sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			fi
 		fi
 	elif [[ $macOSMAJOR -ge 12 ]]; then  # macOS 12
@@ -3802,38 +3835,32 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
 				sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license --user "$installACCOUNT" --stdinpass "$installPASSWORD" >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			else # Intel.
 				sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			fi
 		else # Local user is logged in.
 			if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
 				launchctl asuser "$currentUID" sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license --user "$installACCOUNT" --stdinpass "$installPASSWORD" >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			else # Intel.
 				launchctl asuser "$currentUID" sudo -u root softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license >> "$asuLOG" 2>&1 &
 				softwareupdatePID=$!
-				disown -h
 			fi
 		fi
 	elif [[ $macOSMAJOR -eq 11 ]]; then  # macOS 11
 		if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
 			echo ' ' | softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license >> "$asuLOG" 2>&1 &
 			softwareupdatePID=$!
-			disown -h
 		else # Intel.
 			softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan --agree-to-license >> "$asuLOG" 2>&1 &
 			softwareupdatePID=$!
-			disown -h
 		fi
 	else # macOS 10.x
 		softwareupdate --install "$softwareUpdateLabelTARGET" --restart --force --no-scan >> "$asuLOG" 2>&1 &
 		softwareupdatePID=$!
-		disown -h
 	fi
+	disown -a
 	workflowTIMEOUT="TRUE"
 	
 	# Watch $asuLOG while waiting for the softwareupdate installation workflow to complete.
@@ -3847,6 +3874,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	workflowPreviousCompletePERCENT=0
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 	while read -t $workflowTimeoutSECONDS -r logLINE ; do
+		# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 		if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'No such update' ) -gt 0 ]]; then
 			workflowStartTIMEOUT="FALSE"
 			break
@@ -3960,15 +3988,15 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET MDM START ****"
 	else # macOS update.
 		if [[ "$softwareUpdateDownloadREQUIRED" == "TRUE" ]]; then
-			sendToLog "MDM: Starting $macOSSoftwareUpdateLABEL download and update workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
-			sendToStatus "Running: MDM: Starting $macOSSoftwareUpdateLABEL download and update workflow."
-			sendToMDMCommandLog "**** DOWNLOAD AND UPDATE S.U.P.E.R.M.A.N. $macOSSoftwareUpdateLABEL MDM START ****"
-			sendToMDMWorkflowLog "**** DOWNLOAD AND UPDATE S.U.P.E.R.M.A.N. $macOSSoftwareUpdateLABEL MDM START ****"
+			sendToLog "MDM: Starting macOS $macOSSoftwareUpdateVERSION download and update workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
+			sendToStatus "Running: MDM: Starting macOS $macOSSoftwareUpdateVERSION download and update workflow."
+			sendToMDMCommandLog "**** DOWNLOAD AND UPDATE S.U.P.E.R.M.A.N. MACOS $macOSSoftwareUpdateVERSION MDM START ****"
+			sendToMDMWorkflowLog "**** DOWNLOAD AND UPDATE S.U.P.E.R.M.A.N. MACOS $macOSSoftwareUpdateVERSION MDM START ****"
 		else
-			sendToLog "MDM: Starting $macOSSoftwareUpdateLABEL update workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
-			sendToStatus "Running: MDM: Starting $macOSSoftwareUpdateLABEL update workflow."
-			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE $macOSSoftwareUpdateLABEL MDM START ****"
-			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE $macOSSoftwareUpdateLABEL MDM START ****"
+			sendToLog "MDM: Starting macOS $macOSSoftwareUpdateVERSION update workflow, check $mdmCommandLOG and $mdmWorkflowLOG for more detail."
+			sendToStatus "Running: MDM: Starting macOS $macOSSoftwareUpdateVERSION update workflow."
+			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION MDM START ****"
+			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION MDM START ****"
 		fi
 	fi
 	
@@ -3983,11 +4011,11 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	checkJamfProServerToken
 	
 	# Start log streaming for MDM push commands and send to $mdmCommandLOG.
-	log stream --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "$mdmCommandLOG" &
-	mdmStartStreamPID=$!
+	log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "$mdmCommandLOG" &
+	mdmCommandStreamPID=$!
 	
 	# Start log streaming for MDM update/upgrade progress and send to $mdmWorkflowLOG.
-	log stream --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "Reported progress"' >> "$mdmWorkflowLOG" &
+	log stream --style compact --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "Reported progress"' >> "$mdmWorkflowLOG" &
 	mdmWorkflowStreamPID=$! 
 	
 	# Send the Jamf Pro API command to update and restart via MDM.
@@ -4022,6 +4050,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		
 		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on $mdmTimeoutSECONDS.
 		while read -t $mdmTimeoutSECONDS -r logLINE ; do
+			# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 			if [[ $(echo "$logLINE" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
 				sendToLog "MDM: Workflow error detected."
 				sendToMDMCommandLog "**** TIMESTAMP ****"
@@ -4052,7 +4081,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			mdmFAIL="TRUE"
 			if [[ "$currentUSER" != "FALSE" ]]; then
 				if [[ "$mdmWorkflowTYPE" == "INSTALLER" ]]; then
-					prepareTimeEstimateDISPLAY="10-20"
+					prepareTimeEstimateDISPLAY="20-25"
 					notifyPrepare
 				else
 					notifyRestart
@@ -4061,6 +4090,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			
 			# Watch $mdmCommandLOG while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on $mdmTimeoutSECONDS.
 			while read -t $mdmTimeoutSECONDS -r logLINE ; do
+				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 				if [[ $(echo "$logLINE" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
 					sendToLog "MDM: Workflow error detected."
 					sendToMDMCommandLog "**** TIMESTAMP ****"
@@ -4073,7 +4103,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToLog "MDM: Received push command \"AvailableOSUpdates\"."
 					sendToMDMCommandLog "**** TIMESTAMP ****"
 				elif [[ $(echo "$logLINE" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)') -gt 0 ]]; then
-					kill -9 "$mdmStartStreamPID" > /dev/null 2>&1
+					kill -9 "$mdmCommandStreamPID" > /dev/null 2>&1
 					sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH COMPLETED ****"
 					sendToLog "MDM: Received push command \"ScheduleOSUpdate\", local update/upgrade workflow should start soon..."
 					mdmTIMEOUT="FALSE"
@@ -4086,7 +4116,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		# If the MDM push commands did not complete after $mdmTimeoutSECONDS seconds, then clean-up and try again later.
 		if [[ "$mdmTIMEOUT" == "TRUE" ]] && [[ "$mdmFAIL" == "TRUE" ]]; then
 			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
-			kill -9 "$mdmStartStreamPID" > /dev/null 2>&1
+			kill -9 "$mdmCommandStreamPID" > /dev/null 2>&1
 			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
 			if [[ "$mdmTIMEOUT" == "TRUE" ]]; then
@@ -4112,92 +4142,133 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		workflowPHASE=""
 		workflowCompletePERCENT=0
 		workflowPreviousCompletePERCENT=0
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmWorkflowTYPE is: $mdmWorkflowTYPE"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-		while read -t $workflowTimeoutSECONDS -r logLINE ; do
-			if [[ $(echo "$logLINE" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
-				if [[ "$workflowPHASE" != "PREFLIGHT" ]] && [[ "$workflowPHASE" != "DOWNLOADING" ]] && [[ "$workflowPHASE" != "PREPARING" ]]; then
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade preflight..."
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update preflight..."
-					[[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preflight..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowPHASE="PREFLIGHT"
-				fi
-			elif { [[ "$mdmWorkflowTYPE" == "UPGRADE" ]] || [[ "$mdmWorkflowTYPE" == "UPDATE" ]]; } && [[ $(echo "$logLINE" | grep -c 'phase:DOWNLOADING_UPDATE stalled:NO') -gt 0 ]]; then
-				if [[ "$workflowPHASE" != "DOWNLOADING" ]]; then
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade is downloading..."
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update is downloading..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
-					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-					workflowPHASE="DOWNLOADING"
-				fi
-				workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowCompletePERCENT is: $workflowCompletePERCENT"
-				if [[ $workflowCompletePERCENT -ge 60 ]]; then
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade download progress: 100%\n"
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update download progress: 100%\n"
-				elif [[ $workflowCompletePERCENT -gt $workflowPreviousCompletePERCENT ]]; then
-					workflowCompleteDISPLAY=$( (echo "$workflowCompletePERCENT * 1.69" | bc ) | cut -d '.' -f1)
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade download progress: $workflowCompleteDISPLAY%"
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update download progress: $workflowCompleteDISPLAY%"
-					workflowPreviousCompletePERCENT=$workflowCompletePERCENT
-				fi
-			elif { [[ "$mdmWorkflowTYPE" == "UPGRADE" ]] || [[ "$mdmWorkflowTYPE" == "UPDATE" ]]; } && [[ $(echo "$logLINE" | grep -c 'phase:PREPARING_UPDATE stalled:NO') -gt 0 ]]; then
-				if [[ "$workflowPHASE" != "PREPARING" ]]; then
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade download complete, now preparing..."
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update download complete, now preparing..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
-					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-					workflowPHASE="PREPARING"
-				fi
-				workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowCompletePERCENT is: $workflowCompletePERCENT"
-				if [[ $workflowCompletePERCENT -ge 98 ]]; then
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade preparing progress: 100%\n"
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade is downloaded and prepared, system restart is soon..."
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update preparing progress: 100%\n"
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update is downloaded and prepared, system restart is soon..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-				elif [[ $workflowCompletePERCENT -gt $workflowPreviousCompletePERCENT ]]; then
-					workflowCompleteDISPLAY=$(((workflowCompletePERCENT-60)*2))
-					[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade preparing progress: $workflowCompleteDISPLAY%"
-					[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update preparing progress: $workflowCompleteDISPLAY%"
-					workflowPreviousCompletePERCENT=$workflowCompletePERCENT
-				fi
-			elif [[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && [[ $(echo "$logLINE" | grep -c 'phase:PREPARING_UPDATE stalled:NO') -gt 0 ]]; then
-				if [[ "$workflowPHASE" != "PREPARING" ]]; then
-					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preparing..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
-					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
-					workflowPHASE="PREPARING"
-				fi
-				workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
-				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowCompletePERCENT is: $workflowCompletePERCENT"
-				if [[ $workflowCompletePERCENT -ge 98 ]] && [[ "$workflowPHASE" != "DONE" ]]; then
-					sendToEchoReplaceLine "$macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET preparing progress: 100%\n"
-					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared, system restart is soon..."
+		if [[ "$mdmWorkflowTYPE" == "UPGRADE" ]] || [[ "$mdmWorkflowTYPE" == "UPDATE" ]]; then
+			while read -t $workflowTimeoutSECONDS -r logLINE ; do
+				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+				if [[ $(echo "$logLINE" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
+					if [[ "$workflowPHASE" != "PREFLIGHT" ]] && [[ "$workflowPHASE" != "DOWNLOADING" ]] && [[ "$workflowPHASE" != "PREPARING" ]]; then
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade preflight..."
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update preflight..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
+						[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
+						workflowPHASE="PREFLIGHT"
+					fi
+				elif [[ $(echo "$logLINE" | grep -c 'phase:DOWNLOADING_UPDATE') -gt 0 ]]; then
+					if [[ "$workflowPHASE" != "DOWNLOADING" ]]; then
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade is downloading..."
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update is downloading..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
+						[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
+						workflowPHASE="DOWNLOADING"
+					fi
+					workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
+					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowCompletePERCENT is: $workflowCompletePERCENT"
+					if [[ $workflowCompletePERCENT -ge 60 ]]; then
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade download progress: 100%\n"
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update download progress: 100%\n"
+					elif [[ $workflowCompletePERCENT -gt $workflowPreviousCompletePERCENT ]]; then
+						workflowCompleteDISPLAY=$( (echo "$workflowCompletePERCENT * 1.69" | bc ) | cut -d '.' -f1)
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade download progress: $workflowCompleteDISPLAY%"
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update download progress: $workflowCompleteDISPLAY%"
+						workflowPreviousCompletePERCENT=$workflowCompletePERCENT
+					fi
+				elif [[ $(echo "$logLINE" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+					if [[ "$workflowPHASE" != "PREPARING" ]]; then
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade download complete, now preparing..."
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update download complete, now preparing..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
+						[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
+						workflowPHASE="PREPARING"
+					fi
+					workflowCompletePERCENT=$(echo "$logLINE" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
+					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowCompletePERCENT is: $workflowCompletePERCENT"
+					if [[ $workflowCompletePERCENT -ge 98 ]]; then
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade preparing progress: 100%\n"
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade is downloaded and prepared, system restart is soon..."
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update preparing progress: 100%\n"
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update is downloaded and prepared, system restart is soon..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					elif [[ $workflowCompletePERCENT -gt $workflowPreviousCompletePERCENT ]]; then
+						workflowCompleteDISPLAY=$(((workflowCompletePERCENT-60)*2))
+						[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpgradeLabelTARGET upgrade preparing progress: $workflowCompleteDISPLAY%"
+						[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToEchoReplaceLine "$macOSSoftwareUpdateLABEL update preparing progress: $workflowCompleteDISPLAY%"
+						workflowPreviousCompletePERCENT=$workflowCompletePERCENT
+					fi
+				elif [[ $(echo "$logLINE" | grep -c 'phase:PREPARED_COMMITTING_STASH') -gt 0 ]]; then
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
 					workflowTIMEOUT="FALSE"
 					workflowPHASE="DONE"
-				elif [[ $workflowCompletePERCENT -gt $workflowPreviousCompletePERCENT ]] && [[ "$workflowPHASE" != "DONE" ]]; then
-					sendToEchoReplaceLine "$macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET preparing progress: $workflowCompletePERCENT%"
-					workflowPreviousCompletePERCENT=$workflowCompletePERCENT
+					break
 				fi
-			elif [[ $(echo "$logLINE" | grep -c 'phase:PREPARED_COMMITTING_STASH') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]]; then
-				workflowTIMEOUT="FALSE"
-				workflowPHASE="DONE"
-				break
+			done < <(tail -n1 -F "$mdmWorkflowLOG")
+		else # $mdmWorkflowTYPE == "INSTALLER"
+			# This while loop is broken into sections to allow for the notifyPrepare function to update. Putting this function inside the while loop breaks the tail.
+			while read -t $workflowTimeoutSECONDS -r logLINE ; do
+				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+				if [[ $(echo "$logLINE" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
+					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preflight..."
+					sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
+					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
+					workflowPHASE="PREFLIGHT"
+					break
+				fi
+			done < <(tail -n1 -F "$mdmWorkflowLOG")
+			while read -t $workflowTimeoutSECONDS -r logLINE ; do
+				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+				if [[ $(echo "$logLINE" | grep -c 'phase:DOWNLOADING_SFR') -gt 0 ]]; then
+					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET downloading additional items..."
+					sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					workflowPHASE="DOWNLOADING"
+				elif [[ $(echo "$logLINE" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preparing..."
+					sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					workflowPHASE="PREPARING"
+					break
+				fi
+			done < <(tail -n1 -F "$mdmWorkflowLOG")
+			if [[ "$currentUSER" != "FALSE" ]]; then
+				prepareTimeEstimateDISPLAY="10-15"
+				notifyPrepare
 			fi
-		done < <(tail -n1 -F "$mdmWorkflowLOG")
+			while read -t $workflowTimeoutSECONDS -r logLINE ; do
+				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+				if [[ $(echo "$logLINE" | grep -c 'phase:PREPARED') -gt 0 ]]; then
+					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared, system restart is soon..."
+					sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					workflowPHASE="DONE"
+					break
+				fi
+			done < <(tail -n1 -F "$mdmWorkflowLOG")
+			[[ "$currentUSER" != "FALSE" ]] && notifyRestart
+			while read -t $workflowTimeoutSECONDS -r logLINE ; do
+				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+				if [[ $(echo "$logLINE" | grep -c 'phase:ACCEPTED') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]]; then
+					sendToMDMWorkflowLog "**** TIMESTAMP ****"
+					workflowTIMEOUT="FALSE"
+					workflowPHASE="DONE"
+					break
+				fi
+			done < <(tail -n1 -F "$mdmWorkflowLOG")
+		fi
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTIMEOUT is: $workflowTIMEOUT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowPHASE is: $workflowPHASE"
 		
 		# If the macOS update/upgrade completed, then prepare for restart.
 		if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
 			[[ "$mdmWorkflowTYPE" == "UPGRADE" ]] && sendToLog "MDM: $macOSSoftwareUpgradeLabelTARGET upgrade is prepared and ready for restart."
 			[[ "$mdmWorkflowTYPE" == "UPDATE" ]] && sendToLog "MDM: $macOSSoftwareUpdateLABEL update is prepared and ready for restart."
 			[[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared and ready for restart."
-			{ [[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && [[ "$currentUSER" != "FALSE" ]]; } && notifyRestart
+			if [[ "$mdmWorkflowTYPE" == "INSTALLER" ]] && [[ "$currentUSER" != "FALSE" ]]; then
+				sendToLog "MDM: Forcing logout for user $currentUSER with UID $currentUID."
+				launchctl bootout "user/$currentUID" &
+				disown %
+			fi
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
 			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM COMPLETED ****"
 			defaults write "$superPLIST" RestartValidate -bool true
@@ -4222,7 +4293,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			makeLaunchDaemonCalendar
 		fi
 	else # The MDM push workflow failed so clean-up and try again later.
-		kill -9 "$mdmStartStreamPID" > /dev/null 2>&1
+		kill -9 "$mdmCommandStreamPID" > /dev/null 2>&1
 		sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 		sendToMDMCommandLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
@@ -4277,6 +4348,7 @@ workflowCompletePERCENT=0
 workflowPreviousCompletePERCENT=0
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 while read -t $workflowTimeoutSECONDS -r logLINE ; do
+	# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
 	if [[ $(echo "$logLINE" | grep -c 'Preparing to run') -gt 0 ]]; then
 		sendToLog "startosinstall: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET preparing installation..."
 		sendToInstallerLog "**** TIMESTAMP ****"
@@ -4347,7 +4419,64 @@ else # The startosinstall workflow failed so clean-up and try again later.
 fi
 }
 
-# This is the install and restart workflow when a user is NOT logged in. # FIXME double-check logic.
+# This is the install workflow for all (non-macOS) updates when enforced.
+installRecommendedWorkflow(){
+installRecommendedSoftwareUpdates
+
+# Double-check to make sure all updates are complete.
+fullCheckREQUIRED="TRUE"
+checkSoftwareUpdates
+checkMacOSUpgrades
+checkDownloads
+
+# If we had failures, then try again.
+if [[ "$softwareUpdateERROR" == "TRUE" ]]; then
+	sendToLog "Warning: Failed to install all recommended (non-macOS) updates."
+	[[ "$softwareUpdateRECOMMENDED" == "TRUE" ]] && installRecommendedSoftwareUpdates
+
+	# If it failed twice, then try again later.
+	if [[ "$softwareUpdateERROR" == "TRUE" ]]; then
+		sendToLog "Warning: Failed to install all recommended (non-macOS) updates after multiple attempts, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Failed to install all recommended (non-macOS) updates after multiple attempts, trying again in $defaultDeferSECONDS seconds."
+		makeLaunchDaemonCalendar
+	else
+		fullCheckREQUIRED="TRUE"
+		checkSoftwareUpdates
+		checkMacOSUpgrades
+		checkDownloads
+	fi
+fi
+
+# Log status of recommended update completion.
+if [[ "$softwareUpdateRECOMMENDED" == "FALSE" ]]; then
+	sendToLog "Status: Completed installation of all recommended (non-macOS) updates."
+	
+	# For computers managed via Jamf Pro, submit inventory.
+	if [[ "$jamfVERSION" != "FALSE" ]]; then
+		if [[ "$jamfSERVER" != "FALSE" ]]; then
+			sendToLog "Status: Submitting updated inventory to Jamf Pro. Use \"--verbose-mode\" or check /var/log/jamf.log for more detail..."
+			if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+				jamfRESULT=$("$jamfBINARY" recon -verbose 2>&1)
+				jamfRETURN=$?
+				sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRESULT is:\n$jamfRESULT"
+				sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfRETURN is: $jamfRETURN"
+			else
+				"$jamfBINARY" recon > /dev/null 2>&1
+			fi
+		else
+			sendToLog "Error: Unable to submit inventory to Jamf Pro, trying again in $defaultDeferSECONDS seconds."
+			sendToStatus "Pending: Unable to submit inventory to Jamf Pro, trying again in $defaultDeferSECONDS seconds."
+			makeLaunchDaemonCalendar
+		fi
+	fi
+else
+	sendToLog "Warning: Some recommended (non-macOS) updates did not complete, trying again in $defaultDeferSECONDS seconds."
+	sendToStatus "Pending: Some recommended (non-macOS) updates did not complete, trying again in $defaultDeferSECONDS seconds."
+	makeLaunchDaemonCalendar
+fi
+}
+
+# This is the install and restart workflow when a user is NOT logged in.
 installRestartWorkflowNoUser(){
 if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 	if [[ "$upgradeWORKFLOW" == "LOCAL" ]]; then
@@ -4389,7 +4518,7 @@ else # Workflow when there is no macOS updates/upgrade or test mode is enabled.
 			sendToStatus "Pending: At next startup."
 			makeLaunchDaemonOnStartup
 			shutdown -o -r +1 &
-			disown -h
+			disown -a
 		else # Test mode enabled.
 			sendToLog "Test Mode: Skipping forced restart."
 		fi
@@ -4408,19 +4537,18 @@ if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is avai
 			[[ -n $policyTRIGGERS ]] && runJamfPolicies
 			installMacOSSoftwareUpdate
 		else # Systems older than macOS 12.3 upgrade via installer.
-			prepareTimeEstimateDISPLAY="10-20"
+			prepareTimeEstimateDISPLAY="15-25"
 			notifyPrepare
 			installMacOSAPP
 		fi
 	elif [[ "$upgradeWORKFLOW" == "JAMF" ]]; then
-		prepareTimeEstimateDISPLAY="15-25"
+		prepareTimeEstimateDISPLAY="25-30"
 		notifyPrepare
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies
 		installMacOSMDM
 	else # If Apple Silicon with no valid update/upgrade credentials, then encourage self macOS upgrade.
 		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update/upgrade credentials to ensure a proper workflow."
 		notifySelfInstall &
-		disown -h
 	fi
 elif [[ "$softwareUpdateRESTART" == "TRUE" ]]; then # macOS updates are available.
 	if [[ "$updateWORKFLOW" == "LOCAL" ]]; then
@@ -4435,7 +4563,6 @@ elif [[ "$softwareUpdateRESTART" == "TRUE" ]]; then # macOS updates are availabl
 	else # If Apple Silicon with no valid update/upgrade credentials, then encourage self macOS update.
 		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update/upgrade credentials to ensure a proper workflow."
 		notifySelfInstall &
-		disown -h
 	fi
 else # Workflow when there is no macOS updates/upgrade or test mode is enabled.
 	notifyRestart
@@ -4448,7 +4575,7 @@ else # Workflow when there is no macOS updates/upgrade or test mode is enabled.
 			sendToStatus "Pending: At next startup."
 			makeLaunchDaemonOnStartup
 			shutdown -o -r +1 &
-			disown -h
+			disown -a
 		else # Test mode enabled.
 			sendToLog "Test Mode: Skipping forced restart, killing restart notification in $testModeTimeoutSECONDS seconds..."
 			sleep "$testModeTimeoutSECONDS"
@@ -4506,7 +4633,7 @@ removeLaunchDaemon
 </plist>
 EOLDL
 
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "LaunchDaemon: $launchDaemonNAME.plist...\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: LaunchDaemon $launchDaemonNAME.plist:\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
 
 # Set proper permissions and load the LaunchDaemon.
 chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
@@ -4548,7 +4675,7 @@ removeLaunchDaemon
 </plist>
 EOLDL
 
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "LaunchDaemon: $launchDaemonNAME.plist...\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: LaunchDaemon $launchDaemonNAME.plist:\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
 
 # Set proper permissions for the LaunchDaemon.
 chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
@@ -4603,7 +4730,7 @@ minute=$(date -j -f "%s" "$deferCALC" "+%M" | xargs)
 </plist>
 EOLDL
 
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "LaunchDaemon: $launchDaemonNAME.plist...\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: LaunchDaemon $launchDaemonNAME.plist:\n$(cat "/Library/LaunchDaemons/$launchDaemonNAME.plist")"
 
 # Set proper permissions and load the LaunchDaemon.
 chmod 644 "/Library/LaunchDaemons/$launchDaemonNAME.plist"
@@ -4641,6 +4768,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Test mode option.
 	fi
 else
 	titleWorkflowDISPLAY="Software Update"
+	macOSInstallerNameTARGET="macOS"
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: titleWorkflowDISPLAY is: $titleWorkflowDISPLAY"
 
@@ -4764,8 +4892,8 @@ This computer will automatically restart very soon.
 Save any open documents now."
 }
 
-# Open $ibmNotifierBINARY using the $ibmNotifierARRAY[] options including the handling of any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
-openIbmNotifier() {
+# Open $ibmNotifierBINARY for interactive dialogs using the $ibmNotifierARRAY[] options, and also handle any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
+openDialogIbmNotifier() {
 unset dialogRESULT
 unset dialogRETURN
 if [[ -n $displayRedrawSECONDS ]]; then
@@ -4773,53 +4901,79 @@ if [[ -n $displayRedrawSECONDS ]]; then
 	while [[ -z $dialogRETURN ]] || [[ "$dialogRETURN" -eq 137 ]]; do
 		{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 		{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 		(sleep "$displayRedrawSECONDS"; killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1) &
 		killerPID=$!
 		dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 		dialogRETURN="$?"
 		kill -0 "$killerPID" && kill -9 "$killerPID" > /dev/null 2>&1
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
 	done
 else
 	{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 	{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 	dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 	dialogRETURN="$?"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 fi
 }
 
-# Open $jamfHELPER using the $jamfHelperARRAY[] options including the handling of any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
-openJamfHelper() {
+# Open $jamfHELPER for interactive dialogs using the $jamfHelperARRAY[] options, and also handle any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
+openDialogJamfHelper() {
 unset dialogRESULT
 unset dialogRETURN
 if [[ -n $displayRedrawSECONDS ]]; then
 	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - 1))
 	while [[ -z $dialogRESULT ]]; do
 		[[ -n $displayTimeoutSECONDS ]] && jamfHelperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper options: ${jamfHelperARRAY[*]}"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
 		(sleep "$displayRedrawSECONDS"; killall -9 "jamfHelper" > /dev/null 2>&1) &
 		killerPID=$!
 		dialogRESULT=$("$jamfHELPER" "${jamfHelperARRAY[@]}")
 		dialogRETURN="$?"
 		kill -0 "$killerPID" && kill -9 "$killerPID" > /dev/null 2>&1
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
 	done
 else
 	[[ -n $displayTimeoutSECONDS ]] && jamfHelperARRAY+=(-timeout "$displayTimeoutSECONDS" -countdown)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper options: ${jamfHelperARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
 	dialogRESULT=$("$jamfHELPER" "${jamfHelperARRAY[@]}")
 	dialogRETURN="$?"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog result: $dialogRESULT"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Dialog return: $dialogRETURN"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 fi
+}
+
+# Open $ibmNotifierBINARY for non-interactive notifications using the $ibmNotifierARRAY[] options.
+openNotifyIbmNotifier() {
+# Kill any previous notifications so new ones can take its place.
+kill -9 "$notifyPID" > /dev/null 2>&1
+killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+
+# Open notification in the background allowing super to continue.
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
+"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" & 
+disown %
+notifyPID=$!
+}
+
+# Open $jamfHELPER for non-interactive notifications using the $jamfHelperARRAY[] options.
+openNotifyJamfHelper() {
+# Kill any previous notifications so new ones can take its place.
+kill -9 "$notifyPID" > /dev/null 2>&1
+killall -9 "jamfHelper" > /dev/null 2>&1
+
+# Open notification in the background allowing super to continue.
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
+"$jamfHELPER" "${jamfHelperARRAY[@]}" &
+disown %
+notifyPID=$!
 }
 
 # Display a non-interactive notification informing the user that an update/upgrade that requires preparation has started.
@@ -4837,57 +4991,43 @@ jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyPrep
 # Variations for the main body text of the preparing update notification.
 if [[ "$deadlineDateSTATUS" == "HARD" ]]; then # Hard date deadline preparing update notification.
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-		sendToLog "IBM Notifier: Hard date deadline preparing update notification."
+		sendToLog "IBM Notifier: Hard date deadline preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyHardDateIBM")
 	else
-		sendToLog "jamfHelper Notification: Hard date deadline preparing update notification."
+		sendToLog "jamfHelper Notification: Hard date deadline preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		jamfHelperARRAY+=(-description "$notifyPrepBodyHardDateJAMF")
 	fi
 elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then # Hard days deadline preparing update notification.
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-		sendToLog "IBM Notifier: Hard days deadline preparing update notification."
+		sendToLog "IBM Notifier: Hard days deadline preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyHardDaysIBM")
 	else
-		sendToLog "jamfHelper Notification: Hard days deadline preparing update notification."
+		sendToLog "jamfHelper Notification: Hard days deadline preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		jamfHelperARRAY+=(-description "$notifyPrepBodyHardDaysJAMF")
 	fi
 elif [[ "$deadlineCountSTATUS" == "HARD" ]]; then # Hard count deadline preparing update notification.
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-		sendToLog "IBM Notifier: Hard count deadline preparing update notification."
+		sendToLog "IBM Notifier: Hard count deadline preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyHardCountIBM")
 	else
-		sendToLog "jamfHelper Notification: Hard count deadline preparing update notification."
+		sendToLog "jamfHelper Notification: Hard count deadline preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		jamfHelperARRAY+=(-description "$notifyPrepBodyHardCountJAMF")
 	fi
 else # No deadlines, this is the default preparing update notification.
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-		sendToLog "IBM Notifier: Default preparing update notification."
+		sendToLog "IBM Notifier: Default preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		ibmNotifierARRAY+=(-subtitle "$notifyPrepBodyDefaultIBM")
 	else
-		sendToLog "jamfHelper: Default preparing update notification."
+		sendToLog "jamfHelper: Default preparing update notification showing a $prepareTimeEstimateDISPLAY minute estimate."
 		jamfHelperARRAY+=(-description "$notifyPrepBodyDefaultJAMF")
 	fi
 fi
 
-# Non-interactive notifications do not need a redraw or timeout.
-unset displayRedrawSECONDS
-unset displayTimeoutSECONDS
-
-# Kill any previous notifications so new ones can take its place.
-kill -9 "$notifyPID" > /dev/null 2>&1
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-else
-	killall -9 "jamfHelper" > /dev/null 2>&1
-fi
-
 # Open notification in the background allowing super to continue.
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	openIbmNotifier &
-	notifyPID=$!
+	openNotifyIbmNotifier
 else
-	openJamfHelper &
-	notifyPID=$!
+	openNotifyJamfHelper
 fi
 }
 
@@ -4935,171 +5075,115 @@ else # No deadlines, this is the default restart notification.
 	fi
 fi
 
-# Non-interactive notifications do not need a redraw or timeout.
-unset displayRedrawSECONDS
-unset displayTimeoutSECONDS
-
-# Kill any previous notifications so new ones can take its place.
-kill -9 "$notifyPID" > /dev/null 2>&1
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-else
-	killall -9 "jamfHelper" > /dev/null 2>&1
-fi
-
 # Open notification in the background allowing super to continue.
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	openIbmNotifier &
-	notifyPID=$!
-	disown -h
+	openNotifyIbmNotifier
 else
-	openJamfHelper &
-	notifyPID=$!
-	disown -h
+	openNotifyJamfHelper
 fi
 }
 
 # Display a non-interactive notification informing the user that update process has failed.
 notifyFailure() {
-# This notification does not need a redraw or timeout.
-unset displayRedrawSECONDS
-unset displayTimeoutSECONDS
-
-# Kill any previous notifications so new ones can take its place.
-kill -9 "$notifyPID" > /dev/null 2>&1
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-else
-	killall -9 "jamfHelper" > /dev/null 2>&1
-fi
-
-# Open notification in the background allowing super to continue.
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Opening update failure notification..."
-	# Create initial $ibmNotifierARRAY[] settings for the notification.
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "$notifyFailureTITLE" -subtitle "$notifyFailureBodyIBM" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonTEXT")
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
-	openIbmNotifier &
-	notifyPID=$!
-	disown -h
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
+	openNotifyIbmNotifier
 else
 	sendToLog "jamfHelper: Opening update failure notification..."
-	# Create initial $jamfHelperARRAY[] settings for the dialog.
 	jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyFailureTITLE" -description "$notifyFailureBodyJAMF" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonTEXT" -defaultButton 1)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${jamfHelperARRAY[*]}"
-	openJamfHelper &
-	notifyPID=$!
-	disown -h
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
+	openNotifyJamfHelper
 fi
 }
 
 # Open both a non-interactive notification and the either the macOS installer or the Software Update System Setting/Preference.
 notifySelfInstall() {
-# Kill any previous notifications so new ones can take its place.
-kill -9 "$notifyPID" > /dev/null 2>&1
-if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-else
-	killall -9 "jamfHelper" > /dev/null 2>&1
-fi
-
+# Create initial $ibmNotifierARRAY[] or $jamfHelperARRAY[] options for the notification.
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Opening self install notification..."
-	# Create initial $ibmNotifierARRAY[] settings for the notification.
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_left -bar_title "$notifySelfInstallTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		ibmNotifierARRAY+=(-subtitle "$notifySelfUpgradeBodyIBM")
 	else # macOS updates are available.
 		ibmNotifierARRAY+=(-subtitle "$notifySelfUpdateBodyIBM")
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "IBM Notifier.app options: ${ibmNotifierARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 else
 	sendToLog "jamfHelper: Opening self install notification..."
-	# Create initial $jamfHelperARRAY[] settings for the dialog.
 	jamfHelperARRAY=(-windowType hud -windowPosition ul -lockHUD -title "$notifySelfInstallTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		jamfHelperARRAY+=(-description "$notifySelfUpgradeBodyJAMF")
 	else # macOS updates are available.
 		jamfHelperARRAY+=(-description "$notifySelfUpdateBodyJAMF")
 	fi
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "jamfHelper Options: ${jamfHelperARRAY[*]}"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
 fi
 sendToStatus "Running: Notification self install..."
 
-# Reset various items for the self install notification.
-unset dialogRESULT
-unset displayTimeoutSECONDS
-restartZeroDay
-restartDeferralCounters
-
 # Start System Settings/Preferences and the notification.
 if [[ -n $displayRedrawSECONDS ]]; then
-	[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=0
-	[[ "$testModeOPTION" == "TRUE" ]] && sendToLog "Test Mode: Killing self install notification after 3 attempts..."
-	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self install notification will re-display every $displayRedrawSECONDS seconds until the user restarts the computer."
+	if [[ "$testModeOPTION" == "TRUE" ]]; then
+		sendToLog "Test Mode: Killing self install notification after 3 attempts..."
+		redrawCOUNTER=0
+	else
+		sendToLog "Warning: The self install notification will re-display every $displayRedrawSECONDS seconds until the user restarts the computer."
+	fi
 	while [[ -z $dialogRESULT ]] && [[ redrawCOUNTER -lt 3 ]]; do
 		if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 			if [[ "$testModeOPTION" != "TRUE" ]]; then
-				sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app"
-				installerPID=$!
+				sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app" &
 			else
-				sendToLog "Warning: Test mode does not downlaod the macOS installer, thus cannot open it."
+				sendToLog "Warning: Test mode does not download the macOS installer, thus cannot open it."
 			fi
 		else # macOS updates are available.
 			if [[ $macOSMAJOR -ge 13 ]]; then
-				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app"
+				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app" &
 			else
-				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
+				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app" &
 			fi
-			installerPID=$!
 		fi
+		disown -a
 		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-			"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
+			openNotifyIbmNotifier
 		else
-			"$jamfHELPER" "${jamfHelperARRAY[@]}" &
+			openNotifyJamfHelper
 		fi
 		sleep "$displayRedrawSECONDS"
 		[[ "$testModeOPTION" == "TRUE" ]] && redrawCOUNTER=$((redrawCOUNTER + 1))
-		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-		else
-			killall -9 "jamfHelper" > /dev/null 2>&1
-		fi
-		kill -9 "$installerPID" > /dev/null 2>&1
 	done
 else # No $displayRedrawOPTION.
 	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self install notification does not close until the user restarts the computer."
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		if [[ "$testModeOPTION" != "TRUE" ]]; then
-			sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app"
-			installerPID=$!
+			sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app" &
 		else
-			sendToLog "Warning: Test mode does not downlaod the macOS installer, thus cannot open it."
+			sendToLog "Warning: Test mode does not download the macOS installer, thus cannot open it."
 		fi
 	else # macOS updates are available.
 		if [[ $macOSMAJOR -ge 13 ]]; then
-			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app"
+			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app" &
 		else
-			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app"
+			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app" &
 		fi
-		installerPID=$!
 	fi
+	disown -a
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
 	else
 		"$jamfHELPER" "${jamfHelperARRAY[@]}" &
 	fi
-	if [[ "$testModeOPTION" == "TRUE" ]]; then
-		sendToLog "Test Mode: Killing self install notification in $testModeTimeoutSECONDS seconds..."
-		sleep "$testModeTimeoutSECONDS"
-		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-		else
-			killall -9 "jamfHelper" > /dev/null 2>&1
-		fi
-		kill -9 "$installerPID" > /dev/null 2>&1
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
+		openNotifyIbmNotifier
+	else
+		openNotifyJamfHelper
 	fi
 fi
+
+# Reset various items for the self install.
+restartZeroDay
+restartDeferralCounters
 }
 
 # Display an interactive dialog when a soft deadline has passed, giving the user only one button to continue the workflow.
@@ -5123,7 +5207,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 	displayTimeoutTEXT="$dialogSoftDeadlineTimeoutTEXT"
 	
 	# Start the dialog.
-	openIbmNotifier
+	openDialogIbmNotifier
 
 	# The $dialogRETURN contains the IBM Notifier.app return code.
 	case "$dialogRETURN" in
@@ -5151,7 +5235,7 @@ else
 	fi
 
 	# Start the dialog.
-	openJamfHelper
+	openDialogJamfHelper
 	sendToLog "Status: User or display timeout accepted soft deadline dialog."
 fi
 }
@@ -5203,7 +5287,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 	fi
 
 	# Start the dialog.
-	openIbmNotifier
+	openDialogIbmNotifier
 
 	# The $dialogRETURN contains the IBM Notifier.app return code. If $menuDeferSECONDS was enabled then set $defaultDeferSECONDS.
 	case "$dialogRETURN" in
@@ -5257,7 +5341,7 @@ else
 	fi
 
 	# Start the dialog.
-	openJamfHelper
+	openDialogJamfHelper
 
 	# The $dialogRESULT contains the user's selection; "0" or "1" for deferral and "2" for restart. If $menuDeferSECONDS was enabled then set $defaultDeferSECONDS.
 	case "$dialogRESULT" in
@@ -5342,8 +5426,13 @@ else # Default software update/upgrade workflow.
 		[[ "$updateWORKFLOW" == "JAMF" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION MDM PUSH ****"
 		[[ "$updateWORKFLOW" == "USER" ]] && sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE MACOS $macOSSoftwareUpdateVERSION USER REQUEST ****"
 	elif [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then # Only recommended (non-macOS) updates are available.
-		sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD RECOMMENDED SOFTWAREUPDATE ****"
-		[[ "$testModeOPTION" != "TRUE" ]] && downloadWorkflow
+		if [[ "$enforceAllUpdatesOPTION" == "TRUE" ]]; then # Option to enforce all software updates is enabled.
+			sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL RECOMMENDED SOFTWAREUPDATE ****"
+			[[ "$testModeOPTION" != "TRUE" ]] && installRecommendedWorkflow
+		else
+			sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD RECOMMENDED SOFTWAREUPDATE ****"
+			[[ "$testModeOPTION" != "TRUE" ]] && downloadWorkflow
+		fi
 	else # No software updates/upgrade needed so clean up any leftover deferral counters.
 		defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null
 		defaults delete "$superPLIST" FocusCounter 2> /dev/null
