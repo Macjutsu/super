@@ -8,8 +8,8 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-superVERSION="3.0b7"
-superDATE="2023/02/16"
+superVERSION="3.0b8"
+superDATE="2023/02/20"
 
 # MARK: *** Usage & Help ***
 ################################################################################
@@ -46,8 +46,13 @@ echo "
 
   Display Options:
   [--display-timeout=seconds] [--display-redraw=seconds]
-  [--display-icon=/local/path or URL] [--icon-size-ibm=pixels]
-  [--icon-size-jamf=pixels ] [--prefer-jamf-helper] [--prefer-jamf-helper-off]
+  [--display-icon=/local/path or URL]
+  [--icon-size-ibm=pixels] [--icon-size-jamf=pixels ]
+  [--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO]
+  [--display-accessory-content=/local/path or URL]
+  [--help-button=plain text or URL] [--warning-button=plain text or URL]
+  [--display-silently] [--display-silently-off]
+  [--prefer-jamf-helper] [--prefer-jamf-helper-off]
 
   Software Update Credential Options:
   [--local-account=AccountName] [--local-password=Password]
@@ -85,8 +90,14 @@ echo "
   <key>DisplayTimeout</key> <string>seconds</string>
   <key>DisplayRedraw</key> <string>seconds</string>
   <key>DisplayIcon</key> <string>path</string>
-  <key>IconSizeIbm</key> <string>number</string>
-  <key>IconSizeJamf</key> <string>number</string>
+  <key>IconSizeIbm</key> <string>pixels</string>
+  <key>IconSizeJamf</key> <string>pixels</string>
+  <key>DisplayAccessoryType</key>
+  <string>TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO</string>
+  <key>DisplayAccessoryContent</key> <string>path or URL</string>
+  <key>HelpButton</key> <string>plain text or URL</string>
+  <key>WarningButton</key> <string>plain text or URL</string>
+  <key>DisplaySilently</key> <true/> | <false/>
   <key>PreferJamfHelper</key> <true/> | <false/>
   <key>EnforceAllUpdates</key> <true/> | <false/>
   <key>AllowUpgrade</key> <true/> | <false/>
@@ -359,6 +370,24 @@ while [[ -n $1 ]]; do
 		--icon-size-jamf* )
 			iconSizeJamfOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
+		--display-accessory-type* )
+			displayAccessoryTypeOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
+		--display-accessory-content* )
+			displayAccessoryContentOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
+		--help-button* )
+			helpButtonOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
+		--warning-button* )
+			warningButtonOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
+		-Q|--display-silently|--display-silently-on )
+			displaySilentlyOPTION="TRUE"
+		;;
+		-q|--display-silently-off|--no-display-silently )
+			displaySilentlyOPTION="FALSE"
+		;;
 		-J|--prefer-jamf-helper|--prefer-jamf-helper-on )
 			preferJamfHelperOPTION="TRUE"
 		;;
@@ -389,7 +418,7 @@ while [[ -n $1 ]]; do
 		--jamf-password* )
 			jamfPASSWORD=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
-		-D|--delete-accounts )
+		-d|-D|--delete-accounts )
 			deleteACCOUNTS="TRUE"
 		;;
 		-A|--enforce-all-updates|--enforce-all-updates-on )
@@ -519,6 +548,11 @@ if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
 	rm -r "$cachedICON" > /dev/null 2>&1
 	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
 	defaults delete "$superPLIST" IconSizeJamf 2> /dev/null
+	defaults delete "$superPLIST" DisplayAccessoryType 2> /dev/null
+	defaults delete "$superPLIST" DisplayAccessoryContent 2> /dev/null
+	defaults delete "$superPLIST" HelpButton 2> /dev/null
+	defaults delete "$superPLIST" WarningButton 2> /dev/null
+	defaults delete "$superPLIST" DisplaySilently 2> /dev/null
 	defaults delete "$superPLIST" PreferJamfHelper 2> /dev/null
 	defaults delete "$superPLIST" EnforceAllUpdates 2> /dev/null
 	defaults delete "$superPLIST" AllowUpgrade 2> /dev/null
@@ -570,6 +604,11 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	displayIconMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayIcon 2> /dev/null)
 	iconSizeIbmMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeJamf 2> /dev/null)
+	displayAccessoryTypeMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayAccessoryType 2> /dev/null)
+	displayAccessoryContentMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayAccessoryContent 2> /dev/null)
+	helpButtonMANAGED=$(defaults read "$superMANAGEDPLIST" HelpButton 2> /dev/null)
+	warningButtonMANAGED=$(defaults read "$superMANAGEDPLIST" WarningButton 2> /dev/null)
+	displaySilentlyMANAGED=$(defaults read "$superMANAGEDPLIST" DisplaySilently 2> /dev/null)
 	preferJamfHelperMANAGED=$(defaults read "$superMANAGEDPLIST" PreferJamfHelper 2> /dev/null)
 	enforceAllUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" EnforceAllUpdates 2> /dev/null)
 	allowUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" AllowUpgrade 2> /dev/null)
@@ -602,6 +641,11 @@ if [[ -f "$superPLIST.plist" ]]; then
 	displayRedrawPROPERTY=$(defaults read "$superPLIST" DisplayRedraw 2> /dev/null)
 	iconSizeIbmPROPERTY=$(defaults read "$superPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfPROPERTY=$(defaults read "$superPLIST" IconSizeJamf 2> /dev/null)
+	displayAccessoryTypePROPERTY=$(defaults read "$superPLIST" DisplayAccessoryType 2> /dev/null)
+	displayAccessoryContentPROPERTY=$(defaults read "$superPLIST" DisplayAccessoryContent 2> /dev/null)
+	helpButtonPROPERTY=$(defaults read "$superPLIST" HelpButton 2> /dev/null)
+	warningButtonPROPERTY=$(defaults read "$superPLIST" WarningButton 2> /dev/null)
+	displaySilentlyPROPERTY=$(defaults read "$superPLIST" DisplaySilently 2> /dev/null)
 	preferJamfHelperPROPERTY=$(defaults read "$superPLIST" PreferJamfHelper 2> /dev/null)
 	enforceAllUpdatesPROPERTY=$(defaults read "$superPLIST" EnforceAllUpdates 2> /dev/null)
 	allowUpgradePROPERTY=$(defaults read "$superPLIST" AllowUpgrade 2> /dev/null)
@@ -705,6 +749,31 @@ if [[ -n $iconSizeJamfMANAGED ]]; then
 	iconSizeJamfOPTION="$iconSizeJamfMANAGED"
 elif [[ -z $iconSizeJamfOPTION ]] && [[ -n $iconSizeJamfPROPERTY ]]; then
 	iconSizeJamfOPTION="$iconSizeJamfPROPERTY"
+fi
+if [[ -n $displayAccessoryTypeMANAGED ]]; then
+	displayAccessoryTypeOPTION="$displayAccessoryTypeMANAGED"
+elif [[ -z $displayAccessoryTypeOPTION ]] && [[ -n $displayAccessoryTypePROPERTY ]]; then
+	displayAccessoryTypeOPTION="$displayAccessoryTypePROPERTY"
+fi
+if [[ -n $displayAccessoryContentMANAGED ]]; then
+	displayAccessoryContentOPTION="$displayAccessoryContentMANAGED"
+elif [[ -z $displayAccessoryContentOPTION ]] && [[ -n $displayAccessoryContentPROPERTY ]]; then
+	displayAccessoryContentOPTION="$displayAccessoryContentPROPERTY"
+fi
+if [[ -n $helpButtonMANAGED ]]; then
+	helpButtonOPTION="$helpButtonMANAGED"
+elif [[ -z $helpButtonOPTION ]] && [[ -n $helpButtonPROPERTY ]]; then
+	helpButtonOPTION="$helpButtonPROPERTY"
+fi
+if [[ -n $warningButtonMANAGED ]]; then
+	warningButtonOPTION="$warningButtonMANAGED"
+elif [[ -z $warningButtonOPTION ]] && [[ -n $warningButtonPROPERTY ]]; then
+	warningButtonOPTION="$warningButtonPROPERTY"
+fi
+if [[ -n $displaySilentlyMANAGED ]]; then
+	displaySilentlyOPTION="$displaySilentlyMANAGED"
+elif [[ -z $displaySilentlyOPTION ]] && [[ -n $displaySilentlyPROPERTY ]]; then
+	displaySilentlyOPTION="$displaySilentlyPROPERTY"
 fi
 if [[ -n $preferJamfHelperMANAGED ]]; then
 	preferJamfHelperOPTION="$preferJamfHelperMANAGED"
@@ -1202,6 +1271,56 @@ elif [[ -n $iconSizeJamfOPTION ]] && ! [[ $iconSizeJamfOPTION =~ $regexNUMBER ]]
 	sendToLog "Parameter Error: The IBM Notifier icon size must only be a number."; parameterERROR="TRUE"
 fi
 
+# Validate $displayAccessoryTypeOPTION and $displayAccessoryContentOPTION.
+if [[ "$displayAccessoryTypeOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for display accessory."
+	defaults delete "$superPLIST" DisplayAccessoryType 2> /dev/null
+fi
+if [[ "$displayAccessoryContentOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for display accessory content."
+	defaults delete "$superPLIST" DisplayAccessoryContent 2> /dev/null
+fi
+if { [[ -n $displayAccessoryTypeOPTION ]] && [[ -z $displayAccessoryContentOPTION ]]; } || { [[ -z $displayAccessoryTypeOPTION ]] && [[ -n $displayAccessoryContentOPTION ]]; }; then
+	sendToLog "Parameter Error: To use a custom dialog display accessory you must specifiy both the display accessory type and display accessory content."; parameterERROR="TRUE"
+fi
+if [[ -n $displayAccessoryTypeOPTION ]] && [[ -n $displayAccessoryContentOPTION ]]; then
+	if [[ $displayAccessoryTypeOPTION =~ ^TEXTBOX$|^HTMLBOX$|^HTML$|^IMAGE$|^VIDEO$|^VIDEOAUTO$ ]]; then
+		displayAccessoryTYPE="$displayAccessoryTypeOPTION"
+		defaults write "$superPLIST" DisplayAccessoryType -string "$displayAccessoryTypeOPTION"
+		displayAccessoryCONTENT="$displayAccessoryContentOPTION"
+		defaults write "$superPLIST" DisplayAccessoryContent -string "$displayAccessoryContentOPTION"
+	else
+		sendToLog "Parameter Error: Unrecognized dialog display accessory type: $displayAccessoryTypeOPTION. You must specify one of the following; TEXTBOX, HTMLBOX, HTML, IMAGE, VIDEO, or VIDEOAUTO."; parameterERROR="TRUE"
+	fi
+fi
+
+# Validate $helpButtonOPTION and set $helpBUTTON and save to $superPLIST.
+if [[ "$helpButtonOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for helb button option."
+	defaults delete "$superPLIST" HelpButton 2> /dev/null
+elif [[ -n $helpButtonOPTION ]]; then
+	helpBUTTON="$helpButtonOPTION"
+	defaults write "$superPLIST" HelpButton -string "$helpButtonOPTION"	
+fi
+
+# Validate $warningButtonOPTION and set $warningBUTTON and save to $superPLIST.
+if [[ "$warningButtonOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for helb button option."
+	defaults delete "$superPLIST" WarningButton 2> /dev/null
+elif [[ -n $warningButtonOPTION ]]; then
+	warningBUTTON="$warningButtonOPTION"
+	defaults write "$superPLIST" WarningButton -string "$warningButtonOPTION"
+fi
+
+# Manage $displaySilentlyOPTION and save to $superPLIST.
+if [[ $displaySilentlyOPTION -eq 1 ]] || [[ "$displaySilentlyOPTION" == "TRUE" ]]; then
+	displaySilentlyOPTION="TRUE"
+	defaults write "$superPLIST" DisplaySilently -bool "$displaySilentlyOPTION"
+else
+	displaySilentlyOPTION="FALSE"
+	defaults delete "$superPLIST" DisplaySilently 2> /dev/null
+fi
+
 # Manage $enforceAllUpdatesOPTION and save to $superPLIST.
 if [[ $enforceAllUpdatesOPTION -eq 1 ]] || [[ "$enforceAllUpdatesOPTION" == "TRUE" ]]; then
 	enforceAllUpdatesOPTION="TRUE"
@@ -1291,7 +1410,7 @@ elif [[ -n $testModeTimeoutOPTION ]] && ! [[ $testModeTimeoutOPTION =~ $regexNUM
 fi
 }
 
-# For Apple Silicon computers this function manages update/upgrade credentials given $deleteACCOUNTS, $localACCOUNT, $adminACCOUNT, $superACCOUNT, or $jamfACCOUNT. Any errors set $parameterERROR.
+# For Apple Silicon computers this function manages update/upgrade credentials given $deleteACCOUNTS, $localACCOUNT, $adminACCOUNT, $superACCOUNT, or $jamfACCOUNT. Any errors set $credentialERROR.
 manageUpdateCredentials () {
 credentialERROR="FALSE"
 
@@ -1362,6 +1481,15 @@ if [[ -n $jamfOPTION ]] && [[ -z $jamfPASSWORD ]]; then
 fi
 if [[ -z $jamfOPTION ]] && [[ -n $jamfPASSWORD ]]; then
 	sendToLog "Credential Error: A Jamf Pro API password requires that you also set a Jamf Pro API account name."; credentialERROR="TRUE"
+fi
+
+# Validate that the computer's bootstrap token is properly escrowed.
+if [[ -n $jamfOPTION ]] && [[ "$credentialERROR" != "TRUE" ]]; then
+	if [[ $(profiles status -type bootstraptoken | grep -i 'escrowed' | grep -ic 'yes') -ne 0 ]]; then
+		sendToLog "Startup: Bootstrap token escrow validated."
+	else
+		sendToLog "Credential Error: Can not use MDM workflow because this computer's Bootstrap token is not escrowed."; credentialERROR="TRUE"
+	fi
 fi
 
 # Validate that the account $jamfOPTION and $jamfPASSWORD are valid.
@@ -1573,7 +1701,6 @@ if [[ -n $jamfPROPERTY ]]; then
 			if [[ "$jamfERROR" != "TRUE" ]]; then
 				sendToLog "Startup: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
 				if [[ $(profiles status -type bootstraptoken | grep -i 'escrowed' | grep -ic 'yes') -ne 0 ]]; then
-					sendToLog "Startup: Bootstrap token escrow validated."
 					jamfCREDENTIAL="TRUE"
 				else
 					sendToLog "Credential Error: Can not use MDM workflow because this computer's Bootstrap token is not escrowed."; credentialERROR="TRUE"
@@ -1803,11 +1930,16 @@ else
 	[[ "$helperERROR" == "FALSE" ]] && sendToLog "Startup: Prefer jamfHelper mode enabled."
 fi
 
-# If there is no IBM Notifier.app, then validate $jamfHelper.
-if [[ "$ibmNotifierVALID" == "FALSE" ]]; then
+# If there jamfHelper is to be used, then validate $jamfHelper and show some logs.
+if [[ "$preferJamfHelperOPTION" == "TRUE" ]] || [[ "$ibmNotifierVALID" == "FALSE" ]]; then
 	if [[ ! -e "$jamfHELPER" ]]; then
 		sendToLog "Helper Error: Cannot locate fallback jamfHelper at: $jamfHELPER"; helperERROR="TRUE"
 	fi
+	sendToLog "Warning: The showing the deferral time inside the Defer button is not available when using jamfHelper."
+	{ [[ -n $displayAccessoryTypeOPTION ]] || [[ -n $displayAccessoryContentOPTION ]]; } && sendToLog "Warning: The the custom display accessory option is not available when using jamfHelper."
+	[[ -n $helpBUTTON ]] && sendToLog "Warning: The help button option is not available when using jamfHelper."
+	[[ -n $warningBUTTON ]] && sendToLog "Warning: The warning button option is not available when using jamfHelper."
+	[[ "$displaySilentlyOPTION" == "TRUE" ]] && sendToLog "Warning: The display silently option is not available when using jamfHelper."
 fi
 
 # If needed, validate erase-install items, if missing or invalid then install and check again.
@@ -2081,6 +2213,11 @@ sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: helperERROR is: $helperERROR"
 [[ -n $displayRedrawSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayRedrawSECONDS is: $displayRedrawSECONDS"
 [[ -n $ibmNotifierIconSIZE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierIconSIZE is: $ibmNotifierIconSIZE"
 [[ -n $jamfHelperIconSIZE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperIconSIZE is: $jamfHelperIconSIZE"
+[[ -n $displayAccessoryTYPE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryTYPE is: $displayAccessoryTYPE"
+[[ -n $displayAccessoryCONTENT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryCONTENT is: $displayAccessoryCONTENT"
+[[ -n $helpBUTTON ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: helpBUTTON is: $helpBUTTON"
+[[ -n $warningBUTTON ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: warningBUTTON is: $warningBUTTON"
+[[ -n $displaySilentlyOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displaySilentlyOPTION is: $displaySilentlyOPTION"
 [[ -n $preferJamfHelperOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preferJamfHelperOPTION is: $preferJamfHelperOPTION"
 [[ -n $localOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: localOPTION is: $localOPTION"
 [[ -n $localPASSWORD ]] && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: localPASSWORD is: $localPASSWORD"
@@ -3451,18 +3588,18 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 		softwareUpdateDownloadREQUIRED="FALSE"
 	else # The expected $softwareUpdateTitleTARGETS[] did not match the $softwareUpdateDownloadedTITLES[].
 		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE INCOMPLETE ****"
-		sendToASULog "Error: Download of software udpates did not complete, trying again in $defaultDeferSECONDS seconds."
-		sendToLog "Error: Download of software udpates did not complete, trying again in $defaultDeferSECONDS seconds."
-		sendToStatus "Pending: Download of software udpates did not complete, trying again in $defaultDeferSECONDS seconds."
+		sendToASULog "Error: Download of software updates did not complete, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Download of software updates did not complete, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Download of software updates did not complete, trying again in $defaultDeferSECONDS seconds."
 		kickSoftwareUpdateD
 		makeLaunchDaemonCalendar
 	fi
 else # The softwareupdate download workflow failed so clean-up and try again later.
 	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD SOFTWAREUPDATE FAILED ****"
 	if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
-		sendToASULog "Error: Download of software udpates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToLog "Error: Download of software udpates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToStatus "Pending: Download of software udpates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToASULog "Error: Download of software updates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Download of software updates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Download of software updates failed to start after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 	elif [[ "$workflowStartFAIL" == "CONNECT" ]]; then
 		sendToASULog "Error: Unable to reach Apple Software Update server, trying again in $defaultDeferSECONDS seconds."
 		sendToLog "Error: Unable to reach Apple Software Update server, trying again in $defaultDeferSECONDS seconds."
@@ -3480,9 +3617,9 @@ else # The softwareupdate download workflow failed so clean-up and try again lat
 		sendToLog "Error: Failed to download & prepare updates, trying again in $defaultDeferSECONDS seconds."
 		sendToStatus "Error: Failed to download & prepare updates, trying again in $defaultDeferSECONDS seconds."
 	elif [[ "$workflowTIMEOUT" == "TRUE" ]]; then
-		sendToASULog "Error: Download of software udpates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToLog "Error: Download of software udpates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
-		sendToStatus "Pending: Download of software udpates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToASULog "Error: Download of software updates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToLog "Error: Download of software updates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
+		sendToStatus "Pending: Download of software updates timed out after $workflowTimeoutSECONDS seconds, trying again in $defaultDeferSECONDS seconds."
 	fi
 	kill -9 "$softwareupdatePID" > /dev/null 2>&1
 	kickSoftwareUpdateD
@@ -4215,46 +4352,58 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToMDMWorkflowLog "**** TIMESTAMP ****"
 					workflowTimeoutSECONDS=$mdmWorkflowTimeoutSECONDS
 					[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
+					workflowTIMEOUT="FALSE"
 					workflowPHASE="PREFLIGHT"
 					break
 				fi
 			done < <(tail -n1 -F "$mdmWorkflowLOG")
-			while read -t $workflowTimeoutSECONDS -r logLINE ; do
-				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
-				if [[ $(echo "$logLINE" | grep -c 'phase:DOWNLOADING_SFR') -gt 0 ]]; then
-					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET downloading additional items..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowPHASE="DOWNLOADING"
-				elif [[ $(echo "$logLINE" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
-					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preparing..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowPHASE="PREPARING"
-					break
-				fi
-			done < <(tail -n1 -F "$mdmWorkflowLOG")
-			if [[ "$currentUSER" != "FALSE" ]]; then
+			if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
+			workflowTIMEOUT="TRUE"
+				while read -t $workflowTimeoutSECONDS -r logLINE ; do
+					# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+					if [[ $(echo "$logLINE" | grep -c 'phase:DOWNLOADING_SFR') -gt 0 ]]; then
+						sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET downloading additional items..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowPHASE="DOWNLOADING"
+					elif [[ $(echo "$logLINE" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+						sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer preparing..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowTIMEOUT="FALSE"
+						workflowPHASE="PREPARING"
+						break
+					fi
+				done < <(tail -n1 -F "$mdmWorkflowLOG")
+			fi
+			if [[ "$workflowTIMEOUT" == "FALSE" ]] && [[ "$currentUSER" != "FALSE" ]]; then
 				prepareTimeEstimateDISPLAY="10-15"
 				notifyPrepare
 			fi
-			while read -t $workflowTimeoutSECONDS -r logLINE ; do
-				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
-				if [[ $(echo "$logLINE" | grep -c 'phase:PREPARED') -gt 0 ]]; then
-					sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared, system restart is soon..."
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowPHASE="DONE"
-					break
-				fi
-			done < <(tail -n1 -F "$mdmWorkflowLOG")
-			[[ "$currentUSER" != "FALSE" ]] && notifyRestart
-			while read -t $workflowTimeoutSECONDS -r logLINE ; do
-				# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
-				if [[ $(echo "$logLINE" | grep -c 'phase:ACCEPTED') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]]; then
-					sendToMDMWorkflowLog "**** TIMESTAMP ****"
-					workflowTIMEOUT="FALSE"
-					workflowPHASE="DONE"
-					break
-				fi
-			done < <(tail -n1 -F "$mdmWorkflowLOG")
+			if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
+			workflowTIMEOUT="TRUE"
+				while read -t $workflowTimeoutSECONDS -r logLINE ; do
+					# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+					if [[ $(echo "$logLINE" | grep -c 'phase:PREPARED') -gt 0 ]]; then
+						sendToLog "MDM: $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET installer is prepared, system restart is soon..."
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowTIMEOUT="FALSE"
+						workflowPHASE="DONE"
+						break
+					fi
+				done < <(tail -n1 -F "$mdmWorkflowLOG")
+			fi
+			{ [[ "$workflowTIMEOUT" == "FALSE" ]] && [[ "$currentUSER" != "FALSE" ]]; } && notifyRestart 
+			if [[ "$workflowTIMEOUT" == "FALSE" ]]; then
+			workflowTIMEOUT="TRUE"
+				while read -t $workflowTimeoutSECONDS -r logLINE ; do
+					# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
+					if [[ $(echo "$logLINE" | grep -c 'phase:ACCEPTED') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'phase:APPLYING') -gt 0 ]]; then
+						sendToMDMWorkflowLog "**** TIMESTAMP ****"
+						workflowTIMEOUT="FALSE"
+						workflowPHASE="DONE"
+						break
+					fi
+				done < <(tail -n1 -F "$mdmWorkflowLOG")
+			fi
 		fi
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTIMEOUT is: $workflowTIMEOUT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowPHASE is: $workflowPHASE"
@@ -4548,7 +4697,7 @@ if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is avai
 		installMacOSMDM
 	else # If Apple Silicon with no valid update/upgrade credentials, then encourage self macOS upgrade.
 		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update/upgrade credentials to ensure a proper workflow."
-		notifySelfInstall &
+		notifySelfInstall
 	fi
 elif [[ "$softwareUpdateRESTART" == "TRUE" ]]; then # macOS updates are available.
 	if [[ "$updateWORKFLOW" == "LOCAL" ]]; then
@@ -4562,7 +4711,7 @@ elif [[ "$softwareUpdateRESTART" == "TRUE" ]]; then # macOS updates are availabl
 		installMacOSMDM
 	else # If Apple Silicon with no valid update/upgrade credentials, then encourage self macOS update.
 		[[ -n $policyTRIGGERS ]] && sendToLog "Warning: Skipping Jamf Policy triggers because there are no valid Apple Silicon update/upgrade credentials to ensure a proper workflow."
-		notifySelfInstall &
+		notifySelfInstall
 	fi
 else # Workflow when there is no macOS updates/upgrade or test mode is enabled.
 	notifyRestart
@@ -4750,10 +4899,19 @@ exit 0
 # Set language strings for notifications and dialogs.
 setDisplayLanguage(){
 #### Langauge for the restart button in dialogs. Note that for deadline dialogs this is the default button.
-restartButtonTEXT="Restart"
+restartButtonDISPLAY="Restart"
 
-#### Language for the deferral button in dialogs. Note that for non-deadline dialogs this is the default button.
-deferButtonTEXT="Defer"
+#### Language for the deferral button in dialogs that do not show the $menuDeferOPTION but instead show the $DefaultDefer time in the button display. Note that for non-deadline dialogs this is the default button.
+deferForButtonDISPLAY="Defer For"
+
+#### Language for the deferral button in dialogs that also show the $menuDeferOPTION. Note that for non-deadline dialogs this is the default button.
+deferButtonDISPLAY="Defer"
+
+### Language for various deferral time durations.
+dialogAskForUpdateMinutesDISPLAY="Minutes"
+dialogAskForUpdateHourDISPLAY="Hour"
+dialogAskForUpdateHoursDISPLAY="Hours"
+dialogAskForUpdateDayDISPLAY="Day"
 
 #### This code generates the $titleWorkflowDISPLAY variable to include the appropriate macOS update or upgrade.
 if [[ "$testModeOPTION" != "TRUE" ]]; then # Test mode option.
@@ -4788,11 +4946,7 @@ fi
 #### Language for dialogAskForUpdate(), an interactive dialog giving the user a choice to defer the update or restart.
 dialogAskForUpdateTITLE="$titleWorkflowDISPLAY Requires Restart"
 dialogAskForUpdateDeferMenuTitleIBM="Defer software update for:" # jamfHelper does not allow for customizing the deferral menu language.
-dialogAskForUpdateDeferMenuMinutesIBM="minutes"
-dialogAskForUpdateDeferMenuHourIBM="hour"
-dialogAskForUpdateDeferMenuHoursIBM="hours"
-dialogAskForUpdateDeferMenuDayIBM="day"
-dialogAskForUpdateTimeoutTEXT="Please make selection in" # jamfHelper does not allow for customizing the display timeout language.
+dialogAskForUpdateTimeoutIBM="Please make selection in" # jamfHelper does not allow for customizing the display timeout language.
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 dialogAskForUpdateBodyUnlimitedIBM="• No deadline date and unlimited deferrals.\n"
 dialogAskForUpdateBodyUnlimitedJAMF="• No deadline date and unlimited deferrals."
@@ -4807,7 +4961,7 @@ dialogAskForUpdateBodyDateCountJAMF="• Deferral available until $deadlineDISPL
 
 #### Language for dialogSoftDeadline(), an interactive dialog when a soft deadline has passed, giving the user only one button to continue the workflow.
 dialogSoftDeadlineTITLE="$titleWorkflowDISPLAY Requires Restart"
-dialogSoftDeadlineTimeoutTEXT="Update will automatically start in" # jamfHelper does not allow for customizing the display timeout language.
+dialogSoftDeadlineTimeoutIBM="Update will automatically start in" # jamfHelper does not allow for customizing the display timeout language.
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 dialogSoftDeadlineBodyCountIBM="You have deferred the maximum number of $countMaxDISPLAY times."
 dialogSoftDeadlineBodyCountJAMF="You have deferred the maximum number of $countMaxDISPLAY times."
@@ -4858,10 +5012,14 @@ The system will not restart right now, but you will be notified later when the s
 # This is used if there is no valid macOS update enforcement workflow possible.
 notifySelfInstallTITLE="$titleWorkflowDISPLAY Requires Restart"
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
-notifySelfUpdateBodyIBM="You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update."
-notifySelfUpdateBodyJAMF="You need to update this Mac as soon as possible by clicking the \"Update Now\" or \"Restart Now\" button in Software Update."
-notifySelfUpgradeBodyIBM="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET Installation."
-notifySelfUpgradeBodyJAMF="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET Installation."
+notifySelfUpdateCurrentBodyIBM="You need to update this Mac as soon as possible by clicking the \"Install Now\" or \"Restart Now\" button in Software Update."
+notifySelfUpdateCurrentBodyJAMF="You need to update this Mac as soon as possible by clicking the \"Install Now\" or \"Restart Now\" button in Software Update."
+notifySelfUpdatePreviousBodyIBM="You need to update this Mac as soon as possible by clicking the \"More Info...\" text and then the \"Install Now\" or \"Restart Now\" button in Software Update."
+notifySelfUpdatePreviousBodyJAMF="You need to update this Mac as soon as possible by clicking the \"More Info...\" text and then the \"Install Now\" or \"Restart Now\" button in Software Update."
+notifySelfUpgradeSoftwareBodyIBM="You need to upgrade this Mac as soon as possible by clicking the \"Upgrade Now\" button in Software Update."
+notifySelfUpgradeSoftwareBodyJAMF="You need to upgrade this Mac as soon as possible by clicking the \"Upgrade Now\" button in Software Update."
+notifySelfUpgradeInstallerBodyIBM="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET installation."
+notifySelfUpgradeInstallerBodyJAMF="You need to upgrade this Mac as soon as possible by continuing with the $macOSInstallerNameTARGET installation."
 
 #### Language for notifyRestart(), a non-interactive notification informing the user that the computer is going to restart very soon.
 # This is used for all softwareupdate workflows and near the end of the MDM workflow.
@@ -4892,15 +5050,131 @@ This computer will automatically restart very soon.
 Save any open documents now."
 }
 
+# For IBM Notifier dialogs set a new $deferButtonDISPLAY showing the $defaultDeferSECONDS.
+setDeferButton(){
+if [[ $defaultDeferSECONDS -lt 3600 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY $((defaultDeferSECONDS / 60)) $dialogAskForUpdateMinutesDISPLAY"
+elif [[ $defaultDeferSECONDS -eq 3600 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY 1 $dialogAskForUpdateHourDISPLAY"
+elif [[ $defaultDeferSECONDS -gt 3600 ]] && [[ $defaultDeferSECONDS -lt 7200 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY 1 $dialogAskForUpdateHourDISPLAY $((defaultDeferSECONDS % 3600 / 60)) $dialogAskForUpdateMinutesDISPLAY"
+elif [[ $defaultDeferSECONDS -ge 7200 ]] && [[ $defaultDeferSECONDS -lt 86400 ]] && [[ $((defaultDeferSECONDS % 3600)) -eq 0 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY $((defaultDeferSECONDS / 3600)) $dialogAskForUpdateHoursDISPLAY"
+elif [[ $defaultDeferSECONDS -gt 7200 ]] && [[ $defaultDeferSECONDS -lt 86400 ]] && [[ $((defaultDeferSECONDS % 3600)) -ne 0 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY $((defaultDeferSECONDS / 3600)) $dialogAskForUpdateHoursDISPLAY $((defaultDeferSECONDS % 3600 / 60)) $dialogAskForUpdateMinutesDISPLAY"
+elif [[ $defaultDeferSECONDS -eq 86400 ]]; then
+	deferButtonDISPLAY="deferForButtonDISPLAY 1 $dialogAskForUpdateDayDISPLAY"
+fi
+}
+
+# For IBM Notifier dialogs handle the $helpBUTTON, $warningBUTTON, and $displaySilentlyOPTION options.
+setIbmNotifierOptions(){
+if [[ -n $helpBUTTON ]]; then
+	if [[ $(echo "$helpBUTTON" | grep -c '^http://\|^https://\|^mailto:\|^jamfselfservice://') -gt 0 ]]; then
+		if [[ $(echo "$helpButtonOPTION" | grep -c '^http://\|^https://') -gt 0 ]]; then
+			commandRESULT=$(curl -Is "$helpButtonOPTION" | head -1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: $commandRESULT"
+			if [[ $(echo "$commandRESULT" | grep -c '200') -gt 0 ]] || [[ $(echo "$commandRESULT" | grep -c '302') -gt 0 ]]; then
+				ibmNotifierARRAY+=(-help_button_cta_type link -help_button_cta_payload "$helpBUTTON")
+			else
+				sendToLog "Warning: Help button not shown because URL cannot be reached: $helpBUTTON"
+			fi
+		else
+			ibmNotifierARRAY+=(-help_button_cta_type link -help_button_cta_payload "$helpBUTTON")
+		fi
+	else
+		ibmNotifierARRAY+=(-help_button_cta_type infopopup -help_button_cta_payload "$helpBUTTON")
+	fi
+fi
+if [[ -n $warningBUTTON ]]; then
+	if [[ $(echo "$warningBUTTON" | grep -c '^http://\|^https://\|^mailto:\|^jamfselfservice://') -gt 0 ]]; then
+		if [[ $(echo "$warningButtonOPTION" | grep -c '^http://\|^https://') -gt 0 ]]; then
+			commandRESULT=$(curl -Is "$warningButtonOPTION" | head -1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: $commandRESULT"
+			if [[ $(echo "$commandRESULT" | grep -c '200') -gt 0 ]] || [[ $(echo "$commandRESULT" | grep -c '302') -gt 0 ]]; then
+				ibmNotifierARRAY+=(-warning_button_cta_type link -warning_button_cta_payload "$warningBUTTON")
+			else
+				sendToLog "Warning: Warning button not shown because URL cannot be reached: $warningBUTTON"
+			fi
+		else
+			ibmNotifierARRAY+=(-warning_button_cta_type link -warning_button_cta_payload "$warningBUTTON")
+		fi
+	else
+		ibmNotifierARRAY+=(-warning_button_cta_type infopopup -warning_button_cta_payload "$warningBUTTON")
+	fi
+fi
+[[ "$displaySilentlyOPTION" == "TRUE" ]] && ibmNotifierARRAY+=(-silent)
+}
+
 # Open $ibmNotifierBINARY for interactive dialogs using the $ibmNotifierARRAY[] options, and also handle any $displayTimeoutSECONDS and $displayRedrawSECONDS options.
 openDialogIbmNotifier() {
 unset dialogRESULT
 unset dialogRETURN
+customDisplayACCESSORY="FALSE"
+if [[ -n $displayAccessoryCONTENT ]]; then
+	if [[ $(echo "$displayAccessoryCONTENT" | grep -c '^http://\|^https://') -gt 0 ]]; then
+		if [[ $displayAccessoryTYPE =~ ^TEXTBOX$|^HTMLBOX$|^HTML$ ]]; then
+			displayAccessoryPAYLOAD=$(curl -s -f "$displayAccessoryCONTENT")
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryPAYLOAD is:\n$displayAccessoryPAYLOAD"
+			if [[ -n $displayAccessoryPAYLOAD ]]; then
+				customDisplayACCESSORY="TRUE"
+			else
+				sendToLog "Warning: Custom display accessory not shown because URL cannot be downloaded: $displayAccessoryCONTENT"
+			fi
+		else # $displayAccessoryTYPE is IMAGE or VIDEO or VIDEOAUTO.
+			commandRESULT=$(curl -Is "$displayAccessoryCONTENT" | head -1)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT is: $commandRESULT"
+			if [[ $(echo "$commandRESULT" | grep -c '200') -gt 0 ]] || [[ $(echo "$commandRESULT" | grep -c '302') -gt 0 ]]; then
+				displayAccessoryPAYLOAD="$displayAccessoryCONTENT"
+				customDisplayACCESSORY="TRUE"
+			else
+				sendToLog "Warning: Custom display accessory not shown because URL cannot be found: $displayAccessoryCONTENT"
+			fi
+		fi
+	else # Assume it's a local path.
+		if [[ $displayAccessoryTYPE =~ ^TEXTBOX$|^HTMLBOX$|^HTML$ ]]; then
+			displayAccessoryPAYLOAD=$(<"$displayAccessoryCONTENT")
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryPAYLOAD is:\n$displayAccessoryPAYLOAD"
+			if [[ -n $displayAccessoryPAYLOAD ]]; then
+				customDisplayACCESSORY="TRUE"
+			else
+				sendToLog "Warning: Custom display accessory not shown because file path cannot be read: $displayAccessoryCONTENT"
+			fi
+		else # $displayAccessoryTYPE is IMAGE or VIDEO or VIDEOAUTO.
+			if [[ -f "$displayAccessoryCONTENT" ]]; then
+				displayAccessoryPAYLOAD="$displayAccessoryCONTENT"
+				customDisplayACCESSORY="TRUE"
+			else
+				sendToLog "Warning: Custom display accessory not shown because file path cannot be found: $displayAccessoryCONTENT"
+			fi
+		fi
+	fi
+fi
+if [[ "$customDisplayACCESSORY" == "TRUE" ]]; then
+	[[ "$displayAccessoryTYPE" == TEXTBOX ]] && ibmNotifierARRAY+=(-accessory_view_type whitebox -accessory_view_payload "$displayAccessoryPAYLOAD")
+	[[ "$displayAccessoryTYPE" == HTMLBOX ]] && ibmNotifierARRAY+=(-accessory_view_type htmlwhitebox -accessory_view_payload "$displayAccessoryPAYLOAD")
+	[[ "$displayAccessoryTYPE" == HTML ]] && ibmNotifierARRAY+=(-accessory_view_type html -accessory_view_payload "$displayAccessoryPAYLOAD")
+	[[ "$displayAccessoryTYPE" == IMAGE ]] && ibmNotifierARRAY+=(-accessory_view_type image -accessory_view_payload "$displayAccessoryPAYLOAD")
+	[[ "$displayAccessoryTYPE" == VIDEO ]] && ibmNotifierARRAY+=(-accessory_view_type video -accessory_view_payload "/url $displayAccessoryPAYLOAD")
+	[[ "$displayAccessoryTYPE" == VIDEOAUTO ]] && ibmNotifierARRAY+=(-accessory_view_type video -accessory_view_payload "/url $displayAccessoryPAYLOAD /autoplay")
+fi
+setIbmNotifierOptions
 if [[ -n $displayRedrawSECONDS ]]; then
 	[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - 1))
+	ibmNotifierBackupARRAY=("${ibmNotifierARRAY[@]}")
 	while [[ -z $dialogRETURN ]] || [[ "$dialogRETURN" -eq 137 ]]; do
-		{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
-		{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+		if [[ "$customDisplayACCESSORY" == "TRUE" ]]; then
+			{ [[ -n $menuDeferSECONDS ]] && [[ -z $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
+			{ [[ -z $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+			if [[ -n $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; then
+				sendToLog "Warning: Unable to show display timeout countdown due to the custom display accessory option. However, there will still be a display timeout at $displayTimeoutSECONDS seconds."
+				ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -timeout "$displayTimeoutSECONDS")
+			fi
+		else # No custom display accessory.
+			{ [[ -n $menuDeferSECONDS ]] && [[ -z $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
+			{ [[ -z $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+			{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+		fi
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 		(sleep "$displayRedrawSECONDS"; killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1) &
 		killerPID=$!
@@ -4910,10 +5184,21 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
+		ibmNotifierARRAY=("${ibmNotifierBackupARRAY[@]}")
 	done
 else
-	{ [[ -n $displayTimeoutSECONDS ]] && [[ -z $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
-	{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+	if [[ "$customDisplayACCESSORY" == "TRUE" ]]; then
+		{ [[ -n $menuDeferSECONDS ]] && [[ -z $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
+		{ [[ -z $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+		if [[ -n $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; then
+			sendToLog "Warning: Unable to show display timeout countdown due to the custom display accessory option. However, there will still be a display timeout at $displayTimeoutSECONDS seconds."
+			ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -timeout "$displayTimeoutSECONDS")
+		fi
+	else # No custom display accessory.
+		{ [[ -n $menuDeferSECONDS ]] && [[ -z $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
+		{ [[ -z $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type timer -accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+		{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
+	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 	dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 	dialogRETURN="$?"
@@ -4957,6 +5242,7 @@ kill -9 "$notifyPID" > /dev/null 2>&1
 killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 
 # Open notification in the background allowing super to continue.
+setIbmNotifierOptions
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 "$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" & 
 disown %
@@ -5085,14 +5371,15 @@ fi
 
 # Display a non-interactive notification informing the user that update process has failed.
 notifyFailure() {
+setDeferButton
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Opening update failure notification..."
-	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "$notifyFailureTITLE" -subtitle "$notifyFailureBodyIBM" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonTEXT")
+	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "$notifyFailureTITLE" -subtitle "$notifyFailureBodyIBM" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonDISPLAY")
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 	openNotifyIbmNotifier
 else
 	sendToLog "jamfHelper: Opening update failure notification..."
-	jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyFailureTITLE" -description "$notifyFailureBodyJAMF" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonTEXT" -defaultButton 1)
+	jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyFailureTITLE" -description "$notifyFailureBodyJAMF" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonDISPLAY" -defaultButton 1)
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
 	openNotifyJamfHelper
 fi
@@ -5105,24 +5392,40 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 	sendToLog "IBM Notifier: Opening self install notification..."
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_left -bar_title "$notifySelfInstallTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-		ibmNotifierARRAY+=(-subtitle "$notifySelfUpgradeBodyIBM")
-	else # macOS updates are available.
-		ibmNotifierARRAY+=(-subtitle "$notifySelfUpdateBodyIBM")
+		if [[ $macOSVERSION -ge 1203 ]]; then
+			ibmNotifierARRAY+=(-subtitle "$notifySelfUpgradeSoftwareBodyIBM")
+		else
+			ibmNotifierARRAY+=(-subtitle "$notifySelfUpgradeInstallerBodyIBM")
+		fi
+	else # Only macOS updates are available or allowed.
+		if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
+			ibmNotifierARRAY+=(-subtitle "$notifySelfUpdatePreviousBodyIBM")
+		else
+			ibmNotifierARRAY+=(-subtitle "$notifySelfUpdateCurrentBodyIBM")
+		fi
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 else
 	sendToLog "jamfHelper: Opening self install notification..."
 	jamfHelperARRAY=(-windowType hud -windowPosition ul -lockHUD -title "$notifySelfInstallTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-		jamfHelperARRAY+=(-description "$notifySelfUpgradeBodyJAMF")
-	else # macOS updates are available.
-		jamfHelperARRAY+=(-description "$notifySelfUpdateBodyJAMF")
+		if [[ $macOSVERSION -ge 1203 ]]; then
+			jamfHelperARRAY+=(-description "$notifySelfUpgradeSoftwareBodyJAMF")
+		else
+			jamfHelperARRAY+=(-description "$notifySelfUpgradeInstallerBodyJAMF")
+		fi
+	else # Only macOS updates are available or allowed.
+		if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
+			jamfHelperARRAY+=(-description "$notifySelfUpdatePreviousBodyJAMF")
+		else
+			jamfHelperARRAY+=(-description "$notifySelfUpdateCurrentBodyJAMF")
+		fi
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
 fi
 sendToStatus "Running: Notification self install..."
 
-# Start System Settings/Preferences and the notification.
+# Start the appropriate update/upgrade application and the notification.
 if [[ -n $displayRedrawSECONDS ]]; then
 	if [[ "$testModeOPTION" == "TRUE" ]]; then
 		sendToLog "Test Mode: Killing self install notification after 3 attempts..."
@@ -5133,18 +5436,28 @@ if [[ -n $displayRedrawSECONDS ]]; then
 	while [[ -z $dialogRESULT ]] && [[ redrawCOUNTER -lt 3 ]]; do
 		if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 			if [[ "$testModeOPTION" != "TRUE" ]]; then
-				sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app" &
+				if [[ $macOSMAJOR -ge 13 ]]; then
+					sendToLog "Status: Opening System Settings.app for macOS self-upgrade workflow..."
+					sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app" &
+				elif [[ $macOSVERSION -ge 1203 ]]; then
+					sendToLog "Status: Opening System Preferences.app for macOS self-upgrade workflow..."
+					sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app" &
+				else
+					sendToLog "Status: Opening Install $macOSInstallerNameTARGET.app for macOS self-upgrade workflow..."
+					sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app" &
+				fi
 			else
 				sendToLog "Warning: Test mode does not download the macOS installer, thus cannot open it."
 			fi
-		else # macOS updates are available.
+		else # Only macOS updates are available and allowed.
 			if [[ $macOSMAJOR -ge 13 ]]; then
+				sendToLog "Status: Opening System Settings.app for macOS self-update workflow..."
 				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app" &
 			else
+				sendToLog "Status: Opening System Preferences.app for macOS self-update workflow..."
 				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app" &
 			fi
 		fi
-		disown -a
 		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			openNotifyIbmNotifier
 		else
@@ -5157,27 +5470,47 @@ else # No $displayRedrawOPTION.
 	[[ "$testModeOPTION" != "TRUE" ]] && sendToLog "Warning: The self install notification does not close until the user restarts the computer."
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		if [[ "$testModeOPTION" != "TRUE" ]]; then
-			sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app" &
+			if [[ $macOSMAJOR -ge 13 ]]; then
+				sendToLog "Status: Opening System Settings.app for macOS self-upgrade workflow..."
+				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app" &
+			elif [[ $macOSVERSION -ge 1203 ]]; then
+				sendToLog "Status: Opening System Preferences.app for macOS self-upgrade workflow..."
+				sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app" &
+			else
+				sendToLog "Status: Opening Install $macOSInstallerNameTARGET.app for macOS self-upgrade workflow..."
+				sudo -u "$currentUSER" open "/Applications/Install $macOSInstallerNameTARGET.app" &
+			fi
 		else
 			sendToLog "Warning: Test mode does not download the macOS installer, thus cannot open it."
 		fi
-	else # macOS updates are available.
+	else # Only macOS updates are available and allowed.
 		if [[ $macOSMAJOR -ge 13 ]]; then
+			sendToLog "Status: Opening System Settings.app for macOS self-update workflow..."
 			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Settings.app" &
 		else
+			sendToLog "Status: Opening System Preferences.app for macOS self-update workflow..."
 			sudo -u "$currentUSER" open "/System/Library/PreferencePanes/SoftwareUpdate.prefPane" -a "/System/Applications/System Preferences.app" &
 		fi
-	fi
-	disown -a
-	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-		"$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}" &
-	else
-		"$jamfHELPER" "${jamfHelperARRAY[@]}" &
 	fi
 	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 		openNotifyIbmNotifier
 	else
 		openNotifyJamfHelper
+	fi
+fi
+disown -a
+
+if [[ "$testModeOPTION" == "TRUE" ]]; then
+	sendToLog "Test Mode: Opening failure notification in $testModeTimeoutSECONDS seconds..."
+	sleep "$testModeTimeoutSECONDS"
+	notifyFailure
+	sendToLog "Test Mode: Killing failure notification in $testModeTimeoutSECONDS seconds..."
+	sleep "$testModeTimeoutSECONDS"
+	kill -9 "$notifyPID" > /dev/null 2>&1
+	if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
+		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+	else
+		killall -9 "jamfHelper" > /dev/null 2>&1
 	fi
 fi
 
@@ -5191,7 +5524,7 @@ dialogSoftDeadline() {
 sendToStatus "Running: Dialog soft deadline..."
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	# The initial $ibmNotifierARRAY[] settings for the soft deadline dialog.
-	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogSoftDeadlineTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$restartButtonTEXT")
+	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogSoftDeadlineTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$restartButtonDISPLAY")
 
 	# Variations for the main body text of the soft deadline dialog.
 	if [[ "$deadlineDateSTATUS" == "SOFT" ]]; then
@@ -5204,9 +5537,10 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 		sendToLog "IBM Notifier: soft count deadline dialog..."
 		ibmNotifierARRAY+=(-subtitle "$dialogSoftDeadlineBodyCountIBM")
 	fi
-	displayTimeoutTEXT="$dialogSoftDeadlineTimeoutTEXT"
+	displayTimeoutTEXT="$dialogSoftDeadlineTimeoutIBM"
 	
 	# Start the dialog.
+	unset menuDeferSECONDS
 	openDialogIbmNotifier
 
 	# The $dialogRETURN contains the IBM Notifier.app return code.
@@ -5220,7 +5554,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 	esac
 else
 	# The initial $jamfHelperARRAY[] settings for the soft deadline dialog.
-	jamfHelperARRAY=(-windowType utility -title "$dialogSoftDeadlineTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$restartButtonTEXT" -defaultButton 1)
+	jamfHelperARRAY=(-windowType utility -title "$dialogSoftDeadlineTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$restartButtonDISPLAY" -defaultButton 1)
 
 	# Variations for the main body text of the soft deadline dialog
 	if [[ "$deadlineDateSTATUS" == "SOFT" ]]; then
@@ -5246,8 +5580,8 @@ sendToStatus "Running: Dialog ask for update..."
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Ask for restart or defer dialog..."
 	# Create initial $ibmNotifierARRAY[] settings for the dialog.
-	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogAskForUpdateTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$deferButtonTEXT" -secondary_button_label "$restartButtonTEXT")
-
+	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogAskForUpdateTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -secondary_button_label "$restartButtonDISPLAY")
+	
 	# Body text variations based on deadline options.
 	if [[ -n "$deadlineDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
 		ibmNotifierARRAY+=(-subtitle "$dialogAskForUpdateBodyDateCountIBM")
@@ -5258,34 +5592,36 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 	else # Show no deadlines.
 		ibmNotifierARRAY+=(-subtitle "$dialogAskForUpdateBodyUnlimitedIBM")
 	fi
-	displayTimeoutTEXT="$dialogAskForUpdateTimeoutTEXT"
+	displayTimeoutTEXT="$dialogAskForUpdateTimeoutIBM"
 	
-	# If needed, add the $menuDeferSECONDS option to the $ibmNotifierARRAY[].
+	# If needed, handle the $menuDeferSECONDS option and set $menuDisplayTEXT.
 	if [[ -n $menuDeferSECONDS ]]; then
 		oldIFS="$IFS"; IFS=','
 		read -r -a menuDeferSecondsARRAY <<< "$menuDeferSECONDS"
 		read -r -a menuDeferDisplayARRAY <<< "$menuDeferSECONDS"
 		for i in "${!menuDeferDisplayARRAY[@]}"; do
 			if [[ ${menuDeferDisplayARRAY[i]} -lt 3600 ]]; then
-				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 60)) $dialogAskForUpdateDeferMenuMinutesIBM"
+				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 60)) $dialogAskForUpdateMinutesDISPLAY"
 			elif [[ ${menuDeferDisplayARRAY[i]} -eq 3600 ]]; then
-				menuDeferDisplayARRAY[i]="1 $dialogAskForUpdateDeferMenuHourIBM"
+				menuDeferDisplayARRAY[i]="1 $dialogAskForUpdateHourDISPLAY"
 			elif [[ ${menuDeferDisplayARRAY[i]} -gt 3600 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 7200 ]]; then
-				menuDeferDisplayARRAY[i]="1 $dialogAskForUpdateDeferMenuHourIBM $((menuDeferDisplayARRAY[i] % 3600 / 60)) $dialogAskForUpdateDeferMenuMinutesIBM"
+				menuDeferDisplayARRAY[i]="1 $dialogAskForUpdateHourDISPLAY $((menuDeferDisplayARRAY[i] % 3600 / 60)) $dialogAskForUpdateMinutesDISPLAY"
 			elif [[ ${menuDeferDisplayARRAY[i]} -ge 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $((menuDeferDisplayARRAY[i] % 3600)) -eq 0 ]]; then
-				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 3600)) $dialogAskForUpdateDeferMenuHoursIBM"
+				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 3600)) $dialogAskForUpdateHoursDISPLAY"
 			elif [[ ${menuDeferDisplayARRAY[i]} -gt 7200 ]] && [[ ${menuDeferDisplayARRAY[i]} -lt 86400 ]] && [[ $((menuDeferDisplayARRAY[i] % 3600)) -ne 0 ]]; then
-				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 3600)) $dialogAskForUpdateDeferMenuHoursIBM $((menuDeferDisplayARRAY[i] % 3600 / 60)) $dialogAskForUpdateDeferMenuMinutesIBM"
+				menuDeferDisplayARRAY[i]="$((menuDeferDisplayARRAY[i] / 3600)) $dialogAskForUpdateHoursDISPLAY $((menuDeferDisplayARRAY[i] % 3600 / 60)) $dialogAskForUpdateMinutesDISPLAY"
 			elif [[ ${menuDeferDisplayARRAY[i]} -eq 86400 ]]; then
-				menuDeferDisplayARRAY[i]="1 $dialogAskForUpdateDeferMenuDayIBM"
+				menuDeferDisplayARRAY[i]="1 $dialogAskForUpdateDayDISPLAY"
 			fi
 		done
 		IFS=$'\n'
 		menuDisplayTEXT="${menuDeferDisplayARRAY[*]}"
 		IFS="$oldIFS"
-		ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogAskForUpdateDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
+	else # Instead, add a defer button containing the text based off $defaultDeferSECONDS time.
+		setDeferButton
 	fi
-
+	ibmNotifierARRAY+=(-main_button_label "$deferButtonDISPLAY")
+	
 	# Start the dialog.
 	openDialogIbmNotifier
 
@@ -5321,7 +5657,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 else
 	sendToLog "jamfHelper: Ask for restart or defer dialog..."
 	# Create initial $jamfHelperARRAY[] settings for the dialog.
-	jamfHelperARRAY=(-windowType utility -title "$dialogAskForUpdateTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonTEXT" -button2 "$restartButtonTEXT" -defaultButton 1 -cancelButton 2)
+	jamfHelperARRAY=(-windowType utility -title "$dialogAskForUpdateTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonDISPLAY" -button2 "$restartButtonDISPLAY" -defaultButton 1 -cancelButton 2)
 
 	# Body text variations based on deadline options. Note that any invisible characters (tabs and new line) are "shown" in the jamfHelper dialog.
 	if [[ -n "$deadlineDISPLAY" ]] && [[ -n "$countDISPLAY" ]]; then # Show both date and maximum deferral count deadlines.
@@ -5496,9 +5832,12 @@ elif [[ -n "$recheckDeferSECONDS" ]]; then
 	defaultDeferSECONDS="$recheckDeferSECONDS"
 	makeLaunchDaemonCalendar
 else
-	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then
-		sendToLog "Status: A macOS upgrade is available but not allowed, and no available macOS updates, and --recheck-defer is inactive."
-		sendToStatus "Inactive: A macOS upgrade is available but not allowed, and no available macOS updates, and --recheck-defer is inactive."
+	if [[ "$softwareUpdateRESTART" == "FALSE" ]] && [[ "$macOSUpgradeAVAILABLE" == "FALSE" ]]; then
+		sendToLog "Status: No available macOS updates or upgrades, and --recheck-defer is inactive."
+		sendToStatus "Inactive: No available macOS updates or upgrades, and --recheck-defer is inactive."
+	elif [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then
+		sendToLog "Status: No available macOS updates, a macOS upgrade is available but not allowed, and --recheck-defer is inactive."
+		sendToStatus "Inactive: No available macOS updates, a macOS upgrade is available but not allowed, and --recheck-defer is inactive."
 	else
 		sendToLog "Status: Recheck deferral is inactive."
 		sendToStatus "Inactive: Recheck deferral is inactive."

@@ -48,14 +48,18 @@
                 <dict>
                   <key>AllowUpgrade</key>
                   <true/>
-                  <key>BatteryLevel</key>
-                  <string>75</string>
                   <key>DefaultDefer</key>
                   <string>120</string>
+                  <key>DisplayAccessoryContent</key>
+                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+                  <key>DisplayAccessoryType</key>
+                  <string>HTML</string>
                   <key>DisplayIcon</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayRedraw</key>
                   <string>20</string>
+                  <key>DisplaySilently</key>
+                  <false/>
                   <key>DisplayTimeout</key>
                   <string>60</string>
                   <key>EnforceAllUpdates</key>
@@ -76,6 +80,8 @@
                   <string>2022-07-03:03:03</string>
                   <key>HardDays</key>
                   <string>6</string>
+                  <key>HelpButton</key>
+                  <string>https://support.apple.com/en-us/HT201541</string>
                   <key>IconSizeIbm</key>
                   <string>128</string>
                   <key>IconSizeJamf</key>
@@ -106,6 +112,8 @@
                   <string>15</string>
                   <key>VerboseMode</key>
                   <true/>
+                  <key>WarningButton</key>
+                  <string>https://support.apple.com/en-us/HT201222</string>
                   <key>ZeroDay</key>
                   <string>2022-07-01</string>
                 </dict>
