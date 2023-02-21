@@ -1,14 +1,44 @@
 # CHANGELOG
 
-## [3.0b7]
+## [3.0b8]
 
-2022-02-16
+2023-02-20
 
 - __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
-- New `--enforce-all-updates` option will install all recommended (non-macOS) updates silently in the background even if there is no macOS update or upgrade required. Without using this option, the default behavior for `super` is to install recommended updates only after a macOS update/upgrade restart.
-- The macOS upgrade via MDM workflow now automatically logs out an active user moments before the system attempts to restart the computer. Thus, now all update and upgrade workflows (Intel, local authenticated, and MDM authenticated) will successfully force a restart.
+- New `--display-accessory-type=TYPE` and `--display-accessory-content=/local/path or URL` options allow you to specify a custom display [accessory view for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option). Both options must be specified at the same time, and the supported display accessory types are...
+	- `--display-accessory-type=TEXTBOX` display plain text or Markdown styled text in a white box inside interactive dialogs.
+	- `--display-accessory-type=HTMLBOX` display HTML styled text in a white box inside interactive dialogs.
+	- `--display-accessory-type=HTML` display HTML styled text with a "blank" background as if part of the interactive dialogs.
+	- `--display-accessory-type=IMAGE` display an image inside the interactive dialogs.
+	- `--display-accessory-type=VIDEO` display a paused video inside the interactive dialogs.
+	- `--display-accessory-type=VIDEOAUTO` display a video that will auto-play inside the interactive dialogs.
+	- The `--display-accessory-content=/local/path or URL` option can accept both a local path or a web URL. If the specified local path or URL can not be found then the custom display accessory will not be shown.
+	- The Super-Friends folder now contains several [display accessory examples](https://github.com/Macjutsu/super/tree/main/Super-Friends).
+- New `--help-button=plain text or URL` option allows you to specify a [help button for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option).
+- New `--warning-button=plain text or URL` option allows you to specify a [warning button for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option).
+	- If you specify a plain text string for either help or warning buttons, a pop-up will appear when the user selects the button.
+	- If you specify a URL for either help or warning buttons, the URL will open in another application. Supported URL types are; http://, https://, mailto:, and jamfselfservice://. If the specified web URL cannot be found then the button will not be shown.
+- New `--display-silently` option will open all IBM Notifier dialogs and notifications without playing the system warning sound (jamfHelper dialogs and notifications do not support this option).
+- New Defer button will show the deferral time for IBM Notifier interactive dialogs and notifications (jamfHelper dialogs and notifications do not support this option). However, if the `--menu-defer=` option is also specified, then the default button will not show the deferral time as it's already displayed in the deferral pop-up menu.
+- When using the `--test-mode` option with the self-update workflow the failure dialog is now also displayed (for testing validation).
+- Improved Apple Silicon self-update/upgrade workflow notification dialogs describe required actions more accurately.
+- Resolved an issue where the Apple Silicon self-update/upgrade workflow was not opening the correct application for macOS 12.3 or newer.
+- Resolved an issue where the macOS via MDM workflow timeout was not properly trigger the failure notification. (Thanks to @marcelpogorzelski for spotting this one!)
+- Bootstrap token validation now happens earlier in the credential management workflow and generates less logging on subsequent runs.
+- Updates to the `setDisplayLanguage()` function to allow for new IBM Notifier display options and improved self-update/upgrade workflow text.
+- As always, countless logging refinements and correction of typos.
+- Updated [example MDM profiles for `super` 3.0b8](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- `super` 3.0b8 SHA-256: a38c66833811b2de2839a3c2f2c47523879cf9ce6eb5be40fc54a3793658d45a
+
+## [3.0b7]
+
+2023-02-16
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New `--enforce-all-updates` option installs all recommended (non-macOS) updates silently in the background even if there is no macOS update or upgrade required. Without using this option, the default behavior for `super` is to install recommended updates only after a macOS update/upgrade restart.
+- The macOS upgrade via MDM workflow now automatically logs out an active user moments before the system attempts to restart the computer. Thus, now all update and upgrade workflows (Intel, local authenticated, and MDM authenticated) should successfully force a restart.
 - Improved notifications for the macOS upgrade via MDM workflow now show restart estimates more often and also warn the user before they are forcibly logged out before restarting.
-- If needed, erase-install.sh is automatically updated to [version 27.3](https://github.com/grahampugh/erase-install/releases/tag/v27.3). For compatibility with older systems, `super` will remain using versions of erase-install.sh prior to version 28.
+- If needed, erase-install.sh is automatically updated to [version 27.3](https://github.com/grahampugh/erase-install/releases/tag/v27.3). For compatibility with older systems, `super` continues to use versions of erase-install.sh prior to version 28.
 - Resolved issues that caused download workflows to fail when only a single recommended (non-macOS) update was available.
 - Resolved an issue that prevented `super` from downlading the latest macOS upgrade installer. Now the latest version is calculated via the macOS installer build number.
 - Resolved an issue that prevented `super` from completing the gatekeeper validation for the macOS upgrade installer. This was making macOS upgrades take longer than they should.
@@ -16,11 +46,11 @@
 - As always, countless logging refinements.
 - Updated Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Installed-Version-Jamf-Pro-EA.sh) now collects older versions of `super` as well. (Thanks to @wakco for this one!)
 - Updated [example MDM profiles for `super` 3.0b7](https://github.com/Macjutsu/super/tree/main/Example-MDM).
-- `super` 3.0b6 SHA-256: 23c6402379154f249d8ff6e1182bf500960fb118bdf16b4ccb01d6df26a91e85
+- `super` 3.0b7 SHA-256: 23c6402379154f249d8ff6e1182bf500960fb118bdf16b4ccb01d6df26a91e85
 
 ## [3.0b6]
 
-2022-01-05
+2023-01-05
 
 - __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
 - New support for macOS updates/upgrades when a system is enrolled in a beta seed program, as such `super` now properly detects and installs available macOS betas.
