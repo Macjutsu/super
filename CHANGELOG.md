@@ -12,12 +12,12 @@
 	- `--display-accessory-type=IMAGE` display an image inside the interactive dialogs.
 	- `--display-accessory-type=VIDEO` display a paused video inside the interactive dialogs.
 	- `--display-accessory-type=VIDEOAUTO` display a video that will auto-play inside the interactive dialogs.
-	- The `--display-accessory-content=/local/path or URL` option can accept both a local path or a web URL. If the specified local path or URL can not be found then the custom display accessory will not be shown.
+	- The `--display-accessory-content=/local/path or URL` option can accept a local path or a web URL. If the specified local path or URL can not be found then the custom display accessory will not be shown.
 	- The Super-Friends folder now contains several [display accessory examples](https://github.com/Macjutsu/super/tree/main/Super-Friends).
 - New `--help-button=plain text or URL` option allows you to specify a [help button for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option).
 - New `--warning-button=plain text or URL` option allows you to specify a [warning button for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option).
 	- If you specify a plain text string for either help or warning buttons, a pop-up will appear when the user selects the button.
-	- If you specify a URL for either help or warning buttons, the URL will open in another application. Supported URL types are; http://, https://, mailto:, and jamfselfservice://. If the specified web URL cannot be found then the button will not be shown.
+	- If you specify a URL for either help or warning buttons, the URL will open in another application. Supported URL types are; http://, https://, mailto:, and jamfselfservice://. If a specified web URL cannot be found then the button will not be shown.
 - New `--display-silently` option will open all IBM Notifier dialogs and notifications without playing the system warning sound (jamfHelper dialogs and notifications do not support this option).
 - New Defer button will show the deferral time for IBM Notifier interactive dialogs and notifications (jamfHelper dialogs and notifications do not support this option). However, if the `--menu-defer=` option is also specified, then the default button will not show the deferral time as it's already displayed in the deferral pop-up menu.
 - When using the `--test-mode` option with the self-update workflow the failure dialog is now also displayed (for testing validation).
