@@ -36,8 +36,8 @@
 - New `--error-defer=seconds` option allows you to set a deferral time specifically for errors (as opposed to using the default defer time).
 - New `--free-space-update=gigabytes` and `--free-space-upgrade=gigabytes` options allow you to override the default available free space requirements. These options should be reserved for testing purposes only as the default available free space requirements are set to reasonable minimums.
 - New `--battery-level=percentage` option allows you to override the default battery level requirement. This option should be reserved for testing purposes only as the default battery level requirement is set to a reasonable minimum.
-- New [Generate-MDM-Logs.sh](https://github.com/Macjutsu/super/tree/main/Super-Friends/Generate-MDM-Logs.sh) script creates filtered logs for troubleshooting `super` MDM workflow issues.
-- New [Generate-MDM-Update-Jamf-API.sh](https://github.com/Macjutsu/super/tree/main/Super-Friends/Generate-MDM-Update-Jamf-API.sh) starts a macOS update/upgrade MDM workflow via the Jamf Pro API for troubleshooting `super` MDM workflow issues.
+- New [Generate-MDM-Logs.sh](https://github.com/Macjutsu/super/blob/main/Super-Friends/Create-MDM-Logs.sh) script creates filtered logs for troubleshooting `super` MDM workflow issues.
+- New [Generate-MDM-Update-Jamf-API.sh](https://github.com/Macjutsu/super/blob/main/Super-Friends/Create-MDM-Update-Jamf-API.sh) starts a macOS update/upgrade MDM workflow via the Jamf Pro API for troubleshooting `super` MDM workflow issues.
 - Per Apple guidance, macOS 13.3 and later no longer double-check for available software updates when no updates are found.
 - Improved download mechanism now only pre-downloads macOS updates/upgrades. This resolves issues where pre-downloading updates for actively running software (specifically Safari) would require the application to quit even though the update was only downloading.
 - Improved `--test-mode` now simulates install now workflows, storage validation, power validation, and user authentication workflows.
