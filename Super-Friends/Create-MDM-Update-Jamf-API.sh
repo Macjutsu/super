@@ -4,7 +4,7 @@
 #
 # INSTRUCTIONS - PLEASE READ ME.
 # 1. Fill in the jamfSERVER, jamfACCOUNT, jamfPASSWORD, and jamfProID parameters in the script below.
-# 2. If you want to test beta versions of macOS, make sure you update the betaWORKFLOW parameter below and have run the Beta Access Utility on the test client before continuing.
+# 2. If you want to test BETA macOS updates or upgrades, set the betaWORKFLOW parameter below to "TRUE" and run the Apple Beta Access Utility on the test client before step 3.
 # 3A. For testing macOS UPDATE workflows:
 #	- On the test client in Terminal use: sudo softwareupdate --list.
 #	- On the test client in Terminal copy the * Label: name of the update target.
@@ -12,7 +12,7 @@
 #	- Wait for the macOS download to complete...
 #	- Fill in the "macOSSoftwareUpdateVERSION" parameter in the script below with only the version number, for example: macOSSoftwareUpdateVERSION="12.6.3"
 # 3B. For testing macOS UPGRADE workflows:
-#	- Use a tool like mist to download the full macOS Installer.app: https://github.com/ninxsoft/Mist
+#	- Use a tool like Mist to download the full macOS Installer.app: https://github.com/ninxsoft/Mist
 #	- On the test client put the macOS Installer.app in the /Applications folder.
 #	- On the test client open the macOS Installer.app to confirm the installer is valid. It takes a few moments to perform the Gatekeeper validation.
 #	- Wait for the macOS Installer.app to open (indicating it's valid) and then use Command-Q to quit.
