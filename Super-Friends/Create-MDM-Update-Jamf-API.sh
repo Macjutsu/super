@@ -4,7 +4,7 @@
 #
 # INSTRUCTIONS - PLEASE READ ME.
 # 1. Fill in the jamfSERVER, jamfACCOUNT, jamfPASSWORD, and jamfProID parameters in the script below.
-# 2. If you want to test beta versions of macOS, make sure you have run the Beta Access Utility on the test client before continuing.
+# 2. If you want to test beta versions of macOS, make sure you update the betaWORKFLOW parameter below and have run the Beta Access Utility on the test client before continuing.
 # 3A. For testing macOS UPDATE workflows:
 #	- On the test client in Terminal use: sudo softwareupdate --list.
 #	- On the test client in Terminal copy the * Label: name of the update target.
