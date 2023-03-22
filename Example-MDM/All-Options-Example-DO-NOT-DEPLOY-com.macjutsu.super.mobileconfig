@@ -13,7 +13,7 @@
     <key>PayloadDisplayName</key>
     <string>S.U.P.E.R.M.A.N. All Settings Example</string>
     <key>PayloadDescription</key>
-    <string>This configures settings the super update script. This is an example showing all possible settings AND SHOULD NOT BE DEPLOYED AS IS.</string>
+    <string>This is an example of all possible super managed preferences. DO NOT DEPLOY. THIS EXAMPLE CONTAINS CONFLICTING SETTINGS THAT WILL CAUSE ERRORS IF DEPLOYED.</string>
     <key>PayloadVersion</key>
     <integer>1</integer>
     <key>PayloadEnabled</key>
@@ -48,8 +48,14 @@
                 <dict>
                   <key>AllowUpgrade</key>
                   <true/>
+                  <key>BatteryLevel</key>
+                  <string>50</string>
+                  <key>BatteryTimeout</key>
+                  <string>3600</string>
                   <key>DefaultDefer</key>
                   <string>120</string>
+                  <key>DeferDisplayTimeout</key>
+                  <string>60</string>
                   <key>DisplayAccessoryContent</key>
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayAccessoryType</key>
@@ -60,10 +66,10 @@
                   <string>20</string>
                   <key>DisplaySilently</key>
                   <false/>
-                  <key>DisplayTimeout</key>
-                  <string>60</string>
                   <key>EnforceAllUpdates</key>
                   <true/>
+                  <key>ErrorDefer</key>
+                  <string>120</string>
                   <key>FocusCount</key>
                   <string>5</string>
                   <key>FocusDate</key>
@@ -74,6 +80,12 @@
                   <string>120</string>
                   <key>ForceRestart</key>
                   <true/>
+                  <key>FreeSpaceTimeout</key>
+                  <string>3600</string>
+                  <key>FreeSpaceUpdate</key>
+                  <string>15</string>
+                  <key>FreeSpaceUpgrade</key>
+                  <string>35</string>
                   <key>HardCount</key>
                   <string>5</string>
                   <key>HardDate</key>
@@ -86,10 +98,14 @@
                   <string>128</string>
                   <key>IconSizeJamf</key>
                   <string>128</string>
+                  <key>InstallNow</key>
+                  <true/>
                   <key>JamfProID</key>
                   <string>$JSSID</string>
                   <key>MenuDefer</key>
                   <string>120,200,300</string>
+                  <key>OnlyDownload</key>
+                  <true/>
                   <key>PolicyTriggers</key>
                   <string>trigger1,trigger2</string>
                   <key>PreferJamfHelper</key>
@@ -104,12 +120,18 @@
                   <string>2022-07-02:02</string>
                   <key>SoftDays</key>
                   <string>4</string>
+                  <key>SoftDisplayTimeout</key>
+                  <string>60</string>
                   <key>TargetUpgrade</key>
                   <string>12</string>
                   <key>TestMode</key>
                   <true/>
                   <key>TestModeTimeout</key>
-                  <string>15</string>
+                  <string>60</string>
+                  <key>UserAuthMDMFailover</key>
+                  <string>DEADLINE</string>
+                  <key>UserAuthTimeout</key>
+                  <string>600</string>
                   <key>VerboseMode</key>
                   <true/>
                   <key>WarningButton</key>

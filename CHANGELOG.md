@@ -1,5 +1,57 @@
 # CHANGELOG
 
+## [3.0b9]
+
+2023-03-21
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New `--install-now` workflow option provides full support for "self-servicing" workflows that are started by an active user. With this option enabled the macOS update/upgrade workflow starts immediately. Additionally, if the `--install-now` option is enabled via command-line, and the workflow is successful, this option is not be saved for future runs of `super`. Finally, any failures during the install now workflow do not create an automatic deferral to try again later.
+- New progress notifications for the install now workflow include...
+	- An install now workflow "geting started" notification that appears as soon as the workflow starts.
+	- An install now workflow "downloading" notification that appears if the macOS update/upgrade has not yet downloaded.
+	- An install now workflow "up to date" notification that appears if macOS is fully updated/upgraded.
+	- An install now workflow "failure" notification that appears if the macOS update/upgrade workflow fails.
+	- When applicable, the standard macOS update/upgrade progress notifications are also used with the install now workflow.
+- New `--only-download` workflow option allows you to pre-cache (but not install) macOS update/upgrades silently in the background. This significantly shortens the restart time when an installation workflow is started. If you use this option along with the `--recheck-defer` option then `super` always keeps the latest available macOS updates and allowed macOS upgrades ready for installation.
+- New Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Downloaded-macOS-Jamf-Pro-EA.sh) collects the name and version of the currently cached macOS update/upgrade. Thus allowing for the creation of Jamf Pro Smart Groups to facilitate automatic scoping for Self Service Polices.
+- New (Apple Silicon only) macOS update/upgrade via user authentication workflow can prompt the local user for their credentials via an IBM Notifier dialog. This dialog features all the `super` display customization options. This workflow replaces the "Nudge-like" experience (that opens the native macOS update/upgrade interfaces) when no Apple Silicon update credentials passed into `super`.
+- New `--user-auth-mdm-failover=TYPE` option allows you to specify when the macOS update/upgrade via user authentication workflow should be used as a failover for when the macOS update/upgrade via MDM workflow fails. The supported MDM failover types are...
+	- `--user-auth-mdm-failover=ALWAYS` fail over to the user authentication workflow any time the MDM workflow fails.
+	- `--user-auth-mdm-failover=HARD` fail over to the user authentication workflow only when the MDM workflow fails and a hard deadline has passed.
+	- `--user-auth-mdm-failover=SOFT` fail over to the user authentication workflow only when the MDM workflow fails and a soft deadline has passed.
+	- `--user-auth-mdm-failover=DEADLINE` fail over to the user authentication workflow only when the MDM workflow fails and any hard or soft deadline has passed.
+	- `--user-auth-mdm-failover=INSTALLNOW` fail over to the user authentication workflow only when the MDM workflow fails and during an install now workflow.
+- New `--user-auth-timeout=seconds` option allows you to set a timeout for the macOS update/upgrade via user authentication dialog (default is no timeout). If the user doesn't authenticate the macOS update/upgrade within this timeout then the workflow exits.
+- New `--defer-display-timeout=seconds` option allows you to set a timeout for the restart or defer dialog (default is no timeout). If the user doesn't make a selection to restart or defer within this timeout then the workflow automatically defers.
+- New `--soft-display-timeout=seconds` option allows you to set a timeout for the soft deadline restart dialog (default is no timeout). If the user doesn't choose to restart within this timeout then the workflow automatically starts the macOS update/upgrade restart.
+- New notification for the `--enforce-all-updates` option informing the user that (non-macOS) Apple software updates are installing.
+- New storage validation automatically calculates the required available free space for macOS update/upgrade workflows. This includes a new notification that automatically opens the Storage pane of the System Settings.app or (for older versions of macOS) the Storage Manager.app.
+- New automatic deletion of any unnecessary (not allowed or not matching the targeted version) macOS Installers. This is necessary to accurately calculate the required available free space for macOS updates/upgrades.
+- New automatic deletion of the targeted macOS installer if it fails Gatekeeper validation.
+- New MacBook power validation automatically detects the required AC power or battery level for macOS update/upgrade workflows. This includes a new notification that prompts the user to plug in to AC power if the battery level is below 50%.
+- New automatic error deferral if no user is logged in and there is not enough available free space for the macOS update/upgrade workflow.
+- New automatic error deferral if no user is logged in and connecting to AC power is required for the macOS update/upgrade workflow.
+- New `--free-space-timeout=seconds` option allows you to set a timeout for the required available free space notification (default is one hour). If the minimum available free space requirement is not met within this timeout then the workflow automatically defers.
+- New `--battery-timeout=seconds` option allows you to set a timeout for the AC power required notification (default is one hour). If AC power is not connected within this timeout then the workflow automatically defers.
+- New `--error-defer=seconds` option allows you to set a deferral time specifically for errors (as opposed to using the default defer time).
+- New `--free-space-update=gigabytes` and `--free-space-upgrade=gigabytes` options allow you to override the default available free space requirements. These options should be reserved for testing purposes only as the default available free space requirements are set to reasonable minimums.
+- New `--battery-level=percentage` option allows you to override the default battery level requirement. This option should be reserved for testing purposes only as the default battery level requirement is set to a reasonable minimum.
+- New [Generate-MDM-Logs.sh](https://github.com/Macjutsu/super/tree/main/Super-Friends/Generate-MDM-Logs.sh) script creates filtered logs for troubleshooting `super` MDM workflow issues.
+- New [Generate-MDM-Update-Jamf-API.sh](https://github.com/Macjutsu/super/tree/main/Super-Friends/Generate-MDM-Update-Jamf-API.sh) starts a macOS update/upgrade MDM workflow via the Jamf Pro API for troubleshooting `super` MDM workflow issues.
+- Per Apple guidance, macOS 13.3 and later no longer double-check for available software updates when no updates are found.
+- Improved download mechanism now only pre-downloads macOS updates/upgrades. This resolves issues where pre-downloading updates for actively running software (specifically Safari) would require the application to quit even though the update was only downloading.
+- Improved `--test-mode` now simulates install now workflows, storage validation, power validation, and user authentication workflows.
+- Improved restart validation mechanism (after macOS update/upgrade restart) is now more reliable.
+- Improved soft and hard deadline information now shows in all appropriate macOS update/upgrade dialogs and notifications.
+- Resolved an issue preventing the proper Deferral button text from showing. (Thanks to @homert83 and multiple folks in #super on MacAdmins Slack for spotting this one!)
+- Resolved an issue that caused incompatible macOS Installers to download on older Mac computers. (Thanks to @Kasper Andresen on MacAdmins Slack for spotting this one!)
+- Resolved several issues causing incorrect macOS Installer download status.
+- Removed the `--display-timeout=seconds` option in favor of new specific timeout options.
+- Updates to the `setDisplayLanguage()` function to allow for new install now workflow, available free space notification, power required notification, and user authentication dialog.
+- As always, countless logging refinements and correction of typos.
+- Updated [example MDM profiles for `super` 3.0b9](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- `super` 3.0b9 SHA-256: 07c75419c723a5c7effd520ed52095b83cd7e806e924cb49dcc11260c41a018e
+
 ## [3.0b8]
 
 2023-02-20
@@ -20,6 +72,15 @@
 	- If you specify a URL for either help or warning buttons, the URL will open in another application. Supported URL types are; http://, https://, mailto:, and jamfselfservice://. If a specified web URL cannot be found then the button will not be shown.
 - New `--display-silently` option will open all IBM Notifier dialogs and notifications without playing the system warning sound (jamfHelper dialogs and notifications do not support this option).
 - New Defer button will show the deferral time for IBM Notifier interactive dialogs and notifications (jamfHelper dialogs and notifications do not support this option). However, if the `--menu-defer=` option is also specified, then the default button will not show the deferral time as it's already displayed in the deferral pop-up menu.
+	- `--display-accessory-type=VIDEOAUTO` display a video that auto-plays inside the interactive dialogs.
+	- The `--display-accessory-content=/local/path or URL` option can accept both a local path or a web URL. If the specified local path or URL can not be found then the custom display accessory is not shown.
+	- The Super-Friends folder now contains several [display accessory examples](https://github.com/Macjutsu/super/tree/main/Super-Friends).
+- New `--help-button=plain text or URL` option allows you to specify a [help button for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option).
+- New `--warning-button=plain text or URL` option allows you to specify a [warning button for IBM Notifier](https://raw.githubusercontent.com/IBM/mac-ibm-notifications/main/Images/Popup/popup.png) interactive dialogs (jamfHelper dialogs do not support this option).
+	- If you specify a plain text string for either help or warning buttons, a pop-up appears when the user selects the button.
+	- If you specify a URL for either help or warning buttons, the URL opens in another application. Supported URL types are; http://, https://, mailto:, and jamfselfservice://. If the specified web URL cannot be found then the button is not be shown.
+- New `--display-silently` option opens all IBM Notifier dialogs and notifications without playing the system warning sound (jamfHelper dialogs and notifications do not support this option).
+- New Defer button shows the deferral time for IBM Notifier interactive dialogs and notifications (jamfHelper dialogs and notifications do not support this option). However, if the `--menu-defer=` option is also specified, then the default button does not show the deferral time as it's already displayed in the deferral pop-up menu.
 - When using the `--test-mode` option with the self-update workflow the failure dialog is now also displayed (for testing validation).
 - Improved Apple Silicon self-update/upgrade workflow notification dialogs describe required actions more accurately.
 - Resolved an issue where the Apple Silicon self-update/upgrade workflow was not opening the correct application for macOS 12.3 or newer.

@@ -12,6 +12,8 @@
 	<string>120,200,300</string>
 	<key>RecheckDefer</key>
 	<string>120</string>
+	<key>ErrorDefer</key>
+	<string>120</string>
 	<key>FocusCount</key>
 	<string>5</string>
 	<key>SoftCount</key>
@@ -32,10 +34,12 @@
 	<string>2022-07-02:02</string>
 	<key>HardDate</key>
 	<string>2022-07-03:03:03</string>
-	<key>DisplayTimeout</key>
-	<string>60</string>
 	<key>DisplayRedraw</key>
 	<string>20</string>
+	<key>DeferDisplayTimeout</key>
+	<string>60</string>
+	<key>SoftDisplayTimeout</key>
+	<string>60</string>
 	<key>DisplayIcon</key>
 	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
 	<key>IconSizeIbm</key>
@@ -54,22 +58,40 @@
 	<false/>
 	<key>PreferJamfHelper</key>
 	<false/>
-	<key>EnforceAllUpdates</key>
-	<true/>
+	<key>UserAuthTimeout</key>
+	<string>600</string>
+	<key>UserAuthMDMFailover</key>
+	<string>DEADLINE</string>
 	<key>AllowUpgrade</key>
 	<true/>
 	<key>TargetUpgrade</key>
 	<string>12</string>
+	<key>EnforceAllUpdates</key>
+	<true/>
+	<key>OnlyDownload</key>
+	<true/>
+	<key>InstallNow</key>
+	<true/>
 	<key>PolicyTriggers</key>
 	<string>trigger1,trigger2</string>
 	<key>SkipUpdates</key>
 	<true/>
 	<key>ForceRestart</key>
 	<true/>
+	<key>FreeSpaceUpdate</key>
+	<string>15</string>
+	<key>FreeSpaceUpgrade</key>
+	<string>35</string>
+	<key>FreeSpaceTimeout</key>
+	<string>3600</string>
+	<key>BatteryLevel</key>
+	<string>50</string>
+	<key>BatteryTimeout</key>
+	<string>3600</string>
 	<key>TestMode</key>
 	<true/>
 	<key>TestModeTimeout</key>
-	<string>15</string>
+	<string>60</string>
 	<key>VerboseMode</key>
 	<true/>
 </dict>
