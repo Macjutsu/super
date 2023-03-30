@@ -48,7 +48,11 @@
 	<string>128</string>
 	<key>DisplayAccessoryType</key>
 	<string>HTML</string>
-	<key>DisplayAccessoryContent</key>
+	<key>DisplayAccessoryDefault</key>
+	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+	<key>DisplayAccessoryUpdate</key>
+	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+	<key>DisplayAccessoryUpgrade</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
 	<key>HelpButton</key>
 	<string>https://support.apple.com/en-us/HT201541</string>
@@ -61,7 +65,7 @@
 	<key>UserAuthTimeout</key>
 	<string>600</string>
 	<key>UserAuthMDMFailover</key>
-	<string>DEADLINE</string>
+	<string>HARD,INSTALLNOW,BOOTSTRAP</string>
 	<key>AllowUpgrade</key>
 	<true/>
 	<key>TargetUpgrade</key>

@@ -1,0 +1,187 @@
+
+Tue Mar 28 07:47:27 ASVM-13-0 super[2800]: **** S.U.P.E.R.M.A.N. 3.0b10 DOWNLOAD macOS Ventura 13.3 SOFTWAREUPDATE START ****
+Software Update Tool
+
+Finding available software
+Downloading macOS Ventura 13.3
+
+Downloading: 0.10%
+Downloading: 1.00%
+Downloading: 1.90%
+Tue Mar 28 07:47:33 ASVM-13-0 super[2800]: **** TIMESTAMP ****
+
+Downloading: 3.00%
+Downloading: 3.90%
+Downloading: 4.00%
+Downloading: 6.90%
+Downloading: 7.00%
+Downloading: 8.90%
+Downloading: 9.00%
+Downloading: 9.90%
+Downloading: 10.00%
+Downloading: 16.00%
+Downloading: 18.25%
+Downloading: 18.71%
+Downloading: 19.14%
+Downloading: 19.63%
+Downloading: 20.10%
+Downloading: 20.53%
+Downloading: 21.05%
+Downloading: 21.59%
+Downloading: 22.13%
+Downloading: 22.69%
+Downloading: 23.26%
+Downloading: 23.84%
+Downloading: 24.40%
+Downloading: 24.96%
+Downloading: 25.40%
+Downloading: 25.81%
+Downloading: 26.29%
+Downloading: 26.79%
+Downloading: 27.34%
+Downloading: 27.87%
+Downloading: 28.40%
+Downloading: 28.89%
+Downloading: 29.44%
+Downloading: 30.00%
+Downloading: 30.57%
+Downloading: 31.14%
+Downloading: 31.70%
+Downloading: 32.26%
+Downloading: 32.81%
+Downloading: 33.36%
+Downloading: 33.90%
+Downloading: 34.49%
+Downloading: 35.06%
+Downloading: 35.63%
+Downloading: 36.12%
+Downloading: 36.58%
+Downloading: 37.07%
+Downloading: 37.61%
+Downloading: 38.13%
+Downloading: 38.67%
+Downloading: 39.20%
+Downloading: 39.63%
+Downloading: 40.06%
+Downloading: 40.55%
+Downloading: 41.08%
+Downloading: 41.61%
+Downloading: 42.16%
+Downloading: 42.71%
+Downloading: 43.26%
+Downloading: 43.83%
+Downloading: 44.38%
+Downloading: 44.95%
+Downloading: 45.51%
+Downloading: 46.05%
+Downloading: 46.58%
+Downloading: 47.05%
+Downloading: 47.58%
+Downloading: 48.10%
+Downloading: 48.59%
+Downloading: 49.10%
+Downloading: 49.63%
+Downloading: 50.14%
+Downloading: 50.68%
+Downloading: 51.22%
+Downloading: 51.74%
+Downloading: 52.28%
+Downloading: 52.83%
+Downloading: 53.36%
+Downloading: 53.61%
+Downloading: 53.68%
+Downloading: 53.75%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 54.90%
+Downloading: 55.00%
+Downloading: 60.00%
+Tue Mar 28 07:50:10 ASVM-13-0 super[2800]: **** TIMESTAMP ****
+
+Downloading: 60.00%
+Downloading: 86.46%
+Downloading: 88.40%
+Downloading: 90.97%
+Downloading: 92.71%
+Downloading: 93.16%
+Downloading: 93.83%
+Downloading: 94.40%
+Downloading: 94.85%
+Downloading: 95.30%
+Downloading: 95.72%
+Downloading: 96.13%
+Downloading: 96.52%
+Downloading: 97.27%
+Downloading: 98.01%
+Downloading: 98.41%
+Downloading: 98.51%
+Downloading: 99.90%
+Downloading: 100.00%
+Downloaded: macOS Ventura 13.3
+
+Tue Mar 28 08:01:14 ASVM-13-0 super[2800]: **** TIMESTAMP ****
+
+Tue Mar 28 08:01:14 ASVM-13-0 super[2800]: **** S.U.P.E.R.M.A.N. 3.0b10 DOWNLOAD SOFTWAREUPDATE COMPLETED ****
+
+Tue Mar 28 08:02:29 ASVM-13-0 super[2800]: **** S.U.P.E.R.M.A.N. 3.0b10 UPDATE macOS Ventura 13.3-22E252 SOFTWAREUPDATE START ****
+Software Update Tool
+
+Finding available software
+Downloading macOS Ventura 13.3
+
+Downloaded: macOS Ventura 13.3
+
+Tue Mar 28 08:02:43 ASVM-13-0 super[2800]: **** TIMESTAMP ****
+
+Tue Mar 28 08:02:43 ASVM-13-0 super[2800]: **** TIMESTAMP ****
+
+Tue Mar 28 08:02:43 ASVM-13-0 super[2800]: **** S.U.P.E.R.M.A.N. 3.0b10 UPDATE/UPGRADE MACOS SOFTWAREUPDATE COMPLETED ****
+
+Tue Mar 28 08:06:01 ASVM-13-0 super[631]: **** S.U.P.E.R.M.A.N. 3.0b10 INSTALL RECOMMENDED UPDATES SOFTWAREUPDATE START ****
+Software Update Tool
+
+Finding available software
+
+Downloading SF Symbols
+Downloaded SF Symbols
+Installing SF Symbols
+Tue Mar 28 08:06:18 ASVM-13-0 super[631]: **** TIMESTAMP ****
+
+Tue Mar 28 08:06:18 ASVM-13-0 super[631]: **** TIMESTAMP ****
+
+Done with SF Symbols
+Done.
+
+Tue Mar 28 08:06:23 ASVM-13-0 super[631]: **** TIMESTAMP ****
+
+Tue Mar 28 08:06:23 ASVM-13-0 super[631]: **** TIMESTAMP ****
+
+Tue Mar 28 08:06:23 ASVM-13-0 super[631]: **** S.U.P.E.R.M.A.N. 3.0b10 RECOMMENDED UPDATES SOFTWAREUPDATE COMPLETED ****

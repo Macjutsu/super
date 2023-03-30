@@ -56,10 +56,14 @@
                   <string>120</string>
                   <key>DeferDisplayTimeout</key>
                   <string>60</string>
-                  <key>DisplayAccessoryContent</key>
+                  <key>DisplayAccessoryDefault</key>
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayAccessoryType</key>
                   <string>HTML</string>
+                  <key>DisplayAccessoryUpdate</key>
+                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+                  <key>DisplayAccessoryUpgrade</key>
+                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayIcon</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayRedraw</key>
@@ -129,7 +133,7 @@
                   <key>TestModeTimeout</key>
                   <string>60</string>
                   <key>UserAuthMDMFailover</key>
-                  <string>DEADLINE</string>
+                  <string>HARD,INSTALLNOW,BOOTSTRAP</string>
                   <key>UserAuthTimeout</key>
                   <string>600</string>
                   <key>VerboseMode</key>

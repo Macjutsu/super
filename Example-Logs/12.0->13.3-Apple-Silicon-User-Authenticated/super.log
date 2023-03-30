@@ -1,0 +1,101 @@
+Wed Mar 29 18:37:17 ASVM-12-0-1 super[1543]: **** S.U.P.E.R.M.A.N. 3.0b10 INSTALLATION ****
+Wed Mar 29 18:37:17 ASVM-12-0-1 super[1543]: Installation: Copying file: /Library/Management/super/super
+Wed Mar 29 18:37:17 ASVM-12-0-1 super[1543]: Installation: Creating search path link: /usr/local/bin/super
+Wed Mar 29 18:37:17 ASVM-12-0-1 super[1543]: Installation: Creating LaunchDaemon helper: /Library/Management/super/super-starter
+Wed Mar 29 18:37:17 ASVM-12-0-1 super[1543]: Installation: Setting permissions in: /Library/Management/super
+Wed Mar 29 18:37:17 ASVM-12-0-1 super[1543]: **** S.U.P.E.R.M.A.N. 3.0b10 STARTUP ****
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Status: Current GUI user name is "build".
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Startup: No custom display icon found, copying default icon from: /System/Library/PrivateFrameworks/SoftwareUpdate.framework/Versions/A/Resources/SoftwareUpdate.icns
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Startup: Opening logs for user "build".
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Startup: Apple Silicon Mac computer running macOS 12.0.1-21A559.
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Startup: Last macOS startup was Wed Mar 29 18:36.
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials.
+Wed Mar 29 18:37:18 ASVM-12-0-1 super[1543]: Startup: User authentication will be required to perform a macOS update/upgrade.
+Wed Mar 29 18:37:19 ASVM-12-0-1 super[1543]: Startup: Attempting to download and install IBM Notifier.app...
+Wed Mar 29 18:37:19 ASVM-12-0-1 super[1543]: Startup: Attempting to download and install erase-install.pkg...
+Wed Mar 29 18:37:24 ASVM-12-0-1 super[1543]: Startup: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon...
+Wed Mar 29 18:37:24 ASVM-12-0-1 super[1543]: Exit: LaunchDaemon com.macjutsu.super.plist is scheduled to start right now.
+Wed Mar 29 18:37:24 ASVM-12-0-1 super[1543]: **** S.U.P.E.R.M.A.N. 3.0b10 EXIT ****
+Wed Mar 29 18:37:24 ASVM-12-0-1 super-starter[2036]: **** S.U.P.E.R.M.A.N. 3.0b10 LAUNCHDAEMON ****
+Wed Mar 29 18:37:24 ASVM-12-0-1 super[2057]: **** S.U.P.E.R.M.A.N. 3.0b10 STARTUP ****
+Wed Mar 29 18:37:25 ASVM-12-0-1 super[2057]: Startup: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed Mar 29 18:37:25 ASVM-12-0-1 super[2057]: Status: Current GUI user name is "build".
+Wed Mar 29 18:37:25 ASVM-12-0-1 super[2057]: Startup: Apple Silicon Mac computer running macOS 12.0.1-21A559.
+Wed Mar 29 18:37:25 ASVM-12-0-1 super[2057]: Startup: Last macOS startup was Wed Mar 29 18:36.
+Wed Mar 29 18:37:25 ASVM-12-0-1 super[2057]: Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials.
+Wed Mar 29 18:37:25 ASVM-12-0-1 super[2057]: Startup: User authentication will be required to perform a macOS update/upgrade.
+Wed Mar 29 18:37:26 ASVM-12-0-1 super[2057]: Startup: Creating fail-safe startup LaunchDaemon.
+Wed Mar 29 18:37:26 ASVM-12-0-1 super[2057]: Status: LaunchDaemon com.macjutsu.super.plist is scheduled at next startup.
+Wed Mar 29 18:37:26 ASVM-12-0-1 super[2057]: **** S.U.P.E.R.M.A.N. 3.0b10 CHECK SOFTWARE UPDATES/UPGRADE ****
+Wed Mar 29 18:37:26 ASVM-12-0-1 super[2057]: Status: Last automatic software update check was less than 6 hours ago.
+Wed Mar 29 18:37:26 ASVM-12-0-1 super[2057]: Status: No software update list cache, full update/upgrade check required.
+Wed Mar 29 18:37:26 ASVM-12-0-1 super[2057]: Status: Starting full check for software updates...
+Wed Mar 29 18:37:32 ASVM-12-0-1 super[2057]: softwareupdate: Waiting for update list...
+Wed Mar 29 18:37:32 ASVM-12-0-1 super[2057]: Status: Available macOS update: macOS Monterey 12.6.4-21G526
+Wed Mar 29 18:37:32 ASVM-12-0-1 super[2057]: Status: 1 available recommended (non-macOS) update(s).
+Wed Mar 29 18:37:32 ASVM-12-0-1 super[2057]: Status: Recommended (non-macOS) update 1: SFSymbolsAuto-4.0
+Wed Mar 29 18:37:32 ASVM-12-0-1 super[2057]: Status: Starting full check for macOS upgrades...
+Wed Mar 29 18:37:32 ASVM-12-0-1 super[2057]: mdmclient: Waiting for macOS upgrade list...
+Wed Mar 29 18:37:34 ASVM-12-0-1 super[2057]: erase-install.sh: Waiting for macOS installer list...
+Wed Mar 29 18:37:41 ASVM-12-0-1 super[2057]: Status: macOS upgrade available via installer: macOS Ventura 13.3-22E252
+Wed Mar 29 18:37:41 ASVM-12-0-1 super[2057]: **** S.U.P.E.R.M.A.N. 3.0b10 UPGRADE MACOS 13.3 USER AUTHENTICATION ****
+Wed Mar 29 18:37:41 ASVM-12-0-1 super[2057]: Status: Current GUI user name is "build".
+Wed Mar 29 18:37:41 ASVM-12-0-1 super[2057]: Status: Setting new automatic day zero date to 2023-03-29:18:37.
+Wed Mar 29 18:37:41 ASVM-12-0-1 super[2057]: erase-install.sh: Starting macOS Ventura 13.3-22E252 download instaler workflow, check /Library/Management/super/installer.log for more detail.
+Wed Mar 29 18:37:41 ASVM-12-0-1 super[2057]: erase-install.sh: Install macOS Ventura.app is downloading...
+Wed Mar 29 18:40:36 ASVM-12-0-1 super[2057]: erase-install.sh: Install macOS Ventura.app download complete, now preparing...
+Wed Mar 29 18:40:39 ASVM-12-0-1 super[2057]: erase-install.sh: Install macOS Ventura.app is prepared, now moving to /Applications...
+Wed Mar 29 18:41:58 ASVM-12-0-1 super[2057]: Status: Install macOS Ventura.app Gatekeeper validation...
+Wed Mar 29 18:43:35 ASVM-12-0-1 super[2057]: Status: macOS installer is now available at: /Applications/Install macOS Ventura.app
+Wed Mar 29 18:43:36 ASVM-12-0-1 super[2057]: IBM Notifier: Ask for restart or defer dialog with no timeout.
+Wed Mar 29 18:43:41 ASVM-12-0-1 super[2057]: Status: User chose to restart now.
+Wed Mar 29 18:43:42 ASVM-12-0-1 super[2057]: IBM Notifier: Default user authentication dialog with a 3600 second timeout.
+Wed Mar 29 18:43:48 ASVM-12-0-1 super[2057]: Status: Current user "build" credentials verified.
+Wed Mar 29 18:43:48 ASVM-12-0-1 super[2057]: IBM Notifier: Default preparing update notification showing a 15-25 minute estimate.
+Wed Mar 29 18:43:48 ASVM-12-0-1 super[2057]: startosinstall: Starting macOS Ventura 13.3-22E252 install upgrade workflow, check /Library/Management/super/installer.log for more detail.
+Wed Mar 29 18:43:51 ASVM-12-0-1 super[2057]: startosinstall: macOS Ventura 13.3-22E252 preparing installation...
+Wed Mar 29 18:53:59 ASVM-12-0-1 super[2057]: Status: macOS Ventura 13.3-22E252 is prepared and ready for restart.
+Wed Mar 29 18:53:59 ASVM-12-0-1 super[2057]: IBM Notifier: Default restart soon notification.
+Wed Mar 29 18:53:59 ASVM-12-0-1 super[2057]: Exit: macOS update/upgrade restart is imminent, super is scheduled to run at next startup.
+Wed Mar 29 18:53:59 ASVM-12-0-1 super[2057]: **** S.U.P.E.R.M.A.N. 3.0b10 EXIT ****
+Wed Mar 29 18:56:52 ASVM-12-0-1 super-starter[389]: **** S.U.P.E.R.M.A.N. 3.0b10 LAUNCHDAEMON ****
+Wed Mar 29 18:56:54 ASVM-12-0-1 super[425]: **** S.U.P.E.R.M.A.N. 3.0b10 STARTUP ****
+Wed Mar 29 18:56:54 ASVM-12-0-1 super[425]: Status: Restarting automatically set zero day date.
+Wed Mar 29 18:56:54 ASVM-12-0-1 super[425]: Status: Restarting maximum deferral counters.
+Wed Mar 29 18:56:55 ASVM-12-0-1 super[425]: Startup: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed Mar 29 18:56:55 ASVM-12-0-1 super[425]: Status: No GUI user currently logged in.
+Wed Mar 29 18:56:55 ASVM-12-0-1 super[425]: Startup: Apple Silicon Mac computer running macOS 13.3-22E252.
+Wed Mar 29 18:56:55 ASVM-12-0-1 super[425]: Startup: Last macOS startup was Wed Mar 29 18:56.
+Wed Mar 29 18:56:55 ASVM-12-0-1 super[425]: Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials.
+Wed Mar 29 18:56:55 ASVM-12-0-1 super[425]: Startup: User authentication will be required to perform a macOS update/upgrade.
+Wed Mar 29 18:56:57 ASVM-12-0-1 super[425]: Startup: Creating fail-safe startup LaunchDaemon.
+Wed Mar 29 18:56:57 ASVM-12-0-1 super[425]: Status: LaunchDaemon com.macjutsu.super.plist is scheduled at next startup.
+Wed Mar 29 18:56:57 ASVM-12-0-1 super[425]: **** S.U.P.E.R.M.A.N. 3.0b10 RESTART VALIDATION ****
+Wed Mar 29 18:56:57 ASVM-12-0-1 super[425]: Status: Starting full check for software updates...
+Wed Mar 29 18:57:01 ASVM-12-0-1 super[425]: softwareupdate: Waiting for update list...
+Wed Mar 29 18:57:01 ASVM-12-0-1 super[425]: Status: No available macOS update(s), or they may be deferred via configuration profile.
+Wed Mar 29 18:57:01 ASVM-12-0-1 super[425]: Status: 1 available recommended (non-macOS) update(s).
+Wed Mar 29 18:57:01 ASVM-12-0-1 super[425]: Status: Recommended (non-macOS) update 1: SFSymbolsAuto-4.0
+Wed Mar 29 18:57:01 ASVM-12-0-1 super[425]: Status: Starting full check for macOS upgrades...
+Wed Mar 29 18:57:01 ASVM-12-0-1 super[425]: mdmclient: Waiting for macOS upgrade list...
+Wed Mar 29 18:57:03 ASVM-12-0-1 super[425]: Status: No available macOS upgrade, or it may be deferred via configuration profile.
+Wed Mar 29 18:57:03 ASVM-12-0-1 super[425]: softwareupdate: Starting recommended (non-macOS) software installation workflow, check /Library/Management/super/asu.log for more detail.
+Wed Mar 29 18:57:17 ASVM-12-0-1 super[425]: softwareupdate: SF Symbols is downloading...
+Wed Mar 29 18:57:17 ASVM-12-0-1 super[425]: softwareupdate: SF Symbols download complete.
+Wed Mar 29 18:57:22 ASVM-12-0-1 super[425]: softwareupdate: SF Symbols installed.
+Wed Mar 29 18:57:22 ASVM-12-0-1 super[425]: Status: Completed installation of all recommended (non-macOS) updates.
+Wed Mar 29 18:57:22 ASVM-12-0-1 super[425]: Status: Starting full check for software updates...
+Wed Mar 29 18:57:28 ASVM-12-0-1 super[425]: Status: No available software update(s), or they may be deferred via configuration profile.
+Wed Mar 29 18:57:28 ASVM-12-0-1 super[425]: Status: Starting full check for macOS upgrades...
+Wed Mar 29 18:57:28 ASVM-12-0-1 super[425]: mdmclient: Waiting for macOS upgrade list...
+Wed Mar 29 18:57:31 ASVM-12-0-1 super[425]: Status: No available macOS upgrade, or it may be deferred via configuration profile.
+Wed Mar 29 18:57:31 ASVM-12-0-1 super[425]: Status: All available and enabled software updates/upgrade completed.
+Wed Mar 29 18:57:31 ASVM-12-0-1 super[425]: Status: Submitting updated inventory to Jamf Pro. Use --verbose-mode or check /var/log/jamf.log for more detail...
+Wed Mar 29 18:57:50 ASVM-12-0-1 super[425]: Status: Running Jamf Pro check-in policies. Use --verbose-mode or check /var/log/jamf.log for more detail...
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: **** S.U.P.E.R.M.A.N. 3.0b10 CHECK SOFTWARE UPDATES/UPGRADE ****
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: Status: Last automatic software update check was less than 6 hours ago.
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: Status: No available software update(s), or they may be deferred via configuration profile.
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: Status: No available macOS upgrade, or it may be deferred via configuration profile.
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: Status: Recheck deferral is inactive.
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: Status: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed Mar 29 18:57:53 ASVM-12-0-1 super[425]: **** S.U.P.E.R.M.A.N. 3.0b10 EXIT ****

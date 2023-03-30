@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [3.0b10]
+
+2023-03-29
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- Updated `--user-auth-mdm-failover=TYPE,TYPE,TYPE` option now allows you to specify __one or more failover types separated by commas (no spaces)__ for when the macOS update/upgrade via MDM workflow fails. The supported MDM failover types have also changed slightly...
+	- `--user-auth-mdm-failover=ALWAYS` fail over to the user authentication workflow any time the MDM workflow fails.
+	- `--user-auth-mdm-failover=HARD` fail over to the user authentication workflow when the MDM workflow fails and a hard deadline has passed.
+	- `--user-auth-mdm-failover=SOFT` fail over to the user authentication workflow when the MDM workflow fails and a soft deadline has passed.
+	- `--user-auth-mdm-failover=INSTALLNOW` fail over to the user authentication workflow when the MDM workflow fails and during an install now workflow.
+	- `--user-auth-mdm-failover=BOOTSTRAP` fail over to the user authentication workflow if the computer's bootstrap token has not been escrowed with the MDM service. This option also automatically repairs the bootstrap token escrow if the local user is an administrator with a secure token.
+- The `--display-accessory-content=/local/path or URL` option has been replaced by multiple new display accessory content options (as before these options also require setting the `--user-auth-mdm-failover=TYPE` option)...
+	- New`--display-accessory-default=/local/path or URL` option can accept a local path or a web URL. This shows the display accessory content for all macOS updates and upgrades.
+	- New`--display-accessory-update=/local/path or URL` option can accept a local path or a web URL. This shows the display accessory content for only macOS updates.
+	- New`--display-accessory-upgrade=/local/path or URL` option can accept a local path or a web URL. This shows the display accessory content for only macOS upgrades.
+- Updated [Generate-MDM-Logs-Filtered.sh](https://github.com/Macjutsu/super/blob/main/Super-Friends/Create-MDM-Logs-Filtered.sh) script replaces `Generate-MDM-Logs.sh` and creates filtered logs similar to what `super` generates for troubleshooting MDM workflow issues.
+- New [Generate-MDM-Logs-Unfiltered.sh](https://github.com/Macjutsu/super/blob/main/Super-Friends/Create-MDM-Logs-Unfiltered.sh) script creates detailed ManagedClient and softwareupdated logs for troubleshooting MDM workflow issues.
+- New [Example-Logs](https://github.com/Macjutsu/super/blob/main/Example-Logs) folder contains multiple examples of successful macOS update/upgrades with different plaforms and workflows. (More to examples to come in the future!)
+- The `$softwareUpdateTimeoutSECONDS` increased to 1200 seconds because `softwareupdate` fails to report macOS preparation progress reliably even when it's working.
+- The automatic removal of unnecessary macOS installers now ignores installers found in user home folders, except for installers found in ~/Applications, ~/Desktop, and ~/Downloads. In other words, if an unnecessary macOS installer is found in ~/Documents or ~/Library it will be ignored (the presumption being that it's an intentional archive), but if found in ~/Downloads it will be deleted. (Thanks to @dustin and @julienvs in #super on MacAdmins Slack for sacrificing their personal macOS installer archive!)
+- Resolved an issue during installation if the `/user/local/bin` folder was missing from the local system. (Thanks to @Fluffy in #super on MacAdmins Slack for finding this one!)
+- Resolved several issues where the deferral timer was not being set properly. (Thanks to @dustin and @Scott Thompson in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue where the enforce all items workflow was no properly closing notifications. (Thanks to @Scott Thompson in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue where the macOS update/upgrade download sizes were improperly calculated when a comma was used in the download size. (Thanks to @MiWeMP in #super on MacAdmins Slack for finding this one!)
+- As always, countless logging refinements and correction of typos.
+- Updated [example MDM profiles for `super` 3.0b10](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- `super` 3.0b10 SHA-256: 737f9a054d86173bc08e07bfdf23045b869b6c54a9cf6d3851f2f638aed07105
+
 ## [3.0b9]
 
 2023-03-21
