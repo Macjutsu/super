@@ -1,0 +1,37 @@
+Fri Mar 31 10:41:18 kmwmax super[15715]: **** S.U.P.E.R.M.A.N. 3.0b10 STARTUP ****
+Fri Mar 31 10:41:18 kmwmax super[15715]: Startup: Deleting all local non-account preferences.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Status: Restarting automatically set zero day date.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Status: Restarting maximum deferral counters.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Status: Current GUI user name is "kevin".
+Fri Mar 31 10:41:19 kmwmax super[15715]: Startup: No custom display icon found, copying default icon from: /System/Library/PrivateFrameworks/SoftwareUpdate.framework/Versions/A/Resources/SoftwareUpdate.icns
+Fri Mar 31 10:41:19 kmwmax super[15715]: Startup: Apple Silicon Mac computer running macOS 13.3-22E252.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Startup: Last macOS startup was Thu Mar 30 08:04.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Startup: User authentication will be required to perform a macOS update/upgrade.
+Fri Mar 31 10:41:19 kmwmax super[15715]: Startup: Unable to locate jamf binary at: /usr/local/bin/jamf
+Fri Mar 31 10:41:19 kmwmax super[15715]: Startup: Creating fail-safe startup LaunchDaemon.
+Fri Mar 31 10:41:20 kmwmax super[15715]: Status: LaunchDaemon com.macjutsu.super.plist is scheduled at next startup.
+Fri Mar 31 10:41:20 kmwmax super[15715]: **** S.U.P.E.R.M.A.N. 3.0b10 CHECK SOFTWARE UPDATES/UPGRADE ****
+Fri Mar 31 10:41:20 kmwmax super[15715]: Status: Starting full check for software updates...
+Fri Mar 31 10:41:25 kmwmax super[15715]: softwareupdate: Waiting for update list...
+Fri Mar 31 10:41:25 kmwmax super[15715]: Status: No available macOS update(s), or they may be deferred via configuration profile.
+Fri Mar 31 10:41:25 kmwmax super[15715]: Status: 1 available recommended (non-macOS) update(s).
+Fri Mar 31 10:41:25 kmwmax super[15715]: Status: Recommended (non-macOS) update 1: Command Line Tools for Xcode-14.3
+Fri Mar 31 10:41:25 kmwmax super[15715]: Status: Starting full check for macOS upgrades...
+Fri Mar 31 10:41:25 kmwmax super[15715]: mdmclient: Waiting for macOS upgrade list...
+Fri Mar 31 10:41:28 kmwmax super[15715]: Status: No available macOS upgrade, or it may be deferred via configuration profile.
+Fri Mar 31 10:41:28 kmwmax super[15715]: **** S.U.P.E.R.M.A.N. 3.0b10 UPDATE RECOMMENDED SOFTWARE ****
+Fri Mar 31 10:41:28 kmwmax super[15715]: IBM Notifier: Opening install now installing recommended (non-macOS) software updates notification...
+Fri Mar 31 10:41:28 kmwmax super[15715]: softwareupdate: Starting recommended (non-macOS) software installation workflow, check /Library/Management/super/asu.log for more detail.
+Fri Mar 31 10:41:41 kmwmax super[15715]: softwareupdate: Command Line Tools for Xcode is downloading...
+Fri Mar 31 10:41:41 kmwmax super[15715]: softwareupdate: Command Line Tools for Xcode download complete.
+Fri Mar 31 10:43:08 kmwmax super[15715]: softwareupdate: Command Line Tools for Xcode installed.
+Fri Mar 31 10:43:08 kmwmax super[15715]: Status: Starting full check for software updates...
+Fri Mar 31 10:43:14 kmwmax super[15715]: Status: No available software update(s), or they may be deferred via configuration profile.
+Fri Mar 31 10:43:14 kmwmax super[15715]: Status: Starting full check for macOS upgrades...
+Fri Mar 31 10:43:14 kmwmax super[15715]: mdmclient: Waiting for macOS upgrade list...
+Fri Mar 31 10:43:17 kmwmax super[15715]: Status: No available macOS upgrade, or it may be deferred via configuration profile.
+Fri Mar 31 10:43:17 kmwmax super[15715]: Status: Completed installation of all recommended (non-macOS) updates.
+Fri Mar 31 10:43:17 kmwmax super[15715]: Status: Recheck deferral is inactive.
+Fri Mar 31 10:43:17 kmwmax super[15715]: Status: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Fri Mar 31 10:43:17 kmwmax super[15715]: **** S.U.P.E.R.M.A.N. 3.0b10 EXIT ****
