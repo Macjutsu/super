@@ -8,7 +8,7 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-superVERSION="3.0b11"
+superVERSION="3.0b12"
 superDATE="2023/05/04"
 
 # MARK: *** Documentation ***
@@ -1952,7 +1952,7 @@ elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBE
 			testModeTimeoutSECONDS=$testModeTimeoutOPTION
 		fi
 		redrawMaximumTIMEOUT=$((testModeTimeoutSECONDS / 3))
-		if [[ $displayRedrawSECONDS -gt $redrawMaximumTIMEOUT ]]; then
+		if [[ "$testModeOPTION" == "TRUE" ]] && [[ $displayRedrawSECONDS -gt $redrawMaximumTIMEOUT ]]; then
 			sendToLog "Warning: Test mode requires temporary adjustment of the display redraw option from $displayRedrawSECONDS seconds to $redrawMaximumTIMEOUT seconds. This adjustment will not be saved."
 			displayRedrawSECONDS=$redrawMaximumTIMEOUT
 		fi
@@ -1968,25 +1968,27 @@ elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBE
 		fi
 	fi
 	defaults write "$superPLIST" TestModeTimeout -string "$testModeTimeoutSECONDS"
-	if [[ -n $deferDialogTimeoutSECONDS ]] && [[ $deferDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-			sendToLog "Warning: Test mode requires temporary adjustment of the restart/defer dialog timeout from $deferDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
-			deferDialogTimeoutSECONDS=$testModeTimeoutSECONDS
-	fi
-	if [[ -n $softDialogTimeoutSECONDS ]] && [[ $softDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-			sendToLog "Warning: Test mode requires temporary adjustment of the soft deadline dialog timeout from $softDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
-			softDialogTimeoutSECONDS=$testModeTimeoutSECONDS
-	fi
-	if [[ $userAuthTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-			sendToLog "Warning: Test mode requires temporary adjustment of the user authentication dialog timeout from $userAuthTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
-			userAuthTimeoutSECONDS=$testModeTimeoutSECONDS
-	fi
-	if [[ $freeSpaceTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-			sendToLog "Warning: Test mode requires temporary adjustment of the free space notification timeout from $freeSpaceTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
-			freeSpaceTimeoutSECONDS=$testModeTimeoutSECONDS
-	fi
-	if [[ $batteryTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-			sendToLog "Warning: Test mode requires temporary adjustment of the battery level notification timeout from $batteryTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
-			batteryTimeoutSECONDS=$testModeTimeoutSECONDS
+	if [[ "$testModeOPTION" == "TRUE" ]]; then
+		if [[ -n $deferDialogTimeoutSECONDS ]] && [[ $deferDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+				sendToLog "Warning: Test mode requires temporary adjustment of the restart/defer dialog timeout from $deferDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				deferDialogTimeoutSECONDS=$testModeTimeoutSECONDS
+		fi
+		if [[ -n $softDialogTimeoutSECONDS ]] && [[ $softDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+				sendToLog "Warning: Test mode requires temporary adjustment of the soft deadline dialog timeout from $softDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				softDialogTimeoutSECONDS=$testModeTimeoutSECONDS
+		fi
+		if [[ $userAuthTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+				sendToLog "Warning: Test mode requires temporary adjustment of the user authentication dialog timeout from $userAuthTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				userAuthTimeoutSECONDS=$testModeTimeoutSECONDS
+		fi
+		if [[ $freeSpaceTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+				sendToLog "Warning: Test mode requires temporary adjustment of the free space notification timeout from $freeSpaceTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				freeSpaceTimeoutSECONDS=$testModeTimeoutSECONDS
+		fi
+		if [[ $batteryTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+				sendToLog "Warning: Test mode requires temporary adjustment of the battery level notification timeout from $batteryTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				batteryTimeoutSECONDS=$testModeTimeoutSECONDS
+		fi
 	fi
 elif [[ -n $testModeTimeoutOPTION ]] && ! [[ $testModeTimeoutOPTION =~ $regexNUMBER ]]; then
 	sendToLog "Parameter Error: The test mode timeout must only be a number."; parameterERROR="TRUE"
@@ -3205,7 +3207,7 @@ if [[ $(echo "$profilesRESULT" | grep -c 'MDM server') -gt 0 ]]; then
 	[[ $(echo "$profilesRESULT" | grep 'Enrolled via DEP:' | grep -c 'Yes') -gt 0 ]] && mdmDEP="TRUE"
 	mdmSERVICE="https://$(echo "$profilesRESULT" | grep 'MDM server' | awk -F '/' '{print $3}')"
 	curlRESULT=$(curl -Is "$mdmSERVICE" | head -n 1)
-	if [[ $(echo "$curlRESULT" | grep -c 'HTTP') -gt 0 ]] && [[ $(echo "$curlRESULT" | grep -c -e '4[0-9][0-9]' -e '5[0-9][0-9]') -eq 0 ]]; then
+	if [[ $(echo "$curlRESULT" | grep -c 'HTTP') -gt 0 ]] && [[ $(echo "$curlRESULT" | grep -c -e '400' -e '40[4-9]' -e '4[1-9][0-9]' -e '5[0-9][0-9]') -eq 0 ]]; then
 		sendToLog "Status: MDM service is currently available at: $mdmSERVICE"
 	else
 		sendToLog "Warning: MDM service at $mdmSERVICE is currently unavailable with stauts: $curlRESULT"
@@ -3781,7 +3783,7 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 		macOSSoftwareUpdateLABEL=$(echo "${macOSSoftwareUpdateLABELS[*]}" | grep "$macOSMAJOR.\d")
 		macOSSoftwareUpdateTITLE=$(echo "${macOSSoftwareUpdateTITLES[*]}" | grep "$macOSMAJOR.\d")
 		macOSSoftwareUpdateVERSION=$(echo "${macOSSoftwareUpdateVERSIONS[*]}" | grep "$macOSMAJOR.\d")
-		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | grep "$macOSMAJOR.\d" | awk -F ': ' '{print $4}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
+		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | grep " $macOSMAJOR.\d" | awk -F ': ' '{print $4}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
 	elif [[ $macOSMAJOR -ge 11 ]] || [[ $macOSVERSION -ge 1015 ]]; then
 		allSoftwareUpdateLABELS=($(echo "$softwareUpdateLIST" | awk -F ': ' '/Label:/{print $2}'))
 		allSoftwareUpdateTITLES=($(echo "$softwareUpdateLIST" | awk -F ',' '/Title:/ {print $1}' | cut -d ' ' -f 2-))
@@ -5283,9 +5285,9 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	else # macOS update.
 		mdmWorkflowTYPE="UPDATE"
 		if [[ "$betaWORKFLOW" != "FALSE" ]] || [[ "$softwareUpdateRSR" == "TRUE" ]]; then
-			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": false, "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "restartWithoutUpdates": true }'
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": false, "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
 		else # Standard non-beta workflow.
-			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": false, "updateAction": "DOWNLOAD_AND_INSTALL", "restartWithoutUpdates": true }'
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": false, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
 		fi
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmWorkflowTYPE is: $mdmWorkflowTYPE"

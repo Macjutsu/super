@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [3.0b12]
+
+2023-05-04
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- Resolved an issue preventing the macOS update via MDM workflow properly starting.
+- Resolved an issue causing erroneous test mode timeout warning dialogs. (Thanks to Connor Garside in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue where the MDM service check was too agressive. (Thanks to Julien vander Straeten in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue causing the script to exit due to a bad macOS update size calculation. (Thanks to David C. in #super on MacAdmins Slack for finding this one!)
+- `super` 3.0b12 SHA-256: 747d9311ff411904b4a0e0cd0d17ab1ad7e4169f5c364e8e41c39751e0940dd5
+
 ## [3.0b11]
 
 2023-05-04
@@ -17,7 +28,7 @@
 - Updated [Generate-MDM-Update-Jamf-API.sh](https://github.com/Macjutsu/super/blob/main/Super-Friends/Create-MDM-Update-Jamf-API.sh) script aligns with updated MDM workflow.
 - Updated `--verbose-mode` option now creates two additional debug-level logs for troubleshooting the MDM workflow located at `/Library/Management/super/mdmCommandDebug.log` and `/Library/Management/super/mdmWorkflowDebug.log`.
 - Updated user authentication MDM failover workflow can now prompt for credentials earlier, detect more potential MDM failures, and only attempts to escrow the bootstrap token when the MDM service is actually available.
-- Updated test mode validation will temporarily adjust timeouts to improve the test mode behavior. (Thanks to Dustin Nikles in #super on MacAdmins Slack for finding this one!)
+- Updated test mode validation temporarily adjusts timeouts to improve the test mode behavior. (Thanks to Dustin Nikles in #super on MacAdmins Slack for finding this one!)
 - Updated method for detecting if the Jamf binary is the parent process. (Thanks to @iDrewbs for finding this one!)
 - Updated method for finding available storage space when no user is logged in. (Thanks to @gzilla13 for finding this one!)
 - Resolved issues causing improper calculation of macOS update sizes in non-USA regions. (Thanks to @gzilla13 and @davidjimenezm for helping with this!)
