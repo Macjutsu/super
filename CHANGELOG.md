@@ -7,7 +7,7 @@
 - __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
 - New support for macOS 13 Rapid Security Response (RSR) updates. By (Apple) design, RSR updates still require a system restart to completely install and must also be installed separately from other macOS updates/upgrades. For example, macOS 13.3.1 must be installed before the system can install the macOS RSR 13.3.1 (a) update. However, the total workflow time for completing a RSR update is much faster than a standard macOS update.
 - New `--allow-rsr-updates` option must be specified to install RSR updates, otherwise the default `super` behavior is to not install RSR updates.
-- New`--display-accessory-user-auth=/local/path or URL` option can accept a local path or a web URL (this option also requires setting the `--user-auth-mdm-failover=TYPE` option). This shows specific display accessory content for the user authentication dialog.
+- New`--display-accessory-user-auth=/local/path or URL` option can accept a local path or a web URL (this option also requires setting the `--display-accessory-type=TYPE` option). This shows specific display accessory content for the user authentication dialog.
 - New bootstrap token validation for computers running macOS 13.3 or later. Earlier versions of macOS can only report if the bootstrap token was previously escrowed but unfortunately there is no local method to determine if the escrowed token is still valid.
 - Renamed `--enforce-non-system-updates` option replaces the `--enforce-all-updates` option. This is only a name change to improve clarity of the feature.
 - Renamed `--defer-dialog-timeout=seconds` option replaces the `--defer-display-timeout=seconds` option. This is only a name change to improve clarity of the feature.
@@ -40,7 +40,7 @@
 	- `--user-auth-mdm-failover=SOFT` fail over to the user authentication workflow when the MDM workflow fails and a soft deadline has passed.
 	- `--user-auth-mdm-failover=INSTALLNOW` fail over to the user authentication workflow when the MDM workflow fails and during an install now workflow.
 	- `--user-auth-mdm-failover=BOOTSTRAP` fail over to the user authentication workflow if the computer's bootstrap token has not been escrowed with the MDM service. This option also automatically repairs the bootstrap token escrow if the local user is an administrator with a secure token.
-- The `--display-accessory-content=/local/path or URL` option has been replaced by multiple new display accessory content options (as before these options also require setting the `--user-auth-mdm-failover=TYPE` option)...
+- The `--display-accessory-content=/local/path or URL` option has been replaced by multiple new display accessory content options (as before these options also require setting the `--display-accessory-type=TYPE` option)...
 	- New`--display-accessory-default=/local/path or URL` option can accept a local path or a web URL. This shows the display accessory content for all macOS updates and upgrades.
 	- New`--display-accessory-update=/local/path or URL` option can accept a local path or a web URL. This shows the display accessory content for only macOS updates.
 	- New`--display-accessory-upgrade=/local/path or URL` option can accept a local path or a web URL. This shows the display accessory content for only macOS upgrades.
