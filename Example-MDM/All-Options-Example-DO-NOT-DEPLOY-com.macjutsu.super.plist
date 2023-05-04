@@ -34,12 +34,12 @@
 	<string>2022-07-02:02</string>
 	<key>HardDate</key>
 	<string>2022-07-03:03:03</string>
+	<key>DeferDialogTimeout</key>
+	<string>60</string>
+	<key>SoftDialogTimeout</key>
+	<string>60</string>
 	<key>DisplayRedraw</key>
 	<string>20</string>
-	<key>DeferDisplayTimeout</key>
-	<string>60</string>
-	<key>SoftDisplayTimeout</key>
-	<string>60</string>
 	<key>DisplayIcon</key>
 	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
 	<key>IconSizeIbm</key>
@@ -53,6 +53,8 @@
 	<key>DisplayAccessoryUpdate</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
 	<key>DisplayAccessoryUpgrade</key>
+	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+	<key>DisplayAccessoryUserAuth</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
 	<key>HelpButton</key>
 	<string>https://support.apple.com/en-us/HT201541</string>
@@ -70,7 +72,9 @@
 	<true/>
 	<key>TargetUpgrade</key>
 	<string>12</string>
-	<key>EnforceAllUpdates</key>
+	<key>AllowRSRUpdates</key>
+	<true/>
+	<key>EnforceNonSystemUpdates</key>
 	<true/>
 	<key>OnlyDownload</key>
 	<true/>
@@ -80,7 +84,7 @@
 	<string>trigger1,trigger2</string>
 	<key>SkipUpdates</key>
 	<true/>
-	<key>ForceRestart</key>
+	<key>RestartWithoutUpdates</key>
 	<true/>
 	<key>FreeSpaceUpdate</key>
 	<string>15</string>

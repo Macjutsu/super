@@ -8,8 +8,8 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-superVERSION="3.0b10"
-superDATE="2023/03/29"
+superVERSION="3.0b11"
+superDATE="2023/05/04"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -45,13 +45,14 @@ echo "
   [--hard-date=YYYY-MM-DD:hh:mm] [--delete-dates]
   
   User Interface Options:
-  [--display-redraw=seconds] [--defer-display-timeout=seconds]
-  [--soft-display-timeout=seconds] [--display-icon=/local/path or URL]
+  [--defer-dialog-timeout=seconds] [--soft-dialog-timeout=seconds]
+  [--display-redraw=seconds] [--display-icon=/local/path or URL]
   [--icon-size-ibm=pixels] [--icon-size-jamf=pixels ]
   [--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO]
   [--display-accessory-default=/local/path or URL]
   [--display-accessory-update=/local/path or URL]
   [--display-accessory-upgrade=/local/path or URL]
+  [--display-accessory-user-auth=/local/path or URL]
   [--help-button=plain text or URL] [--warning-button=plain text or URL]
   [--display-silently] [--display-silently-off]
   [--prefer-jamf-helper] [--prefer-jamf-helper-off]
@@ -66,10 +67,13 @@ echo "
   
   Update, Upgrade, and Restart Options:
   [--allow-upgrade] [--allow-upgrade-off] [--target-upgrade=version]
-  [--enforce-all-updates] [--enforce-all-updates-off] [--only-download]
-  [--only-download-off] [--install-now] [--install-now-off]
+  [--allow-rsr-updates] [--allow-rsr-updates-off]
+  [--enforce-non-system-updates] [--enforce-non-system-updates-off]
+  [--only-download] [--only-download-off]
+  [--install-now] [--install-now-off]
   [--policy-triggers=PolicyTrigger,PolicyTrigger,etc...]
-  [--skip-updates] [--skip-updates-off] [--force-restart] [--force-restart-off]
+  [--skip-updates] [--skip-updates-off]
+  [--restart-without-updates] [--restart-without-updates-off]
   
   macOS Update/Upgrade Validation Options:
   [--free-space-update=gigabytes] [--free-space-upgrade=gigabytes]
@@ -97,9 +101,9 @@ echo "
   <key>FocusDate</key> <string>YYYY-MM-DD:hh:mm</string>
   <key>SoftDate</key> <string>YYYY-MM-DD:hh:mm</string>
   <key>HardDate</key> <string>YYYY-MM-DD:hh:mm</string>
+  <key>DeferDialogTimeout</key> <string>seconds</string>
+  <key>SoftDialogTimeout</key> <string>seconds</string>
   <key>DisplayRedraw</key> <string>seconds</string>
-  <key>DeferDisplayTimeout</key> <string>seconds</string>
-  <key>SoftDisplayTimeout</key> <string>seconds</string>
   <key>DisplayIcon</key> <string>path</string>
   <key>IconSizeIbm</key> <string>pixels</string>
   <key>IconSizeJamf</key> <string>pixels</string>
@@ -118,12 +122,13 @@ echo "
   <string>ALWAYS,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>
   <key>AllowUpgrade</key> <true/> | <false/>
   <key>TargetUpgrade</key> <string>version</string>
-  <key>EnforceAllUpdates</key> <true/> | <false/>
+  <key>AllowRSRUpdates</key> <true/> | <false/>
+  <key>EnforceNonSystemUpdates</key> <true/> | <false/>
   <key>OnlyDownload</key> <true/> | <false/>
   <key>InstallNow</key> <true/> | <false/>
   <key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>
   <key>SkipUpdates</key> <true/> | <false/>
-  <key>ForceRestart</key> <true/> | <false/>
+  <key>RestartWithoutUpdates</key> <true/> | <false/>
   <key>FreeSpaceUpdate</key> <string>gigabytes</string>
   <key>FreeSpaceUpgrade</key> <string>gigabytes</string>
   <key>FreeSpaceTimeout</key> <string>seconds</string>
@@ -195,11 +200,17 @@ asuLOG="$superFOLDER/asu.log"
 # Path to the log for all macOS installer application download/install workflows:
 installerLOG="$superFOLDER/installer.log"
 
-# Path to the log for filtered MDM managed client command progress:
+# Path to the log for filtered MDM client command progress:
 mdmCommandLOG="$superFOLDER/mdmCommand.log"
+
+# Path to the log for debug MDM client command progress:
+mdmCommandDebugLOG="$superFOLDER/mdmCommandDebug.log"
 
 # Path to the log for filtered MDM update/upgrade workflow progress:
 mdmWorkflowLOG="$superFOLDER/mdmWorkflow.log"
+
+# Path to the log for debug MDM update/upgrade workflow progress:
+mdmWorkflowDebugLOG="$superFOLDER/mdmWorkflowDebug.log"
 
 # Path to the "hidden" file that triggers a macOS update/upgrade restart validation workflow:
 restartValidateFilePATH="$superFOLDER/.RestartValidate"
@@ -311,7 +322,7 @@ softwareUpdateTimeoutSECONDS=1200
 # The number of seconds to timeout the macOS 10.x softwareupdate download/prepare workflow if no progress is reported.
 softwareUpdateLegacyTimeoutSECONDS=3600
 
-# The number of seconds to timeout the softwareupdate recommended (non-macOS) update workflow if no progress is reported.
+# The number of seconds to timeout the softwareupdate recommended (non-system) update workflow if no progress is reported.
 softwareUpdateRecommendedTimeoutSECONDS=600
 
 # The number of seconds to timeout the macOS installer download workflow if no progress is reported.
@@ -333,6 +344,7 @@ testModeTimeoutSECONDS=10
 macOSMAJOR=$(sw_vers -productVersion | cut -d'.' -f1) # Expected output: 10, 11, 12
 macOSMINOR=$(sw_vers -productVersion | cut -d'.' -f2) # Expected output: 14, 15, 06, 01
 macOSVERSION=${macOSMAJOR}$(printf "%02d" "$macOSMINOR") # Expected output: 1014, 1015, 1106, 1203
+[[ "$macOSMAJOR" -ge 13 ]] && macOSEXTRA=$(sw_vers -productVersionExtra | cut -d'.' -f2) # Expected output: (a), (b), (c)
 macOSBUILD=$(sw_vers -buildVersion) # Expected output: 22D68
 macOSNAME="macOS $(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')" # Expected output: macOS Ventura
 macOSARCH=$(arch) # Expected output: i386, arm64
@@ -418,14 +430,14 @@ while [[ -n $1 ]]; do
 		--delete-dates )
 			deleteDATES="TRUE"
 		;;
+		--defer-dialog-timeout* )
+			deferDialogTimeoutOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
+		--soft-dialog-timeout* )
+			softDialogTimeoutOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
 		--display-redraw* )
 			displayRedrawOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
-		;;
-		--defer-display-timeout* )
-			deferDisplayTimeoutOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
-		;;
-		--soft-display-timeout* )
-			softDisplayTimeoutOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
 		--display-icon* )
 			displayIconOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
@@ -447,6 +459,9 @@ while [[ -n $1 ]]; do
 		;;
 		--display-accessory-upgrade* )
 			displayAccessoryUpgradeOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
+		;;
+		--display-accessory-user-auth* )
+			displayAccessoryUserAuthOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
 		--help-button* )
 			helpButtonOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
@@ -496,23 +511,29 @@ while [[ -n $1 ]]; do
 		-M|--allow-upgrade|--allow-upgrade-on )
 			allowUpgradeOPTION="TRUE"
 		;;
+		-m|--allow-upgrade-off|--no-allow-upgrade )
+			allowUpgradeOPTION="FALSE"
+		;;
 		--user-auth-timeout* )
 			userAuthTimeoutOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
 		--user-auth-mdm-failover* )
 			userAuthMDMFailoverOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
-		-m|--allow-upgrade-off|--no-allow-upgrade )
-			allowUpgradeOPTION="FALSE"
-		;;
 		--target-upgrade* )
 			targetUpgradeOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
 		;;
-		-A|--enforce-all-updates|--enforce-all-updates-on )
-			enforceAllUpdatesOPTION="TRUE"
+		-N|--enforce-non-system-updates|--enforce-non-system-updates-on )
+			enforceNonSystemUpdatesOPTION="TRUE"
 		;;
-		-a|--enforce-all-updates-off|--no-enforce-all-updates )
-			enforceAllUpdatesOPTION="FALSE"
+		-n|--enforce-non-system-updates-off|--no-enforce-non-system-updates )
+			enforceNonSystemUpdatesOPTION="FALSE"
+		;;
+		-R|--allow-rsr-updates|--allow-rsr-updates-on )
+			allowRSRUpdatesOPTION="TRUE"
+		;;
+		-r|--allow-rsr-updates-off|--no-allow-rsr-updates )
+			allowRSRUpdatesOPTION="FALSE"
 		;;
 		-O|--only-download|--only-download-on )
 			onlyDownloadOPTION="TRUE"
@@ -535,11 +556,11 @@ while [[ -n $1 ]]; do
 		-s|--skip-updates-off|--no-skip-updates )
 			skipUpdatesOPTION="FALSE"
 		;;
-		-F|--force-restart|--force-restart-on )
-			forceRestartOPTION="TRUE"
+		-W|--restart-without-updates|--restart-without-updates-on )
+			restartWithoutUpdatesOPTION="TRUE"
 		;;
-		-f|--force-restart-off|--no-force-restart )
-			forceRestartOPTION="FALSE"
+		-w|--restart-without-updates-off|--no-restart-without-updates )
+			restartWithoutUpdatesOPTION="FALSE"
 		;;
 		--free-space-update* )
 			freeSpaceUpdateOPTION=$(echo "$1" | sed -e 's|^[^=]*=||g')
@@ -649,9 +670,9 @@ if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
 	defaults delete "$superPLIST" FocusDate 2> /dev/null
 	defaults delete "$superPLIST" SoftDate 2> /dev/null
 	defaults delete "$superPLIST" HardDate 2> /dev/null
+	defaults delete "$superPLIST" DeferDialogTimeout 2> /dev/null
+	defaults delete "$superPLIST" SoftDialogTimeout 2> /dev/null
 	defaults delete "$superPLIST" DisplayRedraw 2> /dev/null
-	defaults delete "$superPLIST" DeferDisplayTimeout 2> /dev/null
-	defaults delete "$superPLIST" SoftDisplayTimeout 2> /dev/null
 	defaults delete "$superPLIST" DisplayIcon 2> /dev/null
 	rm -r "$cachedICON" > /dev/null 2>&1
 	defaults delete "$superPLIST" IconSizeIbm 2> /dev/null
@@ -669,12 +690,13 @@ if [[ "$resetLocalPROPERTIES" == "TRUE" ]]; then
 	defaults delete "$superPLIST" UserAuthMDMFailover 2> /dev/null
 	defaults delete "$superPLIST" AllowUpgrade 2> /dev/null
 	defaults delete "$superPLIST" TargetUpgrade 2> /dev/null
-	defaults delete "$superPLIST" EnforceAllUpdates 2> /dev/null
+	defaults delete "$superPLIST" AllowRSRUpdates 2> /dev/null
+	defaults delete "$superPLIST" EnforceNonSystemUpdates 2> /dev/null
 	defaults delete "$superPLIST" OnlyDownload 2> /dev/null
 	defaults delete "$superPLIST" InstallNow 2> /dev/null
 	defaults delete "$superPLIST" PolicyTriggers 2> /dev/null
 	defaults delete "$superPLIST" SkipUpdates 2> /dev/null
-	defaults delete "$superPLIST" ForceRestart 2> /dev/null
+	defaults delete "$superPLIST" RestartWithoutUpdates 2> /dev/null
 	defaults delete "$superPLIST" FreeSpaceUpdate 2> /dev/null
 	defaults delete "$superPLIST" FreeSpaceUpgrade 2> /dev/null
 	defaults delete "$superPLIST" FreeSpaceTimeout 2> /dev/null
@@ -722,9 +744,9 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	focusDateMANAGED=$(defaults read "$superMANAGEDPLIST" FocusDate 2> /dev/null)
 	softDateMANAGED=$(defaults read "$superMANAGEDPLIST" SoftDate 2> /dev/null)
 	hardDateMANAGED=$(defaults read "$superMANAGEDPLIST" HardDate 2> /dev/null)
+	deferDialogTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" DeferDialogTimeout 2> /dev/null)
+	softDialogTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" SoftDialogTimeout 2> /dev/null)
 	displayRedrawMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayRedraw 2> /dev/null)
-	deferDisplayTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" DeferDisplayTimeout 2> /dev/null)
-	softDisplayTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" SoftDisplayTimeout 2> /dev/null)
 	displayIconMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayIcon 2> /dev/null)
 	iconSizeIbmMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfMANAGED=$(defaults read "$superMANAGEDPLIST" IconSizeJamf 2> /dev/null)
@@ -732,6 +754,7 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	displayAccessoryDefaultMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayAccessoryDefault 2> /dev/null)
 	displayAccessoryUpdateMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayAccessoryUpdate 2> /dev/null)
 	displayAccessoryUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayAccessoryUpgrade 2> /dev/null)
+	displayAccessoryUserAuthMANAGED=$(defaults read "$superMANAGEDPLIST" DisplayAccessoryUserAuth 2> /dev/null)
 	helpButtonMANAGED=$(defaults read "$superMANAGEDPLIST" HelpButton 2> /dev/null)
 	warningButtonMANAGED=$(defaults read "$superMANAGEDPLIST" WarningButton 2> /dev/null)
 	displaySilentlyMANAGED=$(defaults read "$superMANAGEDPLIST" DisplaySilently 2> /dev/null)
@@ -740,12 +763,13 @@ if [[ -f "$superMANAGEDPLIST.plist" ]]; then
 	userAuthMDMFailoverMANAGED=$(defaults read "$superMANAGEDPLIST" UserAuthMDMFailover 2> /dev/null)
 	allowUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" AllowUpgrade 2> /dev/null)
 	targetUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" TargetUpgrade 2> /dev/null)
-	enforceAllUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" EnforceAllUpdates 2> /dev/null)
+	allowRSRUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" AllowRSRUpdates 2> /dev/null)
+	enforceNonSystemUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" EnforceNonSystemUpdates 2> /dev/null)
 	onlyDownloadMANAGED=$(defaults read "$superMANAGEDPLIST" OnlyDownload 2> /dev/null)
 	installNowMANAGED=$(defaults read "$superMANAGEDPLIST" InstallNow 2> /dev/null)
 	policyTriggersMANAGED=$(defaults read "$superMANAGEDPLIST" PolicyTriggers 2> /dev/null)
 	skipUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" SkipUpdates 2> /dev/null)
-	forceRestartMANAGED=$(defaults read "$superMANAGEDPLIST" ForceRestart 2> /dev/null)
+	restartWithoutUpdatesMANAGED=$(defaults read "$superMANAGEDPLIST" RestartWithoutUpdates 2> /dev/null)
 	freeSpaceUpdateMANAGED=$(defaults read "$superMANAGEDPLIST" FreeSpaceUpdate 2> /dev/null)
 	freeSpaceUpgradeMANAGED=$(defaults read "$superMANAGEDPLIST" FreeSpaceUpgrade 2> /dev/null)
 	freeSpaceTimeoutMANAGED=$(defaults read "$superMANAGEDPLIST" FreeSpaceTimeout 2> /dev/null)
@@ -773,15 +797,16 @@ if [[ -f "$superPLIST.plist" ]]; then
 	focusDatePROPERTY=$(defaults read "$superPLIST" FocusDate 2> /dev/null)
 	softDatePROPERTY=$(defaults read "$superPLIST" SoftDate 2> /dev/null)
 	hardDatePROPERTY=$(defaults read "$superPLIST" HardDate 2> /dev/null)
+	deferDialogTimeoutPROPERTY=$(defaults read "$superPLIST" DeferDialogTimeout 2> /dev/null)
+	softDialogTimeoutPROPERTY=$(defaults read "$superPLIST" SoftDialogTimeout 2> /dev/null)
 	displayRedrawPROPERTY=$(defaults read "$superPLIST" DisplayRedraw 2> /dev/null)
-	deferDisplayTimeoutPROPERTY=$(defaults read "$superPLIST" DeferDisplayTimeout 2> /dev/null)
-	softDisplayTimeoutPROPERTY=$(defaults read "$superPLIST" SoftDisplayTimeout 2> /dev/null)
 	iconSizeIbmPROPERTY=$(defaults read "$superPLIST" IconSizeIbm 2> /dev/null)
 	iconSizeJamfPROPERTY=$(defaults read "$superPLIST" IconSizeJamf 2> /dev/null)
 	displayAccessoryTypePROPERTY=$(defaults read "$superPLIST" DisplayAccessoryType 2> /dev/null)
 	displayAccessoryDefaultPROPERTY=$(defaults read "$superPLIST" DisplayAccessoryDefault 2> /dev/null)
 	displayAccessoryUpdatePROPERTY=$(defaults read "$superPLIST" DisplayAccessoryUpdate 2> /dev/null)
 	displayAccessoryUpgradePROPERTY=$(defaults read "$superPLIST" DisplayAccessoryUpgrade 2> /dev/null)
+	displayAccessoryUserAuthPROPERTY=$(defaults read "$superPLIST" DisplayAccessoryUserAuth 2> /dev/null)
 	helpButtonPROPERTY=$(defaults read "$superPLIST" HelpButton 2> /dev/null)
 	warningButtonPROPERTY=$(defaults read "$superPLIST" WarningButton 2> /dev/null)
 	displaySilentlyPROPERTY=$(defaults read "$superPLIST" DisplaySilently 2> /dev/null)
@@ -790,12 +815,13 @@ if [[ -f "$superPLIST.plist" ]]; then
 	userAuthMDMFailoverPROPERTY=$(defaults read "$superPLIST" UserAuthMDMFailover 2> /dev/null)
 	allowUpgradePROPERTY=$(defaults read "$superPLIST" AllowUpgrade 2> /dev/null)
 	targetUpgradePROPERTY=$(defaults read "$superPLIST" TargetUpgrade 2> /dev/null)
-	enforceAllUpdatesPROPERTY=$(defaults read "$superPLIST" EnforceAllUpdates 2> /dev/null)
+	allowRSRUpdatesPROPERTY=$(defaults read "$superPLIST" AllowRSRUpdates 2> /dev/null)
+	enforceNonSystemUpdatesPROPERTY=$(defaults read "$superPLIST" EnforceNonSystemUpdates 2> /dev/null)
 	onlyDownloadPROPERTY=$(defaults read "$superPLIST" OnlyDownload 2> /dev/null)
 	installNowPROPERTY=$(defaults read "$superPLIST" InstallNow 2> /dev/null)
 	policyTriggersPROPERTY=$(defaults read "$superPLIST" PolicyTriggers 2> /dev/null)
 	skipUpdatesPROPERTY=$(defaults read "$superPLIST" SkipUpdates 2> /dev/null)
-	forceRestartPROPERTY=$(defaults read "$superPLIST" ForceRestart 2> /dev/null)
+	restartWithoutUpdatesPROPERTY=$(defaults read "$superPLIST" RestartWithoutUpdates 2> /dev/null)
 	freeSpaceUpdatePROPERTY=$(defaults read "$superPLIST" FreeSpaceUpdate 2> /dev/null)
 	freeSpaceUpgradePROPERTY=$(defaults read "$superPLIST" FreeSpaceUpgrade 2> /dev/null)
 	freeSpaceTimeoutPROPERTY=$(defaults read "$superPLIST" FreeSpaceTimeout 2> /dev/null)
@@ -882,20 +908,20 @@ if [[ -n $hardDateMANAGED ]]; then
 elif [[ -z $hardDateOPTION ]] && [[ -n $hardDatePROPERTY ]]; then
 	hardDateOPTION="$hardDatePROPERTY"
 fi
+if [[ -n $deferDialogTimeoutMANAGED ]]; then
+	deferDialogTimeoutOPTION="$deferDialogTimeoutMANAGED"
+elif [[ -z $deferDialogTimeoutOPTION ]] && [[ -n $deferDialogTimeoutPROPERTY ]]; then
+	deferDialogTimeoutOPTION="$deferDialogTimeoutPROPERTY"
+fi
+if [[ -n $softDialogTimeoutMANAGED ]]; then
+	softDialogTimeoutOPTION="$softDialogTimeoutMANAGED"
+elif [[ -z $softDialogTimeoutOPTION ]] && [[ -n $softDialogTimeoutPROPERTY ]]; then
+	softDialogTimeoutOPTION="$softDialogTimeoutPROPERTY"
+fi
 if [[ -n $displayRedrawMANAGED ]]; then
 	displayRedrawOPTION="$displayRedrawMANAGED"
 elif [[ -z $displayRedrawOPTION ]] && [[ -n $displayRedrawPROPERTY ]]; then
 	displayRedrawOPTION="$displayRedrawPROPERTY"
-fi
-if [[ -n $deferDisplayTimeoutMANAGED ]]; then
-	deferDisplayTimeoutOPTION="$deferDisplayTimeoutMANAGED"
-elif [[ -z $deferDisplayTimeoutOPTION ]] && [[ -n $deferDisplayTimeoutPROPERTY ]]; then
-	deferDisplayTimeoutOPTION="$deferDisplayTimeoutPROPERTY"
-fi
-if [[ -n $softDisplayTimeoutMANAGED ]]; then
-	softDisplayTimeoutOPTION="$softDisplayTimeoutMANAGED"
-elif [[ -z $softDisplayTimeoutOPTION ]] && [[ -n $softDisplayTimeoutPROPERTY ]]; then
-	softDisplayTimeoutOPTION="$softDisplayTimeoutPROPERTY"
 fi
 [[ -n $displayIconMANAGED ]] && displayIconOPTION="$displayIconMANAGED"
 if [[ -n $iconSizeIbmMANAGED ]]; then
@@ -927,6 +953,11 @@ if [[ -n $displayAccessoryUpgradeMANAGED ]]; then
 	displayAccessoryUpgradeOPTION="$displayAccessoryUpgradeMANAGED"
 elif [[ -z $displayAccessoryUpgradeOPTION ]] && [[ -n $displayAccessoryUpgradePROPERTY ]]; then
 	displayAccessoryUpgradeOPTION="$displayAccessoryUpgradePROPERTY"
+fi
+if [[ -n $displayAccessoryUserAuthMANAGED ]]; then
+	displayAccessoryUserAuthOPTION="$displayAccessoryUserAuthMANAGED"
+elif [[ -z $displayAccessoryUserAuthOPTION ]] && [[ -n $displayAccessoryUserAuthPROPERTY ]]; then
+	displayAccessoryUserAuthOPTION="$displayAccessoryUserAuthPROPERTY"
 fi
 if [[ -n $helpButtonMANAGED ]]; then
 	helpButtonOPTION="$helpButtonMANAGED"
@@ -968,10 +999,15 @@ if [[ -n $targetUpgradeMANAGED ]]; then
 elif [[ -z $targetUpgradeOPTION ]] && [[ -n $targetUpgradePROPERTY ]]; then
 	targetUpgradeOPTION="$targetUpgradePROPERTY"
 fi
-if [[ -n $enforceAllUpdatesMANAGED ]]; then
-	enforceAllUpdatesOPTION="$enforceAllUpdatesMANAGED"
-elif [[ -z $enforceAllUpdatesOPTION ]] && [[ -n $enforceAllUpdatesPROPERTY ]]; then
-	enforceAllUpdatesOPTION="$enforceAllUpdatesPROPERTY"
+if [[ -n $allowRSRUpdatesMANAGED ]]; then
+	allowRSRUpdatesOPTION="$allowRSRUpdatesMANAGED"
+elif [[ -z $allowRSRUpdatesOPTION ]] && [[ -n $allowRSRUpdatesPROPERTY ]]; then
+	allowRSRUpdatesOPTION="$allowRSRUpdatesPROPERTY"
+fi
+if [[ -n $enforceNonSystemUpdatesMANAGED ]]; then
+	enforceNonSystemUpdatesOPTION="$enforceNonSystemUpdatesMANAGED"
+elif [[ -z $enforceNonSystemUpdatesOPTION ]] && [[ -n $enforceNonSystemUpdatesPROPERTY ]]; then
+	enforceNonSystemUpdatesOPTION="$enforceNonSystemUpdatesPROPERTY"
 fi
 if [[ -n $onlyDownloadMANAGED ]]; then
 	onlyDownloadOPTION="$onlyDownloadMANAGED"
@@ -993,10 +1029,10 @@ if [[ -n $skipUpdatesMANAGED ]]; then
 elif [[ -z $skipUpdatesOPTION ]] && [[ -n $skipUpdatesPROPERTY ]]; then
 	skipUpdatesOPTION="$skipUpdatesPROPERTY"
 fi
-if [[ -n $forceRestartMANAGED ]]; then
-	forceRestartOPTION="$forceRestartMANAGED"
-elif [[ -z $forceRestartOPTION ]] && [[ -n $forceRestartPROPERTY ]]; then
-	forceRestartOPTION="$forceRestartPROPERTY"
+if [[ -n $restartWithoutUpdatesMANAGED ]]; then
+	restartWithoutUpdatesOPTION="$restartWithoutUpdatesMANAGED"
+elif [[ -z $restartWithoutUpdatesOPTION ]] && [[ -n $restartWithoutUpdatesPROPERTY ]]; then
+	restartWithoutUpdatesOPTION="$restartWithoutUpdatesPROPERTY"
 fi
 if [[ -n $freeSpaceUpdateMANAGED ]]; then
 	freeSpaceUpdateOPTION="$freeSpaceUpdateMANAGED"
@@ -1135,7 +1171,7 @@ fi
 # Validate $errorDeferOPTION input and if valid override default $errorDeferSECONDS parameter and save to $superPLIST.
 if [[ "$errorDeferOPTION" == "X" ]]; then
 	sendToLog "Startup: Deleting local preference for error deferral."
-	defaults delete "$superPLIST" DefaultDefer 2> /dev/null
+	defaults delete "$superPLIST" ErrorDefer 2> /dev/null
 elif [[ -n $errorDeferOPTION ]] && [[ $errorDeferOPTION =~ $regexNUMBER ]]; then
 	if [[ $errorDeferOPTION -lt 120 ]]; then
 		sendToLog "Warning: Specified error deferral time of $errorDeferOPTION seconds is too low, rounding up to 120 seconds."
@@ -1146,7 +1182,7 @@ elif [[ -n $errorDeferOPTION ]] && [[ $errorDeferOPTION =~ $regexNUMBER ]]; then
 	else
 		errorDeferSECONDS=$errorDeferOPTION
 	fi
-	defaults write "$superPLIST" DefaultDefer -string "$errorDeferSECONDS"
+	defaults write "$superPLIST" ErrorDefer -string "$errorDeferSECONDS"
 elif [[ -n $errorDeferOPTION ]] && ! [[ $errorDeferOPTION =~ $regexNUMBER ]]; then
 	sendToLog "Parameter Error: The error deferral time must only be a number."; parameterERROR="TRUE"
 fi
@@ -1405,6 +1441,60 @@ if { [[ -n $focusCountMAX ]] || [[ -n $focusDaysMAX ]] || [[ -n $focusDateMAX ]]
 	focusDeferSECONDS="$defaultDeferSECONDS"
 fi
 
+# Validate $deferDialogTimeoutOPTION and if valid set $deferDialogTimeoutSECONDS.
+if [[ "$deferDialogTimeoutOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for restart/defer dialog timeout."
+	defaults delete "$superPLIST" DeferDialogTimeout 2> /dev/null
+elif [[ -n $deferDialogTimeoutOPTION ]] && [[ $deferDialogTimeoutOPTION =~ $regexNUMBER ]]; then
+	if [[ $deferDialogTimeoutOPTION -lt 60 ]]; then
+		sendToLog "Warning: Specified restart/defer dialog timeout of $deferDialogTimeoutOPTION seconds is too low, rounding up to 60 seconds."
+		deferDialogTimeoutSECONDS=60
+	elif [[ $deferDialogTimeoutOPTION -gt 86400 ]]; then
+		sendToLog "Warning: Specified restart/defer dialog timeout of $deferDialogTimeoutOPTION seconds is too high, rounding down to 86400 seconds (1 day)."
+		deferDialogTimeoutSECONDS=86400
+	else
+		deferDialogTimeoutSECONDS=$deferDialogTimeoutOPTION
+	fi
+	defaults write "$superPLIST" DeferDialogTimeout -string "$deferDialogTimeoutSECONDS"
+elif [[ -n $deferDialogTimeoutOPTION ]] && ! [[ $deferDialogTimeoutOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Parameter Error: The restart/defer dialog timeout must only be a number."; parameterERROR="TRUE"
+fi
+if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $deferDialogTimeoutSECONDS ]] && [[ -n $displayRedrawSECONDS ]]; then
+	displayMinimumTIMEOUT=$((displayRedrawSECONDS * 3))
+	if [[ $deferDialogTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
+		sendToLog "Warning: Specified restart/defer dialog timeout of $deferDialogTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing restart/defer dialog timeout to $displayMinimumTIMEOUT seconds."
+		deferDialogTimeoutSECONDS=$displayMinimumTIMEOUT
+		defaults write "$superPLIST" DeferDialogTimeout -string "$deferDialogTimeoutSECONDS"
+	fi
+fi
+
+# Validate $softDialogTimeoutOPTION and if valid set $softDialogTimeoutSECONDS.
+if [[ "$softDialogTimeoutOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for soft deadline dialog timeout."
+	defaults delete "$superPLIST" SoftDialogTimeout 2> /dev/null
+elif [[ -n $softDialogTimeoutOPTION ]] && [[ $softDialogTimeoutOPTION =~ $regexNUMBER ]]; then
+	if [[ $softDialogTimeoutOPTION -lt 60 ]]; then
+		sendToLog "Warning: Specified soft deadline dialog timeout of $softDialogTimeoutOPTION seconds is too low, rounding up to 60 seconds."
+		softDialogTimeoutSECONDS=60
+	elif [[ $softDialogTimeoutOPTION -gt 86400 ]]; then
+		sendToLog "Warning: Specified soft deadline dialog timeout of $softDialogTimeoutOPTION seconds is too high, rounding down to 86400 seconds (1 day)."
+		softDialogTimeoutSECONDS=86400
+	else
+		softDialogTimeoutSECONDS=$softDialogTimeoutOPTION
+	fi
+	defaults write "$superPLIST" SoftDialogTimeout -string "$softDialogTimeoutSECONDS"
+elif [[ -n $softDialogTimeoutOPTION ]] && ! [[ $softDialogTimeoutOPTION =~ $regexNUMBER ]]; then
+	sendToLog "Parameter Error: The soft deadline dialog timeout must only be a number."; parameterERROR="TRUE"
+fi
+if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $softDialogTimeoutSECONDS ]] && [[ -n $displayRedrawSECONDS ]]; then
+	displayMinimumTIMEOUT=$((displayRedrawSECONDS * 3))
+	if [[ $softDialogTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
+		sendToLog "Warning: Specified soft deadline dialog timeout of $softDialogTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing soft deadline dialog timeout to $displayMinimumTIMEOUT seconds."
+		softDialogTimeoutSECONDS=$displayMinimumTIMEOUT
+		defaults write "$superPLIST" SoftDialogTimeout -string "$softDialogTimeoutSECONDS"
+	fi
+fi
+
 # Validate $displayRedrawOPTION input and if valid set $displayRedrawSECONDS.
 if [[ "$displayRedrawOPTION" == "X" ]]; then
 	sendToLog "Startup: Deleting local preference for display redraw."
@@ -1422,60 +1512,6 @@ elif [[ -n $displayRedrawOPTION ]] && [[ $displayRedrawOPTION =~ $regexNUMBER ]]
 	defaults write "$superPLIST" DisplayRedraw -string "$displayRedrawSECONDS"
 elif [[ -n $displayRedrawOPTION ]] && ! [[ $displayRedrawOPTION =~ $regexNUMBER ]]; then
 	sendToLog "Parameter Error: The display redraw time must only be a number."; parameterERROR="TRUE"
-fi
-
-# Validate $deferDisplayTimeoutOPTION and if valid set $deferDisplayTimeoutSECONDS.
-if [[ "$deferDisplayTimeoutOPTION" == "X" ]]; then
-	sendToLog "Startup: Deleting local preference for restart/defer display timeout."
-	defaults delete "$superPLIST" DeferDisplayTimeout 2> /dev/null
-elif [[ -n $deferDisplayTimeoutOPTION ]] && [[ $deferDisplayTimeoutOPTION =~ $regexNUMBER ]]; then
-	if [[ $deferDisplayTimeoutOPTION -lt 60 ]]; then
-		sendToLog "Warning: Specified restart/defer display timeout of $deferDisplayTimeoutOPTION seconds is too low, rounding up to 60 seconds."
-		deferDisplayTimeoutSECONDS=60
-	elif [[ $deferDisplayTimeoutOPTION -gt 86400 ]]; then
-		sendToLog "Warning: Specified restart/defer display timeout of $deferDisplayTimeoutOPTION seconds is too high, rounding down to 86400 seconds (1 day)."
-		deferDisplayTimeoutSECONDS=86400
-	else
-		deferDisplayTimeoutSECONDS=$deferDisplayTimeoutOPTION
-	fi
-	defaults write "$superPLIST" DeferDisplayTimeout -string "$deferDisplayTimeoutSECONDS"
-elif [[ -n $deferDisplayTimeoutOPTION ]] && ! [[ $deferDisplayTimeoutOPTION =~ $regexNUMBER ]]; then
-	sendToLog "Parameter Error: The restart/defer display timeout must only be a number."; parameterERROR="TRUE"
-fi
-if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $deferDisplayTimeoutSECONDS ]] && [[ -n $displayRedrawSECONDS ]]; then
-	displayMinimumTIMEOUT=$((displayRedrawSECONDS * 3))
-	if [[ $deferDisplayTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
-		sendToLog "Warning: Specified restart/defer display timeout of $deferDisplayTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing restart/defer display timeout to $displayMinimumTIMEOUT seconds."
-		deferDisplayTimeoutSECONDS=$displayMinimumTIMEOUT
-		defaults write "$superPLIST" DeferDisplayTimeout -string "$deferDisplayTimeoutSECONDS"
-	fi
-fi
-
-# Validate $softDisplayTimeoutOPTION and if valid set $softDisplayTimeoutSECONDS.
-if [[ "$softDisplayTimeoutOPTION" == "X" ]]; then
-	sendToLog "Startup: Deleting local preference for soft deadline display timeout."
-	defaults delete "$superPLIST" DeferDisplayTimeout 2> /dev/null
-elif [[ -n $softDisplayTimeoutOPTION ]] && [[ $softDisplayTimeoutOPTION =~ $regexNUMBER ]]; then
-	if [[ $softDisplayTimeoutOPTION -lt 60 ]]; then
-		sendToLog "Warning: Specified soft deadline display timeout of $softDisplayTimeoutOPTION seconds is too low, rounding up to 60 seconds."
-		softDisplayTimeoutSECONDS=60
-	elif [[ $softDisplayTimeoutOPTION -gt 86400 ]]; then
-		sendToLog "Warning: Specified soft deadline display timeout of $softDisplayTimeoutOPTION seconds is too high, rounding down to 86400 seconds (1 day)."
-		softDisplayTimeoutSECONDS=86400
-	else
-		softDisplayTimeoutSECONDS=$softDisplayTimeoutOPTION
-	fi
-	defaults write "$superPLIST" DeferDisplayTimeout -string "$softDisplayTimeoutSECONDS"
-elif [[ -n $softDisplayTimeoutOPTION ]] && ! [[ $softDisplayTimeoutOPTION =~ $regexNUMBER ]]; then
-	sendToLog "Parameter Error: The soft deadline display timeout must only be a number."; parameterERROR="TRUE"
-fi
-if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $softDisplayTimeoutSECONDS ]] && [[ -n $displayRedrawSECONDS ]]; then
-	displayMinimumTIMEOUT=$((displayRedrawSECONDS * 3))
-	if [[ $softDisplayTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
-		sendToLog "Warning: Specified soft deadline display timeout of $softDisplayTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing soft deadline display timeout to $displayMinimumTIMEOUT seconds."
-		softDisplayTimeoutSECONDS=$displayMinimumTIMEOUT
-		defaults write "$superPLIST" DeferDisplayTimeout -string "$softDisplayTimeoutSECONDS"
-	fi
 fi
 
 # Verify the $displayIconOPTION to be used for the super service account and in notifications and dialogs, and if valid copy and set $cachedICON and save to $superPLIST.
@@ -1569,10 +1605,15 @@ if [[ "$displayAccessoryUpgradeOPTION" == "X" ]]; then
 	defaults delete "$superPLIST" DisplayAccessoryUpgrade 2> /dev/null
 	unset displayAccessoryUpgradeOPTION
 fi
-if [[ -n $displayAccessoryTypeOPTION ]] && [[ -z $displayAccessoryDefaultOPTION ]] && [[ -z $displayAccessoryUpdateOPTION ]] && [[ -z $displayAccessoryUpgradeOPTION ]]; then
+if [[ "$displayAccessoryUserAuthOPTION" == "X" ]]; then
+	sendToLog "Startup: Deleting local preference for display accessory user authentication content."
+	defaults delete "$superPLIST" DisplayAccessoryUserAuth 2> /dev/null
+	unset displayAccessoryUserAuthOPTION
+fi
+if [[ -n $displayAccessoryTypeOPTION ]] && [[ -z $displayAccessoryDefaultOPTION ]] && [[ -z $displayAccessoryUpdateOPTION ]] && [[ -z $displayAccessoryUpgradeOPTION ]] && [[ -z $displayAccessoryUserAuthOPTION ]]; then
 	sendToLog "Parameter Error: To use a display accessory type you must also specifiy one of the display accessory content options."; parameterERROR="TRUE"
 fi
-if [[ -z $displayAccessoryTypeOPTION ]] && { [[ -n $displayAccessoryDefaultOPTION ]] || [[ -n $displayAccessoryUpdateOPTION ]] || [[ -n $displayAccessoryUpgradeOPTION ]]; }; then
+if [[ -z $displayAccessoryTypeOPTION ]] && { [[ -n $displayAccessoryDefaultOPTION ]] || [[ -n $displayAccessoryUpdateOPTION ]] || [[ -n $displayAccessoryUpgradeOPTION ]] || [[ -n $displayAccessoryUserAuthOPTION ]]; }; then
 	sendToLog "Parameter Error: To use any of the display accessory content options you must also specifiy the display accessory type."; parameterERROR="TRUE"
 fi
 if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $displayAccessoryTypeOPTION ]]; then
@@ -1583,7 +1624,7 @@ if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $displayAccessoryTypeOPTION ]]; th
 		sendToLog "Parameter Error: Unrecognized dialog display accessory type: $displayAccessoryTypeOPTION. You must specify one of the following; TEXTBOX, HTMLBOX, HTML, IMAGE, VIDEO, or VIDEOAUTO."; parameterERROR="TRUE"
 	fi
 fi
-if [[ "$parameterERROR" != "TRUE" ]] && { [[ -n $displayAccessoryDefaultOPTION ]] || [[ -n $displayAccessoryUpdateOPTION ]] || [[ -n $displayAccessoryUpgradeOPTION ]]; }; then
+if [[ "$parameterERROR" != "TRUE" ]] && { [[ -n $displayAccessoryDefaultOPTION ]] || [[ -n $displayAccessoryUpdateOPTION ]] || [[ -n $displayAccessoryUpgradeOPTION ]] || [[ -n $displayAccessoryUserAuthOPTION ]]; }; then
 	if [[ -n $displayAccessoryDefaultOPTION ]]; then
 		displayAccessoryDefaultCONTENT="$displayAccessoryDefaultOPTION"
 		defaults write "$superPLIST" DisplayAccessoryDefault -string "$displayAccessoryDefaultOPTION"
@@ -1595,6 +1636,10 @@ if [[ "$parameterERROR" != "TRUE" ]] && { [[ -n $displayAccessoryDefaultOPTION ]
 	if [[ -n $displayAccessoryUpgradeOPTION ]]; then
 		displayAccessoryUpgradeCONTENT="$displayAccessoryUpgradeOPTION"
 		defaults write "$superPLIST" DisplayAccessoryUpgrade -string "$displayAccessoryUpgradeOPTION"
+	fi
+	if [[ -n $displayAccessoryUserAuthOPTION ]]; then
+		displayAccessoryUserAuthCONTENT="$displayAccessoryUserAuthOPTION"
+		defaults write "$superPLIST" DisplayAccessoryUserAuth -string "$displayAccessoryUserAuthOPTION"
 	fi
 fi
 
@@ -1732,13 +1777,22 @@ if [[ "$onlyDownloadOPTION" == "TRUE" ]] && [[ "$installNowOPTION" == "TRUE" ]];
 	onlyDownloadOPTION="FALSE"
 fi
 
-# Manage $enforceAllUpdatesOPTION and save to $superPLIST.
-if [[ $enforceAllUpdatesOPTION -eq 1 ]] || [[ "$enforceAllUpdatesOPTION" == "TRUE" ]]; then
-	enforceAllUpdatesOPTION="TRUE"
-	defaults write "$superPLIST" EnforceAllUpdates -bool true
+# Manage $allowRSRUpdatesOPTION and save to $superPLIST.
+if [[ $allowRSRUpdatesOPTION -eq 1 ]] || [[ "$allowRSRUpdatesOPTION" == "TRUE" ]]; then
+	allowRSRUpdatesOPTION="TRUE"
+	defaults write "$superPLIST" AllowRSRUpdates -bool true
 else
-	enforceAllUpdatesOPTION="FALSE"
-	defaults delete "$superPLIST" EnforceAllUpdates 2> /dev/null
+	allowRSRUpdatesOPTION="FALSE"
+	defaults delete "$superPLIST" AllowRSRUpdates 2> /dev/null
+fi
+
+# Manage $enforceNonSystemUpdatesOPTION and save to $superPLIST.
+if [[ $enforceNonSystemUpdatesOPTION -eq 1 ]] || [[ "$enforceNonSystemUpdatesOPTION" == "TRUE" ]]; then
+	enforceNonSystemUpdatesOPTION="TRUE"
+	defaults write "$superPLIST" EnforceNonSystemUpdates -bool true
+else
+	enforceNonSystemUpdatesOPTION="FALSE"
+	defaults delete "$superPLIST" EnforceNonSystemUpdates 2> /dev/null
 fi
 
 # Validate $policyTriggersOPTION input and if valid set $policyTRIGGERS and save to $superPLIST.
@@ -1762,19 +1816,19 @@ else
 	defaults delete "$superPLIST" SkipUpdates 2> /dev/null
 fi
 if [[ "$skipUpdatesOPTION" == "TRUE" ]] && [[ "$onlyDownloadOPTION" == "TRUE" ]]; then
-	sendToLog "Parameter Error: The --force-restart option can not be used with the --only-download option."; parameterERROR="TRUE"
+	sendToLog "Parameter Error: The --restart-without-updates option can not be used with the --only-download option."; parameterERROR="TRUE"
 fi
 
-# Manage $forceRestartOPTION and save to $superPLIST.
-if [[ $forceRestartOPTION -eq 1 ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; then
-	forceRestartOPTION="TRUE"
-	defaults write "$superPLIST" ForceRestart -bool true
+# Manage $restartWithoutUpdatesOPTION and save to $superPLIST.
+if [[ $restartWithoutUpdatesOPTION -eq 1 ]] || [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]]; then
+	restartWithoutUpdatesOPTION="TRUE"
+	defaults write "$superPLIST" RestartWithoutUpdates -bool true
 else
-	forceRestartOPTION="FALSE"
-	defaults delete "$superPLIST" ForceRestart 2> /dev/null
+	restartWithoutUpdatesOPTION="FALSE"
+	defaults delete "$superPLIST" RestartWithoutUpdates 2> /dev/null
 fi
-if [[ "$forceRestartOPTION" == "TRUE" ]] && [[ "$onlyDownloadOPTION" == "TRUE" ]]; then
-	sendToLog "Parameter Error: The --force-restart option can not be used with the --only-download option."; parameterERROR="TRUE"
+if [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]] && [[ "$onlyDownloadOPTION" == "TRUE" ]]; then
+	sendToLog "Parameter Error: The --restart-without-updates option can not be used with the --only-download option."; parameterERROR="TRUE"
 fi
 
 # Manage $testModeOPTION and save to $superPLIST.
@@ -1887,26 +1941,55 @@ if [[ "$testModeTimeoutOPTION" == "X" ]]; then
 	sendToLog "Startup: Deleting local preference for test mode timeout."
 	defaults delete "$superPLIST" TestModeTimeout 2> /dev/null
 elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBER ]]; then
-	if [[ $testModeTimeoutOPTION -lt 10 ]]; then
-		sendToLog "Warning: Specified test mode timeout of $testModeTimeoutOPTION seconds is too low, rounding up to 10 seconds."
-		testModeTimeoutSECONDS=10
-	elif [[ $testModeTimeoutOPTION -gt 120 ]]; then
-		sendToLog "Warning: Specified test mode timeout of $testModeTimeoutOPTION seconds is too high, rounding down to 120 seconds (2 minutes)."
-		testModeTimeoutSECONDS=120
-	else
-		testModeTimeoutSECONDS=$testModeTimeoutOPTION
+	if [[ -n $displayRedrawSECONDS ]]; then
+		if [[ $testModeTimeoutOPTION -lt 30 ]]; then
+			sendToLog "Warning: Specified test mode timeout of $testModeTimeoutOPTION seconds is too low given that display redraw is also enabled, rounding up to 30 seconds."
+			testModeTimeoutSECONDS=30
+		elif [[ $testModeTimeoutOPTION -gt 120 ]]; then
+			sendToLog "Warning: Specified test mode timeout of $testModeTimeoutOPTION seconds is too high, rounding down to 120 seconds (2 minutes)."
+			testModeTimeoutSECONDS=120
+		else
+			testModeTimeoutSECONDS=$testModeTimeoutOPTION
+		fi
+		redrawMaximumTIMEOUT=$((testModeTimeoutSECONDS / 3))
+		if [[ $displayRedrawSECONDS -gt $redrawMaximumTIMEOUT ]]; then
+			sendToLog "Warning: Test mode requires temporary adjustment of the display redraw option from $displayRedrawSECONDS seconds to $redrawMaximumTIMEOUT seconds. This adjustment will not be saved."
+			displayRedrawSECONDS=$redrawMaximumTIMEOUT
+		fi
+	else # No display redraw enabled.
+		if [[ $testModeTimeoutOPTION -lt 10 ]]; then
+			sendToLog "Warning: Specified test mode timeout of $testModeTimeoutOPTION seconds is too low, rounding up to 10 seconds."
+			testModeTimeoutSECONDS=10
+		elif [[ $testModeTimeoutOPTION -gt 120 ]]; then
+			sendToLog "Warning: Specified test mode timeout of $testModeTimeoutOPTION seconds is too high, rounding down to 120 seconds (2 minutes)."
+			testModeTimeoutSECONDS=120
+		else
+			testModeTimeoutSECONDS=$testModeTimeoutOPTION
+		fi
 	fi
 	defaults write "$superPLIST" TestModeTimeout -string "$testModeTimeoutSECONDS"
+	if [[ -n $deferDialogTimeoutSECONDS ]] && [[ $deferDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+			sendToLog "Warning: Test mode requires temporary adjustment of the restart/defer dialog timeout from $deferDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+			deferDialogTimeoutSECONDS=$testModeTimeoutSECONDS
+	fi
+	if [[ -n $softDialogTimeoutSECONDS ]] && [[ $softDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+			sendToLog "Warning: Test mode requires temporary adjustment of the soft deadline dialog timeout from $softDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+			softDialogTimeoutSECONDS=$testModeTimeoutSECONDS
+	fi
+	if [[ $userAuthTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+			sendToLog "Warning: Test mode requires temporary adjustment of the user authentication dialog timeout from $userAuthTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+			userAuthTimeoutSECONDS=$testModeTimeoutSECONDS
+	fi
+	if [[ $freeSpaceTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+			sendToLog "Warning: Test mode requires temporary adjustment of the free space notification timeout from $freeSpaceTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+			freeSpaceTimeoutSECONDS=$testModeTimeoutSECONDS
+	fi
+	if [[ $batteryTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
+			sendToLog "Warning: Test mode requires temporary adjustment of the battery level notification timeout from $batteryTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+			batteryTimeoutSECONDS=$testModeTimeoutSECONDS
+	fi
 elif [[ -n $testModeTimeoutOPTION ]] && ! [[ $testModeTimeoutOPTION =~ $regexNUMBER ]]; then
 	sendToLog "Parameter Error: The test mode timeout must only be a number."; parameterERROR="TRUE"
-fi
-if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $displayRedrawSECONDS ]]; then
-	displayMinimumTIMEOUT=$((displayRedrawSECONDS * 3))
-	if [[ $testModeTimeoutSECONDS -lt $displayMinimumTIMEOUT ]];then
-		sendToLog "Warning: Specified test mode timeout of $testModeTimeoutSECONDS seconds is too low given a display redraw of $displayRedrawSECONDS seconds, changing test mode timeout to $displayMinimumTIMEOUT seconds."
-		testModeTimeoutSECONDS=$displayMinimumTIMEOUT
-		defaults write "$superPLIST" TestModeTimeout -string "$testModeTimeoutSECONDS"
-	fi
 fi
 }
 
@@ -2619,7 +2702,7 @@ fi
 
 # If super is running via Jamf, then restart via LaunchDaemon to release the jamf process.
 # This is late in the startup workflow so as to only create a valid LaunchDaemon after parameter validation and housekeeping.
-if [[ $1 == "/" ]] || [[ $(ps -p "$PPID" | awk '{print $4;}' | grep -c 'jamf') -gt 0 ]]; then
+if [[ $1 == "/" ]] || [[ $(ps -p "$PPID" | awk '{print $4;}' | grep -c -i 'jamf') -gt 0 ]] || [[ $(ps -p "$PPID" | awk '{print $6;}' | grep -c -i 'jamf') -gt 0 ]]; then
 	sendToLog "Startup: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon..."
 	sendToStatus "Pending: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon."
 	makeLaunchDaemonRestartNow
@@ -2733,6 +2816,7 @@ sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: superDATE is: $superDATE"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSMAJOR is: $macOSMAJOR"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSMINOR is: $macOSMINOR"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSVERSION is: $macOSVERSION"
+[[ "$macOSMAJOR" -ge 13 ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSEXTRA is: $macOSEXTRA"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSARCH is: $macOSARCH"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macModelID is: $macModelID"
 [[ -n $macBOOK ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macBOOK is: $macBOOK"
@@ -2760,15 +2844,16 @@ sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: errorDeferSECONDS is: $errorDe
 [[ -n $focusDateMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: focusDateMAX is: $focusDateMAX"
 [[ -n $softDateMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softDateMAX is: $softDateMAX"
 [[ -n $hardDateMAX ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: hardDateMAX is: $hardDateMAX"
+[[ -n $deferDialogTimeoutSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deferDialogTimeoutSECONDS is: $deferDialogTimeoutSECONDS"
+[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softDialogTimeoutSECONDS is: $softDialogTimeoutSECONDS"
 [[ -n $displayRedrawSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayRedrawSECONDS is: $displayRedrawSECONDS"
-[[ -n $deferDisplayTimeoutSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: deferDisplayTimeoutSECONDS is: $deferDisplayTimeoutSECONDS"
-[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softDisplayTimeoutSECONDS is: $softDisplayTimeoutSECONDS"
 [[ -n $ibmNotifierIconSIZE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierIconSIZE is: $ibmNotifierIconSIZE"
 [[ -n $jamfHelperIconSIZE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperIconSIZE is: $jamfHelperIconSIZE"
 [[ -n $displayAccessoryTYPE ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryTYPE is: $displayAccessoryTYPE"
 [[ -n $displayAccessoryDefaultCONTENT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryDefaultCONTENT is: $displayAccessoryDefaultCONTENT"
 [[ -n $displayAccessoryUpdateCONTENT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryUpdateCONTENT is: $displayAccessoryUpdateCONTENT"
 [[ -n $displayAccessoryUpgradeCONTENT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryUpgradeCONTENT is: $displayAccessoryUpgradeCONTENT"
+[[ -n $displayAccessoryUserAuthCONTENT ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displayAccessoryUserAuthCONTENT is: $displayAccessoryUserAuthCONTENT"
 [[ -n $helpBUTTON ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: helpBUTTON is: $helpBUTTON"
 [[ -n $warningBUTTON ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: warningBUTTON is: $warningBUTTON"
 [[ -n $displaySilentlyOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: displaySilentlyOPTION is: $displaySilentlyOPTION"
@@ -2801,12 +2886,13 @@ sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: userAuthMDMFAILOVER is: $userA
 [[ -n $userAuthMDMFailoverBOOTSTRAP ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: userAuthMDMFailoverBOOTSTRAP is: $userAuthMDMFailoverBOOTSTRAP"
 [[ -n $allowUpgradeOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allowUpgradeOPTION is: $allowUpgradeOPTION"
 [[ -n $targetUpgradeVERSION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: targetUpgradeVERSION is: $targetUpgradeVERSION"
-[[ -n $enforceAllUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: enforceAllUpdatesOPTION is: $enforceAllUpdatesOPTION"
+[[ -n $allowRSRUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allowRSRUpdatesOPTION is: $allowRSRUpdatesOPTION"
+[[ -n $enforceNonSystemUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: enforceNonSystemUpdatesOPTION is: $enforceNonSystemUpdatesOPTION"
 [[ -n $onlyDownloadOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: onlyDownloadOPTION is: $onlyDownloadOPTION"
 [[ -n $installNowOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: installNowOPTION is: $installNowOPTION"
 [[ -n $policyTRIGGERS ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: policyTRIGGERS is: $policyTRIGGERS"
 [[ -n $skipUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: skipUpdatesOPTION is: $skipUpdatesOPTION"
-[[ -n $forceRestartOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: forceRestartOPTION is: $forceRestartOPTION"
+[[ -n $restartWithoutUpdatesOPTION ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: restartWithoutUpdatesOPTION is: $restartWithoutUpdatesOPTION"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: freeSpaceUpdateGB is: $freeSpaceUpdateGB"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: freeSpaceUpgradeGB is: $freeSpaceUpgradeGB"
 sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: freeSpaceTimeoutSECONDS is: $freeSpaceTimeoutSECONDS"
@@ -3008,13 +3094,10 @@ fi
 # Collect the available free storage and set $storageREADY accordingly. This also sets $availableStorageGB and $requiredStorageGB.
 checkAvailableStorage() {
 storageREADY="FALSE"
-availableStorageGB=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
+[[ -z $currentUserNAME ]] && checkCurrentUser
+[[ "$currentUserNAME" != "FALSE" ]] && availableStorageGB=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
+[[ "$currentUserNAME" == "FALSE" ]] && availableStorageGB=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep AvailableDeviceCapacity | head -n 1 | awk '{print $3}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: availableStorageGB: $availableStorageGB"
-if [[ -z $availableStorageGB ]] || [[ ! $availableStorageGB =~ $regexNUMBER ]]; then
-	sendToLog "Warning: Using less-accurate method to determine available free storage."
-	availableStorageGB=$(df -Pk . | column -t | sed 1d | awk '{print $4}' | xargs -I{} expr {} / 1000000)
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: availableStorageGB: $availableStorageGB"
-fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET: $macOSUpgradeVersionTARGET"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateMACOS: $softwareUpdateMACOS"
 if [[ -z $availableStorageGB ]] || [[ ! $availableStorageGB =~ $regexNUMBER ]]; then
@@ -3110,17 +3193,58 @@ fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: powerREADY: $powerREADY"
 }
 
-# Validate that the computer's bootstrap token is properly escrowed.
-checkBootstrapToken() {
-commandRESULT=$(profiles status -type bootstraptoken 2>&1)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: commandRESULT:\n$commandRESULT"
-if [[ $(echo "$commandRESULT" | grep -c 'YES') -eq 2 ]]; then
-	sendToLog "Status: Bootstrap token escrow validated."
-	bootstrapTOKEN="TRUE"
+# Validate the computer's MDM service status and set $mdmENROLLED, $mdmDEP, and $mdmSERVICE
+checkMDMService() {
+mdmENROLLED="FALSE"
+mdmDEP="FALSE"
+mdmSERVICE="FALSE"
+profilesRESULT=$(profiles status -type enrollment 2>&1)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: profilesRESULT:\n$profilesRESULT"
+if [[ $(echo "$profilesRESULT" | grep -c 'MDM server') -gt 0 ]]; then
+	mdmENROLLED="TRUE"
+	[[ $(echo "$profilesRESULT" | grep 'Enrolled via DEP:' | grep -c 'Yes') -gt 0 ]] && mdmDEP="TRUE"
+	mdmSERVICE="https://$(echo "$profilesRESULT" | grep 'MDM server' | awk -F '/' '{print $3}')"
+	curlRESULT=$(curl -Is "$mdmSERVICE" | head -n 1)
+	if [[ $(echo "$curlRESULT" | grep -c 'HTTP') -gt 0 ]] && [[ $(echo "$curlRESULT" | grep -c -e '4[0-9][0-9]' -e '5[0-9][0-9]') -eq 0 ]]; then
+		sendToLog "Status: MDM service is currently available at: $mdmSERVICE"
+	else
+		sendToLog "Warning: MDM service at $mdmSERVICE is currently unavailable with stauts: $curlRESULT"
+		mdmSERVICE="FALSE"
+	fi
 else
-	sendToLog "Warning: Bootstrap token is not escrowed."
-	bootstrapTOKEN="FALSE"
+	sendToLog "Warning: System is not enrolled with a MDM service."
 fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmENROLLED: $mdmENROLLED"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmDEP: $mdmDEP"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmSERVICE: $mdmSERVICE"
+}
+
+# Validate that the computer's bootstrap token is properly escrowed and set $bootstrapTOKEN.
+checkBootstrapToken() {
+bootstrapTOKEN="FALSE"
+profilesRESULT=$(profiles status -type bootstraptoken 2>&1)
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: profilesRESULT:\n$profilesRESULT"
+if [[ $(echo "$profilesRESULT" | grep -c 'YES') -eq 2 ]]; then
+	if [[ "$macOSVERSION" -ge 1303 ]]; then
+		if [[ "$mdmSERVICE" != "FALSE" ]]; then
+			commandRESULT=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'EACSPreflight' | sed -e 's/        EACSPreflight = //g' -e 's/"//g' -e 's/;//g')
+			if [[ $(echo "$commandRESULT" | grep -c 'success') -gt 0 ]] || [[ $(echo "$commandRESULT" | grep -c 'EFI password exists') -gt 0 ]]; then
+				sendToLog "Status: Bootstrap token escrowed and validated with MDM service."
+				bootstrapTOKEN="TRUE"
+			else
+				sendToLog "Warning: Bootstrap token escrow validation failed with status: $commandRESULT"
+			fi
+		else
+			sendToLog "Warning: Bootstrap token was previously escrowed with MDM service but the service is currently unavailable so it can not be validated."
+		fi
+	else
+		sendToLog "Status: Bootstrap token escrowed with MDM service."
+		bootstrapTOKEN="TRUE"
+	fi
+else
+	sendToLog "Warning: Bootstrap token is not escrowed with MDM service."
+fi
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: bootstrapTOKEN: $bootstrapTOKEN"
 }
 
 # MARK: *** Deferrals & Deadlines Prep ***
@@ -3581,11 +3705,24 @@ fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdatesAVAILABLE is: $macOSSoftwareUpdatesAVAILABLE"
 }
 
-# This function evaluates software updates collected from the listSoftwareUpdates() function and sets super software update caches, $softwareUpdateMACOS, and $softwareUpdateRECOMMENDED accordingly.
+# This function evaluates software updates collected from the listSoftwareUpdates() function and sets super software update caches, $softwareUpdateMACOS, $softwareUpdateRSR, and $softwareUpdateRECOMMENDED accordingly.
 # This also sets $allSoftwareUpdateLABELS[], $allSoftwareUpdateTITLES[], $macOSSoftwareUpdateLABELS[], $macOSSoftwareUpdateTITLES[], $macOSSoftwareUpdateVERSIONS[], $macOSSoftwareUpdateLABEL, $macOSSoftwareUpdateTITLE, $macOSSoftwareUpdateVERSION, $recommendedSoftwareUpdateLABELS[], and $recommendedSoftwareUpdateTITLES[].
 checkSoftwareUpdates() {
 softwareUpdateMACOS="FALSE"
+softwareUpdateRSR="FALSE"
 softwareUpdateRECOMMENDED="FALSE"
+unset allSoftwareUpdateLABELS
+unset allSoftwareUpdateTITLES
+unset macOSSoftwareUpdateLABELS
+unset macOSSoftwareUpdateTITLES
+unset macOSSoftwareUpdateVERSIONS
+unset macOSSoftwareUpdateGBS
+unset macOSSoftwareUpdateLABEL
+unset macOSSoftwareUpdateTITLE
+unset macOSSoftwareUpdateVERSION
+unset macOSSoftwareUpdateGB
+unset recommendedSoftwareUpdateLABELS
+unset recommendedSoftwareUpdateTITLES
 
 # Only need to check if a full check is required.
 if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
@@ -3650,7 +3787,7 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 		allSoftwareUpdateTITLES=($(echo "$softwareUpdateLIST" | awk -F ',' '/Title:/ {print $1}' | cut -d ' ' -f 2-))
 		macOSSoftwareUpdateLABEL=$(echo "$softwareUpdateLIST" | grep 'Label: macOS' | sed -e 's/* Label: //')
 		macOSSoftwareUpdateTITLE=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | sed -e 's/,/:/g' | awk -F ': ' '{print $2}')
-		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
+		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | awk -F ': ' '{print $4}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
 		if [[ $macOSMAJOR -eq 11 ]]; then
 			macOSSoftwareUpdateVERSION=$(echo "$macOSSoftwareUpdateLABEL" | grep -o '11.[0-9].[0-9]')
 		else
@@ -3661,7 +3798,7 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 		allSoftwareUpdateTITLES=($(echo "$softwareUpdateLIST" | awk -F '(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//'))
 		macOSSoftwareUpdateLABEL=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '*' '/\*/{print $2}' | sed 's/^ //')
 		macOSSoftwareUpdateTITLE=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//')
-		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '(' '/\t/ {print $2}' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
+		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '(' '/\t/ {print $2}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
 		macOSSoftwareUpdateVERSION=$(echo "$macOSSoftwareUpdateLABEL" | grep -o '10.[0-9][0-9].[0-9]')
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allSoftwareUpdateLABELS[] is:\n${allSoftwareUpdateLABELS[*]}"
@@ -3688,19 +3825,34 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 					sendToLog "Status: macOS update $((i + 1)): ${macOSSoftwareUpdateLABELS[i]}"
 				done
 			fi
-			sendToLog "Status: Available macOS update: $macOSSoftwareUpdateLABEL"
-			softwareUpdateMACOS="TRUE"
+			if [[ $macOSMAJOR -ge 13 ]]; then
+				[[ $(echo "$macOSSoftwareUpdateVERSION" | grep -c '[a-z]') -gt 0 ]] && softwareUpdateRSR="TRUE"
+				if [[ "$softwareUpdateRSR" == "TRUE" ]]; then
+					if [[ "$allowRSRUpdatesOPTION" == "TRUE" ]]; then
+						sendToLog "Status: macOS Rapid Security Response update available: $macOSSoftwareUpdateLABEL."
+						softwareUpdateMACOS="TRUE"
+					else # RSR updates should are not allowed.
+						sendToLog "Status: macOS Rapid Security Response update available but not allowed: $macOSSoftwareUpdateLABEL."
+					fi
+				else
+					sendToLog "Status: macOS update available: $macOSSoftwareUpdateLABEL"
+					softwareUpdateMACOS="TRUE"
+				fi
+			else
+				sendToLog "Status: macOS update available: $macOSSoftwareUpdateLABEL"
+				softwareUpdateMACOS="TRUE"
+			fi
 		else
-			sendToLog "Status: No available macOS update(s), or they may be deferred via configuration profile."
+			sendToLog "Status: No available macOS update(s) or they may be deferred via configuration profile."
 		fi
 		if [[ -n ${recommendedSoftwareUpdateLABELS[*]} ]]; then
-			sendToLog "Status: ${#recommendedSoftwareUpdateLABELS[@]} available recommended (non-macOS) update(s)."
+			sendToLog "Status: ${#recommendedSoftwareUpdateLABELS[@]} available recommended (non-system) update(s)."
 			for i in "${!recommendedSoftwareUpdateLABELS[@]}"; do
-				sendToLog "Status: Recommended (non-macOS) update $((i + 1)): ${recommendedSoftwareUpdateLABELS[i]}"
+				sendToLog "Status: Recommended (non-system) update $((i + 1)): ${recommendedSoftwareUpdateLABELS[i]}"
 			done
 			softwareUpdateRECOMMENDED="TRUE"
 		else
-			sendToLog "Status: No available recommended (non-macOS) update(s), or they may be deferred via configuration profile."
+			sendToLog "Status: No available recommended (non-system) update(s) or they may be deferred via configuration profile."
 		fi
 		
 	else
@@ -3718,7 +3870,7 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 	fi
 	IFS="$oldIFS"
 else # No available software updates.
-	sendToLog "Status: No available software update(s), or they may be deferred via configuration profile."
+	sendToLog "Status: No available software update(s) or they may be deferred via configuration profile."
 	defaults delete "$superPLIST" SoftwareUpdatesList 2> /dev/null
 	defaults write "$superPLIST" SoftwareUpdatesList -bool false
 	defaults delete "$superPLIST" macOSSoftwareUpgradeLabel 2> /dev/null
@@ -3730,8 +3882,9 @@ else # No available software updates.
 	defaults delete "$superPLIST" macOSInstallerDownloadVersion 2> /dev/null
 	defaults delete "$superPLIST" macOSInstallerDownloadName 2> /dev/null
 fi
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateRECOMMENDED is: $softwareUpdateRECOMMENDED"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateMACOS is: $softwareUpdateMACOS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateRSR is: $softwareUpdateRSR"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateRECOMMENDED is: $softwareUpdateRECOMMENDED"
 }
 
 # This function checks for available macOS upgrades for systems older than macOS 12.3 and sets $macOSUpgradeAVAILABLE accordingly. This is in a separate function to facilitate list caching and multiple run workflows.
@@ -3814,6 +3967,20 @@ fi
 # For systems older than macOS 12.3 this also sets $macOSInstallerNameTARGET, $macOSInstallerVersionTARGET, and $macOSInstallerBuildTARGET.
 checkMacOSUpgrades() {
 macOSUpgradeVersionTARGET="FALSE"
+unset macOSSoftwareUpgradeLABEL
+unset macOSSoftwareUpgradeTITLE
+unset macOSSoftwareUpgradeVERSION
+unset macOSSoftwareUpgradeGB
+unset macOSUpgradeAVAILABLE
+unset macOSInstallerNAMES
+unset macOSInstallerVERSIONS
+unset macOSInstallerBUILDS
+unset macOSSoftwareUpgradeLabelTARGET
+unset macOSSoftwareUpgradeTitleTARGET
+unset macOSSoftwareUpgradeVersionTARGET
+unset macOSInstallerNameTARGET
+unset macOSInstallerVersionTARGET
+unset macOSInstallerBuildTARGET
 
 # Only need to list macOS upgrades if a full check is required.
 if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
@@ -3993,7 +4160,7 @@ if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
 		fi
 	fi
 else # No available macOS upgrade.
-	sendToLog "Status: No available macOS upgrade, or it may be deferred via configuration profile."
+	sendToLog "Status: No available macOS upgrade or it may be deferred via configuration profile."
 	[[ $macOSVERSION -ge 1203 ]] && defaults write "$superPLIST" macOSSoftwareUpgradeLabel -bool false
 	[[ $macOSVERSION -ge 1203 ]] && defaults write "$superPLIST" macOSSoftwareUpgradeTitle -bool false
 	defaults write "$superPLIST" macOSUpgradeName -bool false
@@ -4100,7 +4267,14 @@ elif [[ "$softwareUpdateMACOS" == "TRUE" ]] || [[ "$macOSUpgradeAVAILABLE" == "T
 		fi
 		# Only validate prepared macOS update/upgrade if needed.
 		if { [[ $macOSVERSION -ge 1203 ]] && [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; } || { [[ $macOSMAJOR -ge 11 ]] && [[ "$softwareUpdateMACOS" == "TRUE" ]]; }; then
-			preparedMacOSVERSION=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null | grep -w 'OSVersion' | sed -e 's/    OSVersion = "//' -e 's/";//')
+			preparedMacOSATTRIBUTES=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSATTRIBUTES is:\n$preparedMacOSATTRIBUTES"
+			preparedMacOSVERSION=$(echo "$preparedMacOSATTRIBUTES" | grep -w 'OSVersion' | awk -F '"' '{print $2}')
+			if [[ $macOSMAJOR -ge 13 ]]; then
+				preparedMacOSExtraVERSION=$(echo "$preparedMacOSATTRIBUTES" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2}')
+				[[ -n $preparedMacOSExtraVERSION ]] && preparedMacOSVERSION="$preparedMacOSVERSION $preparedMacOSExtraVERSION"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSExtraVERSION is: $preparedMacOSExtraVERSION"
+			fi
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSVERSION is: $preparedMacOSVERSION"
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
 			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdateVERSION is: $macOSSoftwareUpdateVERSION"
@@ -4139,13 +4313,13 @@ checkSoftwareUpdates
 checkMacOSUpgrades
 checkMacOSDownloads
 
-# Install any recommended (non-macOS) software updates.
+# Install any recommended (non-system) software updates.
 if [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then
 	installRecommendedSoftwareUpdates
 	if [[ "$softwareUpdateERROR" != "TRUE" ]]; then
-		sendToLog "Status: Completed installation of all recommended (non-macOS) updates."
+		sendToLog "Status: Completed installation of all recommended (non-system) updates."
 	else
-		sendToLog "Warning: Failed to install all recommended (non-macOS) updates."
+		sendToLog "Warning: Failed to install all recommended (non-system) updates."
 	fi
 	fullCheckREQUIRED="TRUE"
 	checkSoftwareUpdates
@@ -4244,7 +4418,7 @@ softwareUpdateDownloadTITLE=""
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 while read -t $workflowTimeoutSECONDS -r logLINE ; do
 	# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
-	if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]]; then
+	if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'No such update' ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'Failed to download' ) -gt 0 ]]; then
 		workflowStartFAIL="CONNECT"
 		workflowStartTIMEOUT="FALSE"
 		workflowTIMEOUT="FALSE"
@@ -4322,7 +4496,16 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateTitleTARGET is: $softwareUpdateTitleTARGET"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateDownloadTITLE is: $softwareUpdateDownloadTITLE"
 	if [[ "$softwareUpdateTitleTARGET" == "$softwareUpdateDownloadTITLE" ]]; then
-		[[ $macOSMAJOR -ge 11 ]] && preparedMacOSVERSION=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null | grep -w 'OSVersion' | sed -e 's/    OSVersion = "//' -e 's/";//')
+		if [[ $macOSMAJOR -ge 11 ]]; then
+			preparedMacOSATTRIBUTES=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null)
+			[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSATTRIBUTES is:\n$preparedMacOSATTRIBUTES"
+			preparedMacOSVERSION=$(echo "$preparedMacOSATTRIBUTES" | grep -w 'OSVersion' | awk -F '"' '{print $2}')
+			if [[ $macOSMAJOR -ge 13 ]]; then
+				preparedMacOSExtraVERSION=$(echo "$preparedMacOSATTRIBUTES" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2}')
+				[[ -n $preparedMacOSExtraVERSION ]] && preparedMacOSVERSION="$preparedMacOSVERSION $preparedMacOSExtraVERSION"
+				[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSExtraVERSION is: $preparedMacOSExtraVERSION"
+			fi
+		fi
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: preparedMacOSVERSION is: $preparedMacOSVERSION"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSSoftwareUpdateVERSION is: $macOSSoftwareUpdateVERSION"
@@ -4711,11 +4894,11 @@ fi
 # MARK: *** Install & Restart Workflows ***
 ################################################################################
 
-# Install only recommended (non-macOS) updates via the softwareupdate command, and also save results to $superLOG and $asuLOG.
+# Install only recommended (non-system) updates via the softwareupdate command, and also save results to $superLOG and $asuLOG.
 installRecommendedSoftwareUpdates() {
-sendToLog "softwareupdate: Starting recommended (non-macOS) software installation workflow, check $asuLOG for more detail."
-sendToStatus "Running: softwareupdate: Starting recommended (non-macOS) software installation workflow."
-sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL RECOMMENDED UPDATES SOFTWAREUPDATE START ****"
+sendToLog "softwareupdate: Starting recommended (non-system) software installation workflow, check $asuLOG for more detail."
+sendToStatus "Running: softwareupdate: Starting recommended (non-system) software installation workflow."
+sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL RECOMMENDED (NON-SYSTEM) UPDATES SOFTWAREUPDATE START ****"
 oldIFS="$IFS"; IFS=$' '
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is:\n${recommendedSoftwareUpdateLABELS[*]}"
 
@@ -4786,24 +4969,24 @@ if [[ "$workflowStartTIMEOUT" == "FALSE" ]] && [[ "$workflowStartFAIL" == "FALSE
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateTITLES[] is:\n${recommendedSoftwareUpdateTITLES[*]}"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateInstalledTITLES[] is:\n${softwareUpdateInstalledTITLES[*]}"
 	if [[ ! $(echo -e "${recommendedSoftwareUpdateTITLES[*]}\n${softwareUpdateInstalledTITLES[*]}" | sort | uniq -u) ]]; then
-		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE COMPLETED ****"
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED (NON-SYSTEM) UPDATES SOFTWAREUPDATE COMPLETED ****"
 		softwareUpdateERROR="FALSE"
 	else # The expected $recommendedSoftwareUpdateTITLES[] did not match the $softwareUpdateInstalledTITLES[].
-		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE INCOMPLETE ****"
-		sendToASULog "Error: Installation of recommended (non-macOS) software updates did not complete."
-		sendToLog "Error: Installation of recommended (non-macOS) software updates did not complete."
+		sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED (NON-SYSTEM) UPDATES SOFTWAREUPDATE INCOMPLETE ****"
+		sendToASULog "Error: Installation of recommended (non-system) software updates did not complete."
+		sendToLog "Error: Installation of recommended (non-system) software updates did not complete."
 	fi
 else # The softwareupdate installation workflow failed.
-	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED UPDATES SOFTWAREUPDATE FAILED ****"
+	sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION RECOMMENDED (NON-SYSTEM) UPDATES SOFTWAREUPDATE FAILED ****"
 	if [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
-		sendToASULog "Error: Installation of recommended (non-macOS) software updates failed to start after $workflowTimeoutSECONDS seconds."
-		sendToLog "Error: Installation of recommended (non-macOS) software updates failed to start after $workflowTimeoutSECONDS seconds."
+		sendToASULog "Error: Installation of recommended (non-system) software updates failed to start after $workflowTimeoutSECONDS seconds."
+		sendToLog "Error: Installation of recommended (non-system) software updates failed to start after $workflowTimeoutSECONDS seconds."
 	elif [[ "$workflowStartFAIL" == "TRUE" ]]; then
 		sendToASULog "Error: Unable to reach Apple Software Update server."
 		sendToLog "Error: Unable to reach Apple Software Update server."
 	elif [[ "$workflowTIMEOUT" == "TRUE" ]]; then
-		sendToASULog "Error: Installation of recommended (non-macOS) software updates timed out after $workflowTimeoutSECONDS seconds."
-		sendToLog "Error: Installation of recommended (non-macOS) software updates timed out after $workflowTimeoutSECONDS seconds."
+		sendToASULog "Error: Installation of recommended (non-system) software updates timed out after $workflowTimeoutSECONDS seconds."
+		sendToLog "Error: Installation of recommended (non-system) software updates timed out after $workflowTimeoutSECONDS seconds."
 	fi
 	kill -9 "$softwareupdatePID" > /dev/null 2>&1
 	kickSoftwareUpdateD
@@ -4903,7 +5086,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: workflowTimeoutSECONDS is: $workflowTimeoutSECONDS"
 	while read -t $workflowTimeoutSECONDS -r logLINE ; do
 		# sendToLog "Debug Mode: Function ${FUNCNAME[0]}: logLINE is:\n$logLINE"
-		if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'No such update' ) -gt 0 ]]; then
+		if [[ $(echo "$logLINE" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c "Couldn't communicate" ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'No such update' ) -gt 0 ]] || [[ $(echo "$logLINE" | grep -c 'Failed to download' ) -gt 0 ]]; then
 			workflowStartTIMEOUT="FALSE"
 			break
 		elif [[ $macOSMAJOR -lt 11 ]] && [[ $(echo "$logLINE" | grep -c 'Finding available software') -gt 0 ]]; then
@@ -5073,26 +5256,36 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	# Start log streaming for MDM push commands and send to $mdmCommandLOG.
 	log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "$mdmCommandLOG" &
 	mdmCommandStreamPID=$!
+	if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+		sendToLog "Verbose Mode: Starting debug log for MDM client command progress at: $mdmCommandDebugLOG"
+		log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient"' >> "$mdmCommandDebugLOG" &
+		mdmCommandDebugPID=$!
+	fi
 	
 	# Start log streaming for MDM update/upgrade progress and send to $mdmWorkflowLOG.
 	log stream --style compact --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "Reported progress"' >> "$mdmWorkflowLOG" &
-	mdmWorkflowStreamPID=$! 
+	mdmWorkflowStreamPID=$!
+	if [[ "$verboseModeOPTION" == "TRUE" ]]; then
+		sendToLog "Verbose Mode: Starting debug log for MDM update/upgrade workflow progress at: $mdmWorkflowDebugLOG"
+		log stream --style compact --predicate 'process == "softwareupdated"' >> "$mdmWorkflowDebugLOG" &
+		mdmWorkflowDebugPID=$!
+	fi
 	
 	# Send the Jamf Pro API command to update and restart via MDM.
 	jamfAPIURL="${jamfSERVER}api/v1/macos-managed-software-updates/send-updates"
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # macOS upgrade.
 		mdmWorkflowTYPE="INSTALLER"
 		if [[ "$betaWORKFLOW" != "FALSE" ]]; then
-			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSInstallerVersionTARGET}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": true, "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
 		else # Standard non-beta workflow.
-			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSInstallerVersionTARGET}'", "updateAction": "DOWNLOAD_AND_INSTALL" }'
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
 		fi
 	else # macOS update.
 		mdmWorkflowTYPE="UPDATE"
-		if [[ "$betaWORKFLOW" != "FALSE" ]]; then
-			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSSoftwareUpdateVERSION}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+		if [[ "$betaWORKFLOW" != "FALSE" ]] || [[ "$softwareUpdateRSR" == "TRUE" ]]; then
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": false, "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "restartWithoutUpdates": true }'
 		else # Standard non-beta workflow.
-			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "version": "'${macOSSoftwareUpdateVERSION}'", "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+			jamfJSON='{ "deviceIds": ["'${jamfProID}'"], "applyMajorUpdate": false, "updateAction": "DOWNLOAD_AND_INSTALL", "restartWithoutUpdates": true }'
 		fi
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: mdmWorkflowTYPE is: $mdmWorkflowTYPE"
@@ -5164,6 +5357,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 					sendToMDMCommandLog "**** TIMESTAMP ****"
 				elif [[ $(echo "$logLINE" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)') -gt 0 ]]; then
 					kill -9 "$mdmCommandStreamPID" > /dev/null 2>&1
+					[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmCommandDebugPID" > /dev/null 2>&1
 					sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH COMPLETED ****"
 					sendToLog "MDM: Received push command \"ScheduleOSUpdate\", local update/upgrade workflow should start soon..."
 					mdmTIMEOUT="FALSE"
@@ -5177,8 +5371,10 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		if [[ "$mdmTIMEOUT" == "TRUE" ]] && [[ "$mdmFAIL" == "TRUE" ]]; then
 			sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 			kill -9 "$mdmCommandStreamPID" > /dev/null 2>&1
+			[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmCommandDebugPID" > /dev/null 2>&1
 			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
+			[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmWorkflowDebugPID" > /dev/null 2>&1
 			kickSoftwareUpdateD
 			if [[ "$installNowOPTION" == "TRUE" ]]; then
 				if [[ "$userAuthMDMFAILOVER" == "TRUE" ]]; then
@@ -5393,10 +5589,12 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 				disown %
 			fi
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
+			[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmWorkflowDebugPID" > /dev/null 2>&1
 			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM COMPLETED ****"
 			installRestartComplete
 		else # The macOS update/upgrade workflow timed out so clean-up and try again later.
 			kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
+			[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmWorkflowDebugPID" > /dev/null 2>&1
 			sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM FAILED ****"
 			kickSoftwareUpdateD
 			if [[ "$installNowOPTION" == "TRUE" ]]; then
@@ -5436,9 +5634,11 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		fi
 	else # The MDM push workflow failed so clean-up and try again later.
 		kill -9 "$mdmCommandStreamPID" > /dev/null 2>&1
+		[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmCommandDebugPID" > /dev/null 2>&1
 		sendToMDMCommandLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 		sendToMDMCommandLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		kill -9 "$mdmWorkflowStreamPID" > /dev/null 2>&1
+		[[ "$verboseModeOPTION" == "TRUE" ]] && kill -9 "$mdmWorkflowDebugPID" > /dev/null 2>&1
 		sendToMDMWorkflowLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
 		sendToMDMWorkflowLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE/UPGRADE MACOS MDM PUSH FAILED ****"
 		sendToLog "Error: Failed to send MDM install update/upgrade request. Verify that the Jamf Pro API account \"$jamfACCOUNT\" has the privileges \"Jamf Pro Server Objects > Computers > Create & Read\" and \"Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update\"."
@@ -5597,7 +5797,7 @@ else
 fi
 }
 
-# This is the install workflow for all (non-macOS) updates when enforced.
+# This is the install workflow for all (non-system) updates when enforced.
 installRecommendedWorkflow() {
 [[ "$currentUserNAME" != "FALSE" ]] && notifyRecommended
 if [[ "$testModeOPTION" != "TRUE" ]]; then
@@ -5611,19 +5811,19 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	
 	# If we had failures, then try again.
 	if [[ "$softwareUpdateERROR" == "TRUE" ]]; then
-		sendToLog "Warning: Failed to install all recommended (non-macOS) updates."
+		sendToLog "Warning: Failed to install all recommended (non-system) updates."
 		[[ "$softwareUpdateRECOMMENDED" == "TRUE" ]] && installRecommendedSoftwareUpdates
 		# If it failed twice, then try again later.
 		if [[ "$softwareUpdateERROR" == "TRUE" ]]; then
 			if [[ "$installNowOPTION" == "TRUE" ]]; then
-				sendToLog "Error: Failed to install all recommended (non-macOS) updates after multiple attempts, install now workflow can not continue."
-				sendToStatus "Inactive Error: Failed to install all recommended (non-macOS) updates after multiple attempts, install now workflow can not continue."
+				sendToLog "Error: Failed to install all recommended (non-system) updates after multiple attempts, install now workflow can not continue."
+				sendToStatus "Inactive Error: Failed to install all recommended (non-system) updates after multiple attempts, install now workflow can not continue."
 				notifyInstallNowFailure
 				errorExit
 			else
 				deferSECONDS="$errorDeferSECONDS"
-				sendToLog "Warning: Failed to install all recommended (non-macOS) updates after multiple attempts, trying again in $deferSECONDS seconds."
-				sendToStatus "Pending: Failed to install all recommended (non-macOS) updates after multiple attempts, trying again in $deferSECONDS seconds."
+				sendToLog "Warning: Failed to install all recommended (non-system) updates after multiple attempts, trying again in $deferSECONDS seconds."
+				sendToStatus "Pending: Failed to install all recommended (non-system) updates after multiple attempts, trying again in $deferSECONDS seconds."
 				makeLaunchDaemonCalendar
 			fi
 		else
@@ -5636,7 +5836,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 	
 	# Log status of recommended update completion.
 	if [[ "$softwareUpdateRECOMMENDED" == "FALSE" ]]; then
-		sendToLog "Status: Completed installation of all recommended (non-macOS) updates."
+		sendToLog "Status: Completed installation of all recommended (non-system) updates."
 		kill -9 "$notifyPID" > /dev/null 2>&1
 		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
@@ -5671,14 +5871,14 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 		fi
 	else # Some software udpates did not complete
 		if [[ "$installNowOPTION" == "TRUE" ]]; then
-			sendToLog "Error: Some recommended (non-macOS) updates did not complete, install now workflow can not continue."
-			sendToStatus "Inactive Error: Some recommended (non-macOS) updates did not complete, install now workflow can not continue."
+			sendToLog "Error: Some recommended (non-system) updates did not complete, install now workflow can not continue."
+			sendToStatus "Inactive Error: Some recommended (non-system) updates did not complete, install now workflow can not continue."
 			notifyInstallNowFailure
 			errorExit
 		else
 			deferSECONDS="$errorDeferSECONDS"
-			sendToLog "Warning: Some recommended (non-macOS) updates did not complete, trying again in $deferSECONDS seconds."
-			sendToStatus "Pending: Some recommended (non-macOS) updates did not complete, trying again in $deferSECONDS seconds."
+			sendToLog "Warning: Some recommended (non-system) updates did not complete, trying again in $deferSECONDS seconds."
+			sendToStatus "Pending: Some recommended (non-system) updates did not complete, trying again in $deferSECONDS seconds."
 			makeLaunchDaemonCalendar
 		fi
 	fi
@@ -5719,27 +5919,41 @@ fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW is: $upgradeWORKFLOW"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateWORKFLOW is: $updateWORKFLOW"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: installNowOPTION is: $installNowOPTION"
-if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-	if [[ "$upgradeWORKFLOW" == "LOCAL" ]]; then
-		[[ -n $policyTRIGGERS ]] && runJamfPolicies
-		if [[ $macOSVERSION -ge 1203 ]]; then # macOS 12.3 or newer upgrade via softwareupdate.
-			installMacOSSoftwareUpdate
-		else # Systems older than macOS 12.3 upgrade via installer.
-			downloadMacOSInstaller
-			installMacOSAPP
-		fi
-	elif [[ "$upgradeWORKFLOW" == "JAMF" ]]; then
+
+# If MDM workflow is expected, first check for MDM service and bootstrap token.
+if { [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] && [[ "$upgradeWORKFLOW" == "JAMF" ]]; } || { [[ "$softwareUpdateMACOS" == "TRUE" ]] && [[ "$updateWORKFLOW" == "JAMF" ]]; }; then
+	checkMDMService
+	if [[ "$mdmSERVICE" == "FALSE" ]]; then
+		deferSECONDS="$errorDeferSECONDS"
+		sendToLog "Error: Can not use MDM workflow because the MDM service is not available, trying again in $deferSECONDS seconds."
+		sendToStatus "Pending: Can not use MDM workflow because the MDM service is not available, trying again in $deferSECONDS seconds."
+		makeLaunchDaemonCalendar
+	else # MDM service is available.
 		checkBootstrapToken
-		if [[ "$bootstrapTOKEN" == "TRUE" ]]; then
-			[[ -n $policyTRIGGERS ]] && runJamfPolicies
-			downloadMacOSInstaller
-			installMacOSMDM
-		else # Cannot enforce or fix missing bootstrap token.
+		if [[ "$bootstrapTOKEN" == "FALSE" ]]; then
 			deferSECONDS="$errorDeferSECONDS"
 			sendToLog "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
 			sendToStatus "Pending: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
 			makeLaunchDaemonCalendar
 		fi
+	fi
+fi
+
+# Logic to start the appropriate update/upgrade workflow.
+if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
+	if [[ "$upgradeWORKFLOW" == "LOCAL" ]]; then
+		if [[ $macOSVERSION -ge 1203 ]]; then # macOS 12.3 or newer upgrade via softwareupdate.
+			[[ -n $policyTRIGGERS ]] && runJamfPolicies
+			installMacOSSoftwareUpdate
+		else # Systems older than macOS 12.3 upgrade via installer.
+			downloadMacOSInstaller
+			[[ -n $policyTRIGGERS ]] && runJamfPolicies
+			installMacOSAPP
+		fi
+	elif [[ "$upgradeWORKFLOW" == "JAMF" ]]; then
+		downloadMacOSInstaller
+		[[ -n $policyTRIGGERS ]] && runJamfPolicies
+		installMacOSMDM
 	else # Apple Silicon with no valid update/upgrade credentials can not enforce macOS upgrade.
 		deferSECONDS="$errorDeferSECONDS"
 		sendToLog "Status: No valid Apple Silicon credentials and no logged in user, trying again in $deferSECONDS seconds."
@@ -5751,17 +5965,9 @@ elif [[ "$softwareUpdateMACOS" == "TRUE" ]]; then # macOS updates are available.
 		[[ -n $policyTRIGGERS ]] && runJamfPolicies
 		installMacOSSoftwareUpdate
 	elif [[ "$updateWORKFLOW" == "JAMF" ]]; then
-		checkBootstrapToken
-		if [[ "$bootstrapTOKEN" == "TRUE" ]]; then
-			[[ -n $policyTRIGGERS ]] && runJamfPolicies
-			installMacOSMDM
-		else
-			deferSECONDS="$errorDeferSECONDS"
-			sendToLog "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
-			sendToStatus "Pending: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
-			makeLaunchDaemonCalendar
-		fi
-	else # Apple Silicon with no valid update/upgrade credentials can not enforce macOS upgrade.
+		[[ -n $policyTRIGGERS ]] && runJamfPolicies
+		installMacOSMDM
+	else # Apple Silicon with no valid update/upgrade credentials can not enforce macOS update.
 		deferSECONDS="$errorDeferSECONDS"
 		sendToLog "Status: No valid Apple Silicon credentials and no logged in user, trying again in $deferSECONDS seconds."
 		sendToStatus "Pending: No valid Apple Silicon credentials and no logged in user, trying again in $deferSECONDS seconds."
@@ -5769,13 +5975,13 @@ elif [[ "$softwareUpdateMACOS" == "TRUE" ]]; then # macOS updates are available.
 	fi
 else # Workflow when there is no macOS updates/upgrade.
 	[[ -n $policyTRIGGERS ]] && runJamfPolicies
-	if [[ "$forceRestartOPTION" == "TRUE" ]]; then # If requested, force the computer to restart.
+	if [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]]; then # If requested, restart without updates.
 		sendToLog "Forced Restart Mode: Restarting computer..."
 		installRestartComplete
 		shutdown -o -r +1 &
 		disown -a
-	else # Option to force restart is not enabled.
-		sendToLog "Warning: When no macOS update/upgrade is availble you must also specify the --force-restart option to restart automatically."
+	else # Option to restart without updates is not enabled.
+		sendToLog "Warning: When no macOS update/upgrade is availble you must also specify the --restart-without-updates option to restart automatically."
 	fi
 fi
 }
@@ -5787,14 +5993,34 @@ installRestartWorkflowActiveUser() {
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW is: $upgradeWORKFLOW"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateWORKFLOW is: $updateWORKFLOW"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: installNowOPTION is: $installNowOPTION"
-if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-	# If MDM workflow is expected, first check for bootstrap token and possibly failover to user authentication workflow.
-	if [[ "$upgradeWORKFLOW" == "JAMF" ]]; then
+
+# If MDM workflow is expected, first check for MDM service, bootstrap token, and possibly failover to user authentication workflow.
+if { [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] && [[ "$upgradeWORKFLOW" == "JAMF" ]]; } || { [[ "$softwareUpdateMACOS" == "TRUE" ]] && [[ "$updateWORKFLOW" == "JAMF" ]]; }; then
+	checkMDMService
+	if [[ "$mdmSERVICE" == "FALSE" ]]; then
+		if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
+			sendToLog "Status: User authentication failover active due to MDM service is not available."
+			upgradeWORKFLOW="MDMFAIL"
+		else
+			if [[ "$installNowOPTION" == "TRUE" ]]; then
+				sendToLog "Error: Can not use MDM workflow because the MDM service is not available, install now workflow can not continue."
+				sendToStatus "Inactive Error: Can not use MDM workflow because the MDM service is not available, install now workflow can not continue."
+				notifyInstallNowFailure
+				errorExit
+			else
+				deferSECONDS="$errorDeferSECONDS"
+				sendToLog "Error: Can not use MDM workflow because the MDM service is not available, trying again in $deferSECONDS seconds."
+				sendToStatus "Pending: Can not use MDM workflow because the MDM service is not available, trying again in $deferSECONDS seconds."
+				notifyFailure
+				makeLaunchDaemonCalendar
+			fi
+		fi
+	else # MDM service is available.
 		checkBootstrapToken
-		if [[ "$bootstrapTOKEN" != "TRUE" ]]; then
+		if [[ "$bootstrapTOKEN" == "FALSE" ]]; then
 			if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverBOOTSTRAP" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
 				sendToLog "Status: User authentication failover active due to missing bootstrap token escrow."
-				upgradeWORKFLOW="MDMFAIL"
+				updateWORKFLOW="MDMFAIL"
 			else
 				if [[ "$installNowOPTION" == "TRUE" ]]; then
 					sendToLog "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, install now workflow can not continue."
@@ -5802,15 +6028,19 @@ if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is avai
 					notifyInstallNowFailure
 					errorExit
 				else
-					notifyFailure
 					deferSECONDS="$errorDeferSECONDS"
 					sendToLog "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
 					sendToStatus "Pending: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
+					notifyFailure
 					makeLaunchDaemonCalendar
 				fi
 			fi
 		fi
 	fi
+fi
+
+# Logic to start the appropriate update/upgrade workflow.
+if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 	if [[ "$upgradeWORKFLOW" == "LOCAL" ]] || [[ "$upgradeWORKFLOW" == "USER" ]] || [[ "$upgradeWORKFLOW" == "MDMFAIL" ]]; then
 		if [[ "$upgradeWORKFLOW" == "MDMFAIL" ]]; then
 			dialogUserAuth
@@ -5842,28 +6072,6 @@ if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is avai
 		installMacOSMDM
 	fi
 elif [[ "$softwareUpdateMACOS" == "TRUE" ]]; then # macOS updates are available.
-	if [[ "$updateWORKFLOW" == "JAMF" ]]; then
-		checkBootstrapToken
-		if [[ "$bootstrapTOKEN" != "TRUE" ]]; then
-			if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverBOOTSTRAP" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
-				sendToLog "Status: User authentication failover active due to missing bootstrap token escrow."
-				updateWORKFLOW="MDMFAIL"
-			else
-				if [[ "$installNowOPTION" == "TRUE" ]]; then
-					sendToLog "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, install now workflow can not continue."
-					sendToStatus "Inactive Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, install now workflow can not continue."
-					notifyInstallNowFailure
-					errorExit
-				else
-					notifyFailure
-					deferSECONDS="$errorDeferSECONDS"
-					sendToLog "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
-					sendToStatus "Pending: Can not use MDM workflow because this computer's bootstrap token is not escrowed, trying again in $deferSECONDS seconds."
-					makeLaunchDaemonCalendar
-				fi
-			fi
-		fi
-	fi
 	if [[ "$updateWORKFLOW" == "LOCAL" ]] || [[ "$updateWORKFLOW" == "USER" ]] || [[ "$updateWORKFLOW" == "MDMFAIL" ]]; then
 		if [[ "$updateWORKFLOW" == "MDMFAIL" ]]; then
 			dialogUserAuth
@@ -5890,7 +6098,7 @@ elif [[ "$softwareUpdateMACOS" == "TRUE" ]]; then # macOS updates are available.
 else # Workflow when there is no macOS updates/upgrade.
 	notifyRestart
 	[[ -n $policyTRIGGERS ]] && runJamfPolicies
-	if [[ "$forceRestartOPTION" == "TRUE" ]]; then # If requested, force the computer to restart.
+	if [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]]; then # If requested, restart without updates.
 		if [[ "$testModeOPTION" != "TRUE" ]]; then
 			sendToLog "Forced Restart Mode: Restarting computer..."
 			installRestartComplete
@@ -5906,8 +6114,8 @@ else # Workflow when there is no macOS updates/upgrade.
 				killall -9 "jamfHelper" > /dev/null 2>&1
 			fi
 		fi
-	else # Option to force restart is not enabled.
-		sendToLog "Warning: When no macOS update/upgrade is availble you must also specify the --force-restart option to restart automatically."
+	else # Option to restart without updates is not enabled.
+		sendToLog "Warning: When no macOS update/upgrade is availble you must also specify the --restart-without-updates option to restart automatically."
 	fi
 fi
 }
@@ -6096,7 +6304,7 @@ if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is avai
 	fi
 elif [[ "$softwareUpdateMACOS" == "TRUE" ]]; then # macOS updates are available.
 	titleWorkflowDISPLAY="macOS $macOSSoftwareUpdateVERSION Update"
-else # Only recommended (non-macOS) updates are available.
+else # Only recommended (non-system) updates are available.
 	titleWorkflowDISPLAY="Apple Software Updates"
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: titleWorkflowDISPLAY is: $titleWorkflowDISPLAY"
@@ -6247,7 +6455,7 @@ This computer will automatically restart very soon.
 
 Save any open documents now."
 
-#### Language for notifyRecommended(), a non-interactive notification informing the user that the install now workflow is installing recommended (non-macOS) software updates.
+#### Language for notifyRecommended(), a non-interactive notification informing the user that the install now workflow is installing recommended (non-system) software updates.
 notifyRecommendedTITLE="Installing $titleWorkflowDISPLAY"
 # Note that IBM Notifier interprets "\n" as a return, while jamfHelper interprets "real" returns.
 notifyRecommendedBodyIBM="Required Apple software updates are now installing.\n\nThe computer will not restart but some Apple applications (like Safari) may automatically restart.\n\nThis should only take a few minutes, but please do not restart or sleep the computer as it will prolong the update process."
@@ -6312,19 +6520,19 @@ dialogUserAuthRetryPassTITLE="Authentication Failed - Try Password Again:"
 dialogUserAuthRetryPassPLACEHOLDER="Password Required"
 }
 
-# For IBM Notifier dialogs set a new $deferButtonDISPLAY showing the $defaultDeferSECONDS.
+# For IBM Notifier dialogs set a new $deferButtonDISPLAY showing the $deferSECONDS.
 setDeferButton() {
-if [[ $defaultDeferSECONDS -lt 3600 ]]; then
-	deferButtonDISPLAY="$deferForButtonDISPLAY $((defaultDeferSECONDS / 60)) $dialogRestartOrDeferMinutesDISPLAY"
-elif [[ $defaultDeferSECONDS -eq 3600 ]]; then
+if [[ $deferSECONDS -lt 3600 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY $((deferSECONDS / 60)) $dialogRestartOrDeferMinutesDISPLAY"
+elif [[ $deferSECONDS -eq 3600 ]]; then
 	deferButtonDISPLAY="$deferForButtonDISPLAY 1 $dialogRestartOrDeferHourDISPLAY"
-elif [[ $defaultDeferSECONDS -gt 3600 ]] && [[ $defaultDeferSECONDS -lt 7200 ]]; then
-	deferButtonDISPLAY="$deferForButtonDISPLAY 1 $dialogRestartOrDeferHourDISPLAY $((defaultDeferSECONDS % 3600 / 60)) $dialogRestartOrDeferMinutesDISPLAY"
-elif [[ $defaultDeferSECONDS -ge 7200 ]] && [[ $defaultDeferSECONDS -lt 86400 ]] && [[ $((defaultDeferSECONDS % 3600)) -eq 0 ]]; then
-	deferButtonDISPLAY="$deferForButtonDISPLAY $((defaultDeferSECONDS / 3600)) $dialogRestartOrDeferHoursDISPLAY"
-elif [[ $defaultDeferSECONDS -gt 7200 ]] && [[ $defaultDeferSECONDS -lt 86400 ]] && [[ $((defaultDeferSECONDS % 3600)) -ne 0 ]]; then
-	deferButtonDISPLAY="$deferForButtonDISPLAY $((defaultDeferSECONDS / 3600)) $dialogRestartOrDeferHoursDISPLAY $((defaultDeferSECONDS % 3600 / 60)) $dialogRestartOrDeferMinutesDISPLAY"
-elif [[ $defaultDeferSECONDS -eq 86400 ]]; then
+elif [[ $deferSECONDS -gt 3600 ]] && [[ $deferSECONDS -lt 7200 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY 1 $dialogRestartOrDeferHourDISPLAY $((deferSECONDS % 3600 / 60)) $dialogRestartOrDeferMinutesDISPLAY"
+elif [[ $deferSECONDS -ge 7200 ]] && [[ $deferSECONDS -lt 86400 ]] && [[ $((deferSECONDS % 3600)) -eq 0 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY $((deferSECONDS / 3600)) $dialogRestartOrDeferHoursDISPLAY"
+elif [[ $deferSECONDS -gt 7200 ]] && [[ $deferSECONDS -lt 86400 ]] && [[ $((deferSECONDS % 3600)) -ne 0 ]]; then
+	deferButtonDISPLAY="$deferForButtonDISPLAY $((deferSECONDS / 3600)) $dialogRestartOrDeferHoursDISPLAY $((deferSECONDS % 3600 / 60)) $dialogRestartOrDeferMinutesDISPLAY"
+elif [[ $deferSECONDS -eq 86400 ]]; then
 	deferButtonDISPLAY="$deferForButtonDISPLAY 1 $dialogRestartOrDeferDayDISPLAY"
 fi
 }
@@ -6606,7 +6814,6 @@ fi
 # Display a non-interactive notification informing the user that the install now workflow has failed.
 notifyInstallNowFailure() {
 setDisplayLanguage
-setDeferButton
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	sendToLog "IBM Notifier: Opening install now failure notification..."
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "$notifyInstallNowFailureTITLE" -subtitle "$notifyInstallNowFailureBodyIBM" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$okButtonDISPLAY")
@@ -6951,16 +7158,16 @@ else
 fi
 }
 
-# Display a non-interactive notification informing the user that the install now workflow is installing recommended (non-macOS) software updates.
+# Display a non-interactive notification informing the user that the install now workflow is installing recommended (non-system) software updates.
 notifyRecommended() {
 setDisplayLanguage
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	sendToLog "IBM Notifier: Opening install now installing recommended (non-macOS) software updates notification..."
+	sendToLog "IBM Notifier: Opening install now installing recommended (non-system) software updates notification..."
 	ibmNotifierARRAY=(-type popup -always_on_top -position top_right -bar_title "$notifyRecommendedTITLE" -subtitle "$notifyRecommendedBodyIBM" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 	openNotifyIbmNotifier
 else
-	sendToLog "jamfHelper: Opening install now installing recommended (non-macOS) software updates notification..."
+	sendToLog "jamfHelper: Opening install now installing recommended (non-system) software updates notification..."
 	jamfHelperARRAY=(-windowType hud -windowPosition ur -lockHUD -title "$notifyRecommendedTITLE" -description "$notifyRecommendedBodyJAMF" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE")
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfHelperARRAY[] is:\n${jamfHelperARRAY[*]}"
 	openNotifyJamfHelper
@@ -6991,11 +7198,11 @@ fi
 dialogRestartOrDefer() {
 setDisplayLanguage
 sendToStatus "Running: Dialog restart or defer."
-[[ -n $deferDisplayTimeoutSECONDS ]] && displayTimeoutSECONDS=$deferDisplayTimeoutSECONDS
+[[ -n $deferDialogTimeoutSECONDS ]] && displayTimeoutSECONDS=$deferDialogTimeoutSECONDS
 
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
-	[[ -n $deferDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: Ask for restart or defer dialog with a $displayTimeoutSECONDS second timeout."
-	[[ -z $deferDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: Ask for restart or defer dialog with no timeout."
+	[[ -n $deferDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: Ask for restart or defer dialog with a $displayTimeoutSECONDS second timeout."
+	[[ -z $deferDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: Ask for restart or defer dialog with no timeout."
 	# Create initial $ibmNotifierARRAY[] settings for the dialog.
 	ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogRestartOrDeferTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -secondary_button_label "$restartButtonDISPLAY")
 	
@@ -7035,6 +7242,7 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 		menuDisplayTEXT="${menuDeferDisplayARRAY[*]}"
 		IFS="$oldIFS"
 	else # Instead, add a defer button containing the text based off $defaultDeferSECONDS time.
+		deferSECONDS="$defaultDeferSECONDS"
 		setDeferButton
 	fi
 	ibmNotifierARRAY+=(-main_button_label "$deferButtonDISPLAY")
@@ -7074,8 +7282,8 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 		;;
 	esac
 else
-	[[ -n $deferDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: Ask for restart or defer dialog with a $displayTimeoutSECONDS second timeout."
-	[[ -z $deferDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: Ask for restart or defer dialog with no timeout."
+	[[ -n $deferDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: Ask for restart or defer dialog with a $displayTimeoutSECONDS second timeout."
+	[[ -z $deferDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: Ask for restart or defer dialog with no timeout."
 	# Create initial $jamfHelperARRAY[] settings for the dialog.
 	jamfHelperARRAY=(-windowType utility -title "$dialogRestartOrDeferTITLE" -icon "$cachedICON" -iconSize "$jamfHelperIconSIZE" -button1 "$deferButtonDISPLAY" -button2 "$restartButtonDISPLAY" -defaultButton 1 -cancelButton 2)
 
@@ -7125,7 +7333,7 @@ fi
 dialogSoftDeadline() {
 setDisplayLanguage
 sendToStatus "Running: Dialog soft deadline."
-[[ -n $softDisplayTimeoutSECONDS ]] && displayTimeoutSECONDS=$softDisplayTimeoutSECONDS
+[[ -n $softDialogTimeoutSECONDS ]] && displayTimeoutSECONDS=$softDialogTimeoutSECONDS
 
 if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 	# The initial $ibmNotifierARRAY[] settings for the soft deadline dialog.
@@ -7133,16 +7341,16 @@ if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE"
 
 	# Variations for the main body text of the soft deadline dialog.
 	if [[ "$deadlineDateSTATUS" == "SOFT" ]]; then
-		[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft date deadline dialog with a $displayTimeoutSECONDS second timeout."
-		[[ -z $softDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft date deadline dialog with no timeout."
+		[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft date deadline dialog with a $displayTimeoutSECONDS second timeout."
+		[[ -z $softDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft date deadline dialog with no timeout."
 		ibmNotifierARRAY+=(-subtitle "$dialogSoftDeadlineBodyDateIBM")
 	elif [[ "$deadlineDaysSTATUS" == "SOFT" ]]; then
-		[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft days deadline dialog with a $displayTimeoutSECONDS second timeout."
-		[[ -z $softDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft days deadline dialog with no timeout."
+		[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft days deadline dialog with a $displayTimeoutSECONDS second timeout."
+		[[ -z $softDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft days deadline dialog with no timeout."
 		ibmNotifierARRAY+=(-subtitle "$dialogSoftDeadlineBodyDaysIBM")
 	elif [[ "$deadlineCountSTATUS" == "SOFT" ]]; then
-		[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft count deadline dialog with a $displayTimeoutSECONDS second timeout."
-		[[ -z $softDisplayTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft count deadline dialog with no timeout."
+		[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft count deadline dialog with a $displayTimeoutSECONDS second timeout."
+		[[ -z $softDialogTimeoutSECONDS ]] && sendToLog "IBM Notifier: soft count deadline dialog with no timeout."
 		ibmNotifierARRAY+=(-subtitle "$dialogSoftDeadlineBodyCountIBM")
 	fi
 	displayTimeoutTEXT="$dialogSoftDeadlineTimeoutIBM"
@@ -7166,16 +7374,16 @@ else
 
 	# Variations for the main body text of the soft deadline dialog
 	if [[ "$deadlineDateSTATUS" == "SOFT" ]]; then
-		[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: soft date deadline dialog with a $displayTimeoutSECONDS second timeout."
-		[[ -z $softDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: soft date deadline dialog with no timeout."
+		[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: soft date deadline dialog with a $displayTimeoutSECONDS second timeout."
+		[[ -z $softDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: soft date deadline dialog with no timeout."
 		jamfHelperARRAY+=(-description "$dialogSoftDeadlineBodyDateJAMF")
 	elif [[ "$deadlineDaysSTATUS" == "SOFT" ]]; then
-		[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: soft days deadline dialog with a $displayTimeoutSECONDS second timeout."
-		[[ -z $softDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: soft days deadline dialog with no timeout."
+		[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: soft days deadline dialog with a $displayTimeoutSECONDS second timeout."
+		[[ -z $softDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: soft days deadline dialog with no timeout."
 		jamfHelperARRAY+=(-description "$dialogSoftDeadlineBodyDaysJAMF")
 	elif [[ "$deadlineCountSTATUS" == "SOFT" ]]; then
-		[[ -n $softDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: soft count deadline dialog with a $displayTimeoutSECONDS second timeout."
-		[[ -z $softDisplayTimeoutSECONDS ]] && sendToLog "jamfHelper: soft count deadline dialog with no timeout."
+		[[ -n $softDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: soft count deadline dialog with a $displayTimeoutSECONDS second timeout."
+		[[ -z $softDialogTimeoutSECONDS ]] && sendToLog "jamfHelper: soft count deadline dialog with no timeout."
 		jamfHelperARRAY+=(-description "$dialogSoftDeadlineBodyCountJAMF")
 	fi
 
@@ -7224,6 +7432,10 @@ fi
 secureAccessoryPAYLOAD="/title $dialogUserAuthPassTITLE /placeholder $dialogUserAuthPassPLACEHOLDER /required"
 
 # Open the user authentication dialog including handling of the $userAuthTimeoutSECONDS and user password validation.
+if [[ -n $displayAccessoryUserAuthCONTENT ]]; then
+	[[ -n $displayAccessoryCONTENT ]] && displayAccessoryBackupCONTENT="$displayAccessoryCONTENT"
+	displayAccessoryCONTENT="$displayAccessoryUserAuthCONTENT"
+fi
 userAuthREADY="FALSE"
 userAuthATTEMPT=0
 while [[ $displayTimeoutSECONDS -ge 0 ]]; do
@@ -7254,11 +7466,16 @@ while [[ $displayTimeoutSECONDS -ge 0 ]]; do
 		break
 	fi
 done
+if [[ -n $displayAccessoryBackupCONTENT ]]; then
+	displayAccessoryCONTENT="$displayAccessoryBackupCONTENT"
+else
+	unset displayAccessoryCONTENT
+fi
 
 # If user authentication was successful then evaluate option to fix bootstrap token.
 if [[ "$userAuthREADY" == "TRUE" ]]; then
 	sendToLog "Status: Current user \"$currentUserNAME\" credentials verified."
-	if [[ "$bootstrapTOKEN" != "TRUE" ]] && { [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverBOOTSTRAP" == "TRUE" ]]; }; then
+	if [[ "$mdmENROLLED" == "TRUE" ]] && [[ "$bootstrapTOKEN" != "TRUE" ]] && { [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverBOOTSTRAP" == "TRUE" ]]; }; then
 		attemptBootstrapFIX="TRUE"
 		if [[ "$currentUserADMIN" == "FALSE" ]]; then
 			sendToLog "Warning: Local user account \"$currentUserNAME\" can not be used to escrow bootstrap token because they are not a local admin."
@@ -7266,6 +7483,10 @@ if [[ "$userAuthREADY" == "TRUE" ]]; then
 		fi
 		if [[ "$currentUserSecureTOKEN" == "FALSE" ]]; then
 			sendToLog "Warning: Local user account \"$currentUserNAME\" can not be used to escrow bootstrap token because they do not have a secure token."
+			attemptBootstrapFIX="FALSE"
+		fi
+		if [[ "$mdmSERVICE" == "FALSE" ]]; then
+			sendToLog "Warning: Can not escrow bootstrap token because the MDM service is not available."
 			attemptBootstrapFIX="FALSE"
 		fi
 		if [[ "$attemptBootstrapFIX" == "TRUE" ]]; then
@@ -7326,7 +7547,7 @@ elif [[ "$onlyDownloadOPTION" == "TRUE" ]]; then
 	sendToLog "Startup: Only download mode enabled."
 fi
 [[ -n $policyTRIGGERS ]] && sendToLog "Startup: Jamf Pro Policy triggers: $policyTRIGGERS"
-[[ "$forceRestartOPTION" == "TRUE" ]] && sendToLog "Warning: This computer will restart even if there is no macOS update/upgrade availble."
+[[ "$restartWithoutUpdatesOPTION" == "TRUE" ]] && sendToLog "Warning: This computer will restart even if there is no macOS update/upgrade availble."
 
 # Start the appropriate main workflow based on user options.
 if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then # Skip software updates/upgrade mode option.
@@ -7336,7 +7557,7 @@ if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then # Skip software updates/upgrade mo
 	softwareUpdateMACOS="FALSE"
 	if [[ "$testModeOPTION" == "TRUE" ]]; then
 		sendToLog "Test Mode: Simulating skip updates workflow."
-		{ [[ "$forceRestartOPTION" != "TRUE" ]] && [[ -z $policyTRIGGERS ]]; } && sendToLog "Warning: You need to also use --force-restart or --policy-triggers to simulate notification and dialog workflows."
+		{ [[ "$restartWithoutUpdatesOPTION" != "TRUE" ]] && [[ -z $policyTRIGGERS ]]; } && sendToLog "Warning: You need to also use --restart-without-updates or --policy-triggers to simulate notification and dialog workflows."
 	fi
 else # Default software update/upgrade workflows.
 	# Check for updates/upgrades.
@@ -7350,9 +7571,9 @@ else # Default software update/upgrade workflows.
 		softwareUpdateRECOMMENDED="FALSE"
 		macOSUpgradeVersionTARGET="FALSE"
 		softwareUpdateMACOS="FALSE"
-		if [[ "$enforceAllUpdatesOPTION" == "TRUE" ]]; then
+		if [[ "$enforceNonSystemUpdatesOPTION" == "TRUE" ]]; then
 			softwareUpdateRECOMMENDED="TRUE"
-			sendToLog "Test Mode: Simulating enforce all updates workflow."
+			sendToLog "Test Mode: Simulating enforce all non-system updates workflow."
 		elif [[ "$allowUpgradeOPTION" == "TRUE" ]]; then
 			macOSUpgradeVersionTARGET="$macOSMAJOR"
 			macOSSoftwareUpgradeVersionTARGET="$macOSMAJOR.$macOSMINOR"
@@ -7363,8 +7584,8 @@ else # Default software update/upgrade workflows.
 			macOSSoftwareUpdateDownloadREQUIRED="TRUE"
 			macOSInstallerDownloadREQUIRED="TRUE"
 			sendToLog "Test Mode: Simulating macOS $macOSUpgradeVersionTARGET upgrade workflow."
-		elif [[ "$forceRestartOPTION" == "TRUE" ]]; then
-			sendToLog "Test Mode: Simulating force restart workflow."
+		elif [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]]; then
+			sendToLog "Test Mode: Simulating restart without updates workflow."
 		else # Simulate a macOS update.
 			softwareUpdateMACOS="TRUE"
 			macOSSoftwareUpdateLABEL="mac OS Label"
@@ -7423,23 +7644,23 @@ else # Default software update/upgrade workflows.
 		elif [[ -n $displayAccessoryDefaultCONTENT ]]; then
 			displayAccessoryCONTENT="$displayAccessoryDefaultCONTENT"
 		fi
-	elif [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then # Only recommended (non-macOS) updates are available.
+	elif [[ "$softwareUpdateRECOMMENDED" == "TRUE" ]]; then # Only recommended (non-system) updates are available.
 		defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null
 		defaults delete "$superPLIST" FocusCounter 2> /dev/null
 		defaults delete "$superPLIST" SoftCounter 2> /dev/null
 		defaults delete "$superPLIST" HardCounter 2> /dev/null
-		if [[ "$enforceAllUpdatesOPTION" == "TRUE" ]]; then # Option to enforce all software updates is enabled.
+		if [[ "$enforceNonSystemUpdatesOPTION" == "TRUE" ]]; then # Option to enforce all software updates is enabled.
 			if [[ "$installNowOPTION" == "TRUE" ]]; then
-				sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL NOW UPDATE RECOMMENDED SOFTWARE ****"
+				sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL NOW UPDATE RECOMMENDED (NON-SYSTEM) SOFTWARE ****"
 				installRecommendedWorkflow # This function includes internal install now and test mode logic.
 			elif [[ "$onlyDownloadOPTION" == "TRUE" ]]; then
-				sendToLog "Warning: The --enforce-all-updates option is ignored when used with the --only-download option."
+				sendToLog "Warning: The --enforce-non-system-updates option is ignored when used with the --only-download option."
 			else # Default super workflow.
-				sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE RECOMMENDED SOFTWARE ****"
+				sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION UPDATE RECOMMENDED (NON-SYSTEM) SOFTWARE ****"
 				installRecommendedWorkflow # This function includes internal install now and test mode logic.
 			fi
 		else
-			sendToLog "Status: Only recommended (non-macOS) software udpates are availble. You must use the --enforce-all-updates option for these items to install without a macOS update/upgrade."
+			sendToLog "Status: Available recommended (non-system) software udpates are not enforced. You must use the --enforce-non-system-updates option for these items to install without a macOS update/upgrade."
 		fi
 	else # No software updates/upgrade needed so clean up any leftover deferral counters.
 		defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null
@@ -7449,8 +7670,8 @@ else # Default software update/upgrade workflows.
 	fi
 fi
 
-# This is the main logic for determining what to do in the case of available macOS updates, macOS upgrades, $policyTRIGGERS, or the $forceRestartOPTION.
-if [[ "$softwareUpdateMACOS" == "TRUE" ]] || [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] || [[ -n $policyTRIGGERS ]] || [[ "$forceRestartOPTION" == "TRUE" ]]; then
+# This is the main logic for determining what to do in the case of available macOS updates, macOS upgrades, $policyTRIGGERS, or the $restartWithoutUpdatesOPTION.
+if [[ "$softwareUpdateMACOS" == "TRUE" ]] || [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] || [[ -n $policyTRIGGERS ]] || [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]]; then
 	# Check for current user and required storage free space before continuing.
 	checkCurrentUser
 	if [[ "$installNowOPTION" == "TRUE" ]]; then # Install now workflow is only possible if the user is logged in.
@@ -7479,7 +7700,7 @@ if [[ "$softwareUpdateMACOS" == "TRUE" ]] || [[ "$macOSUpgradeVersionTARGET" != 
 			fi
 			checkCountDeadlines
 			# At this point all deferral and deadline options have been evaluated.
-			[[ "$skipUpdatesOPTION" != "TRUE" ]] && downloadMacOSWorkflow # This function only downloads if needed and includes internal storage checks and test mode logic.
+			[[ "$skipUpdatesOPTION" != "TRUE" ]] && downloadMacOSWorkflow # This function only downloads if needed and includes internal storage checks and test mode logic.	
 			# At this point all deferral and deadline options have been evaluated.
 			if [[ "$deadlineDateSTATUS" == "HARD" ]] || [[ "$deadlineDaysSTATUS" == "HARD" ]] || [[ "$deadlineCountSTATUS" == "HARD" ]]; then # A hard deadline has passed, similar to no logged in user but with a notification.
 				[[ "$userAuthMDMFailoverHARD" == "TRUE" ]] && userAuthMDMFAILOVER="TRUE"

@@ -1,0 +1,168 @@
+
+Wed May 03 14:35:38 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 DOWNLOAD macOS Ventura 13.3.1 SOFTWAREUPDATE START ****
+Software Update Tool
+
+Finding available software
+Downloading macOS Ventura 13.3.1
+
+Downloading: 0.10%
+Downloading: 1.00%
+Downloading: 1.90%
+Wed May 03 14:35:44 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+
+Downloading: 3.00%
+Downloading: 3.90%
+Downloading: 4.00%
+Downloading: 6.90%
+Downloading: 7.00%
+Downloading: 8.90%
+Downloading: 9.00%
+Downloading: 9.90%
+Downloading: 10.00%
+Downloading: 16.00%
+Downloading: 19.98%
+Downloading: 20.53%
+Downloading: 21.10%
+Downloading: 21.64%
+Downloading: 22.21%
+Downloading: 22.79%
+Downloading: 23.36%
+Downloading: 23.93%
+Downloading: 24.53%
+Downloading: 25.10%
+Downloading: 25.60%
+Downloading: 26.17%
+Downloading: 26.72%
+Downloading: 27.25%
+Downloading: 27.81%
+Downloading: 28.36%
+Downloading: 28.87%
+Downloading: 29.36%
+Downloading: 29.79%
+Downloading: 30.30%
+Downloading: 30.81%
+Downloading: 31.35%
+Downloading: 31.89%
+Downloading: 32.44%
+Downloading: 33.00%
+Downloading: 33.56%
+Downloading: 34.14%
+Downloading: 34.71%
+Downloading: 35.21%
+Downloading: 35.62%
+Downloading: 36.14%
+Downloading: 36.66%
+Downloading: 37.17%
+Downloading: 37.69%
+Downloading: 38.25%
+Downloading: 38.81%
+Downloading: 39.38%
+Downloading: 39.96%
+Downloading: 40.53%
+Downloading: 41.10%
+Downloading: 41.66%
+Downloading: 42.22%
+Downloading: 42.79%
+Downloading: 43.35%
+Downloading: 43.93%
+Downloading: 44.50%
+Downloading: 45.06%
+Downloading: 45.61%
+Downloading: 46.16%
+Downloading: 46.73%
+Downloading: 47.30%
+Downloading: 47.89%
+Downloading: 48.45%
+Downloading: 49.01%
+Downloading: 49.58%
+Downloading: 50.16%
+Downloading: 50.56%
+Downloading: 51.06%
+Downloading: 51.58%
+Downloading: 51.97%
+Downloading: 52.47%
+Downloading: 52.98%
+Downloading: 53.50%
+Downloading: 53.63%
+Downloading: 53.70%
+Downloading: 53.85%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 53.90%
+Downloading: 54.90%
+Downloading: 55.00%
+Downloading: 60.00%
+Wed May 03 14:38:17 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+
+Downloading: 60.00%
+Downloading: 86.46%
+Downloading: 88.50%
+Downloading: 91.15%
+Downloading: 92.74%
+Downloading: 93.15%
+Downloading: 93.79%
+Downloading: 94.27%
+Downloading: 94.74%
+Downloading: 95.55%
+Downloading: 96.46%
+Downloading: 97.11%
+Downloading: 97.93%
+Downloading: 98.39%
+Downloading: 98.51%
+Downloading: 99.90%
+Downloading: 100.00%
+Downloaded: macOS Ventura 13.3.1
+
+Wed May 03 14:49:34 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+
+Wed May 03 14:49:34 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 DOWNLOAD SOFTWAREUPDATE COMPLETED ****
+
+Wed May 03 15:00:52 ASVM-13-0 super[743]: **** S.U.P.E.R.M.A.N. 3.0b11 INSTALL RECOMMENDED (NON-SYSTEM) UPDATES SOFTWAREUPDATE START ****
+2023-05-03 15:00:52.777 softwareupdate[2753:11992] XType: Using static font registry.
+Software Update Tool
+
+Finding available software
+
+Downloading SF Symbols
+Downloaded SF Symbols
+Wed May 03 15:01:10 ASVM-13-0 super[743]: **** TIMESTAMP ****
+
+Wed May 03 15:01:10 ASVM-13-0 super[743]: **** TIMESTAMP ****
+
+Installing SF Symbols
+Done with SF Symbols
+Done.
+
+Wed May 03 15:01:15 ASVM-13-0 super[743]: **** TIMESTAMP ****
+
+Wed May 03 15:01:15 ASVM-13-0 super[743]: **** TIMESTAMP ****
+
+Wed May 03 15:01:15 ASVM-13-0 super[743]: **** S.U.P.E.R.M.A.N. 3.0b11 RECOMMENDED (NON-SYSTEM) UPDATES SOFTWAREUPDATE COMPLETED ****

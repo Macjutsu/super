@@ -1,0 +1,23 @@
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 UPDATE MACOS 13.3.1 MDM START ****
+Filtering the log data using "subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil""
+Timestamp               Ty Process[PID:TID]
+2023-05-03 14:49:55.377 Df mdmclient[9341:6f30] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x6f30>] >>>>> Sending HTTP request (PUT) [Idle] >>>>>
+2023-05-03 14:49:55.590 Df mdmclient[9341:6f30] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x6f30>] <<<<< Received HTTP response (200) [Idle] <<<<<
+2023-05-03 14:49:55.601 Df mdmclient[9341:6f30] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x6f30>] >>>>> Sending HTTP request (PUT) [Acknowledged(ScheduleOSUpdateScan):e1e48384-d47b-4641-9ba1-b112c87a31da] >>>>>
+2023-05-03 14:49:55.673 Df mdmclient[9341:6f30] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x6f30>] <<<<< Received HTTP response (200) [Acknowledged(ScheduleOSUpdateScan):e1e48384-d47b-4641-9ba1-b112c87a31da] <<<<<
+2023-05-03 14:49:55.684 Df mdmclient[9341:6f30] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x6f30>] >>>>> Sending HTTP request (PUT) [Idle] >>>>>
+Wed May 03 14:49:55 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+2023-05-03 14:49:55.850 Df mdmclient[9341:6f30] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x6f30>] <<<<< Received HTTP response (200) [Idle] <<<<<
+Wed May 03 14:55:09 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+2023-05-03 14:55:10.037 Df mdmclient[11141:84ca] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84ca>] >>>>> Sending HTTP request (PUT) [Idle] >>>>>
+2023-05-03 14:55:10.681 Df mdmclient[11141:84ca] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84ca>] <<<<< Received HTTP response (200) [Idle] <<<<<
+Wed May 03 14:55:10 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+2023-05-03 14:55:15.575 Df mdmclient[11141:84ca] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84ca>] >>>>> Sending HTTP request (PUT) [Acknowledged(AvailableOSUpdates):3766bd79-6530-4b6e-9d95-48a8e84580b0] >>>>>
+2023-05-03 14:55:15.710 Df mdmclient[11141:84ca] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84ca>] <<<<< Received HTTP response (200) [Acknowledged(AvailableOSUpdates):3766bd79-6530-4b6e-9d95-48a8e84580b0] <<<<<
+Wed May 03 14:55:15 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+2023-05-03 14:55:16.166 Df mdmclient[11141:84cb] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84cb>] >>>>> Sending HTTP request (PUT) [Idle] >>>>>
+2023-05-03 14:55:16.401 Df mdmclient[11141:84cb] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84cb>] <<<<< Received HTTP response (200) [Idle] <<<<<
+Wed May 03 14:55:16 ASVM-13-0 super[3414]: **** TIMESTAMP ****
+2023-05-03 14:55:19.080 Df mdmclient[11141:84cb] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84cb>] >>>>> Sending HTTP request (PUT) [Acknowledged(ScheduleOSUpdate):f1fd75b5-ad4d-42d7-83d7-93384ae977e5] >>>>>
+2023-05-03 14:55:19.158 Df mdmclient[11141:84cb] [com.apple.ManagedClient:HTTPUtil] [0:MDMDaemon:HTTPUtil:<0x84cb>] <<<<< Received HTTP response (200) [Acknowledged(ScheduleOSUpdate):f1fd75b5-ad4d-42d7-83d7-93384ae977e5] <<<<<
+Wed May 03 14:55:19 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 UPDATE/UPGRADE MACOS MDM PUSH COMPLETED ****

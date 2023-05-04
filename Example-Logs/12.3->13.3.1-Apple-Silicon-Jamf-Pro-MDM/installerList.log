@@ -1,6 +1,6 @@
 
-   [erase-install] v27.3 script execution started: Wed Mar 29 19:54:54 PDT 2023
-   [erase-install] Caffeinating this script (pid=3377)
+   [erase-install] v27.3 script execution started: Thu May  4 05:03:51 PDT 2023
+   [erase-install] Caffeinating this script (pid=4064)
    [erase-install] Looking for existing installer app or pkg
    [find_existing_installer] No valid installer found.
    [erase-install] Running on architecture arm64
@@ -43,23 +43,24 @@ Build ID         : 21E258
 19  002-77154       11.6.5     20G527   2022-04-11  macOS Big Sur                  Unsupported macOS version
 20  012-08272       11.6.6     20G624   2022-05-24  macOS Big Sur                  Unsupported macOS version
 21  012-60271       13.1       22C65    2023-01-11  macOS Ventura                  
-22  032-12843       12.6.2     21G320   2023-01-11  macOS Monterey                 
-23  032-12833       11.7.2     20G1020  2023-01-11  macOS Big Sur                  Unsupported macOS version
-24  032-35706       13.2       22D49    2023-01-23  macOS Ventura                  
-25  032-33756       11.7.3     20G1116  2023-01-31  macOS Big Sur                  Unsupported macOS version
-26  032-33828       12.6.3     21G419   2023-01-31  macOS Monterey                 
-27  032-48342       13.2.1     22D68    2023-02-20  macOS Ventura                  
-28  032-50519       11.7.4     20G1120  2023-02-15  macOS Big Sur                  Unsupported macOS version
-29  002-75541       13.3       22E252   2023-03-27  macOS Ventura                  
-30  032-63749       12.6.4     21G526   2023-03-27  macOS Monterey                 
-31  032-63762       11.7.5     20G1225  2023-03-27  macOS Big Sur                  Unsupported macOS version
+22  032-35706       13.2       22D49    2023-01-23  macOS Ventura                  
+23  032-33756       11.7.3     20G1116  2023-01-31  macOS Big Sur                  Unsupported macOS version
+24  032-33828       12.6.3     21G419   2023-01-31  macOS Monterey                 
+25  032-50519       11.7.4     20G1120  2023-02-15  macOS Big Sur                  Unsupported macOS version
+26  032-48342       13.2.1     22D68    2023-02-20  macOS Ventura                  
+27  002-75541       13.3       22E252   2023-03-27  macOS Ventura                  
+28  032-63749       12.6.4     21G526   2023-03-27  macOS Monterey                 
+29  032-63762       11.7.5     20G1225  2023-03-27  macOS Big Sur                  Unsupported macOS version
+30  032-66588       13.3.1     22E261   2023-04-17  macOS Ventura                  
+31  032-71575       12.6.5     21G531   2023-04-17  macOS Monterey                 
+32  032-71551       11.7.6     20G1231  2023-04-17  macOS Big Sur                  Unsupported macOS version
 
-Latest valid build: 22E252 (# 29)
+Latest valid build: 22E261 (# 30)
 
 Valid seeding programs are: CustomerSeed, DeveloperSeed, PublicSeed
 
 
    [erase-install] attempting to terminate the 'caffeinate' process - Termination message indicates success
-/Library/Management/erase-install/erase-install.sh: line 1047:  3395 Terminated: 15          /usr/bin/caffeinate -dimsu -w $$
+/Library/Management/erase-install/erase-install.sh: line 1047:  4081 Terminated: 15          /usr/bin/caffeinate -dimsu -w $$
 
    [finish] Script exit code: 0

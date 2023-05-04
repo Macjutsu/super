@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [3.0b11]
+
+2023-05-04
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New support for macOS 13 Rapid Security Response (RSR) updates. By (Apple) design, RSR updates still require a system restart to completely install and must also be installed separately from other macOS updates/upgrades. For example, macOS 13.3.1 must be installed before the system can install the macOS RSR 13.3.1 (a) update. However, the total workflow time for completing a RSR update is much faster than a standard macOS update.
+- New `--allow-rsr-updates` option must be specified to install RSR updates, otherwise the default `super` behavior is to not install RSR updates.
+- New`--display-accessory-user-auth=/local/path or URL` option can accept a local path or a web URL (this option also requires setting the `--user-auth-mdm-failover=TYPE` option). This shows specific display accessory content for the user authentication dialog.
+- New bootstrap token validation for computers running macOS 13.3 or later. Earlier versions of macOS can only report if the bootstrap token was previously escrowed but unfortunately there is no local method to determine if the escrowed token is still valid.
+- Renamed `--enforce-non-system-updates` option replaces the `--enforce-all-updates` option. This is only a name change to improve clarity of the feature.
+- Renamed `--defer-dialog-timeout=seconds` option replaces the `--defer-display-timeout=seconds` option. This is only a name change to improve clarity of the feature.
+- Renamed `--soft-dialog-timeout=seconds` option replaces the `--soft-display-timeout=seconds` option. This is only a name change to improve clarity of the feature.
+- Renamed `--restart-without-updates` option replaces the `--force-restart` option. This is only a name change to improve clarity of the feature.
+- Updated MDM workflow is now more reliable when used with newer versions of Jamf Pro.
+- Updated [Generate-MDM-Update-Jamf-API.sh](https://github.com/Macjutsu/super/blob/main/Super-Friends/Create-MDM-Update-Jamf-API.sh) script aligns with updated MDM workflow.
+- Updated `--verbose-mode` option now creates two additional debug-level logs for troubleshooting the MDM workflow located at `/Library/Management/super/mdmCommandDebug.log` and `/Library/Management/super/mdmWorkflowDebug.log`.
+- Updated user authentication MDM failover workflow can now prompt for credentials earlier, detect more potential MDM failures, and only attempts to escrow the bootstrap token when the MDM service is actually available.
+- Updated test mode validation will temporarily adjust timeouts to improve the test mode behavior. (Thanks to Dustin Nikles in #super on MacAdmins Slack for finding this one!)
+- Updated method for detecting if the Jamf binary is the parent process. (Thanks to @iDrewbs for finding this one!)
+- Updated method for finding available storage space when no user is logged in. (Thanks to @gzilla13 for finding this one!)
+- Resolved issues causing improper calculation of macOS update sizes in non-USA regions. (Thanks to @gzilla13 and @davidjimenezm for helping with this!)
+- Resolved issues causing improper validation of dialog timeout options. (Thanks to @gzilla13 for finding this one!)
+- Resolved issues preventing the Defer button from showing the correct deferment time. (Thanks to @iDrewbs for finding this one!)
+- Resolved issues preventing the completion of the install non-system updates workflow.
+- As always, countless logging refinements and correction of typos.
+- Updated [example logs](https://github.com/Macjutsu/super/blob/main/Example-Logs). (Still more to examples to come in the future!)
+- Updated [example MDM configuration profiles for `super` 3.0b11](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- `super` 3.0b11 SHA-256: 7e74c463511b2962c7b984db889256a98c606219fe70af89c2d9d32981f89fd0
+
 ## [3.0b10]
 
 2023-03-29
@@ -20,12 +49,12 @@
 - New [Example-Logs](https://github.com/Macjutsu/super/blob/main/Example-Logs) folder contains multiple examples of successful macOS update/upgrades with different plaforms and workflows. (More to examples to come in the future!)
 - The `$softwareUpdateTimeoutSECONDS` increased to 1200 seconds because `softwareupdate` fails to report macOS preparation progress reliably even when it's working.
 - The automatic removal of unnecessary macOS installers now ignores installers found in user home folders, except for installers found in ~/Applications, ~/Desktop, and ~/Downloads. In other words, if an unnecessary macOS installer is found in ~/Documents or ~/Library it will be ignored (the presumption being that it's an intentional archive), but if found in ~/Downloads it will be deleted. (Thanks to @dustin and @julienvs in #super on MacAdmins Slack for sacrificing their personal macOS installer archive!)
-- Resolved an issue during installation if the `/user/local/bin` folder was missing from the local system. (Thanks to @Fluffy in #super on MacAdmins Slack for finding this one!)
-- Resolved several issues where the deferral timer was not being set properly. (Thanks to @dustin and @Scott Thompson in #super on MacAdmins Slack for finding this one!)
-- Resolved an issue where the enforce all items workflow was no properly closing notifications. (Thanks to @Scott Thompson in #super on MacAdmins Slack for finding this one!)
-- Resolved an issue where the macOS update/upgrade download sizes were improperly calculated when a comma was used in the download size. (Thanks to @MiWeMP in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue during installation if the `/user/local/bin` folder was missing from the local system. (Thanks to Matthieu Sibilleau in #super on MacAdmins Slack for finding this one!)
+- Resolved several issues where the deferral timer was not being set properly. (Thanks to Dustin Nikles and Scott Thompson in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue where the enforce all items workflow was no properly closing notifications. (Thanks to Scott Thompson in #super on MacAdmins Slack for finding this one!)
+- Resolved an issue where the macOS update/upgrade download sizes were improperly calculated when a comma was used in the download size. (Thanks to MiWeMP in #super on MacAdmins Slack for finding this one!)
 - As always, countless logging refinements and correction of typos.
-- Updated [example MDM profiles for `super` 3.0b10](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` 3.0b10](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 - `super` 3.0b10 SHA-256: 737f9a054d86173bc08e07bfdf23045b869b6c54a9cf6d3851f2f638aed07105
 
 ## [3.0b9]
@@ -72,12 +101,12 @@
 - Improved restart validation mechanism (after macOS update/upgrade restart) is now more reliable.
 - Improved soft and hard deadline information now shows in all appropriate macOS update/upgrade dialogs and notifications.
 - Resolved an issue preventing the proper Deferral button text from showing. (Thanks to @homert83 and multiple folks in #super on MacAdmins Slack for spotting this one!)
-- Resolved an issue that caused incompatible macOS Installers to download on older Mac computers. (Thanks to @Kasper Andresen on MacAdmins Slack for spotting this one!)
+- Resolved an issue that caused incompatible macOS Installers to download on older Mac computers. (Thanks to Kasper Andresen in #super on MacAdmins Slack for spotting this one!)
 - Resolved several issues causing incorrect macOS Installer download status.
 - Removed the `--display-timeout=seconds` option in favor of new specific timeout options.
 - Updates to the `setDisplayLanguage()` function to allow for new install now workflow, available free space notification, power required notification, and user authentication dialog.
 - As always, countless logging refinements and correction of typos.
-- Updated [example MDM profiles for `super` 3.0b9](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` 3.0b9](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 - `super` 3.0b9 SHA-256: 07c75419c723a5c7effd520ed52095b83cd7e806e924cb49dcc11260c41a018e
 
 ## [3.0b8]
@@ -116,7 +145,7 @@
 - Bootstrap token validation now happens earlier in the credential management workflow and generates less logging on subsequent runs.
 - Updates to the `setDisplayLanguage()` function to allow for new IBM Notifier display options and improved self-update/upgrade workflow text.
 - As always, countless logging refinements and correction of typos.
-- Updated [example MDM profiles for `super` 3.0b8](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` 3.0b8](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 - `super` 3.0b8 SHA-256: a38c66833811b2de2839a3c2f2c47523879cf9ce6eb5be40fc54a3793658d45a
 
 ## [3.0b7]
@@ -134,7 +163,7 @@
 - Improved `--test-mode` behavior.
 - As always, countless logging refinements.
 - Updated Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Installed-Version-Jamf-Pro-EA.sh) now collects older versions of `super` as well. (Thanks to @wakco for this one!)
-- Updated [example MDM profiles for `super` 3.0b7](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` 3.0b7](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 - `super` 3.0b7 SHA-256: 23c6402379154f249d8ff6e1182bf500960fb118bdf16b4ccb01d6df26a91e85
 
 ## [3.0b6]

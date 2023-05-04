@@ -1,0 +1,147 @@
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: **** S.U.P.E.R.M.A.N. 3.0b11 INSTALLATION ****
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Installation: Copying file: /Library/Management/super/super
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Installation: Creating search path link: /usr/local/bin/super
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Installation: Creating LaunchDaemon helper: /Library/Management/super/super-starter
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Installation: Setting permissions in: /Library/Management/super
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: **** S.U.P.E.R.M.A.N. 3.0b11 STARTUP ****
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Startup: Deleting all local non-account preferences.
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Status: Restarting automatically set zero day date.
+Wed May 03 14:33:23 ASVM-13-0 super[1737]: Status: Restarting maximum deferral counters.
+Wed May 03 14:33:24 ASVM-13-0 super[1737]: Status: Current GUI user name is "build".
+Wed May 03 14:33:24 ASVM-13-0 super[1737]: Startup: No custom display icon found, copying default icon from: /System/Library/PrivateFrameworks/SoftwareUpdate.framework/Versions/A/Resources/SoftwareUpdate.icns
+Wed May 03 14:33:25 ASVM-13-0 super[1737]: Startup: No saved accounts to delete.
+Wed May 03 14:33:25 ASVM-13-0 super[1737]: Startup: Saving new credentials for Jamf Pro API account "super"...
+Wed May 03 14:33:25 ASVM-13-0 super[1737]: Startup: Validated saved credentials for Jamf Pro API account "super".
+Wed May 03 14:33:25 ASVM-13-0 super[1737]: Startup: Apple Silicon Mac computer running macOS 13.0-22A380.
+Wed May 03 14:33:25 ASVM-13-0 super[1737]: Startup: Last macOS startup was Wed May 3 14:28.
+Wed May 03 14:33:25 ASVM-13-0 super[1737]: Startup: macOS update/upgrade workflows authenticated via Jamf Pro API with no user authentication MDM failover.
+Wed May 03 14:33:26 ASVM-13-0 super[1737]: Startup: Attempting to download and install IBM Notifier.app...
+Wed May 03 14:33:27 ASVM-13-0 super[1737]: Startup: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon...
+Wed May 03 14:33:27 ASVM-13-0 super[1737]: Exit: LaunchDaemon com.macjutsu.super.plist is scheduled to start right now.
+Wed May 03 14:33:27 ASVM-13-0 super[1737]: **** S.U.P.E.R.M.A.N. 3.0b11 EXIT ****
+Wed May 03 14:33:27 ASVM-13-0 super-starter[2327]: **** S.U.P.E.R.M.A.N. 3.0b11 LAUNCHDAEMON ****
+Wed May 03 14:33:27 ASVM-13-0 super[2348]: **** S.U.P.E.R.M.A.N. 3.0b11 STARTUP ****
+Wed May 03 14:33:28 ASVM-13-0 super[2348]: Startup: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed May 03 14:33:28 ASVM-13-0 super[2348]: Status: Current GUI user name is "build".
+Wed May 03 14:33:28 ASVM-13-0 super[2348]: Startup: Found saved credentials for Jamf Pro API account "super".
+Wed May 03 14:33:29 ASVM-13-0 super[2348]: Startup: Validated saved credentials for Jamf Pro API account "super".
+Wed May 03 14:33:29 ASVM-13-0 super[2348]: Startup: Apple Silicon Mac computer running macOS 13.0-22A380.
+Wed May 03 14:33:29 ASVM-13-0 super[2348]: Startup: Last macOS startup was Wed May 3 14:28.
+Wed May 03 14:33:29 ASVM-13-0 super[2348]: Startup: macOS update/upgrade workflows authenticated via Jamf Pro API with no user authentication MDM failover.
+Wed May 03 14:33:30 ASVM-13-0 super[2348]: Startup: Creating fail-safe startup LaunchDaemon.
+Wed May 03 14:33:30 ASVM-13-0 super[2348]: Status: LaunchDaemon com.macjutsu.super.plist is scheduled at next startup.
+Wed May 03 14:33:30 ASVM-13-0 super[2348]: **** S.U.P.E.R.M.A.N. 3.0b11 SKIP UPDATES/UPGRADE ****
+Wed May 03 14:33:30 ASVM-13-0 super[2348]: Status: Recheck deferral is inactive.
+Wed May 03 14:33:30 ASVM-13-0 super[2348]: Status: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed May 03 14:33:30 ASVM-13-0 super[2348]: **** S.U.P.E.R.M.A.N. 3.0b11 EXIT ****
+Wed May 03 14:35:25 ASVM-13-0 super[2908]: **** S.U.P.E.R.M.A.N. 3.0b11 INSTALLATION ****
+Wed May 03 14:35:25 ASVM-13-0 super[2908]: Installation: Copying file: /Library/Management/super/super
+Wed May 03 14:35:25 ASVM-13-0 super[2908]: Installation: Creating search path link: /usr/local/bin/super
+Wed May 03 14:35:25 ASVM-13-0 super[2908]: Installation: Creating LaunchDaemon helper: /Library/Management/super/super-starter
+Wed May 03 14:35:25 ASVM-13-0 super[2908]: Installation: Setting permissions in: /Library/Management/super
+Wed May 03 14:35:25 ASVM-13-0 super[2908]: **** S.U.P.E.R.M.A.N. 3.0b11 STARTUP ****
+Wed May 03 14:35:26 ASVM-13-0 super[2908]: Status: Current GUI user name is "build".
+Wed May 03 14:35:26 ASVM-13-0 super[2908]: Startup: Opening logs for user "build".
+Wed May 03 14:35:26 ASVM-13-0 super[2908]: Startup: Found saved credentials for Jamf Pro API account "super".
+Wed May 03 14:35:27 ASVM-13-0 super[2908]: Startup: Validated saved credentials for Jamf Pro API account "super".
+Wed May 03 14:35:27 ASVM-13-0 super[2908]: Startup: Apple Silicon Mac computer running macOS 13.0-22A380.
+Wed May 03 14:35:27 ASVM-13-0 super[2908]: Startup: Last macOS startup was Wed May 3 14:28.
+Wed May 03 14:35:27 ASVM-13-0 super[2908]: Startup: macOS update/upgrade workflows authenticated via Jamf Pro API with no user authentication MDM failover.
+Wed May 03 14:35:28 ASVM-13-0 super[2908]: Startup: Found that Jamf is installing or is the parent process, restarting with new LaunchDaemon...
+Wed May 03 14:35:28 ASVM-13-0 super[2908]: Exit: LaunchDaemon com.macjutsu.super.plist is scheduled to start right now.
+Wed May 03 14:35:28 ASVM-13-0 super[2908]: **** S.U.P.E.R.M.A.N. 3.0b11 EXIT ****
+Wed May 03 14:35:28 ASVM-13-0 super-starter[3402]: **** S.U.P.E.R.M.A.N. 3.0b11 LAUNCHDAEMON ****
+Wed May 03 14:35:28 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 STARTUP ****
+Wed May 03 14:35:29 ASVM-13-0 super[3414]: Startup: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed May 03 14:35:29 ASVM-13-0 super[3414]: Status: Current GUI user name is "build".
+Wed May 03 14:35:29 ASVM-13-0 super[3414]: Startup: Found saved credentials for Jamf Pro API account "super".
+Wed May 03 14:35:30 ASVM-13-0 super[3414]: Startup: Validated saved credentials for Jamf Pro API account "super".
+Wed May 03 14:35:30 ASVM-13-0 super[3414]: Startup: Apple Silicon Mac computer running macOS 13.0-22A380.
+Wed May 03 14:35:30 ASVM-13-0 super[3414]: Startup: Last macOS startup was Wed May 3 14:28.
+Wed May 03 14:35:30 ASVM-13-0 super[3414]: Startup: macOS update/upgrade workflows authenticated via Jamf Pro API with no user authentication MDM failover.
+Wed May 03 14:35:30 ASVM-13-0 super[3414]: Startup: Creating fail-safe startup LaunchDaemon.
+Wed May 03 14:35:30 ASVM-13-0 super[3414]: Status: LaunchDaemon com.macjutsu.super.plist is scheduled at next startup.
+Wed May 03 14:35:31 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 CHECK SOFTWARE UPDATES/UPGRADE ****
+Wed May 03 14:35:31 ASVM-13-0 super[3414]: Status: Last automatic software update check was less than 6 hours ago.
+Wed May 03 14:35:31 ASVM-13-0 super[3414]: Status: No software update list cache, full update/upgrade check required.
+Wed May 03 14:35:31 ASVM-13-0 super[3414]: Status: Starting full check for software updates...
+Wed May 03 14:35:35 ASVM-13-0 super[3414]: softwareupdate: Waiting for update list...
+Wed May 03 14:35:35 ASVM-13-0 super[3414]: Status: macOS update available: macOS Ventura 13.3.1-22E261
+Wed May 03 14:35:35 ASVM-13-0 super[3414]: Status: 1 available recommended (non-system) update(s).
+Wed May 03 14:35:35 ASVM-13-0 super[3414]: Status: Recommended (non-system) update 1: SFSymbolsAuto-4.0
+Wed May 03 14:35:35 ASVM-13-0 super[3414]: Status: Starting full check for macOS upgrades...
+Wed May 03 14:35:35 ASVM-13-0 super[3414]: mdmclient: Waiting for macOS upgrade list...
+Wed May 03 14:35:37 ASVM-13-0 super[3414]: Status: No available macOS upgrade or it may be deferred via configuration profile.
+Wed May 03 14:35:37 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 UPDATE MACOS 13.3.1 MDM PUSH ****
+Wed May 03 14:35:37 ASVM-13-0 super[3414]: Status: Current GUI user name is "build".
+Wed May 03 14:35:37 ASVM-13-0 super[3414]: Status: Setting new automatic day zero date to 2023-05-03:14:35.
+Wed May 03 14:35:38 ASVM-13-0 super[3414]: softwareupdate: Starting macOS Ventura 13.3.1 download workflow, check /Library/Management/super/asu.log for more detail.
+Wed May 03 14:35:44 ASVM-13-0 super[3414]: softwareupdate: macOS Ventura 13.3.1 is downloading...
+Wed May 03 14:38:17 ASVM-13-0 super[3414]: softwareupdate: macOS Ventura 13.3.1 download complete, now preparing...
+Wed May 03 14:49:34 ASVM-13-0 super[3414]: softwareupdate: macOS Ventura 13.3.1 download and preparation complete.
+Wed May 03 14:49:34 ASVM-13-0 super[3414]: IBM Notifier: Ask for restart or defer dialog with no timeout.
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: Status: User chose to restart now.
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: Status: MDM service is currently available at: https://macjutsu.jamfcloud.com
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: Status: Bootstrap token escrowed with MDM service.
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: IBM Notifier: Default preparing update notification showing a 5 minute estimate.
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: MDM: Starting macOS 13.3.1 update workflow.
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: MDM: check /Library/Management/super/mdmCommand.log and /Library/Management/super/mdmWorkflow.log for more detail.
+Wed May 03 14:49:39 ASVM-13-0 super[3414]: Status: Restarting various softwareupdate daemon processes...
+Wed May 03 14:49:55 ASVM-13-0 super[3414]: MDM: Successful macOS update/upgrade command request.
+Wed May 03 14:49:55 ASVM-13-0 super[3414]: MDM: Received push command "ScheduleOSUpdateScan", checking back after Jamf Pro's mandatory 5 minute delay...
+Wed May 03 14:55:09 ASVM-13-0 super[3414]: MDM: Jamf Pro's mandatory 5 minute delay should be complete, sending Blank Push...
+Wed May 03 14:55:09 ASVM-13-0 super[3414]: IBM Notifier: Default restart soon notification.
+Wed May 03 14:55:09 ASVM-13-0 super[3414]: MDM: Received blank push.
+Wed May 03 14:55:10 ASVM-13-0 super[3414]: MDM: Received blank push.
+Wed May 03 14:55:15 ASVM-13-0 super[3414]: MDM: Received push command "AvailableOSUpdates".
+Wed May 03 14:55:16 ASVM-13-0 super[3414]: MDM: Received blank push.
+Wed May 03 14:55:19 ASVM-13-0 super[3414]: MDM: Received push command "ScheduleOSUpdate", local update/upgrade workflow should start soon...
+Wed May 03 14:56:22 ASVM-13-0 super[3414]: MDM: macOS Ventura 13.3.1-22E261 update is prepared and ready for restart.
+Wed May 03 14:56:22 ASVM-13-0 super[3414]: Exit: macOS update/upgrade restart is imminent, super is scheduled to run at next startup.
+Wed May 03 14:56:23 ASVM-13-0 super[3414]: **** S.U.P.E.R.M.A.N. 3.0b11 EXIT ****
+Wed May 03 14:59:12 ASVM-13-0 super-starter[593]: **** S.U.P.E.R.M.A.N. 3.0b11 LAUNCHDAEMON ****
+Wed May 03 14:59:21 ASVM-13-0 super[743]: **** S.U.P.E.R.M.A.N. 3.0b11 STARTUP ****
+Wed May 03 14:59:21 ASVM-13-0 super[743]: Status: Restarting automatically set zero day date.
+Wed May 03 14:59:21 ASVM-13-0 super[743]: Status: Restarting maximum deferral counters.
+Wed May 03 14:59:22 ASVM-13-0 super[743]: Startup: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed May 03 14:59:22 ASVM-13-0 super[743]: Status: No GUI user currently logged in.
+Wed May 03 14:59:22 ASVM-13-0 super[743]: Startup: Found saved credentials for Jamf Pro API account "super".
+Wed May 03 15:00:40 ASVM-13-0 super[743]: Startup: Validated saved credentials for Jamf Pro API account "super".
+Wed May 03 15:00:40 ASVM-13-0 super[743]: Startup: Apple Silicon Mac computer running macOS 13.3.1-22E261.
+Wed May 03 15:00:40 ASVM-13-0 super[743]: Startup: Last macOS startup was Wed May 3 14:58.
+Wed May 03 15:00:40 ASVM-13-0 super[743]: Startup: macOS update/upgrade workflows authenticated via Jamf Pro API with no user authentication MDM failover.
+Wed May 03 15:00:41 ASVM-13-0 super[743]: Startup: Creating fail-safe startup LaunchDaemon.
+Wed May 03 15:00:41 ASVM-13-0 super[743]: Status: LaunchDaemon com.macjutsu.super.plist is scheduled at next startup.
+Wed May 03 15:00:41 ASVM-13-0 super[743]: **** S.U.P.E.R.M.A.N. 3.0b11 RESTART VALIDATION ****
+Wed May 03 15:00:41 ASVM-13-0 super[743]: Status: Starting full check for software updates...
+Wed May 03 15:00:50 ASVM-13-0 super[743]: softwareupdate: Waiting for update list...
+Wed May 03 15:00:50 ASVM-13-0 super[743]: Status: macOS Rapid Security Response update available but not allowed: macOS Security Response 13.3.1 (a)-22E772610a.
+Wed May 03 15:00:50 ASVM-13-0 super[743]: Status: 1 available recommended (non-system) update(s).
+Wed May 03 15:00:50 ASVM-13-0 super[743]: Status: Recommended (non-system) update 1: SFSymbolsAuto-4.0
+Wed May 03 15:00:50 ASVM-13-0 super[743]: Status: Starting full check for macOS upgrades...
+Wed May 03 15:00:50 ASVM-13-0 super[743]: mdmclient: Waiting for macOS upgrade list...
+Wed May 03 15:00:52 ASVM-13-0 super[743]: Status: No available macOS upgrade or it may be deferred via configuration profile.
+Wed May 03 15:00:52 ASVM-13-0 super[743]: softwareupdate: Starting recommended (non-system) software installation workflow, check /Library/Management/super/asu.log for more detail.
+Wed May 03 15:01:10 ASVM-13-0 super[743]: softwareupdate: SF Symbols is downloading...
+Wed May 03 15:01:10 ASVM-13-0 super[743]: softwareupdate: SF Symbols download complete.
+Wed May 03 15:01:15 ASVM-13-0 super[743]: softwareupdate: SF Symbols installed.
+Wed May 03 15:01:15 ASVM-13-0 super[743]: Status: Completed installation of all recommended (non-system) updates.
+Wed May 03 15:01:15 ASVM-13-0 super[743]: Status: Starting full check for software updates...
+Wed May 03 15:01:21 ASVM-13-0 super[743]: softwareupdate: Waiting for update list...
+Wed May 03 15:01:21 ASVM-13-0 super[743]: Status: macOS Rapid Security Response update available but not allowed: macOS Security Response 13.3.1 (a)-22E772610a.
+Wed May 03 15:01:21 ASVM-13-0 super[743]: Status: No available recommended (non-system) update(s) or they may be deferred via configuration profile.
+Wed May 03 15:01:21 ASVM-13-0 super[743]: Status: Starting full check for macOS upgrades...
+Wed May 03 15:01:21 ASVM-13-0 super[743]: mdmclient: Waiting for macOS upgrade list...
+Wed May 03 15:01:23 ASVM-13-0 super[743]: Status: No available macOS upgrade or it may be deferred via configuration profile.
+Wed May 03 15:01:23 ASVM-13-0 super[743]: Status: All available and enabled software updates/upgrade completed.
+Wed May 03 15:01:23 ASVM-13-0 super[743]: Status: Submitting updated inventory to Jamf Pro. Use --verbose-mode or check /var/log/jamf.log for more detail...
+Wed May 03 15:01:41 ASVM-13-0 super[743]: Status: Running Jamf Pro check-in policies. Use --verbose-mode or check /var/log/jamf.log for more detail...
+Wed May 03 15:01:44 ASVM-13-0 super[743]: **** S.U.P.E.R.M.A.N. 3.0b11 CHECK SOFTWARE UPDATES/UPGRADE ****
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: Last automatic software update check was less than 6 hours ago.
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: Cached software update list appears to be accurate.
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: macOS Rapid Security Response update available but not allowed: macOS Security Response 13.3.1 (a)-22E772610a.
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: No available recommended (non-system) update(s) or they may be deferred via configuration profile.
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: No available macOS upgrade or it may be deferred via configuration profile.
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: Recheck deferral is inactive.
+Wed May 03 15:01:44 ASVM-13-0 super[743]: Status: Removing previous LaunchDaemon com.macjutsu.super.plist.
+Wed May 03 15:01:45 ASVM-13-0 super[743]: **** S.U.P.E.R.M.A.N. 3.0b11 EXIT ****

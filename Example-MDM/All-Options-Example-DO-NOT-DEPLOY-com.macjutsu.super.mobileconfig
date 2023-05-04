@@ -46,6 +46,8 @@
               <dict>
                 <key>mcx_preference_settings</key>
                 <dict>
+                  <key>AllowRSRUpdates</key>
+                  <true/>
                   <key>AllowUpgrade</key>
                   <true/>
                   <key>BatteryLevel</key>
@@ -54,7 +56,7 @@
                   <string>3600</string>
                   <key>DefaultDefer</key>
                   <string>120</string>
-                  <key>DeferDisplayTimeout</key>
+                  <key>DeferDialogTimeout</key>
                   <string>60</string>
                   <key>DisplayAccessoryDefault</key>
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
@@ -64,13 +66,15 @@
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayAccessoryUpgrade</key>
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+                  <key>DisplayAccessoryUserAuth</key>
+                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayIcon</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayRedraw</key>
                   <string>20</string>
                   <key>DisplaySilently</key>
                   <false/>
-                  <key>EnforceAllUpdates</key>
+                  <key>EnforceNonSystemUpdates</key>
                   <true/>
                   <key>ErrorDefer</key>
                   <string>120</string>
@@ -82,8 +86,6 @@
                   <string>2</string>
                   <key>FocusDefer</key>
                   <string>120</string>
-                  <key>ForceRestart</key>
-                  <true/>
                   <key>FreeSpaceTimeout</key>
                   <string>3600</string>
                   <key>FreeSpaceUpdate</key>
@@ -116,6 +118,8 @@
                   <false/>
                   <key>RecheckDefer</key>
                   <string>120</string>
+                  <key>RestartWithoutUpdates</key>
+                  <true/>
                   <key>SkipUpdates</key>
                   <true/>
                   <key>SoftCount</key>
@@ -124,7 +128,7 @@
                   <string>2022-07-02:02</string>
                   <key>SoftDays</key>
                   <string>4</string>
-                  <key>SoftDisplayTimeout</key>
+                  <key>SoftDialogTimeout</key>
                   <string>60</string>
                   <key>TargetUpgrade</key>
                   <string>12</string>
