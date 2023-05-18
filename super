@@ -8,8 +8,8 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-superVERSION="3.0b12"
-superDATE="2023/05/04"
+superVERSION="3.0rc1"
+superDATE="2023/05/18"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -63,7 +63,7 @@ echo "
   [--super-account=AccountName] [--super-password=Password]
   [--jamf-account=AccountName] [--jamf-password=Password]
   [--delete-accounts] [--user-auth-timeout=seconds]
-  [--user-auth-mdm-failover=ALWAYS,SOFT,HARD,INSTALLNOW,BOOTSTRAP]
+  [--user-auth-mdm-failover=ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP]
   
   Update, Upgrade, and Restart Options:
   [--allow-upgrade] [--allow-upgrade-off] [--target-upgrade=version]
@@ -119,7 +119,7 @@ echo "
   <key>PreferJamfHelper</key> <true/> | <false/>
   <key>UserAuthTimeout</key> <string>seconds</string>
   <key>UserAuthMDMFailover</key>
-  <string>ALWAYS,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>
+  <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>
   <key>AllowUpgrade</key> <true/> | <false/>
   <key>TargetUpgrade</key> <string>version</string>
   <key>AllowRSRUpdates</key> <true/> | <false/>
@@ -1708,6 +1708,8 @@ elif [[ -n $userAuthMDMFailoverOPTION ]]; then
 	for option in "${userAuthMDMFailoverARRAY[@]}"; do
 		if [[ $option =~ ^ALWAYS$ ]]; then
 			userAuthMDMFAILOVER="TRUE"
+		elif [[ $option =~ ^NOSERVICE$ ]]; then
+			userAuthMDMFailoverNOSERVICE="TRUE"
 		elif [[ $option =~ ^SOFT$ ]]; then
 			userAuthMDMFailoverSOFT="TRUE"
 		elif [[ $option =~ ^HARD$ ]]; then
@@ -2278,7 +2280,10 @@ if [[ -n $jamfPROPERTY ]]; then
 				sendToLog "Startup: Validated saved credentials for Jamf Pro API account \"$jamfACCOUNT\"."
 				jamfCREDENTIAL="TRUE"
 			else
-				if [[ "$installNowOPTION" == "TRUE" ]]; then
+				if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverNOSERVICE" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
+					sendToLog "Warning: Unable to validate Jamf Pro user account, failing over to user authenticated workflow."
+					upgradeWORKFLOW="MDMFAIL"
+				elif [[ "$installNowOPTION" == "TRUE" ]]; then
 					sendToLog "Error: Unable to validate Jamf Pro user account, install now workflow can not continue."
 					sendToStatus "Inactive Error: Unable to validate Jamf Pro user account, install now workflow can not continue."
 					notifyInstallNowFailure
@@ -2291,7 +2296,10 @@ if [[ -n $jamfPROPERTY ]]; then
 				fi
 			fi
 		else
-			if [[ "$installNowOPTION" == "TRUE" ]]; then
+			if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverNOSERVICE" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
+				sendToLog "Warning: Unable to connect to Jamf Pro to validate user account, failing over to user authenticated workflow."
+				upgradeWORKFLOW="MDMFAIL"
+			elif [[ "$installNowOPTION" == "TRUE" ]]; then
 				sendToLog "Error: Unable to connect to Jamf Pro to validate user account, install now workflow can not continue."
 				sendToStatus "Inactive Error: Unable to connect to Jamf Pro to validate user account, install now workflow can not continue."
 				notifyInstallNowFailure
@@ -2304,7 +2312,12 @@ if [[ -n $jamfPROPERTY ]]; then
 			fi
 		fi
 	else
-		sendToLog "Credential Error: Unable to retrieve password for saved Jamf Pro API account \"$jamfACCOUNT\"."; credentialERROR="TRUE"
+		if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverNOSERVICE" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
+			sendToLog "Warning: Unable to retrieve password for saved Jamf Pro API account \"$jamfACCOUNT\", failing over to user authenticated workflow."
+			upgradeWORKFLOW="MDMFAIL"
+		else
+			sendToLog "Credential Error: Unable to retrieve password for saved Jamf Pro API account \"$jamfACCOUNT\"."; credentialERROR="TRUE"
+		fi
 	fi
 fi
 }
@@ -2315,7 +2328,6 @@ workflowERROR="FALSE"
 # Update/upgrade workflow modes: FALSE, JAMF, LOCAL, or USER
 updateWORKFLOW="FALSE"
 upgradeWORKFLOW="FALSE"
-# Beta workflow modes: FALSE, PublicSeed, CustomerSeed, or DeveloperSeed
 betaWORKFLOW="FALSE"
 
 # Logic to determin update/upgrade workflow.
@@ -2366,11 +2378,20 @@ fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW is: $upgradeWORKFLOW"
 
 # Check for beta program enrollment.
-seedutilSTATUS=$(/System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil current)
-[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: seedutilSTATUS is:\n$seedutilSTATUS"
-if [[ $(echo "$seedutilSTATUS" | grep -c 'Is Enrolled: YES') -gt 0 ]]; then
-	betaWORKFLOW=$(echo "$seedutilSTATUS" | awk '/Currently enrolled in:/ {print $4;}')
-	sendToLog "Startup: This system is currently enrolled in beta access program: $betaWORKFLOW"
+if [[ $macOSVERSION -ge 1304 ]]; then
+	queryDeviceINFO=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'IsDefaultCatalog')
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: queryDeviceINFO is:\n$queryDeviceINFO"
+	if [[ $(echo "$queryDeviceINFO" | grep -c '1') -eq 0 ]]; then
+		sendToLog "Startup: This system is currently configured to receive macOS beta updates and upgrades."
+		betaWORKFLOW="TRUE"
+	fi
+else # macOS versions prior to 13.4.
+	seedutilSTATUS=$(/System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil current)
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: seedutilSTATUS is:\n$seedutilSTATUS"
+	if [[ $(echo "$seedutilSTATUS" | grep -c 'Is Enrolled: YES') -gt 0 ]]; then
+		sendToLog "Startup: This system is currently configured to receive macOS beta updates and upgrades."
+		betaWORKFLOW="TRUE"
+	fi
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: betaWORKFLOW is: $betaWORKFLOW"
 }
@@ -2909,12 +2930,12 @@ sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: batteryTimeoutSECONDS is: $bat
 
 # Validate the connection to a managed computer's Jamf Pro service and set $jamfSERVER accordingly.
 getJamfProServer() {
-jamfSTATUS=$("$jamfBINARY" checkJSSConnection -retry 1)
+jamfSTATUS=$("$jamfBINARY" checkJSSConnection -retry 1 2>/dev/null)
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSTATUS is: $jamfSTATUS"
 if [[ $(echo "$jamfSTATUS" | grep -c 'available') -gt 0 ]]; then
 	jamfSERVER=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
 else
-	sendToLog "Status: Jamf Pro service unavailable."; jamfSERVER="FALSE"; jamfERROR="TRUE"
+	sendToLog "Warning: Jamf Pro service unavailable."; jamfSERVER="FALSE"; jamfERROR="TRUE"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSTATUS is: $jamfSTATUS"
 fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: jamfSERVER is: $jamfSERVER"
@@ -3229,12 +3250,12 @@ profilesRESULT=$(profiles status -type bootstraptoken 2>&1)
 if [[ $(echo "$profilesRESULT" | grep -c 'YES') -eq 2 ]]; then
 	if [[ "$macOSVERSION" -ge 1303 ]]; then
 		if [[ "$mdmSERVICE" != "FALSE" ]]; then
-			commandRESULT=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'EACSPreflight' | sed -e 's/        EACSPreflight = //g' -e 's/"//g' -e 's/;//g')
-			if [[ $(echo "$commandRESULT" | grep -c 'success') -gt 0 ]] || [[ $(echo "$commandRESULT" | grep -c 'EFI password exists') -gt 0 ]]; then
+			queryDeviceINFO=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'EACSPreflight' | sed -e 's/        EACSPreflight = //g' -e 's/"//g' -e 's/;//g')
+			if [[ $(echo "$queryDeviceINFO" | grep -c 'success') -gt 0 ]] || [[ $(echo "$queryDeviceINFO" | grep -c 'EFI password exists') -gt 0 ]]; then
 				sendToLog "Status: Bootstrap token escrowed and validated with MDM service."
 				bootstrapTOKEN="TRUE"
 			else
-				sendToLog "Warning: Bootstrap token escrow validation failed with status: $commandRESULT"
+				sendToLog "Warning: Bootstrap token escrow validation failed with status: $queryDeviceINFO"
 			fi
 		else
 			sendToLog "Warning: Bootstrap token was previously escrowed with MDM service but the service is currently unavailable so it can not be validated."
@@ -3779,17 +3800,17 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 		macOSSoftwareUpdateLABELS=($(echo "$softwareUpdateLIST" | grep 'Label: macOS' | sed -e 's/* Label: //' | sort -k3 -r -V))
 		macOSSoftwareUpdateTITLES=($(echo "$softwareUpdateLIST" | grep 'Title: macOS' | sed -e 's/,/:/g' | awk -F ': ' '{print $2}' | sort -k3 -r -V))
 		macOSSoftwareUpdateVERSIONS=($(echo "$softwareUpdateLIST" | grep 'Title: macOS' | sed -e 's/,/:/g' | awk -F ': ' '{print $4}' | sort -r -V))
-		macOSSoftwareUpdateGBS=($(echo "$softwareUpdateLIST" | grep 'Title: macOS' | sort -k6 -r -V | awk -F ': ' '{print $4}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}'))
+		macOSSoftwareUpdateGBS=($(echo "$softwareUpdateLIST" | grep 'Title: macOS' | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc))
 		macOSSoftwareUpdateLABEL=$(echo "${macOSSoftwareUpdateLABELS[*]}" | grep "$macOSMAJOR.\d")
 		macOSSoftwareUpdateTITLE=$(echo "${macOSSoftwareUpdateTITLES[*]}" | grep "$macOSMAJOR.\d")
 		macOSSoftwareUpdateVERSION=$(echo "${macOSSoftwareUpdateVERSIONS[*]}" | grep "$macOSMAJOR.\d")
-		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | grep " $macOSMAJOR.\d" | awk -F ': ' '{print $4}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
+		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | grep " $macOSMAJOR.\d" | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
 	elif [[ $macOSMAJOR -ge 11 ]] || [[ $macOSVERSION -ge 1015 ]]; then
 		allSoftwareUpdateLABELS=($(echo "$softwareUpdateLIST" | awk -F ': ' '/Label:/{print $2}'))
 		allSoftwareUpdateTITLES=($(echo "$softwareUpdateLIST" | awk -F ',' '/Title:/ {print $1}' | cut -d ' ' -f 2-))
 		macOSSoftwareUpdateLABEL=$(echo "$softwareUpdateLIST" | grep 'Label: macOS' | sed -e 's/* Label: //')
 		macOSSoftwareUpdateTITLE=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | sed -e 's/,/:/g' | awk -F ': ' '{print $2}')
-		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | awk -F ': ' '{print $4}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
+		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'Title: macOS' | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
 		if [[ $macOSMAJOR -eq 11 ]]; then
 			macOSSoftwareUpdateVERSION=$(echo "$macOSSoftwareUpdateLABEL" | grep -o '11.[0-9].[0-9]')
 		else
@@ -3800,7 +3821,7 @@ if [[ "$softwareUpdatesAVAILABLE" == "TRUE" ]]; then
 		allSoftwareUpdateTITLES=($(echo "$softwareUpdateLIST" | awk -F '(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//'))
 		macOSSoftwareUpdateLABEL=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '*' '/\*/{print $2}' | sed 's/^ //')
 		macOSSoftwareUpdateTITLE=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '(' '/\t/ {print $1}' | cut -d $'\t' -f 2 | sed 's/.$//')
-		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F '(' '/\t/ {print $2}' | sed -e 's/,//g' | grep -o -E '[0-9]+' | awk '{print $1/1000000}' | awk -F '.' '{print $1+1}')
+		macOSSoftwareUpdateGB=$(echo "$softwareUpdateLIST" | grep 'macOS' | awk -F ',' '{print $2}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
 		macOSSoftwareUpdateVERSION=$(echo "$macOSSoftwareUpdateLABEL" | grep -o '10.[0-9][0-9].[0-9]')
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: allSoftwareUpdateLABELS[] is:\n${allSoftwareUpdateLABELS[*]}"
@@ -5647,8 +5668,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 		kickSoftwareUpdateD
 		if [[ "$installNowOPTION" == "TRUE" ]]; then
 			if [[ "$userAuthMDMFAILOVER" == "TRUE" ]]; then
+				sendToMDMCommandLog "Error: Push workflow for macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
 				sendToLog "Error: Push workflow for macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
-				sendToStatus "Inactive Error: Push workflow for macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
 				upgradeWORKFLOW="MDMFAIL"
 				updateWORKFLOW="MDMFAIL"
 				unset policyTRIGGERS
@@ -5662,8 +5683,8 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 			fi
 		else # Default super workflow.
 			if [[ "$currentUserNAME" != "FALSE" ]] && [[ "$userAuthMDMFAILOVER" == "TRUE" ]]; then
+				sendToMDMCommandLog "Error: Push workflow for macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
 				sendToLog "Error: Push workflow for macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
-				sendToStatus "Pending: Push workflow for macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
 				upgradeWORKFLOW="MDMFAIL"
 				updateWORKFLOW="MDMFAIL"
 				unset policyTRIGGERS
@@ -6000,8 +6021,8 @@ installRestartWorkflowActiveUser() {
 if { [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] && [[ "$upgradeWORKFLOW" == "JAMF" ]]; } || { [[ "$softwareUpdateMACOS" == "TRUE" ]] && [[ "$updateWORKFLOW" == "JAMF" ]]; }; then
 	checkMDMService
 	if [[ "$mdmSERVICE" == "FALSE" ]]; then
-		if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
-			sendToLog "Status: User authentication failover active due to MDM service is not available."
+		if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverNOSERVICE" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
+			sendToLog "Warning: MDM service is not available, failing over to user authenticated workflow."
 			upgradeWORKFLOW="MDMFAIL"
 		else
 			if [[ "$installNowOPTION" == "TRUE" ]]; then
@@ -6021,7 +6042,7 @@ if { [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] && [[ "$upgradeWORKFLOW" == "
 		checkBootstrapToken
 		if [[ "$bootstrapTOKEN" == "FALSE" ]]; then
 			if [[ "$userAuthMDMFAILOVER" == "TRUE" ]] || [[ "$userAuthMDMFailoverBOOTSTRAP" == "TRUE" ]] || { [[ "$installNowOPTION" == "TRUE" ]] && [[ "$userAuthMDMFailoverINSTALLNOW" == "TRUE" ]]; }; then
-				sendToLog "Status: User authentication failover active due to missing bootstrap token escrow."
+				sendToLog "Warning: Missing or invalid bootstrap token escrow, failing over to user authenticated workflow."
 				updateWORKFLOW="MDMFAIL"
 			else
 				if [[ "$installNowOPTION" == "TRUE" ]]; then

@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [3.0rc1]
+
+2023-05-18
+
+- __UPGRADE NOTICE: Any version of `super` prior to 3.0b4 may unintentionally upgrade computers with macOS 12.6.2 to macOS 13.1+. You should avoid using any version of `super` prior to version 3.0b4 on macOS 12 or newer.__
+- New additional MDM failover type of `--user-auth-mdm-failover=NOSERVICE` fails over to the user authentication workflow any time the MDM service is unavailable or the API account fails to authenticate.
+- Updated macOS beta program detection method for macOS 13.4 and later.
+- New Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Deferral-Counter-Focus-Jamf-Pro-EA.sh) collects the number of times the Focus Deadline had been deferred.
+- New Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Deferral-Counter-Soft-Jamf-Pro-EA.sh) collects the number of times the Soft Deadline had been deferred.
+- New Jamf Pro [extension attribute script](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-Deferral-Counter-Hard-Jamf-Pro-EA.sh) collects the number of times the Hard Deadline had been deferred.
+- Resolved issues causing bad macOS update size calculation in non-USA regions. (Thanks to @davidjimenezm for fixing this one!)
+- `super` 3.0rc1 SHA-256: 88e8b15c02bff48dcab1842092289f66eea1b38a2d470ae6361ecc71ed0fe7b3
+
 ## [3.0b12]
 
 2023-05-04
