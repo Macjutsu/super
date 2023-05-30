@@ -8,8 +8,8 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-superVERSION="3.0rc1"
-superDATE="2023/05/18"
+superVERSION="3.0rc2"
+superDATE="2023/05/30"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -4057,13 +4057,9 @@ if [[ "$macOSUpgradeAVAILABLE" == "TRUE" ]]; then
 	if [[ $macOSVERSION -ge 1203 ]]; then  # Newer systems upgrade via softwareupdate.
 		defaults write "$superPLIST" macOSSoftwareUpgradeLabel -string "$macOSSoftwareUpgradeLABEL"
 		defaults write "$superPLIST" macOSSoftwareUpgradeTitle -string "$macOSSoftwareUpgradeTITLE"
-		defaults delete "$superPLIST" macOSUpgradeName 2> /dev/null
-		defaults delete "$superPLIST" macOSUpgradeVersion 2> /dev/null
 	fi
 	defaults write "$superPLIST" macOSUpgradeName -string "$macOSUpgradeNAME"
 	[[ $macOSVERSION -ge 1015 ]] && defaults write "$superPLIST" macOSUpgradeVersion -string "$macOSUpgradeVERSION"
-	defaults delete "$superPLIST" macOSSoftwareUpgradeLabel 2> /dev/null
-	defaults delete "$superPLIST" macOSSoftwareUpgradeTitle 2> /dev/null
 	
 	# If macOS upgrades are allowed then set various macOS upgrade targets.
 	if [[ "$upgradeWORKFLOW" != "FALSE" ]]; then
@@ -6531,13 +6527,15 @@ $deadlineDateDISPLAY."
 dialogUserAuthTITLE="$titleWorkflowDISPLAY Requires Authentication"
 dialogUserAuthDefaultBODY="You must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
 dialogUserAuthDeadlineCountBODY="You have deferred the maximum number of $countMaxDISPLAY times.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
-dialogUserAuthDeadlineDaysBODY="You have deferred the maximum number of $hardDaysMAX days.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
+dialogUserAuthDeadlineSoftDaysBODY="You have deferred the maximum number of $softDaysMAX days.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
+dialogUserAuthDeadlineHardDaysBODY="You have deferred the maximum number of $hardDaysMAX days.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
 dialogUserAuthDeadlineDateBODY="The deferment deadline of $deadlineDateDISPLAY has passed.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
 dialogUserAuthPassTITLE="Enter Password Here:"
 dialogUserAuthPassPLACEHOLDER="Password Required"
 dialogUserAuthRetryDefaultBODY="You must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
 dialogUserAuthRetryDeadlineCountBODY="You have deferred the maximum number of $countMaxDISPLAY times.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
-dialogUserAuthRetryDeadlineDaysBODY="You have deferred the maximum number of $hardDaysMAX days.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
+dialogUserAuthRetryDeadlineSoftDaysBODY="You have deferred the maximum number of $softDaysMAX days.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
+dialogUserAuthRetryDeadlineHardDaysBODY="You have deferred the maximum number of $hardDaysMAX days.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
 dialogUserAuthRetryDeadlineDateBODY="The deferment deadline of $deadlineDateDISPLAY has passed.\n\nYou must enter the password for user \"$currentUserRealNAME\" to install the $titleWorkflowDISPLAY.\n"
 dialogUserAuthRetryPassTITLE="Authentication Failed - Try Password Again:"
 dialogUserAuthRetryPassPLACEHOLDER="Password Required"
@@ -7442,9 +7440,12 @@ ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogUserAuthTITLE" -
 if [[ "$deadlineDateSTATUS" == "SOFT" ]] || [[ "$deadlineDateSTATUS" == "HARD" ]]; then
 	sendToLog "IBM Notifier: Date deadline user authentication dialog with a $displayTimeoutSECONDS second timeout."
 	ibmNotifierARRAY+=(-subtitle "$dialogUserAuthDeadlineDateBODY")
-elif [[ "$deadlineDaysSTATUS" == "SOFT" ]] || [[ "$deadlineDaysSTATUS" == "HARD" ]]; then
-	sendToLog "IBM Notifier: Days deadline user authentication dialog with a $displayTimeoutSECONDS second timeout."
-	ibmNotifierARRAY+=(-subtitle "$dialogUserAuthDeadlineDaysBODY")
+elif [[ "$deadlineDaysSTATUS" == "SOFT" ]]; then
+	sendToLog "IBM Notifier: Soft days deadline user authentication dialog with a $displayTimeoutSECONDS second timeout."
+	ibmNotifierARRAY+=(-subtitle "$dialogUserAuthDeadlineSoftDaysBODY")
+elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then
+	sendToLog "IBM Notifier: Hard days deadline user authentication dialog with a $displayTimeoutSECONDS second timeout."
+	ibmNotifierARRAY+=(-subtitle "$dialogUserAuthDeadlineHardDaysBODY")
 elif [[ "$deadlineCountSTATUS" == "SOFT" ]] || [[ "$deadlineCountSTATUS" == "HARD" ]]; then
 	sendToLog "IBM Notifier: Count deadline user authentication dialog with a $displayTimeoutSECONDS second timeout."
 	ibmNotifierARRAY+=(-subtitle "$dialogUserAuthDeadlineCountBODY")
@@ -7465,11 +7466,13 @@ while [[ $displayTimeoutSECONDS -ge 0 ]]; do
 	if [[ $userAuthATTEMPT -eq 1 ]]; then
 		# Re-create $ibmNotifierARRAY[] settings for the user authentication dialog when the user authentication fails.
 		ibmNotifierARRAY=(-type popup -always_on_top -bar_title "$dialogUserAuthTITLE" -icon_path "$cachedICON" -icon_width "$ibmNotifierIconSIZE" -icon_height "$ibmNotifierIconSIZE" -main_button_label "$restartButtonDISPLAY")
-		if [[ "$deadlineDateSTATUS" == "SOFT" ]] || [[ "$deadlineDateSTATUS" == "HARD" ]]; then # Hard date deadline user authentication dialog.
+		if [[ "$deadlineDateSTATUS" == "SOFT" ]] || [[ "$deadlineDateSTATUS" == "HARD" ]]; then
 			ibmNotifierARRAY+=(-subtitle "$dialogUserAuthRetryDeadlineDateBODY")
-		elif [[ "$deadlineDaysSTATUS" == "SOFT" ]] || [[ "$deadlineDaysSTATUS" == "HARD" ]]; then # Hard days deadline user authentication dialog.
-			ibmNotifierARRAY+=(-subtitle "$dialogUserAuthRetryDeadlineDaysBODY")
-		elif [[ "$deadlineCountSTATUS" == "SOFT" ]] || [[ "$deadlineCountSTATUS" == "HARD" ]]; then # Hard count deadline user authentication dialog.
+		elif [[ "$deadlineDaysSTATUS" == "SOFT" ]]; then
+			ibmNotifierARRAY+=(-subtitle "$dialogUserAuthRetryDeadlineSoftDaysBODY")
+		elif [[ "$deadlineDaysSTATUS" == "HARD" ]]; then
+			ibmNotifierARRAY+=(-subtitle "$dialogUserAuthRetryDeadlineHardDaysBODY")
+		elif [[ "$deadlineCountSTATUS" == "SOFT" ]] || [[ "$deadlineCountSTATUS" == "HARD" ]]; then
 			ibmNotifierARRAY+=(-subtitle "$dialogUserAuthRetryDeadlineCountBODY")
 		else # No deadlines, this is the default user authentication dialog.
 			ibmNotifierARRAY+=(-subtitle "$dialogUserAuthRetryDefaultBODY")
@@ -7621,6 +7624,11 @@ else # Default software update/upgrade workflows.
 	fi
 	deleteUnneededMacOSInstallers # This function includes internal test mode logic.
 	# At this point all available updates/upgrades have been evaluated so report different workflow statuses.
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: upgradeWORKFLOW is: $upgradeWORKFLOW"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateMACOS is: $softwareUpdateMACOS"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: updateWORKFLOW is: $updateWORKFLOW"
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateRECOMMENDED is: $softwareUpdateRECOMMENDED"
 	if [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		if [[ $macOSVERSION -ge 1203 ]] && [[ "$upgradeWORKFLOW" != "JAMF" ]]; then # macOS 12.3 or newer can upgrade via softwareupdate, unless using MDM workflow.
 			if [[ "$installNowOPTION" == "TRUE" ]]; then
@@ -7694,6 +7702,10 @@ else # Default software update/upgrade workflows.
 fi
 
 # This is the main logic for determining what to do in the case of available macOS updates, macOS upgrades, $policyTRIGGERS, or the $restartWithoutUpdatesOPTION.
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateMACOS is: $softwareUpdateMACOS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macOSUpgradeVersionTARGET is: $macOSUpgradeVersionTARGET"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: policyTRIGGERS is: $policyTRIGGERS"
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: restartWithoutUpdatesOPTION is: $restartWithoutUpdatesOPTION"
 if [[ "$softwareUpdateMACOS" == "TRUE" ]] || [[ "$macOSUpgradeVersionTARGET" != "FALSE" ]] || [[ -n $policyTRIGGERS ]] || [[ "$restartWithoutUpdatesOPTION" == "TRUE" ]]; then
 	# Check for current user and required storage free space before continuing.
 	checkCurrentUser
