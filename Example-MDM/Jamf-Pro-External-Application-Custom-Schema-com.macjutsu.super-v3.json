@@ -15,9 +15,13 @@
   },
   "DefaultDefer": {
    "title": "Default Defer",
-   "description": "The number of seconds to defer until the next update attempt if a user chooses not to update restart. It must be between 120 and 86400. Default deferral time is 3600.",
-   "type": "integer",
-   "default": "3600"
+   "description": "The number of seconds to defer until the next update attempt if a user chooses not to update restart. It must be between 120 and 86400. Default deferral time is 3600. Put X to diasble this option.",
+   "type": "string",
+   "options": {
+    "inputAttributes": {
+     "placeholder": "3600"
+    }
+   }
   },
   "FocusDefer": {
    "title": "Focus Defer",
@@ -51,9 +55,13 @@
   },
   "ErrorDefer": {
    "title": "Error Defer",
-   "description": "The number of seconds to defer if super detects an error in the workflow (for example, network or MDM connectivity issues). It must be between 120 and 86400. Default deferral time is 3600.",
-   "type": "integer",
-   "default": "3600"
+   "description": "The number of seconds to defer if super detects an error in the workflow (for example, network or MDM connectivity issues). It must be between 120 and 86400. Default deferral time is 3600. Put X to diasble this option.",
+   "type": "string",
+   "options": {
+    "inputAttributes": {
+     "placeholder": "3600"
+    }
+   }
   },
   "FocusCount": {
    "title": "Focus Count",
