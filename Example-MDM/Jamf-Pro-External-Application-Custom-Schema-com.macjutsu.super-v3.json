@@ -49,6 +49,12 @@
     }
    }
   },
+  "ErrorDefer": {
+   "title": "Error Defer",
+   "description": "The number of seconds to defer if super detects an error in the workflow (for example, network or MDM connectivity issues). It must be between 120 and 86400. Default deferral time is 3600.",
+   "type": "integer",
+   "default": "3600"
+  },
   "FocusCount": {
    "title": "Focus Count",
    "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
