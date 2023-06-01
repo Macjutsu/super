@@ -8,8 +8,8 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-superVERSION="3.0rc2"
-superDATE="2023/05/30"
+superVERSION="3.0"
+superDATE="2023/06/01"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -247,7 +247,7 @@ eraseInstallCHECKSUM="890f3ec8fe0e2efa7b33d407eee96358d8a44ca4"
 
 # Path to the local erase-install folder:
 eraseInstallFOLDER="/Library/Management/erase-install"
-# IMPORTANT DETAIL: super will NOT move the default erase-install folder content to another custom location.
+# IMPORTANT DETAIL: super does NOT move the default erase-install folder content to another custom location.
 # Changing this folder path to anything besides "/Library/Management/erase-install" requires that you must also deploy the erase-install folder to the custom location prior to using super.
 
 # Path to the local copy of erase-install.sh:
@@ -1611,10 +1611,10 @@ if [[ "$displayAccessoryUserAuthOPTION" == "X" ]]; then
 	unset displayAccessoryUserAuthOPTION
 fi
 if [[ -n $displayAccessoryTypeOPTION ]] && [[ -z $displayAccessoryDefaultOPTION ]] && [[ -z $displayAccessoryUpdateOPTION ]] && [[ -z $displayAccessoryUpgradeOPTION ]] && [[ -z $displayAccessoryUserAuthOPTION ]]; then
-	sendToLog "Parameter Error: To use a display accessory type you must also specifiy one of the display accessory content options."; parameterERROR="TRUE"
+	sendToLog "Parameter Error: To use a display accessory type you must also specify one of the display accessory content options."; parameterERROR="TRUE"
 fi
 if [[ -z $displayAccessoryTypeOPTION ]] && { [[ -n $displayAccessoryDefaultOPTION ]] || [[ -n $displayAccessoryUpdateOPTION ]] || [[ -n $displayAccessoryUpgradeOPTION ]] || [[ -n $displayAccessoryUserAuthOPTION ]]; }; then
-	sendToLog "Parameter Error: To use any of the display accessory content options you must also specifiy the display accessory type."; parameterERROR="TRUE"
+	sendToLog "Parameter Error: To use any of the display accessory content options you must also specify the display accessory type."; parameterERROR="TRUE"
 fi
 if [[ "$parameterERROR" != "TRUE" ]] && [[ -n $displayAccessoryTypeOPTION ]]; then
 	if [[ $displayAccessoryTypeOPTION =~ ^TEXTBOX$|^HTMLBOX$|^HTML$|^IMAGE$|^VIDEO$|^VIDEOAUTO$ ]]; then
@@ -1645,7 +1645,7 @@ fi
 
 # Validate $helpButtonOPTION and set $helpBUTTON and save to $superPLIST.
 if [[ "$helpButtonOPTION" == "X" ]]; then
-	sendToLog "Startup: Deleting local preference for helb button option."
+	sendToLog "Startup: Deleting local preference for help button option."
 	defaults delete "$superPLIST" HelpButton 2> /dev/null
 elif [[ -n $helpButtonOPTION ]]; then
 	helpBUTTON="$helpButtonOPTION"
@@ -1654,7 +1654,7 @@ fi
 
 # Validate $warningButtonOPTION and set $warningBUTTON and save to $superPLIST.
 if [[ "$warningButtonOPTION" == "X" ]]; then
-	sendToLog "Startup: Deleting local preference for helb button option."
+	sendToLog "Startup: Deleting local preference for help button option."
 	defaults delete "$superPLIST" WarningButton 2> /dev/null
 elif [[ -n $warningButtonOPTION ]]; then
 	warningBUTTON="$warningButtonOPTION"
@@ -1719,7 +1719,7 @@ elif [[ -n $userAuthMDMFailoverOPTION ]]; then
 		elif [[ $option =~ ^BOOTSTRAP$ ]]; then
 			userAuthMDMFailoverBOOTSTRAP="TRUE"
 		else
-			sendToLog "Parameter Error: Unrecognized user authentication MDM failover type: $option. You can specify any of the following types seperated by commas (no spaces); ALWAYS,SOFT,HARD,INSTALLNOW,BOOTSTRAP."; parameterERROR="TRUE"
+			sendToLog "Parameter Error: Unrecognized user authentication MDM failover type: $option. You can specify any of the following types separated by commas (no spaces); ALWAYS,SOFT,HARD,INSTALLNOW,BOOTSTRAP."; parameterERROR="TRUE"
 		fi
 	done
 	IFS="$oldIFS"
@@ -1955,7 +1955,7 @@ elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBE
 		fi
 		redrawMaximumTIMEOUT=$((testModeTimeoutSECONDS / 3))
 		if [[ "$testModeOPTION" == "TRUE" ]] && [[ $displayRedrawSECONDS -gt $redrawMaximumTIMEOUT ]]; then
-			sendToLog "Warning: Test mode requires temporary adjustment of the display redraw option from $displayRedrawSECONDS seconds to $redrawMaximumTIMEOUT seconds. This adjustment will not be saved."
+			sendToLog "Warning: Test mode requires temporary adjustment of the display redraw option from $displayRedrawSECONDS seconds to $redrawMaximumTIMEOUT seconds. This adjustment is not saved."
 			displayRedrawSECONDS=$redrawMaximumTIMEOUT
 		fi
 	else # No display redraw enabled.
@@ -1972,23 +1972,23 @@ elif [[ -n $testModeTimeoutOPTION ]] && [[ $testModeTimeoutOPTION =~ $regexNUMBE
 	defaults write "$superPLIST" TestModeTimeout -string "$testModeTimeoutSECONDS"
 	if [[ "$testModeOPTION" == "TRUE" ]]; then
 		if [[ -n $deferDialogTimeoutSECONDS ]] && [[ $deferDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-				sendToLog "Warning: Test mode requires temporary adjustment of the restart/defer dialog timeout from $deferDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				sendToLog "Warning: Test mode requires temporary adjustment of the restart/defer dialog timeout from $deferDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment is not saved."
 				deferDialogTimeoutSECONDS=$testModeTimeoutSECONDS
 		fi
 		if [[ -n $softDialogTimeoutSECONDS ]] && [[ $softDialogTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-				sendToLog "Warning: Test mode requires temporary adjustment of the soft deadline dialog timeout from $softDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				sendToLog "Warning: Test mode requires temporary adjustment of the soft deadline dialog timeout from $softDialogTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment is not saved."
 				softDialogTimeoutSECONDS=$testModeTimeoutSECONDS
 		fi
 		if [[ $userAuthTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-				sendToLog "Warning: Test mode requires temporary adjustment of the user authentication dialog timeout from $userAuthTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				sendToLog "Warning: Test mode requires temporary adjustment of the user authentication dialog timeout from $userAuthTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment is not saved."
 				userAuthTimeoutSECONDS=$testModeTimeoutSECONDS
 		fi
 		if [[ $freeSpaceTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-				sendToLog "Warning: Test mode requires temporary adjustment of the free space notification timeout from $freeSpaceTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				sendToLog "Warning: Test mode requires temporary adjustment of the free space notification timeout from $freeSpaceTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment is not saved."
 				freeSpaceTimeoutSECONDS=$testModeTimeoutSECONDS
 		fi
 		if [[ $batteryTimeoutSECONDS -gt $testModeTimeoutSECONDS ]]; then
-				sendToLog "Warning: Test mode requires temporary adjustment of the battery level notification timeout from $batteryTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment will not be saved."
+				sendToLog "Warning: Test mode requires temporary adjustment of the battery level notification timeout from $batteryTimeoutSECONDS seconds to $testModeTimeoutSECONDS seconds. This adjustment is not saved."
 				batteryTimeoutSECONDS=$testModeTimeoutSECONDS
 		fi
 	fi
@@ -2357,13 +2357,13 @@ if [[ "$macOSARCH" == "arm64" ]]; then  # Mac computers with Apple Silicon.
 			[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="JAMF"
 		else
 			sendToLog "Warning: Automatic macOS update/upgrade enforcement via MDM is only available on macOS 11.3 or newer."
-			sendToLog "Startup: User authentication will be required to perform a macOS update/upgrade."
+			sendToLog "Startup: User authentication is required to perform a macOS update/upgrade."
 			updateWORKFLOW="USER"
 			[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="USER"
 		fi
 	else
 		sendToLog "Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials."
-		sendToLog "Startup: User authentication will be required to perform a macOS update/upgrade."
+		sendToLog "Startup: User authentication is required to perform a macOS update/upgrade."
 		updateWORKFLOW="USER"
 		[[ "$allowUpgradeOPTION" == "TRUE" ]] && upgradeWORKFLOW="USER"
 	fi
@@ -2497,6 +2497,8 @@ if [[ -e "$jamfBINARY" ]]; then
 		sendToLog "Helper Error: super requires Jamf Pro version 10.38 or later, the currently installed version of Jamf Pro $jamfVERSION is not supported."; helperERROR="TRUE"
 	elif [[ "$jamfVERSION" -lt 1000 ]]; then
 		sendToLog "Helper Error: super requires Jamf Pro version 10.00 or later, the currently installed version of Jamf Pro $jamfVERSION is not supported."; helperERROR="TRUE"
+	else
+		sendToLog "Startup: Computer is currently managed by Jamf Pro version $jamfMAJOR.$jamfMINOR."
 	fi
 else
 	sendToLog "Startup: Unable to locate jamf binary at: $jamfBINARY"
@@ -2769,6 +2771,7 @@ defaults write "$superPLIST" FailSafeActive -bool true
 cleanExit() {
 [[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 defaults delete "$superPLIST" InstallNow 2> /dev/null
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file $superPLIST is:\n$(defaults read "$superPLIST" 2> /dev/null)"
 sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION EXIT ****"
 rm -f "$superPIDFILE"
 exit 0
@@ -2778,6 +2781,7 @@ exit 0
 errorExit() {
 [[ -n "$jamfProTOKEN" ]] && deleteJamfProServerToken
 defaults delete "$superPLIST" InstallNow 2> /dev/null
+[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file $superPLIST is:\n$(defaults read "$superPLIST" 2> /dev/null)"
 sendToLog "**** S.U.P.E.R.M.A.N. $superVERSION ERROR EXIT ****"
 sendToPending "Inactive."
 rm -f "$superPIDFILE"
@@ -3181,7 +3185,7 @@ fi
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: storageREADY: $storageREADY"
 }
 
-# Validate if current system power is adequate for performing a macOS update/upgrade and set $powerREADY accordingly. Desktops will obviously always return that they are ready.
+# Validate if current system power is adequate for performing a macOS update/upgrade and set $powerREADY accordingly. Desktops, obviously, always return that they are ready.
 checkAvailablePower() {
 powerREADY="FALSE"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: macBOOK: $macBOOK"
@@ -3606,7 +3610,7 @@ if [[ "$fullCheckREQUIRED" == "FALSE" ]]; then
 			macOSSoftwareUpgradeTITLE="$previousMacOSSoftwareUpgradeTITLE"
 			if [[ "$upgradeWORKFLOW" != "FALSE" ]]; then # macOS upgrade option is enabled.
 				if [[ -n $softwareUpdateLIST ]];then # Cached macOS installer list exists.
-					if [[ $(echo "$softwareUpdateLIST" | grep -c 'Software Update found') -gt 0 ]] && [[ $(echo "$softwareUpdateLIST" | grep -c 'macOS') -gt 0 ]];then # Cached macOS softareupdate list was completed.
+					if [[ $(echo "$softwareUpdateLIST" | grep -c 'Software Update found') -gt 0 ]] && [[ $(echo "$softwareUpdateLIST" | grep -c 'macOS') -gt 0 ]];then # Cached macOS softwareupdate list was completed.
 						sendToLog "Status: Cached macOS upgrade list appears to be valid."
 					else
 						sendToLog "Status: macOS upgrade list cache invalid, full update/upgrade check required."
@@ -3994,7 +3998,6 @@ unset macOSSoftwareUpgradeLABEL
 unset macOSSoftwareUpgradeTITLE
 unset macOSSoftwareUpgradeVERSION
 unset macOSSoftwareUpgradeGB
-unset macOSUpgradeAVAILABLE
 unset macOSInstallerNAMES
 unset macOSInstallerVERSIONS
 unset macOSInstallerBUILDS
@@ -4019,14 +4022,14 @@ if [[ "$fullCheckREQUIRED" == "TRUE" ]]; then
 	# macOS installer list check failed, try again later.
 	if [[ "$workflowStartFAIL" == "TRUE" ]] && [[ "$workflowStartTIMEOUT" == "TRUE" ]]; then
 		if [[ "$installNowOPTION" == "TRUE" ]]; then
-			sendToLog "Error: Checking for macOS instsallers did not complete after multiple attempts, install now workflow can not continue."
-			sendToStatus "Inactive Error: Checking for macOS instsallers did not complete after multiple attempts, install now workflow can not continue."
+			sendToLog "Error: Checking for macOS installers did not complete after multiple attempts, install now workflow can not continue."
+			sendToStatus "Inactive Error: Checking for macOS installers did not complete after multiple attempts, install now workflow can not continue."
 			notifyInstallNowFailure
 			errorExit
 		else
 			deferSECONDS="$errorDeferSECONDS"
-			sendToLog "Error: Checking for macOS instsallers did not complete after multiple attempts, trying again in $deferSECONDS seconds."
-			sendToStatus "Pending: Checking for macOS instsallers did not complete after multiple attempts, trying again in $deferSECONDS seconds."
+			sendToLog "Error: Checking for macOS installers did not complete after multiple attempts, trying again in $deferSECONDS seconds."
+			sendToStatus "Pending: Checking for macOS installers did not complete after multiple attempts, trying again in $deferSECONDS seconds."
 			makeLaunchDaemonCalendar
 		fi
 	fi
@@ -4281,7 +4284,7 @@ elif [[ "$softwareUpdateMACOS" == "TRUE" ]] || [[ "$macOSUpgradeAVAILABLE" == "T
 		fi
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: lastREBOOT is: $lastREBOOT"
 		if [[ "$lastREBOOT" != "$previousLastREBOOT" ]]; then
-			sendToLog "Warning: The system has been restarted without applying the prevously downloaded macOS update, download workflow needs to run again."
+			sendToLog "Warning: The system has been restarted without applying the previously downloaded macOS update, download workflow needs to run again."
 			previousDownloadFAILURE="TRUE"
 		fi
 		# Only validate prepared macOS update/upgrade if needed.
@@ -4395,7 +4398,7 @@ sendToStatus "Running: softwareupdate: Starting $softwareUpdateTitleTARGET downl
 sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD $softwareUpdateTitleTARGET SOFTWAREUPDATE START ****"
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGET[] is:\n${softwareUpdateLabelTARGET[*]}"
 
-# The softwareupdate download process is backgrounded and will be watched via a while loop later on. Also note the difference between macOS versions.
+# The softwareupdate download process is backgrounded and is watched via a while loop later on. Also note the difference between macOS versions.
 if [[ $macOSMAJOR -ge 13 ]]; then # macOS 13+
 	if [[ "$macOSARCH" == "arm64" ]]; then  # Apple Silicon.
 		echo ' ' | launchctl asuser "$currentUserUID" sudo -u "$currentUserNAME" softwareupdate --download "$softwareUpdateLabelTARGET" --agree-to-license --user "$currentUserNAME" --stdinpass >> "$asuLOG" 2>&1 &
@@ -4650,8 +4653,8 @@ fi
 
 # Download macOS installer via $eraseInstallSCRIPT, and also save results to $superLOG, $installerLOG, and $superPLIST.
 downloadMacOSInstaller() {
-sendToLog "erase-install.sh: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET download instaler workflow, check $installerLOG for more detail."
-sendToStatus "Running: erase-install.sh: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET download instaler workflow."
+sendToLog "erase-install.sh: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET download installer workflow, check $installerLOG for more detail."
+sendToStatus "Running: erase-install.sh: Starting $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET download installer workflow."
 sendToInstallerLog "**** S.U.P.E.R.M.A.N. $superVERSION DOWNLOAD $macOSInstallerNameTARGET $macOSInstallerVersionTARGET-$macOSInstallerBuildTARGET INSTALLER START ****"
 
 # Background the erase-install download process and send to $installerLOG.
@@ -4834,7 +4837,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 				[[ "$installNowOPTION" == "TRUE" ]] && notifyInstallNowDownload
 				downloadMacOSSoftwareUpdate
 			else
-				sendToLog "Status: Previoulsy downloaded macOS upgrade is prepared: $macOSSoftwareUpdateDownloadLABEL"
+				sendToLog "Status: Previously downloaded macOS upgrade is prepared: $macOSSoftwareUpdateDownloadLABEL"
 			fi
 		else # Systems older than macOS 12.3 or using the MDM workflow upgrade via installer.
 			if [[ "$macOSInstallerDownloadREQUIRED" == "TRUE" ]]; then
@@ -4849,7 +4852,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 			[[ "$installNowOPTION" == "TRUE" ]] && notifyInstallNowDownload
 			downloadMacOSSoftwareUpdate
 		else
-			sendToLog "Status: Previoulsy downloaded macOS update is prepared: $macOSSoftwareUpdateDownloadLABEL"
+			sendToLog "Status: Previously downloaded macOS update is prepared: $macOSSoftwareUpdateDownloadLABEL"
 		fi
 	fi
 else # Test mode.
@@ -4921,7 +4924,7 @@ sendToASULog "**** S.U.P.E.R.M.A.N. $superVERSION INSTALL RECOMMENDED (NON-SYSTE
 oldIFS="$IFS"; IFS=$' '
 [[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: recommendedSoftwareUpdateLABELS[] is:\n${recommendedSoftwareUpdateLABELS[*]}"
 
-# The update process is backgrounded and will be watched via a while loop later on. Also note the different requirements between macOS versions.
+# The update process is backgrounded and is watched via a while loop later on. Also note the different requirements between macOS versions.
 if [[ $macOSMAJOR -ge 12 ]]; then
 	if [[ "$currentUserNAME" == "FALSE" ]]; then
 		sudo -i softwareupdate --install "${recommendedSoftwareUpdateLABELS[@]}" --agree-to-license >> "$asuLOG" 2>&1 &
@@ -5041,7 +5044,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then # Not in test mode.
 	fi
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: softwareUpdateLabelTARGET is: $softwareUpdateLabelTARGET"
 	
-	# The update/upgrade process is backgrounded and will be watched via while loops later on. Also note the different requirements between macOS versions.
+	# The update/upgrade process is backgrounded and is watched via while loops later on. Also note the different requirements between macOS versions.
 	if [[ $macOSMAJOR -ge 13 ]]; then  # macOS 13+
 		if [[ "$currentUserNAME" == "FALSE" ]]; then # Local user not is logged in.
 			if [[ "$macOSARCH" == "arm64" ]]; then # Apple Silicon.
@@ -5888,7 +5891,7 @@ if [[ "$testModeOPTION" != "TRUE" ]]; then
 				fi
 			fi
 		fi
-	else # Some software udpates did not complete
+	else # Some software updates did not complete
 		if [[ "$installNowOPTION" == "TRUE" ]]; then
 			sendToLog "Error: Some recommended (non-system) updates did not complete, install now workflow can not continue."
 			sendToStatus "Inactive Error: Some recommended (non-system) updates did not complete, install now workflow can not continue."
@@ -6000,7 +6003,7 @@ else # Workflow when there is no macOS updates/upgrade.
 		shutdown -o -r +1 &
 		disown -a
 	else # Option to restart without updates is not enabled.
-		sendToLog "Warning: When no macOS update/upgrade is availble you must also specify the --restart-without-updates option to restart automatically."
+		sendToLog "Warning: When no macOS update/upgrade is available you must also specify the --restart-without-updates option to restart automatically."
 	fi
 fi
 }
@@ -6134,7 +6137,7 @@ else # Workflow when there is no macOS updates/upgrade.
 			fi
 		fi
 	else # Option to restart without updates is not enabled.
-		sendToLog "Warning: When no macOS update/upgrade is availble you must also specify the --restart-without-updates option to restart automatically."
+		sendToLog "Warning: When no macOS update/upgrade is available you must also specify the --restart-without-updates option to restart automatically."
 	fi
 fi
 }
@@ -6692,7 +6695,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 				{ [[ -n $menuDeferSECONDS ]] && [[ -z $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogRestartOrDeferDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
 				{ [[ -z $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 				if [[ -n $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; then
-					sendToLog "Warning: Unable to show display timeout countdown due to the custom display accessory option. However, there will still be a display timeout at $displayTimeoutSECONDS seconds."
+					sendToLog "Warning: Unable to show display timeout countdown due to the custom display accessory option. However, there is still a display timeout at $displayTimeoutSECONDS seconds."
 					ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogRestartOrDeferDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -timeout "$displayTimeoutSECONDS")
 				fi
 			fi
@@ -6705,6 +6708,7 @@ if [[ -n $displayRedrawSECONDS ]]; then
 				{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogRestartOrDeferDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 			fi
 		fi
+		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: userAuthMODE is: $userAuthMODE"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 		(sleep "$displayRedrawSECONDS"; killall -9 "IBM Notifier" "IBM Notifier Popup") &
 		killerPID=$!
@@ -6712,7 +6716,8 @@ if [[ -n $displayRedrawSECONDS ]]; then
 		dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 		dialogRETURN="$?"
 		kill -0 "$killerPID" && kill -9 "$killerPID" > /dev/null 2>&1
-		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+		{ [[ "$verboseModeOPTION" == "TRUE" ]] && [[ "$userAuthMODE" != "TRUE" ]]; } && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+		{ [[ "$verboseModeOPTION" == "TRUE" ]] && [[ "$userAuthMODE" == "TRUE" ]]; } && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
 		[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 		[[ -n $displayTimeoutSECONDS ]] && displayTimeoutSECONDS=$((displayTimeoutSECONDS - displayRedrawSECONDS))
 		ibmNotifierARRAY=("${ibmNotifierBackupARRAY[@]}")
@@ -6725,7 +6730,7 @@ else
 			{ [[ -n $menuDeferSECONDS ]] && [[ -z $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogRestartOrDeferDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0")
 			{ [[ -z $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; } && ibmNotifierARRAY+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 			if [[ -n $menuDeferSECONDS ]] && [[ -n $displayTimeoutSECONDS ]]; then
-				sendToLog "Warning: Unable to show display timeout countdown due to the custom display accessory option. However, there will still be a display timeout at $displayTimeoutSECONDS seconds."
+				sendToLog "Warning: Unable to show display timeout countdown due to the custom display accessory option. However, there is still a display timeout at $displayTimeoutSECONDS seconds."
 				ibmNotifierARRAY+=(-secondary_accessory_view_type dropdown -secondary_accessory_view_payload "/title $dialogRestartOrDeferDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -timeout "$displayTimeoutSECONDS")
 			fi
 		fi
@@ -6738,10 +6743,12 @@ else
 			{ [[ -n $displayTimeoutSECONDS ]] && [[ -n $menuDeferSECONDS ]]; } && ibmNotifierARRAY+=(-accessory_view_type dropdown -accessory_view_payload "/title $dialogRestartOrDeferDeferMenuTitleIBM /list $menuDisplayTEXT /selected 0" -secondary_accessory_view_type timer -secondary_accessory_view_payload "$displayTimeoutTEXT %@" -timeout "$displayTimeoutSECONDS")
 		fi
 	fi
+	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: userAuthMODE is: $userAuthMODE"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: ibmNotifierARRAY[] is:\n${ibmNotifierARRAY[*]}"
 	dialogRESULT=$("$ibmNotifierBINARY" "${ibmNotifierARRAY[@]}")
 	dialogRETURN="$?"
-	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+	{ [[ "$verboseModeOPTION" == "TRUE" ]] && [[ "$userAuthMODE" != "TRUE" ]]; } && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
+	{ [[ "$verboseModeOPTION" == "TRUE" ]] && [[ "$userAuthMODE" == "TRUE" ]]; } && sendToEcho "Verbose Mode: Function ${FUNCNAME[0]}: dialogRESULT is: $dialogRESULT"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: dialogRETURN is: $dialogRETURN"
 fi
 }
@@ -6921,7 +6928,7 @@ while [[ "$whileTimeoutSECONDS" -ge 0 ]]; do
 	sleep "$storageRecheckSECONDS"
 	checkAvailableStorage
 	if [[ "$storageREADY" == "TRUE" ]]; then
-		sendToLog "Status: Current available storage is now at $availableStorageGB GBs, the macOS update/upgade workflow can continue."
+		sendToLog "Status: Current available storage is now at $availableStorageGB GBs, the macOS update/upgrade workflow can continue."
 		kill -9 "$notifyPID" > /dev/null 2>&1
 		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
@@ -6953,14 +6960,14 @@ done
 # If there still is not sufficient free space, then exit.
 if [[ "$storageREADY" == "FALSE" ]]; then
 	if [[ "$installNowOPTION" == "TRUE" ]]; then
-		sendToLog "Error: Waiting for user to make more free space avaliable timed out after $workflowTimeoutSECONDS seconds, install now workflow can not continue."
-		sendToStatus "Inactive Error: Waiting for user to make more free space avaliable timed out after $workflowTimeoutSECONDS seconds, install now workflow can not continue."
+		sendToLog "Error: Waiting for user to make more free space available timed out after $workflowTimeoutSECONDS seconds, install now workflow can not continue."
+		sendToStatus "Inactive Error: Waiting for user to make more free space available timed out after $workflowTimeoutSECONDS seconds, install now workflow can not continue."
 		notifyInstallNowFailure
 		errorExit
 	else
 		deferSECONDS="$errorDeferSECONDS"
-		sendToLog "Error: Waiting for user to make more free space avaliable timed out after $workflowTimeoutSECONDS seconds, trying again in $deferSECONDS seconds."
-		sendToStatus "Pending: Waiting for user to make more free space avaliable timed out after $workflowTimeoutSECONDS seconds, trying again in $deferSECONDS seconds."
+		sendToLog "Error: Waiting for user to make more free space available timed out after $workflowTimeoutSECONDS seconds, trying again in $deferSECONDS seconds."
+		sendToStatus "Pending: Waiting for user to make more free space available timed out after $workflowTimeoutSECONDS seconds, trying again in $deferSECONDS seconds."
 		notifyFailure
 		makeLaunchDaemonCalendar
 	fi
@@ -7032,7 +7039,7 @@ while [[ "$whileTimeoutSECONDS" -ge 0 ]]; do
 	[[ $(pmset -g ps | grep -ic 'AC Power') -ne 0 ]] && acPOWER="TRUE"
 	[[ "$verboseModeOPTION" == "TRUE" ]] && sendToLog "Verbose Mode: Function ${FUNCNAME[0]}: acPOWER: $acPOWER"
 	if [[ "$acPOWER" == "TRUE" ]]; then
-		sendToLog "Status: AC power detected, the macOS update/upgade workflow can continue."
+		sendToLog "Status: AC power detected, the macOS update/upgrade workflow can continue."
 		kill -9 "$notifyPID" > /dev/null 2>&1
 		if [[ "$ibmNotifierVALID" == "TRUE" ]] && [[ "$preferJamfHelperOPTION" != "TRUE" ]]; then
 			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
@@ -7460,6 +7467,7 @@ if [[ -n $displayAccessoryUserAuthCONTENT ]]; then
 	[[ -n $displayAccessoryCONTENT ]] && displayAccessoryBackupCONTENT="$displayAccessoryCONTENT"
 	displayAccessoryCONTENT="$displayAccessoryUserAuthCONTENT"
 fi
+userAuthMODE="TRUE"
 userAuthREADY="FALSE"
 userAuthATTEMPT=0
 while [[ $displayTimeoutSECONDS -ge 0 ]]; do
@@ -7497,6 +7505,7 @@ if [[ -n $displayAccessoryBackupCONTENT ]]; then
 else
 	unset displayAccessoryCONTENT
 fi
+unset userAuthMODE
 
 # If user authentication was successful then evaluate option to fix bootstrap token.
 if [[ "$userAuthREADY" == "TRUE" ]]; then
@@ -7573,7 +7582,7 @@ elif [[ "$onlyDownloadOPTION" == "TRUE" ]]; then
 	sendToLog "Startup: Only download mode enabled."
 fi
 [[ -n $policyTRIGGERS ]] && sendToLog "Startup: Jamf Pro Policy triggers: $policyTRIGGERS"
-[[ "$restartWithoutUpdatesOPTION" == "TRUE" ]] && sendToLog "Warning: This computer will restart even if there is no macOS update/upgrade availble."
+[[ "$restartWithoutUpdatesOPTION" == "TRUE" ]] && sendToLog "Warning: Restart without updates option is enabled, this computer will restart if there is no macOS update or upgrade available."
 
 # Start the appropriate main workflow based on user options.
 if [[ "$skipUpdatesOPTION" == "TRUE" ]]; then # Skip software updates/upgrade mode option.
@@ -7691,7 +7700,7 @@ else # Default software update/upgrade workflows.
 				installRecommendedWorkflow # This function includes internal install now and test mode logic.
 			fi
 		else
-			sendToLog "Status: Available recommended (non-system) software udpates are not enforced. You must use the --enforce-non-system-updates option for these items to install without a macOS update/upgrade."
+			sendToLog "Status: Available recommended (non-system) software updates are not enforced. You must use the --enforce-non-system-updates option for these items to install without a macOS update/upgrade."
 		fi
 	else # No software updates/upgrade needed so clean up any leftover deferral counters.
 		defaults delete "$superPLIST" ZeroDayAuto 2> /dev/null

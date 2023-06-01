@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [3.0]
+
+2023-06-01
+- New reporting of Jamf Pro version number in super.log, if computer is managed by Jamf Pro. (Thanks to @wacko for recommending this one!)
+- New [Jamf Pro External Application Custom Schema for MDM Configuration Profiles](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v3.json) courtesy of @wacko and @theadamcraig!
+- Improved verbose mode now shows the saved `super` settings (com.macjutsu.super.plist) on exit.
+- Resolved an issuing causing the cached macOS upgrade status to fail which also lead to inadvertently deleting macOS installers. (Thanks to multiple folks in #super on MacAdmins Slack for spotting this one!)
+- Resolved an issue where, in verbose mode only, the local user authentication dialog was erroneously sending the user's password to the super.log. Now, similar to other password displays in verbose mode, it's only sent to command line output. (Thanks to Lewis B in #super on MacAdmins Slack for finding this one!)
+- Fixed. So. Many. Typos.
+- `super` 3.0 SHA-256: ac297dd3f5496a20648e35b73313ccddd8843a75cc95c9dadb9d900a60b8edd8
+
 ## [3.0rc2]
 
 2023-05-30
