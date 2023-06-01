@@ -1,350 +1,400 @@
 {
- "title": "Super Version 3.0 (com.macjutsu.super)",
- "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true, please remember to set to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
- "__preferencedomain": "com.macjutsu.super",
- "options": {
-  "remove_empty_properties": true
- },
- "properties": {
-  "JamfProID": {
-   "title": "JamfPro ID",
-   "description": "Use this when using super with Jamf Pro API account.",
-   "type": "string",
-   "enum": ["$JSSID"],
-   "default": "$JSSID"
-  },
-  "DefaultDefer": {
-   "title": "Default Defer",
-   "description": "The number of seconds to defer until the next update attempt if a user chooses not to update restart. It must be between 120 and 86400. Default deferral time is 3600. Put X to diasble this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "3600"
+    "title": "Super Version 3.0 (com.macjutsu.super)",
+    "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true, please remember to set to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
+    "__preferencedomain": "com.macjutsu.super",
+    "options": {
+        "remove_empty_properties": true
+    },
+    "properties": {
+        "JamfProID": {
+            "title": "JamfPro ID",
+            "description": "Use this when using super with Jamf Pro API account.",
+            "type": "string",
+            "enum": ["$JSSID"],
+            "default": "$JSSID"
+        },
+        "DefaultDefer": {
+            "title": "Default Defer",
+            "description": "The number of seconds to defer until the next update attempt if a user chooses not to update restart. It must be between 120 and 86400. Default deferral time is 3600. Put X to diasble this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "3600"
+                }
+            }
+        },
+        "FocusDefer": {
+            "title": "Focus Defer",
+            "description": "The number of seconds to defer the update restart dialog automatically if a process has prevented display sleep (for example, during an active meeting) or the user has Focus or Do Not Disturb enabled. It must be between 120 and 86400. Put X to diasble this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "3600"
+                }
+            }
+        },
+        "MenuDefer": {
+            "title": "Menu Defer",
+            "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DefaultDefer time. It must be between 120 and 86400. Put X to diable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "1800,3600,86400"
+                }
+            }
+        },
+        "RecheckDefer": {
+            "title": "Recheck Defer",
+            "description": "The number of seconds to defer if no software updates are found. It must be between 120 and 2628288. Put X to diable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "86400"
+                }
+            }
+        },
+        "ErrorDefer": {
+            "title": "Error Defer",
+            "description": "The number of seconds to defer if super detects an error in the workflow (for example, network or MDM connectivity issues). It must be between 120 and 86400. Default deferral time is 3600. Put X to diasble this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "3600"
+                }
+            }
+        },
+        "FocusCount": {
+            "title": "Focus Count",
+            "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+            "type": "string"
+        },
+        "SoftCount": {
+            "title": "Soft Count",
+            "description": "The maximum number of user selected deferrals allowed before the soft deadline automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+            "type": "string"
+        },
+        "HardCount": {
+            "title": "Hard Count",
+            "description": "The maximum number of user selected deferrals allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+            "type": "string"
+        },
+        "FocusDays": {
+            "title": "Focus Days",
+            "description": "The maximum number of days that automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+            "type": "string"
+        },
+        "SoftDays": {
+            "title": "Soft Days",
+            "description": "The maximum number of days allowed before the soft deadline dialog. The soft deadline is an interactive update restart dialog indicating that no more deferrals are allowed. Put X to diable this option.",
+            "type": "string"
+        },
+        "HardDays": {
+            "title": "Hard Days",
+            "description": "The maximum number of days allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+            "type": "string"
+        },
+        "ZeroDay": {
+            "title": "Zero Day",
+            "description": "Instead of having the days deadline counter automatically select the day zero date. PutX to diable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "YYYY-MM-DD:hh:mm"
+                }
+            }
+        },
+        "FocusDate": {
+            "title": "Focus Date",
+            "description": "This is the last date and time when automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "YYYY-MM-DD:hh:mm"
+                }
+            }
+        },
+        "SoftDate": {
+            "title": "Soft Date",
+            "description": "If this date and time have passed, an interactive update restart dialog appears indicating that no more user deferrals are allowed. Put X to disable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "YYYY-MM-DD:hh:mm"
+                }
+            }
+        },
+        "HardDate": {
+            "title": "Hard Date",
+            "description": "If this date has passed, the computer restarts and udpates without asking the user for approval. Put X to diable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "YYYY-MM-DD:hh:mm"
+                }
+            }
+        },
+        "DeferDialogTimeout": {
+            "title": "Defer Display Timeout",
+            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
+            "type": "string"
+        },
+        "SoftDialogTimeout": {
+            "title": "Soft Display Timeout",
+            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
+            "type": "string"
+        },
+        "DisplayRedraw": {
+            "title": "Display Redraw",
+            "description": "If a user ignores a notification or dialog (for example, it's moved offscreen)this specifies the number of seconds to wait before closing and then reopening the notification or dialog, thus redrawing the notification or dialog back in it's original open possition. Put X to diable this option.",
+            "type": "string"
+        },
+        "DisplayIcon": {
+            "title": "Display Icon",
+            "description": "Local path or http(s) URL to a file that is the picture to display in  notifications or dialogs. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "IconSizeIbm": {
+            "title": "Icon Size IBM",
+            "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs. The value must be in between 96 and 150. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "128"
+                }
+            }
+        },
+        "IconSizeJamf": {
+            "title": "Icon Size Jamf",
+            "description": "Number of pixels for the --display-icon in jamfHelper dialogs and notifications. The value must be in between 96 and 150. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "128"
+                }
+            }
+        },
+        "DisplayAccessoryType": {
+            "title": "Custom Display Accessory",
+            "description": "Interactive dialogs (but not notifications) generated by IBM Notifier can be easily customized via several display accessory options. The display accessory content appears below any deferral or deadline text but above any interactive item like the deferral pop-up menu or user authentication field. Put X to disable this option.",
+            "type": "string",
+            "enum": ["X", "TEXTBOX", "HTMLBOX", "HTML", "IMAGE", "VIDEO", "VIDEOAUTO"],
+            "default": "X"
+        },
+        "DisplayAccessoryDefault": {
+            "title": "Default Accessory",
+            "description": "Local path or http(s) URL to a file that is the default accessory. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "DisplayAccessoryUpdate": {
+            "title": "Updates Accessory",
+            "description": "Local path or http(s) URL to a file that is the accessory to display when performing macOS updates. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "DisplayAccessoryUpgrade": {
+            "title": "Upgrades Accessory",
+            "description": "Local path or http(s) URL to a file that is the accessory to display when performing macOS upgrades. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "DisplayAccessoryUserAuth": {
+            "title": "Apple Silicon User Authentication Accessory",
+            "description": "Local path or http(s) URL to a file that is the accessory to display when Apple Silicon Macs require user authentication. Put X to reset this to default.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "HelpButton": {
+            "title": "Help Button",
+            "description": "Plain text to display or http(s) URL link to follow for the Help Button. Put X to disable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "WarningButton": {
+            "title": "Warning Button",
+            "description": "Plain text or http(s) URL link to follow for the Warning Button. Put X to disable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "https://example.com/sample.png"
+                }
+            }
+        },
+        "DisplaySilently": {
+            "title": "Display Dialogs Silently",
+            "description": "When enabled, the system alert sound is suppressed when displaying dialogs.",
+            "type": "boolean"
+        },
+        "PreferJamfHelper": {
+            "title": "Prefer Jamf Helper",
+            "description": "Prefer jamfHelpler over IBM Notifier.app for user interactions.",
+            "type": "boolean"
+        },
+        "UserAuthTimeout": {
+            "title": "User Authentication Timeout",
+            "description": "On Mac computers with Apple Silicon, the number of seconds to wait for the user to successfully authenticate when presented with the user authenticated dialog. This dialog does not show a visual countdown of the timeout. Default time is 3600seconds (1 hour).",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "3600"
+                }
+            }
+        },
+        "UserAuthMDMFailover": {
+            "title": "User Authentication MDM Failover",
+            "description": "The MDM workflow can be unreliable due to its complexity, and super will automatically try again upon failure, however this settings allows super to try other options. For more information see https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#user-authentication-mdm-failover. Put X to diable this option.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP"
+                }
+            }
+        },
+        "AllowUpgrade": {
+            "title": "Allow Upgrades",
+            "description": "macOS now presents some Upgrades options as updates, super detects and ignores them by default (objective update over upgrade). Enabling this setting will allow the upgrades.",
+            "type": "boolean"
+        },
+        "TargetUpgrade": {
+            "title": "Target Upgrades",
+            "description": "This setting provides a limitation on the Allow Upgrades setting, providing some management of the maximum macOS version to upgrade to.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "13"
+                }
+            }
+        },
+        "AllowRSRUpdates": {
+            "title": "Allow Rapid Security Response Updates",
+            "description": "macOS 13.3+ Ventura support Rapid Security Response updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions.",
+            "type": "boolean"
+        },
+        "EnforceNonSystemUpdates": {
+            "title": "Enforce Non-System Updates",
+            "description": "If you don't want the super workflow to wait for a macOS update to also install non-system Apple software updates, then you can enforce those non-system updates as soon as they become available.",
+            "type": "boolean"
+        },
+        "OnlyDownload": {
+            "title": "Only Download Updates",
+            "description": "Download and prepare any available macOS updates but do not start any installation workflow. This super option is designed to work along with the --install-now option to significantly reduce the user experience wait time for user-initiated macOS update workflows.",
+            "type": "boolean"
+        },
+        "InstallNow": {
+            "title": "Install All Updates Now",
+            "description": "Installs all updates now, works best with the --only-download option as the macOS update workflow can take some time, and the above option can help manage that time better.",
+            "type": "boolean"
+        },
+        "FreeSpaceUpdate": {
+            "title": "Free Space Update",
+            "description": "Free Space Required for updates",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "15"
+                }
+            }
+        },
+        "FreeSpaceUpgrade": {
+            "title": "Free Space Upgrade",
+            "description": "Free Space Required for upgrades",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "35"
+                }
+            }
+        },
+        "FreeSpaceTimeout": {
+            "title": "FreeSpaceTimeout",
+            "description": "Timeout for computers with not enough free space.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "3600"
+                }
+            }
+        },
+        "BatteryLevel": {
+            "title": "BatteryLevel",
+            "description": "Minmum Battery Percentage",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "50"
+                }
+            }
+        },
+        "BatteryTimeout": {
+            "title": "BatteryTimeout",
+            "description": "Timeout for computers with not enough Battery.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "3600"
+                }
+            }
+        },
+        "PolicyTriggers": {
+            "title": "Policy Triggers",
+            "description": "If a restart is required for system updates or forced via RestartWithoutUpdates, this list of Jamf Policy Triggers runs before any available updates install and the computer restarts.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "triggerA,triggerB,triggerC"
+                }
+            }
+        },
+        "SkipUpdates": {
+            "title": "Skip Updates",
+            "description": "Skip Apple software updates, even if they are available.",
+            "type": "boolean"
+        },
+        "RestartWithoutUpdates": {
+            "title": "Restart Without Updates",
+            "description": "Force a restart even if Apple software updates do not need it.",
+            "type": "boolean"
+        },
+        "TestMode": {
+            "title": "Test Mode",
+            "description": "Mode to validate parameters, credentials, notifications, dialogs, deferrals, and deadline logic.",
+            "type": "boolean",
+            "default": "true"
+        },
+        "TestModeTimeout": {
+            "title": "Test Mode Timeout",
+            "description": "The amount of time in seconds to leave test notifications and dialogs open before moving on in the workflow.",
+            "type": "string"
+        },
+        "VerboseMode": {
+            "title": "Verbose Mode",
+            "description": "Mode to generate additional log output.",
+            "type": "boolean"
+        }
     }
-   }
-  },
-  "FocusDefer": {
-   "title": "Focus Defer",
-   "description": "The number of seconds to defer the update restart dialog automatically if a process has prevented display sleep (for example, during an active meeting) or the user has Focus or Do Not Disturb enabled. It must be between 120 and 86400. Put X to diasble this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "3600"
-    }
-   }
-  },
-  "MenuDefer": {
-   "title": "Menu Defer",
-   "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DefaultDefer time. It must be between 120 and 86400. Put X to diable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "1800,3600,86400"
-    }
-   }
-  },
-  "RecheckDefer": {
-   "title": "Recheck Defer",
-   "description": "The number of seconds to defer if no software updates are found. It must be between 120 and 2628288. Put X to diable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "86400"
-    }
-   }
-  },
-  "ErrorDefer": {
-   "title": "Error Defer",
-   "description": "The number of seconds to defer if super detects an error in the workflow (for example, network or MDM connectivity issues). It must be between 120 and 86400. Default deferral time is 3600. Put X to diasble this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "3600"
-    }
-   }
-  },
-  "FocusCount": {
-   "title": "Focus Count",
-   "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
-   "type": "string"
-  },
-  "SoftCount": {
-   "title": "Soft Count",
-   "description": "The maximum number of user selected deferrals allowed before the soft deadline automatically restarts for updates without asking the user for approval. Put X to diable this option.",
-   "type": "string"
-  },
-  "HardCount": {
-   "title": "Hard Count",
-   "description": "The maximum number of user selected deferrals allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
-   "type": "string"
-  },
-  "FocusDays": {
-   "title": "Focus Days",
-   "description": "The maximum number of days that automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
-   "type": "string"
-  },
-  "SoftDays": {
-   "title": "Soft Days",
-   "description": "The maximum number of days allowed before the soft deadline dialog. The soft deadline is an interactive update restart dialog indicating that no more deferrals are allowed. Put X to diable this option.",
-   "type": "string"
-  },
-  "HardDays": {
-   "title": "Hard Days",
-   "description": "The maximum number of days allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
-   "type": "string"
-  },
-  "ZeroDay": {
-   "title": "Zero Day",
-   "description": "Instead of having the days deadline counter automatically select the day zero date. PutX to diable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "YYYY-MM-DD:hh:mm"
-    }
-   }
-  },
-  "FocusDate": {
-   "title": "Focus Date",
-   "description": "This is the last date and time when automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "YYYY-MM-DD:hh:mm"
-    }
-   }
-  },
-  "SoftDate": {
-   "title": "Soft Date",
-   "description": "If this date and time have passed, an interactive update restart dialog appears indicating that no more user deferrals are allowed. Put X to disable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "YYYY-MM-DD:hh:mm"
-    }
-   }
-  },
-  "HardDate": {
-   "title": "Hard Date",
-   "description": "If this date has passed, the computer restarts and udpates without asking the user for approval. Put X to diable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "YYYY-MM-DD:hh:mm"
-    }
-   }
-  },
-  "DeferDialogTimeout": {
-   "title": "Defer Display Timeout",
-   "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
-   "type": "string"
-  },
-  "SoftDialogTimeout": {
-   "title": "Soft Display Timeout",
-   "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
-   "type": "string"
-  },
-  "DisplayRedraw": {
-   "title": "Display Redraw",
-   "description": "If a user ignores a notification or dialog (for example, it's moved offscreen)this specifies the number of seconds to wait before closing and then reopening the notification or dialog, thus redrawing the notification or dialog back in it's original open possition. Put X to diable this option.",
-   "type": "string"
-  },
-  "DisplayIcon": {
-   "title": "Display Icon",
-   "description": "Local path or http(s) URL to a file that is the picture to display in  notifications or dialogs. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "IconSizeIbm": {
-   "title": "Icon Size IBM",
-   "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs. The value must be in between 96 and 150. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "128"
-    }
-   }
-  },
-  "IconSizeJamf": {
-   "title": "Icon Size Jamf",
-   "description": "Number of pixels for the --display-icon in jamfHelper dialogs and notifications. The value must be in between 96 and 150. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "128"
-    }
-   }
-  },
-  "DisplayAccessoryType": {
-   "title": "Custom Display Accessory",
-   "description": "Interactive dialogs (but not notifications) generated by IBM Notifier can be easily customized via several display accessory options. The display accessory content appears below any deferral or deadline text but above any interactive item like the deferral pop-up menu or user authentication field. Put X to disable this option.",
-   "type": "string",
-   "enum": ["X","TEXTBOX","HTMLBOX","HTML","IMAGE","VIDEO","VIDEOAUTO"],
-   "default": "X"
-  },
-  "DisplayAccessoryDefault": {
-   "title": "Default Accessory",
-   "description": "Local path or http(s) URL to a file that is the default accessory. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "DisplayAccessoryUpdate": {
-   "title": "Updates Accessory",
-   "description": "Local path or http(s) URL to a file that is the accessory to display when performing macOS updates. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "DisplayAccessoryUpgrade": {
-   "title": "Upgrades Accessory",
-   "description": "Local path or http(s) URL to a file that is the accessory to display when performing macOS upgrades. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "DisplayAccessoryUserAuth": {
-   "title": "Apple Silicon User Authentication Accessory",
-   "description": "Local path or http(s) URL to a file that is the accessory to display when Apple Silicon Macs require user authentication. Put X to reset this to default.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "HelpButton": {
-   "title": "Help Button",
-   "description": "Plain text to display or http(s) URL link to follow for the Help Button. Put X to disable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "WarningButton": {
-   "title": "Warning Button",
-   "description": "Plain text or http(s) URL link to follow for the Warning Button. Put X to disable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "https://example.com/sample.png"
-    }
-   }
-  },
-  "DisplaySilently": {
-   "title": "Display Dialogs Silently",
-   "description": "When enabled, the system alert sound is suppressed when displaying dialogs.",
-   "type": "boolean"
-  },
-  "PreferJamfHelper": {
-   "title": "Prefer Jamf Helper",
-   "description": "Prefer jamfHelpler over IBM Notifier.app for user interactions.",
-   "type": "boolean"
-  },
-  "UserAuthTimeout": {
-   "title": "User Authentication Timeout",
-   "description": "On Mac computers with Apple Silicon, the number of seconds to wait for the user to successfully authenticate when presented with the user authenticated dialog. This dialog does not show a visual countdown of the timeout. Default time is 3600seconds (1 hour).",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "3600"
-    }
-   }
-  },
-  "UserAuthMDMFailover": {
-   "title": "User Authentication MDM Failover",
-   "description": "The MDM workflow can be unreliable due to its complexity, and super will automatically try again upon failure, however this settings allows super to try other options. For more information see https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#user-authentication-mdm-failover. Put X to diable this option.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP"
-    }
-   }
-  },
-  "AllowUpgrade": {
-   "title": "Allow Upgrades",
-   "description": "macOS now presents some Upgrades options as updates, super detects and ignores them by default (objective update over upgrade). Enabling this setting will allow the upgrades.",
-   "type": "boolean"
-  },
-  "TargetUpgrade": {
-   "title": "Target Upgrades",
-   "description": "This setting provides a limitation on the Allow Upgrades setting, providing some management of the maximum macOS version to upgrade to.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "13"
-    }
-   }
-  },
-  "AllowRSRUpdates": {
-   "title": "Allow Rapid Security Response Updates",
-   "description": "macOS 13.3+ Ventura support Rapid Security Response updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions.",
-   "type": "boolean"
-  },
-  "EnforceNonSystemUpdates": {
-   "title": "Enforce Non-System Updates",
-   "description": "If you don't want the super workflow to wait for a macOS update to also install non-system Apple software updates, then you can enforce those non-system updates as soon as they become available.",
-   "type": "boolean"
-  },
-  "OnlyDownload": {
-   "title": "Only Download Updates",
-   "description": "Download and prepare any available macOS updates but do not start any installation workflow. This super option is designed to work along with the --install-now option to significantly reduce the user experience wait time for user-initiated macOS update workflows.",
-   "type": "boolean"
-  },
-  "InstallNow": {
-   "title": "Install All Updates Now",
-   "description": "Installs all updates now, works best with the --only-download option as the macOS update workflow can take some time, and the above option can help manage that time better.",
-   "type": "boolean"
-  },
-  "PolicyTriggers": {
-   "title": "Policy Triggers",
-   "description": "If a restart is required for system updates or forced via RestartWithoutUpdates, this list of Jamf Policy Triggers runs before any available updates install and the computer restarts.",
-   "type": "string",
-   "options": {
-    "inputAttributes": {
-     "placeholder": "triggerA,triggerB,triggerC"
-    }
-   }
-  },
-  "SkipUpdates": {
-   "title": "Skip Updates",
-   "description": "Skip Apple software updates, even if they are available.",
-   "type": "boolean"
-  },
-  "RestartWithoutUpdates": {
-   "title": "Restart Without Updates",
-   "description": "Force a restart even if Apple software updates do not need it.",
-   "type": "boolean"
-  },
-  "TestMode": {
-   "title": "Test Mode",
-   "description": "Mode to validate parameters, credentials, notifications, dialogs, deferrals, and deadline logic.",
-   "type": "boolean",
-   "default": "true"
-  },
-  "TestModeTimeout": {
-   "title": "Test Mode Timeout",
-   "description": "The amount of time in seconds to leave test notifications and dialogs open before moving on in the workflow.",
-   "type": "string"
-  },
-  "VerboseMode": {
-   "title": "Verbose Mode",
-   "description": "Mode to generate additional log output.",
-   "type": "boolean"
-  }
- }
 }
