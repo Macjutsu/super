@@ -314,16 +314,20 @@
             "title": "Free Space Update",
             "description": "Free Space Required for updates",
             "type": "string",
-            "inputAttributes": {
-                "placeholder": "15"
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "15"
+                }
             }
         },
         "FreeSpaceUpgrade": {
             "title": "Free Space Upgrade",
             "description": "Free Space Required for upgrades",
             "type": "string",
-            "inputAttributes": {
-                "placeholder": "35"
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "35"
+                }
             }
         },
         "FreeSpaceTimeout": {
@@ -340,8 +344,10 @@
             "title": "BatteryLevel",
             "description": "Minmum Battery Percentage",
             "type": "string",
-            "inputAttributes": {
-                "placeholder": "50"
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "50"
+                }
             }
         },
         "BatteryTimeout": {
