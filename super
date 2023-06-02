@@ -6300,13 +6300,13 @@ cleanExit
 # Set language strings for notifications and dialogs.
 setDisplayLanguage() {
 #### Langauge for the restart button in dialogs. Note that for deadline dialogs this is the default button.
-restartButtonDISPLAY="Restart"
+restartButtonDISPLAY="再起動"
 
 #### Language for the deferral button in dialogs that do not show the $menuDeferOPTION but instead show the $DefaultDefer time in the button display. Note that for non-deadline dialogs this is the default button.
-deferForButtonDISPLAY="Defer For"
+deferForButtonDISPLAY="再通知"
 
 #### Language for the deferral button in dialogs that also show the $menuDeferOPTION. Note that for non-deadline dialogs this is the default button.
-deferButtonDISPLAY="Defer"
+deferButtonDISPLAY="延期"
 
 #### Language for the ok button in certain notifications.
 okButtonDISPLAY="OK"
