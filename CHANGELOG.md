@@ -22,7 +22,7 @@
 - __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
 - It is safe to mix `super` version 3.0 and 4.x managed preferences in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-options.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x]((https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-managed-preferences.tsv).
 - Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
 - Updated [example MDM configuration profiles for `super` 4.0.0-beta1](https://github.com/Macjutsu/super/tree/4.0.0-beta1/Example-MDM).
 
