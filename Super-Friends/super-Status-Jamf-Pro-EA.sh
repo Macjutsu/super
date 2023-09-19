@@ -2,19 +2,24 @@
 
 # This script returns the super status to Jamf inventory as reported by super 3.0 or later.
 # Make sure to set the Extension Attribute Data Type to "String".
-# This script must be run as root or via Jamf Pro.
+# https://github.com/Macjutsu/super
+# by Kevin M. White
+# 2023/09/19
 
-# Path to a local property list file:
-superPLIST="/Library/Management/super/com.macjutsu.super" # No trailing ".plist"
+# Path to the super working folder:
+SUPER_FOLDER="/Library/Management/super"
 
-# Report if the file exists.
-if [[ -f "$superPLIST.plist" ]]; then
-	superSTATUS=$(defaults read "$superPLIST" SuperStatus)
+# Path to the local property list file:
+SUPER_LOCAL_PLIST="${SUPER_FOLDER}/com.macjutsu.super" # No trailing ".plist"
+
+# Report if the super preference file exists.
+if [[ -f "${SUPER_LOCAL_PLIST}.plist" ]]; then
+	super_status=$(defaults read "${SUPER_LOCAL_PLIST}" SuperStatus)
 	# Report if the file has a value.
-	if [[ -n $superSTATUS ]]; then
-		echo "<result>$superSTATUS</result>"
+	if [[ -n "${super_status}" ]]; then
+		echo "<result>${super_status}</result>"
 	else
-		echo "<result>No super status reported.</result>"
+		echo "<result>No super status found.</result>"
 	fi
 else
 	echo "<result>No super preference file.</result>"

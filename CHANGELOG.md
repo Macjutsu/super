@@ -1,5 +1,96 @@
 # CHANGELOG
 
+## [4.0.0-beta1]
+
+2023-09-19
+
+### Highlights
+
+- New option to save the user's password for future automatic macOS updates and upgrades. Literally, "Save Password" but for automatic macOS updates and upgrades.
+- New display customization options including unmovable dialogs and hide background mode courtesy of [IBM Notifier 3.0.3](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-3.0.3-b-108).
+- New macOS installer workflows are now handled by [`mist-cli`](https://github.com/ninxsoft/mist-cli) integration, thus removing all `python` dependencies.
+- New LaunchDaemon architecture significantly improves automatic launch and deferment reliability for all `super` workflows.
+- New default "always on" behavior automatically checks for Apple software updates on a regular basis.
+- Support for Jamf Pro 10.48+ [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html).
+- Support for Jamf Pro 10.49+ [API Roles and Clients](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/API_Roles_and_Clients.html).
+
+### Compatibility Notes
+
+- `super` version 4.x requires macOS 11 or newer (all code supporting macOS 10.x has been removed).
+- All `super` 4.x code has been refactored for [style](https://google.github.io/styleguide/shellguide.html), clarity, and uniformity. __As such nearly every single option name has been changed.__
+- __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 4.x__
+- __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
+- It is safe to mix `super` version 3.0 and 4.x managed preferences in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-options.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x]((https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
+- Updated [example MDM configuration profiles for `super` 4.0.0-beta1](https://github.com/Macjutsu/super/tree/4.0.0-beta1/Example-MDM).
+
+### Specific Changes (4.0.0-beta1)
+
+- New `--usage` and `--help` options behavior now no longer requires `sudo`, or installs `super` items, or writes anything to the super.log, or interferes with any running `super` workflow. However, `super` still installs automatically (if needed) when using any other options.
+- New default behavior if no updates/upgrades are available (or allowed), `super` now automatically checks for new updates/upgrades on a reoccurring basis. Thus, the `--recheck-defer` option has been replaced by this default behavior.
+- New deferral timer behavior, all deferral timer options are now in minutes (dialog timeouts remain in seconds).
+- New deferral timer behavior, all deferral timer options now allow you to specify up to 10080 minutes (1 week).
+- New `--deferral-timer-workflow-relaunch=minutes` option allows you to override the default check for new updates/upgrades deferral interval time of six hours (360 minutes).
+- New `--workflow-disable-relaunch` option prevents `super` from checking for new updates/upgrades on a reoccurring basis.
+- New `--auth-ask-user-to-save-password` option to save the user's password to the user's keychain after a succesfull user authentication dialog.
+- New `--auth-credential-failover-to-user` option enables fail over to user authentication if any new or previously saved authentication option fails. (The `--auth-mdm-failover-to-user` option remains as is still used to facilitate failover specific to MDM workflows.)
+- New saved authentication behavior, only one authentication option can be active at any given time. If multiple authentication options have been specified the priority order is; `--auth-ask-user-to-save-password` > `--auth-local-account` > `--auth-service-add-via-admin-account` > `--auth-jamf-client` > `--auth-jamf-account`
+- New Apple silicon credential storage mechanism now encodes all keychain items as base64. This allows for storing unicode text strings and further obfuscates the authentication credentials.
+- New Apple silicon credential storage mechanism now also stores all saved administrator credential "account names" in the system keychain. The "account names" were previously stored in the `super` preference file.
+- Previously saved `super` 3 Apple silicon authentication credentials are automatically migrated to this new storage mechanism the first time `super` 4 runs.
+- New support for Jamf Pro 10.48+ [(Beta) Managed Software Updates API](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html). `super` automatically detects if this feature is enabled on your Jamf Pro server
+- New permisions requirements for the [(Beta) Managed Software Updates API](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html):
+	- Jamf Pro Server Objects > Managed Software Updates > Read & Create
+	- Jamf Pro Server Objects > Computers > Read
+	- Jamf Pro Server Objects > Mobile Devices > Read
+	- Jamf Pro Server Actions > Send Computer Remote Command to Download and Install macOS Update
+	- Jamf Pro Server Actions > Send Mobile Device Remote Command to Download and Install iOS Update
+- New support for Jamf Pro 10.49+ [API roles and clients authentication](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/API_Roles_and_Clients.html). The new `--auth-jamf-client=ClientID` and `--auth-jamf-secret=ClientSecret` options allow you to specify credentials for this new authentication mechanism.
+- New Jamf Pro API computer ID discovery method leverages the Jamf binary if no Jamf Pro ID is provided via [`super` MDM configuration profile](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-ID-Only-Example-com.macjutsu.super.plist). (The Jamf Pro API privilege for "Computers Read" is no longer used to resolve the Jamf Pro ID.)
+- New `--jamf-custom-url=URL` option allows you to override the default Jamf Pro management URL for a custom Jamf Pro API URL.
+- New [IBM Notifier 3.0.3](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-3.0.3-b-108) is automatically installed.
+- New dialog and notification behavior now automatically re-opens if the user attempts to quit via Command-Q keyboard shortcut.
+- Updated `--display-silently` option now allows for selectable display type behavior, see below for the available types.
+- New `--display-unmovable` option prevents the user from moving dialogs and notifications. Thus, the `--display-redraw` option has been removed.
+- New `--display-hide-background` option hides (via translucent blur) the background when displaying dialogs and notifications.
+- The new `--display-silently`, `--display-hide-background`, `--display-hide-background` options modify display behavior via the following types:
+	- ALWAYS - Modify display behavior for all dialogs and notifications.
+	- SOFT - Modify display behavior for Dialogs and notifications during a soft deadline.
+	- HARD - Modify display behavior for Dialogs and notifications during a soft deadline.
+	- INSTALLNOW - Modify display behavior for Dialogs and notifications during the install now workflow.
+	- DEFER - Modify display behavior for the defer or restart dialog.
+	- USERAUTH - Modify display behavior for the user authentication dialog.
+	- POWER - Modify display behavior for the power required notification.
+	- STORAGE - Modify display behavior for the insufficient storage notification.
+- New default behavior, no `super` dialog ever times out unless you use the `--dialog-timeout-default=seconds` option. This option sets the default timeout for any dialog that doesn't have a specific timeout setting.
+- New individual dialog timeout options now includes the following options:
+	- `--dialog-timeout-restart-or-defer=seconds`
+	- `--dialog-timeout-soft-deadline=seconds`
+	- `--dialog-timeout-user-auth=seconds`
+	- `--dialog-timeout-insufficient-storage=seconds`
+	- `--dialog-timeout-power-required=seconds`
+- The user authentication dialog now shows the dialog timeout countdown (only when no custom display accessory is enabled).
+- New (renamed) `--workflow-install-now` option behavior now works when there is no active users.
+- New (renamed) `--workflow-install-now` option behavior is now a temporary option that is not saved for future runs of `super`. As such the `InstallNow` managed preference has been removed.
+- New rearchitected macOS installer workflows leverage `mist-cli` instead of `erase-install.sh` for installer listings and downloads. (Thanks for your service @grahampugh)
+- New automatic installation of [`mist-cli` version 1.15](https://github.com/ninxsoft/mist-cli) if required to facilitate macOS installer workflows. (Huge shout out to @ninxsoft)
+- New internal mechanisms to validate downloaded macOS installers. (Thanks to @grahampugh code inspiration!)
+- Upgrade workflows using the macOS installer now use more accurate storage space requirements courtesy of `mist-cli` (previously this was statically set to 13GB for all macOS installers).
+- Systems with macOS 13 and newer no longer check for macOS installers (as they should be able to perform a macOS major upgrade via `softwareupdate` for all workflows).
+- `jamfHelper` is no loger supported, as such the following options have been removed: `--icon-size-jamf=pixels` `--prefer-jamf-helper` `--prefer-jamf-helper-off`
+- `jamfHelper` is no longer a display option (all code supporting jamfHelper has been removed). Thus, the `--icon-size-jamf` and `--prefer-jamf-helper` options have been removed.
+- The default battery level required percentage for Mac computers with Apple Silicon is now 20% (Intel remains at 50%).
+- Improved `--reset-super` clears local preferences for all versions of `super` including legacy preferences.
+- Improved temporary file methods for helper installation are now more secure. (Thanks to @giantwombat and @paragonsec for recommending this one!)
+- All `super` logs are now stored in the "logs" folder inside the `super` working folder. At this time legacy `super` logs are not moved to this new location.
+- Removed python dependency for Jamf Pro API token extraction. (Thanks to @jelockwood for this one!)
+- Resolved an issue where MacBook computers with M2 chips were not being properly identified as portables.
+- Resolved an issue where the patch version number (11.7.10 <- this last number) of macOS minor updates were not being properly identified.
+- Countless improvements to both regular and verbose log output.
+- `super` 4.0.0-beta1 SHA-256: f179ef824b128510f8867388d6d0252044cd2b4b36036181293a7601873c9ee3
+
 ## [3.0]
 
 2023-06-01
@@ -318,7 +409,7 @@
 - Validated against the late August 2022 Apple Security Updates.
 - The Jamf Pro API token is now invalidated when `super` exits (previously it was only deleted from local memory).
 - You can now set custom dialog timeout text for both the "Ask for Update" and "Soft Deadline" dialogs in the `setDisplayLanguage()` function.
-- IBM Notifier [Version 2.8.0 Build 87](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-2.8.0-b-87) is automatically downloaded and installed in the $superFOLDER.
+- IBM Notifier [Version 2.8.0 Build 87](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-2.8.0-b-87) is automatically downloaded and installed to the `super` working folder.
 - Resolved an issue where deleting account credentials did not set the appropriate update workflow.
 
 ## [2.0b2]
@@ -346,7 +437,7 @@
 - Maximum deferral count and maximum deferral days deadlines can now be restarted with the `--restart-count` and `--restart-days` options.
 - Multiple options of a similar type can now be deleted with a single option, this includes; `--delete-deferrals`, `--delete-counts`, `--delete-days`, `--delete-dates`, and `--delete-accounts`.
 - Improved icon scaling when using the `--icon-size-ibm` option courtesy of...
-- IBM Notifier [Version 2.7.1 Build 81](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-2.7.1-b-81) is automatically downloaded and installed in the $superFOLDER.
+- IBM Notifier [Version 2.7.1 Build 81](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-2.7.1-b-81) is automatically downloaded and installed to the `super` working folder.
 - As a default behavior, the `--policy-triggers` option now waits for restart-required system updates to become available before running any Jamf Policy Triggers. Alternately, you can combine this option with the `--skip-updates` option to run the Jamf Policy triggers without waiting for a restart-required system update.
 - The `--clear-super` option is renamed to `--reset-super` and also includes improved logging.
 - Improved behavior for the `--open-logs` option.
@@ -408,7 +499,7 @@
 
 2022-03-09
 
- - [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) is automatically downloaded and installed in the $superFOLDER.
+ - [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) is automatically downloaded and installed to the `super` working folder.
  - [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) is default for all user interactions, but if IBM Notifier.app can't be downloaded or is invalid then super falls back to `jamfHelper`.
  - Ability to specify custom icon size when using [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) via `--icon-size-ibm pixels` option and managed preference: `<key>IconSizeIbm</key> <string>number</string>`
  - Ability to specify custom icon size when using `jamfHelper` via `--icon-size-jamf pixels` option and managed preference: `<key>IconSizeJamf</key> <string>number</string>`

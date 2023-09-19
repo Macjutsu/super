@@ -3,13 +3,13 @@
 <plist version="1">
   <dict>
     <key>PayloadUUID</key>
-    <string>C70AFE28-6CB4-467D-99E6-AE5F2C5E4716</string>
+    <string>D1A08192-187F-4940-AB15-0623AD93B2BB</string>
     <key>PayloadType</key>
     <string>Configuration</string>
     <key>PayloadOrganization</key>
     <string>Macjutsu</string>
     <key>PayloadIdentifier</key>
-    <string>C70AFE28-6CB4-467D-99E6-AE5F2C5E4716</string>
+    <string>D1A08192-187F-4940-AB15-0623AD93B2BB</string>
     <key>PayloadDisplayName</key>
     <string>S.U.P.E.R.M.A.N. Jamf Pro ID Only Example</string>
     <key>PayloadDescription</key>
@@ -28,13 +28,13 @@
         <key>PayloadDisplayName</key>
         <string>Custom Settings</string>
         <key>PayloadIdentifier</key>
-        <string>F4B5AEAE-4579-4C62-A95E-2645ADA76815</string>
+        <string>22539B64-64B4-4973-AA52-B6B105B4C014</string>
         <key>PayloadOrganization</key>
-        <string>Macjutsu</string>
+        <string>JAMF Software</string>
         <key>PayloadType</key>
         <string>com.apple.ManagedClient.preferences</string>
         <key>PayloadUUID</key>
-        <string>F4B5AEAE-4579-4C62-A95E-2645ADA76815</string>
+        <string>22539B64-64B4-4973-AA52-B6B105B4C014</string>
         <key>PayloadVersion</key>
         <integer>1</integer>
         <key>PayloadContent</key>
@@ -46,7 +46,7 @@
               <dict>
                 <key>mcx_preference_settings</key>
                 <dict>
-                  <key>JamfProID</key>
+                  <key>AuthJamfComputerID</key>
                   <string>$JSSID</string>
                 </dict>
               </dict>
