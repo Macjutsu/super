@@ -1,13 +1,13 @@
 {
-    "title": "Super Version 4.0 (com.macjutsu.super)",
+    "title": "Super Version 4.0.0 (com.macjutsu.super)",
     "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true, please remember to set to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
     "__preferencedomain": "com.macjutsu.super",
     "options": {
         "remove_empty_properties": true
     },
     "properties": {
-        "JamfProID": {
-            "title": "JamfPro ID",
+        "AuthJamfComputerID": {
+            "title": "Auth Jamf Computer ID",
             "description": "Use this when using super with Jamf Pro API account.",
             "type": "string",
             "enum": ["$JSSID"],
