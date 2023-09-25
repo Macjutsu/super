@@ -16,7 +16,7 @@ super 3.0	super 4.0.0-beta1
 <key>HardDate</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>
 <key>DeferDialogTimeout</key> <string>seconds</string>	<key>DialogTimeoutRestartOrDefer</key> <string>seconds</string>
 <key>SoftDialogTimeout</key> <string>seconds</string>	<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>
-<key>DisplayRedraw</key> <string>seconds</string>	<key>DialogTimeoutUserAuth</key> <string>seconds</string>
+<key>DisplayRedraw</key> <string>seconds</string>	REMOVED
 <key>DisplayIcon</key> <string>path</string>	<key>DisplayIconFile</key> <string>path</string>
 <key>IconSizeIbm</key> <string>pixels</string>	<key>DisplayIconSize</key> <string>pixels</string>
 <key>IconSizeJamf</key> <string>pixels</string>	REMOVED
