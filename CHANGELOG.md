@@ -21,10 +21,10 @@
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 4.x__
 - __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
 - It is safe to mix `super` version 3.0 and 4.x managed preferences in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-options.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-managed-preferences.tsv).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` 4.0.0-beta1](https://github.com/Macjutsu/super/tree/4.0.0-beta1/Example-MDM).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Super-Friends/super-3to4-migration-options.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
+- Updated [example MDM configuration profiles for `super` 4.0.0-beta2](https://github.com/Macjutsu/super/tree/4.0.0-beta2/Example-MDM).
 
 ### Specific Changes (4.0.0-beta2)
 
@@ -38,7 +38,7 @@
 - Resolved issues causing some display behavior options (`--display-unmovable`, `--display-hide-background`, and `--display-silently`) from being applied when multiple dialogs or notifications are shown.
 - Resolved an issue preventing the `--auth-mdm-failover-to-user` option from working. (Thanks to @croaker-1 for suggesting a fix to this one.)
 - Resolved a potential permission issue preventing display of the custom display icon cache. (Thanks to @master-vodawagner for suggesting a fix to this one.)
-- Updated [Jamf Pro config profile external application custom schema for `super` 4.0.0](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v4.0.0-beta2.json). (Thanks to @robjschroeder for updating this!)
+- Updated [Jamf Pro config profile external application custom schema for `super` 4.0.0-beta2](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v4.0.0-beta2.json). (Thanks to @robjschroeder for updating this!)
 - `super` 4.0.0-beta2 SHA-256: 40824d6425757022af8c78a9942e81c4a9c442f83c808950429efcf71afcfb2e
 
 ### Specific Changes (4.0.0-beta1)
