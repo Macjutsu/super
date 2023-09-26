@@ -1,5 +1,5 @@
 {
-    "title": "Super Version 4.0.0 (com.macjutsu.super)",
+    "title": "Super Version 4.0.0-beta1 (com.macjutsu.super)",
     "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true, please remember to set to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
     "__preferencedomain": "com.macjutsu.super",
     "options": {
@@ -14,7 +14,7 @@
             "default": "$JSSID"
         },
         "DeferralTimerDefault": {
-            "title": "Default Defer",
+            "title": "Default Defer Timer",
             "description": "The number of minutes to defer until the next update attempt if a user chooses not to update restart. It must be between 2 and 1440. Default deferral time is 60. Put X to diasble this option.",
             "type": "string",
             "options": {
@@ -24,7 +24,7 @@
             }
         },
         "DeferralTimerFocus": {
-            "title": "Focus Defer",
+            "title": "Focus Defer Timer",
             "description": "The number of minutes to defer the update restart dialog automatically if a process has prevented display sleep (for example, during an active meeting) or the user has Focus or Do Not Disturb enabled. It must be between 2 and 1440. Put X to diasble this option.",
             "type": "string",
             "options": {
@@ -34,7 +34,7 @@
             }
         },
         "DeferralTimerMenu": {
-            "title": "Menu Defer",
+            "title": "Menu Defer Timer",
             "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DeferralTimerDefault time. It must be between 2 and 1440. Put X to diable this option.",
             "type": "string",
             "options": {
@@ -44,7 +44,7 @@
             }
         },
         "DeferralTimerWorkflowRelaunch": {
-            "title": "Recheck Defer",
+            "title": "Workflow Relaunch Defer Timer",
             "description": "The number of minutes to defer if no software updates are found. It must be between 2 and 43804. Put X to diable this option.",
             "type": "string",
             "options": {
@@ -54,7 +54,7 @@
             }
         },
         "DeferralTimerError": {
-            "title": "Error Defer",
+            "title": "Error Defer Timer",
             "description": "The number of minutes to defer if super detects an error in the workflow (for example, network or MDM connectivity issues). It must be between 2 and 1440. Default deferral time is 60. Put X to diasble this option.",
             "type": "string",
             "options": {
@@ -64,37 +64,37 @@
             }
         },
         "DeadlineCountFocus": {
-            "title": "Focus Count",
+            "title": "Focus Count Deadline",
             "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
             "type": "string"
         },
         "DeadlineCountSoft": {
-            "title": "Soft Count",
+            "title": "Soft Count Deadline",
             "description": "The maximum number of user selected deferrals allowed before the soft deadline automatically restarts for updates without asking the user for approval. Put X to diable this option.",
             "type": "string"
         },
         "DeadlineCountHard": {
-            "title": "Hard Count",
+            "title": "Hard Count Deadline",
             "description": "The maximum number of user selected deferrals allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
             "type": "string"
         },
         "DeadlineDaysFocus": {
-            "title": "Focus Days",
+            "title": "Focus Days Deadline",
             "description": "The maximum number of days that automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
             "type": "string"
         },
-        "DeadlineSoftDays": {
-            "title": "Soft Days",
+        "DeadlineDaysSoft": {
+            "title": "Soft Days Deadline",
             "description": "The maximum number of days allowed before the soft deadline dialog. The soft deadline is an interactive update restart dialog indicating that no more deferrals are allowed. Put X to diable this option.",
             "type": "string"
         },
-        "DeadlineHardDays": {
-            "title": "Hard Days",
+        "DeadlineDaysHard": {
+            "title": "Hard Days Deadline",
             "description": "The maximum number of days allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
             "type": "string"
         },
         "WorkflowZeroDateManual": {
-            "title": "Zero Day",
+            "title": "Zero Day Workflow Date",
             "description": "Instead of having the days deadline counter, automatically select the day zero date. PutX to diable this option.",
             "type": "string",
             "options": {
@@ -104,7 +104,7 @@
             }
         },
         "DeadlineDateFocus": {
-            "title": "Focus Date",
+            "title": "Focus Date Deadline",
             "description": "This is the last date and time when automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
             "type": "string",
             "options": {
@@ -114,7 +114,7 @@
             }
         },
         "DeadlineDateSoft": {
-            "title": "Soft Date",
+            "title": "Soft Date Deadline",
             "description": "If this date and time have passed, an interactive update restart dialog appears indicating that no more user deferrals are allowed. Put X to disable this option.",
             "type": "string",
             "options": {
@@ -124,7 +124,7 @@
             }
         },
         "DeadlineDateHard": {
-            "title": "Hard Date",
+            "title": "Hard Date Deadline",
             "description": "If this date has passed, the computer restarts and udpates without asking the user for approval. Put X to diable this option.",
             "type": "string",
             "options": {
@@ -134,7 +134,7 @@
             }
         },
         "DialogTimeoutRestartOrDefer": {
-            "title": "Defer Display Timeout",
+            "title": "Restart or Defer Display Timeout",
             "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
             "type": "string"
         },
@@ -154,7 +154,7 @@
             }
         },
         "DisplayIconSize": {
-            "title": "Icon Size IBM",
+            "title": "Icon Size",
             "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs. The value must be in between 96 and 150. Put X to reset this to default.",
             "type": "string",
             "options": {
@@ -233,7 +233,12 @@
         "DisplaySilently": {
             "title": "Display Dialogs Silently",
             "description": "When enabled, the system alert sound is suppressed when displaying dialogs.",
-            "type": "boolean"
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE"
+                }
+            }
         },
         "DialogTimeoutUserAuth": {
             "title": "User Authentication Timeout",
@@ -286,7 +291,7 @@
             "type": "boolean"
         },
         "TestStorageUpdate": {
-            "title": "Free Space Update",
+            "title": "Test Free Space Update",
             "description": "Free Space Required for updates",
             "type": "string",
             "options": {
@@ -296,7 +301,7 @@
             }
         },
         "TestStorageUpgrade": {
-            "title": "Free Space Upgrade",
+            "title": "Test Free Space Upgrade",
             "description": "Free Space Required for upgrades",
             "type": "string",
             "options": {
@@ -306,7 +311,7 @@
             }
         },
         "DialogTimeoutInsufficientStorage": {
-            "title": "FreeSpaceTimeout",
+            "title": "Test Free Space Timeout",
             "description": "Timeout for computers with not enough free space.",
             "type": "string",
             "options": {
@@ -316,7 +321,7 @@
             }
         },
         "TestBatteryLevel": {
-            "title": "BatteryLevel",
+            "title": "Test BatteryLevel",
             "description": "Minmum Battery Percentage",
             "type": "string",
             "options": {
@@ -326,8 +331,8 @@
             }
         },
         "DialogTimeoutPowerRequired": {
-            "title": "BatteryTimeout",
-            "description": "Timeout for computers with not enough Battery.",
+            "title": "Battery Timeout",
+            "description": "Timeout for computers where power is required.",
             "type": "string",
             "options": {
                 "inputAttributes": {
