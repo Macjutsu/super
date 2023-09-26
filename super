@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2024,SC2207
 
-SUPER_VERSION="4.0.0-beta1"
-SUPER_DATE="2023/09/19"
+SUPER_VERSION="4.0.0-beta2"
+SUPER_DATE="2023/09/26"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -714,9 +714,6 @@ if [[ "${reset_super_option}" == "TRUE" ]]; then
 	local auth_ask_user_to_save_password_backup
 	auth_ask_user_to_save_password_backup=$(defaults read "${SUPER_LOCAL_PLIST}" AuthAskUserToSavePassword 2> /dev/null)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_ask_user_to_save_password_backup: ${auth_ask_user_to_save_password_backup}"
-	local auth_user_account_backup
-	auth_user_account_backup=$(defaults read "${SUPER_LOCAL_PLIST}" AuthUserAccount 2> /dev/null)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_account_backup: ${auth_user_account_backup}"
 	local auth_local_account_backup
 	auth_local_account_backup=$(defaults read "${SUPER_LOCAL_PLIST}" AuthLocalAccount 2> /dev/null)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_account_backup: ${auth_local_account_backup}"
@@ -754,16 +751,10 @@ if [[ "${reset_super_option}" == "TRUE" ]]; then
 	[[ "${verbose_mode_option}" == "TRUE" ]] && defaults write "${SUPER_LOCAL_PLIST}" VerboseMode -bool true
 	
 	# Restore any saved preferences from backup.
-	[[ "${auth_ask_user_to_save_password_backup}" -eq 0 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthAskUserToSavePassword -bool false
 	[[ "${auth_ask_user_to_save_password_backup}" -eq 1 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthAskUserToSavePassword -bool true
-	[[ -n "${auth_user_account_backup}" ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthUserAccount -string "${auth_user_account_backup}"
-	[[ "${auth_local_account_backup}" -eq 0 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthLocalAccount -bool false
 	[[ "${auth_local_account_backup}" -eq 1 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthLocalAccount -bool true
-	[[ "${auth_service_account_backup}" -eq 0 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthServiceAccount -bool false
 	[[ "${auth_service_account_backup}" -eq 1 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthServiceAccount -bool true
-	[[ "${auth_jamf_client_backup}" -eq 0 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthJamfClient -bool false
 	[[ "${auth_jamf_client_backup}" -eq 1 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthJamfClient -bool true
-	[[ "${auth_jamf_account_backup}" -eq 0 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthJamfAccount -bool false
 	[[ "${auth_jamf_account_backup}" -eq 1 ]] && defaults write "${SUPER_LOCAL_PLIST}" AuthJamfAccount -bool true
 	[[ -n "${auth_legacy_local_account_backup}" ]] && defaults write "${SUPER_LOCAL_PLIST}" LocalAccount -string "${auth_legacy_local_account_backup}"
 	[[ -n "${auth_legacy_super_account_backup}" ]] && defaults write "${SUPER_LOCAL_PLIST}" SuperAccount -string "${auth_legacy_super_account_backup}"
@@ -1824,6 +1815,7 @@ elif [[ -n "${display_icon_file_option}" ]] && [[ "${display_icon_file_option}" 
 	elif [[ -e "${display_icon_file_option}" ]]; then
 		log_super "Status: Copying requested --display-icon-file from: ${display_icon_file_option}"
 		sips_response=$(sips --setProperty format png "${display_icon_file_option}" --out "${DISPLAY_ICON_FILE_CACHE}" 2>&1)
+		chmod a+r "${DISPLAY_ICON_FILE_CACHE}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: sips_response is:\n${sips_response}"
 		defaults write "${SUPER_LOCAL_PLIST}" DisplayIconFileCachedOrigin -string "${display_icon_file_option}"
 	else
@@ -2038,9 +2030,9 @@ if [[ "${auth_mdm_failover_to_user_option}" == "X" ]]; then
 elif [[ -n "${auth_mdm_failover_to_user_option}" ]]; then
 	local previous_ifs
 	previous_ifs="${IFS}"; IFS=','
-	local auth-mdm-failover-to-user-array
-	read -r -a auth-mdm-failover-to-user-array <<< "${auth_mdm_failover_to_user_option}"
-	for option_type in "${auth-mdm-failover-to-user-array[@]}"; do
+	local auth_mdm_failover_to_user_array
+	read -r -a auth_mdm_failover_to_user_array <<< "${auth_mdm_failover_to_user_option}"
+	for option_type in "${auth_mdm_failover_to_user_array[@]}"; do
 		if [[ "${option_type}" =~ ^ALWAYS$ ]]; then
 			auth_mdm_failover_always="TRUE"
 		elif [[ "${option_type}" =~ ^NOSERVICE$ ]]; then
@@ -2179,7 +2171,6 @@ manage_authentication_options () {
 auth_error_new="FALSE"
 
 # Collect any previously saved credential states (including legacy methods) from ${SUPER_LOCAL_PLIST}.
-auth_user_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" AuthUserAccount 2> /dev/null)
 [[ "${auth_ask_user_to_save_password}" -eq 1 ]] && auth_ask_user_to_save_password="TRUE"
 auth_local_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" AuthLocalAccount 2> /dev/null)
 [[ "${auth_local_account_saved}" -eq 1 ]] && auth_local_account_saved="TRUE"
@@ -2196,7 +2187,6 @@ auth_legacy_super_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" SuperAcco
 local auth_legacy_jamf_account_saved
 auth_legacy_jamf_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" JamfAccount 2> /dev/null)
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_ask_user_to_save_password: ${auth_ask_user_to_save_password}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_account_saved: ${auth_user_account_saved}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_account_saved: ${auth_local_account_saved}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_service_account_saved: ${auth_service_account_saved}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_client_saved: ${auth_jamf_client_saved}"
@@ -2211,14 +2201,14 @@ auth_legacy_jamf_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" JamfAccoun
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_delete_all_option: ${auth_delete_all_option}"
 
 # Logging to indicate if there are no saved accounts when a delete is requested.
-{ [[ -z "${auth_user_account_saved}" ]] && [[ -z "${auth_local_account_saved}" ]] && [[ -z "${auth_service_account_saved}" ]] && [[ -z "${auth_jamf_client_saved}" ]] && [[ -z "${auth_jamf_account_saved}" ]] && [[ -z "${auth_legacy_local_account_saved}" ]] && [[ -z "${auth_legacy_super_account_saved}" ]] && [[ -z "${auth_legacy_jamf_account_saved}" ]] && [[ -n "${auth_delete_all_option}" ]]; } && log_super "Status: No saved authentication credentials to delete."
+{ [[ -z "${auth_local_account_saved}" ]] && [[ -z "${auth_service_account_saved}" ]] && [[ -z "${auth_jamf_client_saved}" ]] && [[ -z "${auth_jamf_account_saved}" ]] && [[ -z "${auth_legacy_local_account_saved}" ]] && [[ -z "${auth_legacy_super_account_saved}" ]] && [[ -z "${auth_legacy_jamf_account_saved}" ]] && [[ -n "${auth_delete_all_option}" ]]; } && log_super "Status: No saved authentication credentials to delete."
 
 # If the user specified any new Apple silicon authentication option or the ${auth_delete_all_option} then delete any previously saved credentials.
-if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] || [[ -n "${auth_local_account_option}" ]] || [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; then
-	if [[ -n "${auth_user_account_saved}" ]] && [[ "${auth_ask_user_to_save_password}" != "TRUE" ]]; then
+if [[ -n "${auth_ask_user_to_save_password}" ]] || [[ -n "${auth_local_account_option}" ]] || [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; then
+	{ [[ "${auth_ask_user_to_save_password}" != "TRUE" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; } && auth_ask_user_to_save_password="FALSE"
+	if [[ "${auth_ask_user_to_save_password}" == "FALSE" ]]; then
 		log_super "Status: Deleting saved credentials for the --auth-ask-user-to-save-password option."
-		sudo -u "${auth_user_account_saved}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
-		defaults delete "${SUPER_LOCAL_PLIST}" AuthUserAccount > /dev/null 2>&1
+		sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
 		defaults delete "${SUPER_LOCAL_PLIST}" AuthAskUserToSavePassword > /dev/null 2>&1
 		auth_user_account_saved="FALSE"
 	fi
@@ -2322,7 +2312,18 @@ if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_sav
 	[[ -n "${auth_service_add_via_admin_account_option}" ]] && log_super "Warning: Ignoring the --auth-service-add-via-admin-account option."
 	[[ -n "${auth_jamf_client_option}" ]] && log_super "Warning: Ignoring the --auth-jamf-client option."
 	[[ -n "${auth_jamf_account_option}" ]] && log_super "Warning: Ignoring the --auth-jamf-account option."
-	[[ -z "${auth_user_account_saved}" ]] && log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+	if [[ "${current_user_account_name}" != "FALSE" ]]; then
+		auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" 2>&1)
+		if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
+			auth_user_account_saved="TRUE"
+		else
+			log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+			unset auth_user_password_keychain
+			auth_user_account_saved="FALSE"
+		fi
+	else # No ${current_user_account_name}
+		log_super "Warning: No currently logged in user, cannot check status of the --auth-ask-user-to-save-passwor option."
+	fi
 	# The ${auth_ask_user_to_save_password} option is handled later by the dialog_user_auth function.
 elif [[ -n "${auth_local_account_option}" ]]; then
 	{ [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]]; } && log_super "Warning: The --auth-local-account option overrides the --auth-service-add-via-admin-account option and any other Apple silicon MDM authentication methods."
@@ -2549,6 +2550,7 @@ elif [[ -n "${auth_jamf_account_option}" ]]; then
 	fi
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_account_saved: ${auth_user_account_saved}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_account_saved: ${auth_local_account_saved}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_service_account_saved: ${auth_service_account_saved}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_client_saved: ${auth_jamf_client_saved}"
@@ -2589,8 +2591,8 @@ if [[ "${auth_error_new}" != "TRUE" ]]; then
 		[[ "${workflow_only_download_option}" != "TRUE" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via system account (root)."
 		workflow_auth_macos="LOCAL"
 	else # Standard workflow and computers with Apple silicon.
-		if [[ -n "${auth_user_account_saved}" ]] || [[ "${auth_local_account_saved}" == "TRUE" ]] || [[ "${auth_service_account_saved}" == "TRUE" ]]; then
-			[[ -n "${auth_user_account_saved}" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via saved user password."
+		if [[ "${auth_user_account_saved}" == "TRUE" ]] || [[ "${auth_local_account_saved}" == "TRUE" ]] || [[ "${auth_service_account_saved}" == "TRUE" ]]; then
+			[[ "${auth_user_account_saved}" == "TRUE" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via saved password for user: ${current_user_account_name}"
 			[[ "${auth_local_account_saved}" == "TRUE" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via saved local account."
 			[[ "${auth_service_account_saved}" == "TRUE" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via super service account."
 			workflow_auth_macos="LOCAL"
@@ -2671,44 +2673,36 @@ auth_jamf_account_valid="FALSE"
 
 # If there is a previously saved user account then validate the credentials and set ${auth_local_account} and ${auth_local_password}.
 if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-	[[ -z "${auth_user_account_saved}" ]] && auth_user_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" AuthUserAccount 2> /dev/null)
-	if [[ -n "${auth_user_account_saved}" ]]; then
-		[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(sudo -u "${auth_user_account_saved}" security find-generic-password -w -a "super_auth_user_password" 2> /dev/null)
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_account_saved: ${auth_user_account_saved}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
-		if [[ -n "${auth_user_account_saved}" ]] && [[ -n "${auth_user_password_keychain}" ]]; then
-			auth_local_account="${auth_user_account_saved}"
-			auth_local_password="${auth_user_password_keychain}"
-			check_auth_local_account
-			if [[ "${auth_error_local}" != "TRUE" ]]; then
-				log_super "Status: Validated saved credentials for the --auth-ask-user-to-save-password option using local account: ${auth_user_account_saved}"
-				auth_user_saved_password_valid="TRUE"
-			else
-				log_super "Auth Error: Unable to validate the saved --auth-ask-user-to-save-password credentials for local account: ${auth_user_account_saved}"; auth_error_saved="TRUE"
-				unset auth_local_account
-				unset auth_local_password
-			fi
+	[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" 2>&1)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
+	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
+		auth_local_account="${current_user_account_name}"
+		auth_local_password="${auth_user_password_keychain}"
+		check_auth_local_account
+		if [[ "${auth_error_local}" != "TRUE" ]]; then
+			log_super "Status: Validated saved credentials for the --auth-ask-user-to-save-password option using local account: ${current_user_account_name}"
+			auth_user_saved_password_valid="TRUE"
 		else
-			log_super "Auth Error: Unable to retrieve the saved credentials for the --auth-ask-user-to-save-password option."; auth_error_saved="TRUE"
-		fi
-		auth_user_account_saved="FALSE"
-		unset auth_user_password_keychain
-		if [[ "${auth_error_saved}" == "TRUE" ]]; then
+			log_super "Warning: Unable to validate the saved --auth-ask-user-to-save-password credentials for local account: ${current_user_account_name}"
+			unset auth_local_account
+			unset auth_local_password
 			log_super "Warning: Deleting invalid saved credentials for the --auth-ask-user-to-save-password option."
+			sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
 			log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
-			sudo -u "${auth_user_account_saved}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
-			defaults delete "${SUPER_LOCAL_PLIST}" AuthUserAccount > /dev/null 2>&1
-			auth_error_saved="FALSE"
+			auth_error_saved="TRUE"
+			auth_user_account_saved="FALSE"
 		fi
 	else
 		log_super "Status: The --auth-ask-user-to-save-password option is enabled but a user password is not currently saved."
 		log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+		auth_error_saved="TRUE"
+		auth_user_account_saved="FALSE"
 	fi
-else
-	auth_ask_user_to_save_password="FALSE"
+	unset auth_user_password_keychain
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_ask_user_to_save_password: ${auth_ask_user_to_save_password}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_saved_password_valid: ${auth_user_saved_password_valid}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_account_saved: ${auth_user_account_saved}"
 
 # If there is a previously saved local account then validate the credentials and set ${auth_local_account} and ${auth_local_password}.
 if [[ "${auth_local_account_saved}" -eq 1 ]] || [[ "${auth_local_account_saved}" == "TRUE" ]]; then
@@ -3131,6 +3125,15 @@ if [[ "${verbose_mode_option}" == "TRUE" ]]; then
 	log_super "Verbose Mode: Function ${FUNCNAME[0]}: Uptime is: $(uptime)"
 fi
 
+# In case super is running at system startup, wait for the loginwindow process befor continuing.
+local startup_timeout
+startup_timeout=0
+while [[ ! $(pgrep "loginwindow") ]] && [[ "${startup_timeout}" -lt 600 ]]; do
+	log_super "Status: Waiting for macOS startup to complete..."
+	sleep 10
+	startup_timeout=$((startup_timeout + 10))
+done
+
 # Detailed system and user checks.
 check_system
 check_current_user
@@ -3396,7 +3399,11 @@ mac_cpu_architecture=$(arch) # Expected output: i386, arm64
 mac_model_name=$(system_profiler SPHardwareDataType | grep 'Model Name' | awk -F ': ' '{print $2}') # Expected output: MacBook Pro
 [[ $(echo "${mac_model_name}" | grep -c 'Book') -gt 0 ]] && mac_is_portable="TRUE" # Expected output: TRUE
 local last_reboot_response
-last_reboot_response=$(last -1 reboot | cut -c 41- | xargs) # Expected output: Aug 25 00:16
+if [[ "$macos_version_major" -ge 14 ]]; then
+	last_reboot_response=$(last -1 reboot | cut -c 48- | xargs) # Expected output: Aug 25 00:16
+else
+	last_reboot_response=$(last -1 reboot | cut -c 41- | xargs) # Expected output: Aug 25 00:16
+fi
 mac_last_startup=$(date -j -f "%b %d %H:%M:%S" "${last_reboot_response}:00" +"%Y-%m-%d:%H:%M:%S") # Expected output: 2023-08-25:00:16:00
 defaults write "${SUPER_LOCAL_PLIST}" MacLastStartup -string "${mac_last_startup}"
 if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Mac computers with Apple Silicon.
@@ -4212,7 +4219,7 @@ if [[ "${workflow_check_asu_error}" == "FALSE" ]]; then
 			asu_macos_minor_update_label=$(echo "${asu_macos_all_labels_array[*]}" | grep "${macos_version_major}.\d")
 			asu_macos_minor_update_title=$(echo "${asu_macos_all_titles_array[*]}" | grep "${macos_version_major}.\d")
 			asu_macos_minor_update_version=$(echo "${asu_macos_all_versions_array[*]}" | grep "${macos_version_major}.\d")
-			asu_macos_minor_update_size=$(echo "${asu_list}" | grep 'Title: macOS' | grep " ${macos_version_major}.\d" | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
+			asu_macos_minor_update_size=$(echo "${asu_list}" | grep 'Title: macOS' | grep "Version: ${macos_version_major}.\d" | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
 		else # macOS version prior to macOS 12.3.
 			asu_all_labels_array=($(echo "${asu_list}" | awk -F ': ' '/Label:/{print $2}'))
 			asu_all_titles_array=($(echo "${asu_list}" | awk -F ',' '/Title:/{print $1}' | cut -d ' ' -f 2-))
@@ -4324,22 +4331,23 @@ if [[ -n "${mdmclient_response}" ]]; then
 	if [[ $(echo "${mdmclient_response}" | grep -c 'Available updates') -gt 0 ]]; then
 		local mdmclient_macos_major_upgrade
 		{ [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_beta_program}" == "FALSE" ]]; } && mdmclient_macos_major_upgrade=$(echo "${mdmclient_response}" | grep -e ' HumanReadableName =' -e ' Version =' | tr '\n' '-' | sed -e 's/        HumanReadableName = //g' -e 's/;-        Version = //g' | tr ';-' '\n' | grep -e 'macOS' | sed -e 's/""/:/g' -e 's/"//g' | sort -t: -k2 -r -V | head -1)
-		{ [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_beta_program}" == "TRUE" ]]; } && mdmclient_macos_major_upgrade=$(echo "${mdmclient_response}" | grep -e ' HumanReadableName =' -e ' Version =' | tr '\n' '-' | sed -e 's/        HumanReadableName = //g' -e 's/;-        Version = //g' | tr ';-' '\n' | grep -e 'macOS' | grep -e 'Beta' | sed -e 's/""/:/g' -e 's/"//g' | sort -t: -k2 -r -V | head -1)
+		{ [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_beta_program}" == "TRUE" ]]; } && mdmclient_macos_major_upgrade=$(echo "${mdmclient_response}" | grep -e ' HumanReadableName =' -e ' Version =' | tr '\n' '-' | sed -e 's/        HumanReadableName = //g' -e 's/;-        Version = //g' | tr ';-' '\n' | grep -e 'macOS' | grep -e 'beta' -e 'Beta' | sed -e 's/""/:/g' -e 's/"//g' | sort -t: -k2 -r -V | head -1)
 		[[ "${macos_version_number}" -lt 1203 ]] && mdmclient_macos_major_upgrade=$(echo "${mdmclient_response}" | grep -e ' HumanReadableName =' -e ' Version =' | tr '\n' '-' | sed -e 's/        HumanReadableName = //g' -e 's/;-        Version = //g' | tr ';-' '\n' | grep -e 'macOS' | sed -e 's/""/:/g' -e 's/"//g' | sort -t: -k2 -r -V | head -1)
 	else
 		log_super "mdmclient Error: Response did not include a valid list of newer macOS versions."
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mdmclient_response is:\n${mdmclient_response}"
 		return 0
 	fi
 else
 	log_super "mdmclient Error: Response did not include any results."
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mdmclient_response is:\n${mdmclient_response}"
 	return 0
 fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mdmclient_response is:\n${mdmclient_response}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_beta_program is: ${macos_beta_program}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mdmclient_macos_major_upgrade is: ${mdmclient_macos_major_upgrade}"
 
 # Parse and validate mdmclient response.
 if [[ -n "${mdmclient_macos_major_upgrade}" ]]; then
-	macos_major_upgrade_marketing_name=$(echo "${mdmclient_macos_major_upgrade}"| awk -F ':' '{print $1}')
+	macos_major_upgrade_marketing_name=$(echo "${mdmclient_macos_major_upgrade}"| awk -F ':' '{print $1}' | sed -e 's/[0-9]*//g' -e 's/\.*//g' | xargs)
 	if [[ ! $(echo "${macos_major_upgrade_marketing_name}" | grep -c 'macOS') -gt 0 ]]; then
 			log_super "mdmclient Error: Response did not include a valid macOS upgrade marketing name."
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_marketing_name is: ${macos_major_upgrade_marketing_name}"
@@ -4776,13 +4784,14 @@ elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_
 			fi
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: prepared_macos_version is: ${prepared_macos_version}"
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_major_upgrade_version_target is: ${asu_macos_major_upgrade_version_target}"
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_version is: ${asu_macos_minor_update_version}"
 			if [[ -z "${prepared_macos_version}" ]]; then
 				log_super "Warning: Previously downloaded macOS update/upgrade is no longer valid, download workflow needs to run again."
 				downloaded_asu_error="TRUE"
 			else
-				if { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; } && [[ "${prepared_macos_version}" != "${macos_major_upgrade_version_major_target}" ]]; then
-					log_super "Warning: Previously downloaded macOS upgrade version ${prepared_macos_version} doesn't match expected version ${macos_major_upgrade_version_major_target}, download workflow needs to run again."
+				if { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; } && [[ "${prepared_macos_version}" != "${asu_macos_major_upgrade_version_target}" ]]; then
+					log_super "Warning: Previously downloaded macOS upgrade version ${prepared_macos_version} doesn't match expected version ${asu_macos_major_upgrade_version_target}, download workflow needs to run again."
 					downloaded_asu_error="TRUE"
 				fi
 				if [[ "${macos_major_upgrade_version_major_target}" == "FALSE" ]] && [[ "${prepared_macos_version}" != "${asu_macos_minor_update_version}" ]]; then
@@ -6455,7 +6464,7 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_m
 		if [[ "${workflow_auth_macos}" == "LOCAL" ]] || [[ "${workflow_auth_macos}" == "JAMF" ]]; then
 			get_saved_authentication
 			if [[ "${auth_error_saved}" == "TRUE" ]]; then
-				if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]]; then
+				if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
 					log_super "Warning: Saved authentication error, failing over to user authenticated workflow."
 					workflow_auth_macos="FAILOVER"
 					dialog_user_auth
@@ -6989,11 +6998,8 @@ open_notification_ibm_notifier() {
 # Append any additional display options to the ${ibm_notifier_array}.
 set_display_strings_optional_buttons
 { [[ "${display_unmovable_status}" == "TRUE" ]] || [[ "${display_unmovable_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-unmovable)
-[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
-[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
-[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
 # Kill any previous notifications so new ones can take its place.
@@ -7097,11 +7103,8 @@ else # No custom display accessory.
 fi
 set_display_strings_optional_buttons
 { [[ "${display_unmovable_status}" == "TRUE" ]] || [[ "${display_unmovable_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-unmovable)
-[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
-[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
-[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
 # Kill any previous notifications so new ones can take its place.
@@ -7241,6 +7244,11 @@ done
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_insufficient_storage_error is: ${notification_insufficient_storage_error}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: storage_ready is: ${storage_ready}"
 
+# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
+[[ "${display_hide_background_status}" == "TEMPOFF" ]] && unset display_hide_background_status
+[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
+
 # If there still is not sufficient storage, then exit.
 if [[ "${notification_insufficient_storage_error}" == "FALSE" ]] && [[ "${storage_ready}" == "FALSE" ]]; then
 	log_super "Error: Waiting for user to make more storage available timed out after ${notification_insufficient_storage_timeout_seconds} seconds."
@@ -7302,6 +7310,11 @@ while [[ "${notification_power_required_check_timeout}" -ge 0 ]]; do
 	notification_power_required_check_timeout=$((notification_power_required_check_timeout-POWER_REQUIRED_RECHECK_SECONDS))
 done
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: power_required_charger_connected is: ${power_required_charger_connected}"
+
+# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
+[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
 
 # If there still is no AC power, then exit.
 if [[ "${power_required_charger_connected}" == "FALSE" ]]; then
@@ -7455,6 +7468,11 @@ ibm_notifier_array+=(-main_button_label "${display_string_deferral_button}")
 
 # Start the dialog.
 open_dialog_ibm_notifier
+
+# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
+[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
 
 # The ${dialog_return} contains the IBM Notifier.app return code. If ${deferral_timer_menu_minutes} was enabled then set ${deferral_timer_minutes}.
 case "${dialog_return}" in
@@ -7632,6 +7650,11 @@ else
 fi
 unset dialog_user_auth_enabled
 
+# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
+[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
+
 # If user authentication was successful then evaluate options to save password or fix bootstrap token.
 if [[ "${dialog_user_auth_valid}" == "TRUE" ]]; then
 	log_super "Status: Current user \"${auth_local_account}\" credentials verified."
@@ -7640,8 +7663,7 @@ if [[ "${dialog_user_auth_valid}" == "TRUE" ]]; then
 		local auth_user_password_keychain
 		auth_user_password_keychain=$(sudo -u "${auth_local_account}" security find-generic-password -w -a "super_auth_user_password" 2> /dev/null)
 		if [[ "${auth_local_password}" == "${auth_user_password_keychain}" ]]; then
-			log_super "Status: Saving new --auth-ask-user-to-save-password credentials for user: ${auth_local_account}"
-			defaults write "${SUPER_LOCAL_PLIST}" AuthUserAccount -string "${auth_local_account}"
+			log_super "Status: Saved new --auth-ask-user-to-save-password credentials for user: ${auth_local_account}"
 		else
 			log_super "Warning: Unable to validate keychain item for --auth-ask-user-to-save-password, deleting keychain item."
 			sudo -u "${auth_local_account}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1

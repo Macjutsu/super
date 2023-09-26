@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [4.0.0-beta1]
+## [4.0.0-betaX]
 
-2023-09-19
+2023-09-26
 
 ### Highlights
 
@@ -25,6 +25,21 @@
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/super-3to4-migration-managed-preferences.tsv).
 - Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta1/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
 - Updated [example MDM configuration profiles for `super` 4.0.0-beta1](https://github.com/Macjutsu/super/tree/4.0.0-beta1/Example-MDM).
+
+### Specific Changes (4.0.0-beta2)
+
+- New startup behavior now waits for the `loginwindow` process before continuing. This reduces `softwareupdate` errors during the restart validation workflow.
+- Further refinements of the `--auth-ask-user-to-save-password` workflow including that the local account name is no longer stored in the `super` preference file.
+- Resolved an issue preventing the identification of last startup date on macOS 14.
+- Resolved an issue preventing user authentication failover if the previously saved user password was invalid.
+- Resolved an issue preventing macOS major beta upgrades from being properly discovered.
+- Resolved an issue causing calculation errors in macOS minor update required installation size.
+- Resolved an issue that caused repeated download attempts of macOS major upgrades.
+- Resolved issues causing some display behavior options (`--display-unmovable`, `--display-hide-background`, and `--display-silently`) from being applied when multiple dialogs or notifications are shown.
+- Resolved an issue preventing the `--auth-mdm-failover-to-user` option from working. (Thanks to @croaker-1 for suggesting a fix to this one.)
+- Resolved a potential permission issue preventing display of the custom display icon cache. (Thanks to @master-vodawagner for suggesting a fix to this one.)
+- Updated [Jamf Pro config profile external application custom schema for `super` 4.0.0](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v4.0.0-beta2.json). (Thanks to @robjschroeder for updating this!)
+- `super` 4.0.0-beta2 SHA-256: 40824d6425757022af8c78a9942e81c4a9c442f83c808950429efcf71afcfb2e
 
 ### Specific Changes (4.0.0-beta1)
 
