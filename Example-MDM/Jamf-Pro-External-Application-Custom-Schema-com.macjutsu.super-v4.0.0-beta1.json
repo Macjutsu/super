@@ -1,5 +1,5 @@
 {
-    "title": "Super Version 4.0.0 (com.macjutsu.super)",
+    "title": "Super Version 4.0.0-beta1 (com.macjutsu.super)",
     "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true, please remember to set to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
     "__preferencedomain": "com.macjutsu.super",
     "options": {
@@ -233,7 +233,12 @@
         "DisplaySilently": {
             "title": "Display Dialogs Silently",
             "description": "When enabled, the system alert sound is suppressed when displaying dialogs.",
-            "type": "boolean"
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE"
+                }
+            }
         },
         "DialogTimeoutUserAuth": {
             "title": "User Authentication Timeout",
