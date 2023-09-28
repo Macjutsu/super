@@ -2,7 +2,7 @@
 
 ## [4.0.0-betaX]
 
-2023-09-26
+2023-09-27
 
 ### Highlights
 
@@ -25,6 +25,19 @@
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Super-Friends/super-3to4-migration-managed-preferences.tsv).
 - Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
 - Updated [example MDM configuration profiles for `super` 4.0.0-beta2](https://github.com/Macjutsu/super/tree/4.0.0-beta2/Example-MDM).
+
+### Known Issues
+
+- [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
+- There are reports of an issue affecting the legacy Jamf Pro API where requesting a minor update on macOS 13 systems results Jamf Pro unintentionally sending a command to install macOS 14.
+
+### Specific Changes (4.0.0-beta3)
+
+- New automatic installation of [`mist-cli` version 2.0](https://github.com/ninxsoft/mist-cli) if required to facilitate macOS installer workflows. (Huge shout out to @ninxsoft)
+- If the `--auth-delete-all` option is used with other authentication options the `--auth-delete-all` option takes priority and no longer allows for other credential options.
+- Further refinements to the saved user authentication workflow.
+- Resolved an issue where previously saved authentication credentials were being unintentionally deleted.
+- `super` 4.0.0-beta3 SHA-256: fca929a284893e6019f337acc2993a8b254490981920a8afcb56c69b40b3d399
 
 ### Specific Changes (4.0.0-beta2)
 
