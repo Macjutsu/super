@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2024,SC2207
 
-SUPER_VERSION="4.0.0-beta3"
-SUPER_DATE="2023/09/27"
+SUPER_VERSION="4.0.0-beta4"
+SUPER_DATE="2023/10/11"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -234,7 +234,7 @@ INSTALLER_LIST_LOG="${SUPER_LOG_FOLDER}/installer-list.log"
 readonly INSTALLER_LIST_LOG
 
 # Path to the log for all softwareupdate download/install workflows:
-ASU_WORKFLOW_LOG="${SUPER_LOG_FOLDER}/asu-worfklow.log"
+ASU_WORKFLOW_LOG="${SUPER_LOG_FOLDER}/asu-workflow.log"
 readonly ASU_WORKFLOW_LOG
 
 # Path to the log for all macOS installer application download/install workflows:
@@ -305,7 +305,7 @@ readonly MIST_CLI_DOWNLOAD_URL
 
 # Target version for mist-cli:
 MIST_CLI_TARGET_VERSION="2.0"
-readonly MIST_CLI_DOWNLOAD_URL
+readonly MIST_CLI_TARGET_VERSION
 
 # Path to the local mist-cli binary:
 MIST_CLI_BINARY="/usr/local/bin/mist"
@@ -354,7 +354,7 @@ readonly STORAGE_REQUIRED_UPDATE_DEFAULT_GB
 STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=35
 readonly STORAGE_REQUIRED_UPGRADE_DEFAULT_GB
 
-# The number of seconds between storage checks when displaying the insufficient storage notification via the notification_insufficient_storage() function.
+# The number of seconds between storage checks when displaying the insufficient storage notification via the dialog_insufficient_storage() function.
 STORAGE_REQUIRED_RECHECK_SECONDS=5
 readonly STORAGE_REQUIRED_RECHECK_SECONDS
 
@@ -366,7 +366,7 @@ readonly POWER_REQUIRED_BATTERY_APPLE_SILICON_PERCENT
 POWER_REQUIRED_BATTERY_INTEL_PERCENT=50
 readonly POWER_REQUIRED_BATTERY_INTEL_PERCENT
 
-# The number of seconds between AC power checks when displaying the insufficient battery notification via the notification_insufficient_storage() function.
+# The number of seconds between AC power checks when displaying the insufficient battery notification via the dialog_insufficient_storage() function.
 POWER_REQUIRED_RECHECK_SECONDS=1
 readonly POWER_REQUIRED_RECHECK_SECONDS
 
@@ -1598,6 +1598,11 @@ fi
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${deadline_date_soft}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_soft is: ${deadline_date_soft}"
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${deadline_date_hard}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_hard is: ${deadline_date_hard}"
 
+# Some validation and logging for the focus deferral timer option.
+if [[ -n "${deferral_timer_focus_option}" ]] && { [[ -z "${deadline_count_focus}" ]] && [[ -z "${deadline_days_focus}" ]] && [[ -z "${deadline_date_focus}" ]]; }; then
+	log_super "Parameter Error: The --deferral-timer-focus option requires that you also specify at least one focus deadline option."; option_error="TRUE"
+fi
+
 # Validate ${dialog_timeout_default_option} and if valid set ${dialog_timeout_default_seconds} and save to ${SUPER_LOCAL_PLIST}.
 if [[ "${dialog_timeout_default_option}" == "X" ]]; then
 	log_super "Status: Deleting local preference for the --dialog-timeout-default option."
@@ -1804,6 +1809,7 @@ elif [[ -n "${display_icon_file_option}" ]] && [[ "${display_icon_file_option}" 
 		download_response=$(curl --location "${display_icon_file_option}" --output "${temp_file}" 2>&1)
 		if [[ -f "${temp_file}" ]]; then
 			sips_response=$(sips --setProperty format png "${temp_file}" --out "${DISPLAY_ICON_FILE_CACHE}" 2>&1)
+			chmod a+r "${DISPLAY_ICON_FILE_CACHE}"
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: sips_response is:\n${sips_response}"
 			defaults write "${SUPER_LOCAL_PLIST}" DisplayIconFileCachedOrigin -string "${display_icon_file_option}"
 		else
@@ -1825,6 +1831,7 @@ fi
 if [[ ! -f "${DISPLAY_ICON_FILE_CACHE}" ]]; then
 	log_super "Status: No --display-icon-file icon found, copying default display icon from: ${DISPLAY_ICON_DEFAULT_FILE}"
 	sips_response=$(sips --setProperty format png "${DISPLAY_ICON_DEFAULT_FILE}" --out "${DISPLAY_ICON_FILE_CACHE}" 2>&1)
+	chmod a+r "${DISPLAY_ICON_FILE_CACHE}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: sips_response is:\n${sips_response}"
 	defaults write "${SUPER_LOCAL_PLIST}" DisplayIconFileCachedOrigin -string "${DISPLAY_ICON_DEFAULT_FILE}"
 fi
@@ -2175,7 +2182,7 @@ auth_error_new="FALSE"
 # Collect any previously saved credential states (including legacy methods) from ${SUPER_LOCAL_PLIST}.
 auth_user_account_saved="FALSE"
 if [[ "${current_user_account_name}" != "FALSE" ]]; then
-	auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" 2>&1)
+	auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" 2>&1)
 	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
 		auth_user_account_saved="TRUE"
 	else
@@ -2219,7 +2226,7 @@ auth_legacy_jamf_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" JamfAccoun
 # If the user specified any new Apple silicon authentication option or the ${auth_delete_all_option} then delete any previously saved credentials.
 if [[ "${auth_user_account_saved}" == "TRUE" ]] && { [[ "${auth_ask_user_to_save_password}" == "FALSE" ]] || [[ -n "${auth_local_account_option}" ]] || [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; }; then
 	log_super "Status: Deleting saved credentials for the --auth-ask-user-to-save-password option."
-	sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
+	sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
 	defaults delete "${SUPER_LOCAL_PLIST}" AuthAskUserToSavePassword > /dev/null 2>&1
 	auth_ask_user_to_save_password="FALSE"
 	auth_user_account_saved="FALSE"
@@ -2676,7 +2683,7 @@ auth_jamf_account_valid="FALSE"
 
 # If there is a previously saved user account then validate the credentials and set ${auth_local_account} and ${auth_local_password}.
 if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-	[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" 2>&1)
+	[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" 2>&1)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
 	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
 		auth_local_account="${current_user_account_name}"
@@ -2689,7 +2696,7 @@ if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_sav
 			log_super "Warning: Unable to validate previously saved credentials for the current user: ${current_user_account_name}"
 			unset auth_local_account
 			unset auth_local_password
-			sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
+			sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
 			log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
 			auth_error_saved="TRUE"
 			auth_user_account_saved="FALSE"
@@ -3186,7 +3193,7 @@ if [[ "${workflow_install_now_option}" == "TRUE" ]] || [[ -f "${WORKFLOW_INSTALL
 		fi
 	fi
 elif [[ "${workflow_only_download_option}" == "TRUE" ]]; then
-	log_super "Status: Only download alternate workflow enabled."
+	log_super "Status: Only download alternate workflow enabled. The workflow zero day date is not set in this mode."
 	[[ -n "${workflow_jamf_policy_triggers_option}" ]] && log_super "Warning: The --workflow-jamf-policy-triggers option is ignored when used with the --only-download option."
 fi
 { [[ "${workflow_only_download_option}" != "TRUE" ]] && [[ -n "${workflow_jamf_policy_triggers_option}" ]]; } && log_super "Status: Jamf Pro Policy triggers: ${workflow_jamf_policy_triggers_option}"
@@ -3612,27 +3619,44 @@ defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterHard 2> /dev/null
 # Delete the workflow automatic zero date in ${SUPER_LOCAL_PLIST} to restart the automatic zero date.
 restart_workflow_automatic_zero_date() {
 log_super "Status: Restarting workflow automatic zero date."
-defaults delete "${SUPER_LOCAL_PLIST}" WorkflowAutomaticZeroDate 2> /dev/null
+defaults delete "${SUPER_LOCAL_PLIST}" WorkflowZeroDateAutomatic 2> /dev/null
+defaults delete "${SUPER_LOCAL_PLIST}" WorkflowZeroDateMacOSVersion 2> /dev/null
 }
 
-# Evaluate ${workflow_zero_date_manual} and ${workflow_zero_date_previous}, then set ${workflow_zero_date}, ${workflow_zero_date_epoch}, and ${display_string_workflow_zero_date} accordingly.
+# Evaluate ${workflow_zero_date_manual}, ${workflow_zero_date_previous}, and ${workflow_zero_date_macos_version_previous}. Then set ${workflow_zero_date}, ${workflow_zero_date_epoch}, and ${display_string_workflow_zero_date} accordingly.
 check_zero_date() {
 if [[ -n "${workflow_zero_date_manual}" ]]; then # If there is a ${workflow_zero_date_manual} then use that first.
 	workflow_zero_date="${workflow_zero_date_manual}"
 	log_super "Status: Using manually set zero date of: ${workflow_zero_date}."
-else
+	defaults write "${SUPER_LOCAL_PLIST}" WorkflowZeroDateMacOSVersion -string "${workflow_macos_version_target}"
+else # Using an automatically set zero date.
 	local workflow_zero_date_previous
-	workflow_zero_date_previous=$(defaults read "${SUPER_LOCAL_PLIST}" WorkflowAutomaticZeroDate 2> /dev/null)
+	workflow_zero_date_previous=$(defaults read "${SUPER_LOCAL_PLIST}" WorkflowZeroDateAutomatic 2> /dev/null)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_zero_date_previous: ${workflow_zero_date_previous}"
-	if [[ -n "${workflow_zero_date_previous}" ]]; then # If there was a previously saved zero day date then use that.
-		workflow_zero_date="${workflow_zero_date_previous}"
-		log_super "Status: Using previously set automatic zero date of: ${workflow_zero_date}."
-	else # Otherwise this is a new zero day date, so save to ${SUPER_LOCAL_PLIST}.
-		workflow_zero_date=$(date +"%Y-%m-%d:%H:%M")
-		log_super "Status: Setting new automatic zero date to ${workflow_zero_date}."
-		defaults write "${SUPER_LOCAL_PLIST}" WorkflowAutomaticZeroDate -string "${workflow_zero_date}"
+	if [[ -n "${workflow_zero_date_previous}" ]]; then # There was a previously saved zero day date.
+		local workflow_zero_date_macos_version_previous
+		workflow_zero_date_macos_version_previous=$(defaults read "${SUPER_LOCAL_PLIST}" WorkflowZeroDateMacOSVersion 2> /dev/null)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_zero_date_macos_version_previous: ${workflow_zero_date_macos_version_previous}"
+		if [[ "${workflow_macos_version_target}" == "FALSE" ]] || [[ "${workflow_macos_version_target}" == "${workflow_zero_date_macos_version_previous}" ]]; then # If the current workflow is either not installing macOS or the macOS workflow version matches the previously saved zero day version.
+			workflow_zero_date="${workflow_zero_date_previous}"
+			log_super "Status: Using previously set automatic zero date of: ${workflow_zero_date}."
+		else
+			{ [[ "${workflow_macos_version_target}" != "FALSE" ]] && [[ -n "${workflow_zero_date_macos_version_previous}" ]]; } && log_super "Warning: Previously set zero date macOS version of ${workflow_zero_date_macos_version_previous} did not match the current macOS workflow target of ${workflow_macos_version_target}."
+			{ [[ "${workflow_macos_version_target}" != "FALSE" ]] && [[ -z "${workflow_zero_date_macos_version_previous}" ]]; } && log_super "Warning: There was no previously set zero date macOS version."
+		fi
 	fi
 fi
+
+# If there is no ${workflow_zero_date} at this point then time to set a new one and save info to ${SUPER_LOCAL_PLIST}.
+if [[ -z "${workflow_zero_date}" ]]; then
+	workflow_zero_date=$(date +"%Y-%m-%d:%H:%M")
+	log_super "Status: Setting new automatic zero date of: ${workflow_zero_date}."
+	defaults write "${SUPER_LOCAL_PLIST}" WorkflowZeroDateAutomatic -string "${workflow_zero_date}"
+	defaults write "${SUPER_LOCAL_PLIST}" WorkflowZeroDateMacOSVersion -string "${workflow_macos_version_target}"
+	restart_deadline_counters
+fi
+
+# Set remaining zero date parameters.
 workflow_zero_date_epoch=$(date -j -f "%Y-%m-%d:%H:%M" "${workflow_zero_date}" +"%s")
 local display_string_workflow_zero_date_only_date
 display_string_workflow_zero_date_only_date=$(date -r "${workflow_zero_date_epoch}" "${DISPLAY_STRING_FORMAT_DATE}")
@@ -4141,7 +4165,7 @@ fi
 
 # This function evaluates software updates collected from the get_asu_list() function and sets super software update caches, ${asu_macos_minor_update_available}, ${asu_rapid_security_response_available}, and ${asu_non_system_update_available} accordingly.
 # This also sets ${asu_all_labels_array}, ${asu_all_titles_array}, ${asu_macos_all_labels_array}, ${asu_macos_all_titles_array}, ${asu_macos_all_versions_array}, ${asu_macos_minor_update_label}, ${asu_macos_minor_update_title}, ${asu_macos_minor_update_version}, ${asu_non_system_update_labels_array}, and ${asu_non_system_update_titles_array}.
-workflow_check_asu() {
+check_asu() {
 local workflow_check_asu_error
 workflow_check_asu_error="FALSE"
 asu_macos_minor_update_available="FALSE"
@@ -4163,10 +4187,6 @@ unset asu_non_system_update_titles_array
 # Only need to create a new ${asu_list} if a full check is required.
 if [[ "${workflow_software_full_check_required}" == "TRUE" ]]; then
 	log_super "Status: Starting full check for all available system software..."
-	restart_deadline_counters
-	restart_workflow_automatic_zero_date
-	reset_software_status_caches
-	check_macos_beta_program
 	get_asu_list
 	
 	# Double-checking in case softwareupdate is misbehaving.
@@ -4422,10 +4442,10 @@ elif [[ "${get_macos_installers_list_error}" == "TRUE" ]]; then
 fi
 }
 
-# This function evaluates macOS upgrade information collected from the workflow_check_asu(), get_macos_major_upgrade(), and get_macos_installers_list() functions to save cache information and set ${macos_major_upgrade_version_major_target} accordingly.
+# This function evaluates macOS upgrade information collected from the check_asu(), get_macos_major_upgrade(), and get_macos_installers_list() functions to save cache information and set ${macos_major_upgrade_version_major_target} accordingly.
 # For systems that can upgrade via Apple software update this alos sets ${asu_macos_major_upgrade_available}, ${asu_macos_major_upgrade_label_target}, ${asu_macos_major_upgrade_title_target}, ${asu_macos_major_upgrade_version_target}, ${asu_macos_major_upgrade_version_major_target}, and ${asu_macos_major_upgrade_size_target}.
 # For systems that can only upgrade via installer application this also sets ${macos_installer_id_target}, ${macos_installer_marketing_name_target}, ${macos_installer_version_target}, ${macos_installer_version_major_target}, ${macos_installer_build_target}, ${macos_installer_size_target}, and ${macos_installer_date_target}.
-workflow_check_macos_major_upgrades() {
+check_macos_major_upgrades() {
 local workflow_check_macos_major_upgrades_error
 workflow_check_macos_major_upgrades_error="FALSE"
 asu_macos_major_upgrade_available="FALSE"
@@ -4647,12 +4667,24 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "TRUE" ]]; then
 fi
 }
 
+# This is the main workflow for checking all available Apple software including non-system software, macOS minor updates, and macOS major upgrades.
+workflow_check_all_available() {
+# If a full check is required then reset any cached information.
+if [[ "${workflow_software_full_check_required}" == "TRUE" ]]; then
+	reset_software_status_caches
+	check_macos_beta_program
+fi
+
+# The main battery of software checks. These functions all have internal handaling for ${workflow_software_full_check_required}.
+check_asu
+check_macos_major_upgrades
+check_macos_downloads
+}
+
 # This function checks the macOS upgrade/update status after a previous super macOS upgrade/update restart.
 workflow_restart_validate() {
 workflow_software_full_check_required="TRUE"
-workflow_check_asu
-workflow_check_macos_major_upgrades
-check_macos_downloads
+workflow_check_all_available
 
 # Install any non-system Apple software updates.
 if [[ "${asu_non_system_update_available}" == "TRUE" ]]; then
@@ -4663,9 +4695,7 @@ if [[ "${asu_non_system_update_available}" == "TRUE" ]]; then
 		log_super "Warning: Failed to install all non-system Apple software updates."
 	fi
 	workflow_software_full_check_required="TRUE"
-	workflow_check_asu
-	workflow_check_macos_major_upgrades
-	check_macos_downloads
+	workflow_check_all_available
 fi
 
 # Log status of updates/upgrade completion.
@@ -4733,14 +4763,12 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] && { [[ "${mac
 			download_macos_installer_required="TRUE"
 			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
 			rm -Rf "/Applications/Install ${macos_installer_marketing_name_target}.app" > /dev/null 2>&1
-			restart_workflow_automatic_zero_date
 		fi
 		defaults write "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller -string "${macos_installer_marketing_name_target} ${macos_installer_version_target}-${macos_installer_build_target}"
 	else # No local macOS installer.
 		[[ -n "${downloaded_macos_installer}" ]] && log_super "Warning: Previously downloaded macOS installer could not be found."
 		download_macos_installer_required="TRUE"
 		defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
-		restart_workflow_automatic_zero_date
 	fi
 elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_upgrade_available}" == "TRUE" ]]; then # Evaluate previously downloaded macOS updates or upgrades and compare them to currently available, setting ${download_maocs_asu_required} accordingly.
 	if [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 12.3 or newer can upgrade via softwareupdate.
@@ -4764,7 +4792,6 @@ elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_
 		if [[ "${downloaded_macos_asu_label}" != "${asu_macos_label_target}" ]]; then
 			log_super "Warning: Previously downloaded macOS update/upgrade \"${downloaded_macos_asu_label}\" does not match the expected macOS update/upgrade \"${asu_macos_label_target}\", download workflow needs to run again."
 			downloaded_asu_error="TRUE"
-			restart_workflow_automatic_zero_date
 		fi
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mac_last_startup is: ${mac_last_startup}"
 		if [[ "${downloaded_macos_asu_last_startup}" != "${mac_last_startup}" ]]; then
@@ -5228,8 +5255,8 @@ if [[ "${check_storage_available_error}" == "FALSE" ]]; then
 			log_super "Error: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs that is required for download. And no active user is logged in to attempt remediation."
 			workflow_download_macos_error="TRUE"
 		else # A normal user is currently logged in.
-			notification_insufficient_storage
-			[[ "${notification_insufficient_storage_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+			dialog_insufficient_storage
+			[[ "${dialog_insufficient_storage_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
 		fi
 	fi
 else # "${check_storage_available_error}" == "TRUE"
@@ -5639,9 +5666,11 @@ fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required is: ${download_maocs_asu_required}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_mdm_failover is: ${auth_mdm_failover}"
 local install_macos_mdm_workflow_type
+local install_macos_mdm_version
 if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS major upgrade.
 	if [[ "${macos_version_major}" -ge 13 ]]; then # macOS major upgrade possible via MDM with Apple software update.
 		install_macos_mdm_workflow_type="UPGRADE"
+		install_macos_mdm_version="${asu_macos_major_upgrade_version_target}"
 		if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
 			if [[ "${auth_mdm_failover}" == "TRUE" ]]; then
 				log_super "MDM: Starting macOS ${asu_macos_major_upgrade_version_target} download and upgrade workflow with user authenticated failover."
@@ -5665,6 +5694,7 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 
 		fi
 	else # macOS major upgrade via MDM only possible via installer application, all macOS installers are pre-downloaded.
 		install_macos_mdm_workflow_type="INSTALLER"
+		install_macos_mdm_version="${macos_installer_version_target}"
 		if [[ "${auth_mdm_failover}" == "TRUE" ]]; then
 			log_super "MDM: Starting ${macos_installer_marketing_name_target} ${macos_installer_version_target}-${macos_installer_build_target} install workflow with user authenticated failover."
 			log_status "Running: MDM: Starting ${macos_installer_marketing_name_target} ${macos_installer_version_target}-${macos_installer_build_target} install workflow with user authenticated failover."
@@ -5677,6 +5707,7 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 
 	fi
 else # macOS minor update.
 	install_macos_mdm_workflow_type="UPDATE"
+	install_macos_mdm_version="${asu_macos_minor_update_version}"
 	if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
 		if [[ "${auth_mdm_failover}" == "TRUE" ]]; then
 			log_super "MDM: Starting macOS ${asu_macos_minor_update_version} download and update workflow with user authenticated failover."
@@ -5701,6 +5732,7 @@ else # macOS minor update.
 fi
 log_super "MDM: check ${MDM_COMMAND_LOG} and ${MDM_WORKFLOW_LOG} for more detail."
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_macos_mdm_workflow_type is: ${install_macos_mdm_workflow_type}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_macos_mdm_version is: ${install_macos_mdm_version}"
 
 # Validate Jamf Pro API token and update workflow.
 check_jamf_api_access_token
@@ -5744,25 +5776,13 @@ if [[ "${auth_error_jamf}" == "FALSE" ]]; then
 	local jamf_api_update_json
 	if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then # Jamf Pro API new managed update workflow.
 		jamf_api_update_url="${jamf_api_url}api/v1/managed-software-updates/plans"
-		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS major upgrade.
-			jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MAJOR" } }'
-		else # macOS minor update.
-			jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MINOR" } }'
-		fi
+		jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "SPECIFIC_VERSION", "specificVersion": "'${install_macos_mdm_version}'" } }'
 	else # Jamf Pro API legacy managed update workflow.
 		jamf_api_update_url="${jamf_api_url}api/v1/macos-managed-software-updates/send-updates"
-		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS major upgrade.
-			if [[ "${macos_beta_program}" == "FALSE" ]]; then
-				jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "applyMajorUpdate": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
-			else # macOS beta workflow.
-				jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "applyMajorUpdate": true, "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
-			fi
+		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS major upgrade errors when also sending "forceRestart".
+			jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${install_macos_mdm_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
 		else # macOS minor update.
-			if [[ "${macos_beta_program}" == "FALSE" ]] || [[ "${asu_rapid_security_response_available}" == "TRUE" ]]; then
-				jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "applyMajorUpdate": false, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
-			else # macOS beta workflow.
-				jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "applyMajorUpdate": false, "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
-			fi
+			jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${install_macos_mdm_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
 		fi
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: jamf_api_update_workflow is: ${jamf_api_update_workflow}"
@@ -6221,9 +6241,7 @@ fi
 # Install and Double-check to make sure all updates are complete.
 install_non_system_asu
 workflow_software_full_check_required="TRUE"
-workflow_check_asu
-workflow_check_macos_major_upgrades
-check_macos_downloads
+workflow_check_all_available
 
 # If we had failures, then try again.
 if [[ "${install_non_system_asu_error}" == "TRUE" ]]; then
@@ -6244,9 +6262,7 @@ if [[ "${install_non_system_asu_error}" == "TRUE" ]]; then
 		fi
 	else # Installation did not fail.
 		workflow_software_full_check_required="TRUE"
-		workflow_check_asu
-		workflow_check_macos_major_upgrades
-		check_macos_downloads
+		workflow_check_all_available
 	fi
 fi
 
@@ -6418,8 +6434,8 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_m
 	check_storage_available
 	if [[ "${check_storage_available_error}" == "FALSE" ]]; then
 		if [[ "${storage_ready}" == "FALSE" ]]; then
-			notification_insufficient_storage
-			[[ "${notification_insufficient_storage_error}" == "TRUE" ]] && workflow_install_macos_active_user_error="TRUE"
+			dialog_insufficient_storage
+			[[ "${dialog_insufficient_storage_error}" == "TRUE" ]] && workflow_install_macos_active_user_error="TRUE"
 		fi
 	else # "${check_storage_available_error}" == "TRUE"
 		workflow_install_macos_active_user_error="TRUE"
@@ -6429,15 +6445,15 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_m
 	check_power_required
 	if [[ "${check_power_required_error}" == "FALSE" ]]; then
 		if [[ "${power_ready}" == "FALSE" ]]; then
-			notification_power_required
-			[[ "${notification_power_required_error}" == "TRUE" ]] && workflow_install_macos_active_user_error="TRUE"
+			dialog_power_required
+			[[ "${dialog_power_required_error}" == "TRUE" ]] && workflow_install_macos_active_user_error="TRUE"
 		fi
 	else # "${check_power_required_error}" == "TRUE"
 		workflow_install_macos_active_user_error="TRUE"
 	fi
 	
 	# If MDM workflow is expected, first check for MDM service, bootstrap token, and possibly failover to user authentication workflow.
-	if [[ "${workflow_auth_macos}" == "JAMF" ]]; then
+	if [[ "${workflow_install_macos_active_user_error}" == "FALSE" ]] && [[ "${workflow_auth_macos}" == "JAMF" ]]; then
 		check_mdm_service
 		if [[ "${auth_error_mdm}" == "TRUE" ]]; then
 			if [[ "${auth_mdm_failover}" == "TRUE" ]] || [[ "${auth_mdm_failover_no_service}" == "TRUE" ]] || { [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${auth_mdm_failover_install_now}" == "TRUE" ]]; }; then
@@ -6462,7 +6478,7 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_m
 	fi
 	
 	# For computers with Apple silicon, get authentication.
-	if [[ "${mac_cpu_architecture}" == "arm64" ]]; then
+	if [[ "${workflow_install_macos_active_user_error}" == "FALSE" ]] && [[ "${mac_cpu_architecture}" == "arm64" ]]; then
 		if [[ "${workflow_auth_macos}" == "LOCAL" ]] || [[ "${workflow_auth_macos}" == "JAMF" ]]; then
 			get_saved_authentication
 			if [[ "${auth_error_saved}" == "TRUE" ]]; then
@@ -6796,6 +6812,9 @@ display_string_restart_button="Restart"
 #### Language for the deferral button in dialogs.
 display_string_deferral_button="Defer"
 
+#### Language for the ok button in certain dialogs and notifications.
+display_string_ok_button="OK"
+
 ### Language for various deferral time durations.
 display_string_minutes="Minutes"
 display_string_hour="Hour"
@@ -6804,9 +6823,6 @@ display_string_day="Day"
 display_string_days="Days"
 display_string_week="Week"
 display_string_and="and"
-
-#### Language for the ok button in certain notifications.
-display_string_ok_button="OK"
 
 #### This code generates the ${display_string_workflow_title} variable to include the appropriate macOS update or upgrade.
 if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
@@ -6856,22 +6872,6 @@ display_string_install_now_up_to_date_body="Apple system software is already up 
 display_string_install_now_failed_title="${display_string_workflow_title} Failed"
 display_string_install_now_failed_body="The ${display_string_workflow_title} failed to complete, the computer will not be restarting.\n\nYou can try again or consider contacting your technical support team if you're experiencing consistent failures."
 
-#### Language for notification_insufficient_storage(), a non-interactive notification informing the user that there is insufficient storage for macOS update/upgrade.
-# This is used for both non-deadline and deadline workflows.
-display_string_insufficient_storage_title="Insufficient Storage For ${display_string_workflow_title}"
-display_string_insufficient_storage_default_body="A required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
-display_string_insufficient_storage_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
-display_string_insufficient_storage_deadline_days_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
-display_string_insufficient_storage_deadline_date_body="The deferment deadline of ${display_string_deadline_date} has passed.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
-
-#### Language for notification_power_required(), a non-interactive notification informing the user that they need to plug the computer into AC power.
-# This is used for both non-deadline and deadline workflows.
-display_string_power_required_title="${display_string_workflow_title} Requires Power Source"
-display_string_power_required_default_body="You must connect this computer to a power supply in order to install the required macOS update."
-display_string_power_required_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
-display_string_power_required_deadline_days_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
-display_string_power_required_deadline_date_body="The deferment deadline of ${display_string_deadline_date} has passed.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
-
 #### Language for notification_prepare(), a non-interactive notification informing the user that a update/upgrade preparation process has started.
 # This is used for both non-deadline and deadline workflows.
 display_string_prepare_title="${display_string_workflow_title} Requires Restart"
@@ -6897,6 +6897,24 @@ display_string_non_system_updates_body="Required Apple software updates are now 
 # This is used for all update/upgrade workflows if they fail to start or timeout after a pending restart notification has been shown.
 display_string_failed_title="${display_string_workflow_title} Failed"
 display_string_failed_body="The ${display_string_workflow_title} failed to complete.\n\nThe computer will not restart right now, but you will be notified later when the software update is attempted again."
+
+#### Language for dialog_insufficient_storage(), a dialog informing the user that there is insufficient storage for macOS update/upgrade.
+# This is used for both non-deadline and deadline workflows.
+display_string_insufficient_storage_title="Insufficient Storage For ${display_string_workflow_title}"
+display_string_insufficient_storage_timeout="Please remove unecissary items in"
+display_string_insufficient_storage_default_body="A required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
+display_string_insufficient_storage_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
+display_string_insufficient_storage_deadline_days_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
+display_string_insufficient_storage_deadline_date_body="The deferment deadline of ${display_string_deadline_date} has passed.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
+
+#### Language for dialog_power_required(), a dialog notification informing the user that they need to plug the computer into AC power.
+# This is used for both non-deadline and deadline workflows.
+display_string_power_required_title="${display_string_workflow_title} Requires Power Source"
+display_string_power_required_timeout="Please connect power supply in"
+display_string_power_required_default_body="You must connect this computer to a power supply in order to install the required macOS update."
+display_string_power_required_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
+display_string_power_required_deadline_days_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
+display_string_power_required_deadline_date_body="The deferment deadline of ${display_string_deadline_date} has passed.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
 
 #### Language for dialog_restart_or_defer(), an interactive dialog giving the user a choice to defer the update or restart.
 display_string_restart_or_defer_title="${display_string_workflow_title} Requires Restart"
@@ -7034,7 +7052,7 @@ local display_accessory_payload
 local display_accessory_enabled
 display_accessory_enabled="FALSE"
 local curl_response
-if [[ -n "${display_accessory_content}" ]]; then
+if [[ -n "${display_accessory_content}" ]] && [[ "${dialog_alert_enabled}" != "TRUE" ]]; then
 	if [[ $(echo "${display_accessory_content}" | grep -c '^http://\|^https://') -gt 0 ]]; then
 		if [[ "${display_accessory_type}" =~ ^TEXTBOX$|^HTMLBOX$|^HTML$ ]]; then
 			display_accessory_payload=$(curl -s -f "${display_accessory_content}")
@@ -7097,7 +7115,10 @@ else # No custom display accessory.
 	if [[ "${dialog_user_auth_enabled}" == "TRUE" ]]; then # User authentication dialog.
 		[[ -n "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-accessory_view_type timer -accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}" -secondary_accessory_view_type secureinput -secondary_accessory_view_payload "${display_accessory_secure_payload}")
 		[[ -z "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-accessory_view_type secureinput -accessory_view_payload "${display_accessory_secure_payload}")
-	else # Not the user authentication dialog.
+	elif [[ "${dialog_alert_enabled}" == "TRUE" ]]; then # Alert dialogs; insufficient storage or power required.
+		[[ -n "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-accessory_view_type timer -accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}" -secondary_accessory_view_type progressbar -secondary_accessory_view_payload "/percent indeterminate")
+		[[ -z "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+	else # A restart dialog.
 		{ [[ -n "${deferral_timer_menu_minutes}" ]] && [[ -z "${dialog_timeout_seconds}" ]]; } && ibm_notifier_array+=(-accessory_view_type dropdown -accessory_view_payload "/title ${display_string_restart_or_defer_menu_title} /list ${display_string_deferral_menu} /selected 0")
 		{ [[ -z "${deferral_timer_menu_minutes}" ]] && [[ -n "${dialog_timeout_seconds}" ]]; } && ibm_notifier_array+=(-accessory_view_type timer -accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}")
 		{ [[ -n "${dialog_timeout_seconds}" ]] && [[ -n "${deferral_timer_menu_minutes}" ]]; } && ibm_notifier_array+=(-accessory_view_type dropdown -accessory_view_payload "/title ${display_string_restart_or_defer_menu_title} /list ${display_string_deferral_menu} /selected 0" -secondary_accessory_view_type timer -secondary_accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}")
@@ -7180,152 +7201,6 @@ disown -a
 # MARK: *** Default Notifications ***
 ################################################################################
 
-# Display a non-interactive notification informing the user there is insufficient storage for a macOS update/upgrade.
-notification_insufficient_storage() {
-notification_insufficient_storage_error="FALSE"
-log_super "Warning: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs that is required for macOS update/upgrade workflow."
-log_status "Running: Notification insufficient storage."
-local notification_insufficient_storage_timeout_seconds
-notification_insufficient_storage_timeout_seconds="${dialog_timeout_insufficient_storage_seconds}"
-set_display_strings_language
-
-# The initial ${ibm_notifier_array} settings for the insufficient storage notification.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_insufficient_storage_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
-
-# Variations for the main body text of the insufficient storage notification.
-if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
-	log_super "IBM Notifier: Insufficient storage deadline date notification with a ${notification_insufficient_storage_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
-	log_super "IBM Notifier: Insufficient storage deadline days notification with a ${notification_insufficient_storage_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_days_body}")
-elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
-	log_super "IBM Notifier: Insufficient storage deadline count notification with a ${notification_insufficient_storage_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_count_body}")
-else # No deadlines, this is the default insufficient storage notification.
-	log_super "IBM Notifier: Insufficient storage default notification with a ${notification_insufficient_storage_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_default_body}")
-fi
-
-# Open the appropriate storage assistant and the insufficient storage notification.
-if [[ "${macos_version_major}" -ge 13 ]]; then
-	log_super "Status: Opening the Storage pane of the System Settings.app."
-	sudo -u "${current_user_account_name}" open "x-apple.systempreferences:com.apple.settings.Storage" &
-else
-	log_super "Status: Opening the Storage Management.app."
-	sudo -u "${current_user_account_name}" open "/System/Library/CoreServices/Applications/Storage Management.app" &
-fi
-
-# Evaluate ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
-{ [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable_option}" | grep -c 'STORAGE') -gt 0 ]]; } && display_unmovable_status="TEMP"
-[[ "${display_hide_background_status}" == "TRUE" ]] && display_hide_background_status="TEMPOFF" # Don't want to ever hide the background for this one so the user can try to use the storage optimizer.
-{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently_option}" | grep -c 'STORAGE') -gt 0 ]]; } && display_silently_status="TEMP"
-
-# Open the initial power required notification.
-open_notification_ibm_notifier &
-
-# This handles waiting for available storage along with the ${dialog_timeout_insufficient_storage_seconds} option.
-local notification_insufficient_storage_check_timeout
-notification_insufficient_storage_check_timeout="${notification_insufficient_storage_timeout_seconds}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: STORAGE_REQUIRED_RECHECK_SECONDS is: ${STORAGE_REQUIRED_RECHECK_SECONDS}"
-while [[ "${notification_insufficient_storage_check_timeout}" -ge 0 ]]; do
-	sleep "${STORAGE_REQUIRED_RECHECK_SECONDS}"
-	check_storage_available
-	if [[ "${check_storage_available_error}" == "FALSE" ]]; then
-		if [[ "${storage_ready}" == "TRUE" ]]; then
-			log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
-			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-			break
-		fi
-	else # "${check_storage_available_error}" == "FALSE"
-		notification_insufficient_storage_error="TRUE"
-		break
-	fi
-	notification_insufficient_storage_check_timeout=$((notification_insufficient_storage_check_timeout-STORAGE_REQUIRED_RECHECK_SECONDS))
-done
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_insufficient_storage_error is: ${notification_insufficient_storage_error}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: storage_ready is: ${storage_ready}"
-
-# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
-[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
-[[ "${display_hide_background_status}" == "TEMPOFF" ]] && unset display_hide_background_status
-[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
-
-# If there still is not sufficient storage, then exit.
-if [[ "${notification_insufficient_storage_error}" == "FALSE" ]] && [[ "${storage_ready}" == "FALSE" ]]; then
-	log_super "Error: Waiting for user to make more storage available timed out after ${notification_insufficient_storage_timeout_seconds} seconds."
-	notification_insufficient_storage_error="TRUE"
-fi
-[[ "${display_hide_background_status}" == "TEMPOFF" ]] && display_hide_background_status="TRUE"
-}
-
-# Display a non-interactive notification informing the user they need to plug the computer into AC power.
-notification_power_required() {
-local power_required_charger_connected
-power_required_charger_connected="FALSE"
-notification_power_required_error="FALSE"
-log_super "Warning: Current battery level is at ${power_battery_percent}% which is below the minimum required level of ${power_required_battery_percent}%."
-log_status "Running: Notification AC power required."
-local notification_power_required_timeout_seconds
-notification_power_required_timeout_seconds="${dialog_timeout_power_required_seconds}"
-set_display_strings_language
-
-# The initial ${ibm_notifier_array} settings for the power required notification.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_power_required_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
-
-# Variations for the main body text of the power required notification.
-if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
-	log_super "IBM Notifier: Power required deadline date notification with a ${notification_power_required_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
-	log_super "IBM Notifier: Power required deadline days notification with a ${notification_power_required_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_days_body}")
-elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
-	log_super "IBM Notifier: Power required deadline count notification with a ${notification_power_required_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_count_body}")
-else # No deadlines, this is the default power required notification.
-	log_super "IBM Notifier: Power required default notification with a ${notification_power_required_timeout_seconds} second timeout."
-	ibm_notifier_array+=(-subtitle "${display_string_power_required_default_body}")
-fi
-
-# Evaluate ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
-{ [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable_option}" | grep -c 'POWER') -gt 0 ]]; } && display_unmovable_status="TEMP"
-{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background_option}" | grep -c 'POWER') -gt 0 ]]; } && display_hide_background_status="TEMP"
-{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently_option}" | grep -c 'POWER') -gt 0 ]]; } && display_silently_status="TEMP"
-
-# Open the initial power required notification.
-open_notification_ibm_notifier &
-
-# This handles waiting for AC power along with the ${dialog_timeout_power_required_seconds} option.
-local notification_power_required_check_timeout
-notification_power_required_check_timeout="${notification_power_required_timeout_seconds}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: POWER_REQUIRED_RECHECK_SECONDS is: ${POWER_REQUIRED_RECHECK_SECONDS}"
-while [[ "${notification_power_required_check_timeout}" -ge 0 ]]; do
-	sleep "${POWER_REQUIRED_RECHECK_SECONDS}"
-	[[ $(pmset -g ps | grep -ic 'AC Power') -ne 0 ]] && power_required_charger_connected="TRUE"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: power_required_charger_connected: ${power_required_charger_connected}"
-	if [[ "${power_required_charger_connected}" == "TRUE" ]]; then
-		log_super "Status: AC power detected, the macOS update/upgrade workflow can continue."
-		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-		break
-	fi
-	notification_power_required_check_timeout=$((notification_power_required_check_timeout-POWER_REQUIRED_RECHECK_SECONDS))
-done
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: power_required_charger_connected is: ${power_required_charger_connected}"
-
-# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
-[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
-[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
-[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
-
-# If there still is no AC power, then exit.
-if [[ "${power_required_charger_connected}" == "FALSE" ]]; then
-	log_super "Error: Waiting for user to connect AC power timed out after ${notification_power_required_timeout_seconds} seconds."
-	notification_power_required_error="TRUE"
-fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_power_required_error is: ${notification_power_required_error}"
-}
-
 # Display a non-interactive notification informing the user that an update/upgrade that requires preparation has started.
 notification_prepare() {
 set_display_strings_language
@@ -7401,6 +7276,170 @@ disown -a
 # MARK: *** Interactive Dialogs ***
 ################################################################################
 
+# Display a dialog informing the user there is insufficient storage for a macOS update/upgrade.
+dialog_insufficient_storage() {
+dialog_insufficient_storage_error="FALSE"
+dialog_alert_enabled="TRUE"
+log_super "Warning: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs that is required for macOS update/upgrade workflow."
+log_status "Running: Dialog insufficient storage."
+set_display_strings_language
+unset dialog_timeout_seconds
+[[ -n "${dialog_timeout_insufficient_storage_seconds}" ]] && dialog_timeout_seconds="${dialog_timeout_insufficient_storage_seconds}"
+{ [[ -z "${dialog_timeout_insufficient_storage_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
+
+# The initial ${ibm_notifier_array} settings for the insufficient storage dialog.
+ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_insufficient_storage_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
+
+# Variations for the main body text of the insufficient storage dialog.
+if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline date dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline date dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_date_body}")
+elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline days dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline days dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_days_body}")
+elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline count dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline count dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_count_body}")
+else # No deadlines, this is the default insufficient storage dialog.
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage default dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage default dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_default_body}")
+fi
+[[ -n "${dialog_timeout_seconds}" ]] && display_string_dialog_timeout="${display_string_insufficient_storage_timeout}"
+
+# Open the appropriate storage assistant and the insufficient storage dialog.
+if [[ "${macos_version_major}" -ge 13 ]]; then
+	log_super "Status: Opening the Storage pane of the System Settings.app."
+	sudo -u "${current_user_account_name}" open "x-apple.systempreferences:com.apple.settings.Storage" &
+else
+	log_super "Status: Opening the Storage Management.app."
+	sudo -u "${current_user_account_name}" open "/System/Library/CoreServices/Applications/Storage Management.app" &
+fi
+
+# Manage ${display_unmovable_option}, ${display_hide_background_option}, ${display_silently_option}, ${display_accessory_content}, and ${deferral_timer_menu_minutes} options.
+{ [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable_option}" | grep -c 'STORAGE') -gt 0 ]]; } && display_unmovable_status="TEMP"
+[[ "${display_hide_background_status}" == "TRUE" ]] && display_hide_background_status="TEMPOFF" # Don't want to ever hide the background for this one so the user can try to use the storage optimizer.
+{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently_option}" | grep -c 'STORAGE') -gt 0 ]]; } && display_silently_status="TEMP"
+
+# Open the initial insufficient storage dialog.
+open_dialog_ibm_notifier &
+
+# This handles waiting for available storage along with the ${dialog_timeout_seconds} option.
+local dialog_insufficient_storage_check_timeout
+[[ -n "${dialog_timeout_seconds}" ]] && dialog_insufficient_storage_check_timeout="${dialog_timeout_seconds}"
+[[ -z "${dialog_timeout_seconds}" ]] && dialog_insufficient_storage_check_timeout=1
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: STORAGE_REQUIRED_RECHECK_SECONDS is: ${STORAGE_REQUIRED_RECHECK_SECONDS}"
+while [[ "${dialog_insufficient_storage_check_timeout}" -ge 0 ]]; do
+	sleep "${STORAGE_REQUIRED_RECHECK_SECONDS}"
+	check_storage_available
+	if [[ "${check_storage_available_error}" == "FALSE" ]]; then
+		if [[ "${storage_ready}" == "TRUE" ]]; then
+			log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
+			killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+			break
+		fi
+	else # "${check_storage_available_error}" == "FALSE"
+		dialog_insufficient_storage_error="TRUE"
+		break
+	fi
+	[[ -n "${dialog_timeout_seconds}" ]] && dialog_insufficient_storage_check_timeout=$((dialog_insufficient_storage_check_timeout-STORAGE_REQUIRED_RECHECK_SECONDS))
+done
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: dialog_insufficient_storage_error is: ${dialog_insufficient_storage_error}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: storage_ready is: ${storage_ready}"
+
+# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, ${display_silently_option}, ${display_accessory_content}, and ${deferral_timer_menu_minutes} options.
+[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
+[[ "${display_hide_background_status}" == "TEMPOFF" ]] && unset display_hide_background_status
+[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
+
+# If there still is not sufficient storage, then error.
+if [[ "${dialog_insufficient_storage_error}" == "FALSE" ]] && [[ "${storage_ready}" == "FALSE" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "Error: Waiting for user to make more storage available timed out after ${dialog_timeout_seconds} seconds."
+	dialog_insufficient_storage_error="TRUE"
+fi
+[[ "${display_hide_background_status}" == "TEMPOFF" ]] && display_hide_background_status="TRUE"
+unset dialog_alert_enabled
+}
+
+# Display a dialog informing the user they need to plug the computer into AC power.
+dialog_power_required() {
+local power_required_charger_connected
+power_required_charger_connected="FALSE"
+dialog_power_required_error="FALSE"
+dialog_alert_enabled="TRUE"
+log_super "Warning: Current battery level is at ${power_battery_percent}% which is below the minimum required level of ${power_required_battery_percent}%."
+log_status "Running: Dialog power required."
+set_display_strings_language
+unset dialog_timeout_seconds
+[[ -n "${dialog_timeout_power_required_seconds}" ]] && dialog_timeout_seconds="${dialog_timeout_power_required_seconds}"
+{ [[ -z "${dialog_timeout_power_required_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
+
+# The initial ${ibm_notifier_array} settings for the power required dialog.
+ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_power_required_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
+
+# Variations for the main body text of the power required dialog.
+if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline date dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline date dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_date_body}")
+elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline days dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline days dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_days_body}")
+elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline count dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline count dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_count_body}")
+else # No deadlines, this is the default power required dialog.
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required default dialog with a ${dialog_timeout_seconds} second timeout."
+	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required default dialog with no timeout."
+	ibm_notifier_array+=(-subtitle "${display_string_power_required_default_body}")
+fi
+[[ -n "${dialog_timeout_seconds}" ]] && display_string_dialog_timeout="${display_string_power_required_timeout}"
+
+# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+{ [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable_option}" | grep -c 'POWER') -gt 0 ]]; } && display_unmovable_status="TEMP"
+{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background_option}" | grep -c 'POWER') -gt 0 ]]; } && display_hide_background_status="TEMP"
+{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently_option}" | grep -c 'POWER') -gt 0 ]]; } && display_silently_status="TEMP"
+
+# Open the initial power required dialog.
+open_dialog_ibm_notifier &
+
+# This handles waiting for AC power along with the ${dialog_timeout_power_required_seconds} option.
+local dialog_power_required_check_timeout
+[[ -n "${dialog_timeout_seconds}" ]] && dialog_power_required_check_timeout="${dialog_timeout_seconds}"
+[[ -z "${dialog_timeout_seconds}" ]] && dialog_power_required_check_timeout=1
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: POWER_REQUIRED_RECHECK_SECONDS is: ${POWER_REQUIRED_RECHECK_SECONDS}"
+while [[ "${dialog_power_required_check_timeout}" -ge 0 ]]; do
+	sleep "${POWER_REQUIRED_RECHECK_SECONDS}"
+	[[ $(pmset -g ps | grep -ic 'AC Power') -ne 0 ]] && power_required_charger_connected="TRUE"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: power_required_charger_connected: ${power_required_charger_connected}"
+	if [[ "${power_required_charger_connected}" == "TRUE" ]]; then
+		log_super "Status: AC power detected, the macOS update/upgrade workflow can continue."
+		killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+		break
+	fi
+	[[ -n "${dialog_timeout_seconds}" ]] && dialog_power_required_check_timeout=$((dialog_power_required_check_timeout-POWER_REQUIRED_RECHECK_SECONDS))
+done
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: power_required_charger_connected is: ${power_required_charger_connected}"
+
+# Reset temporary ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
+[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
+
+# If there still is no AC power, then exit.
+if [[ "${power_required_charger_connected}" == "FALSE" ]]; then
+	[[ -n "${dialog_timeout_seconds}" ]] && log_super "Error: Waiting for user to connect AC power timed out after ${dialog_timeout_seconds} seconds."
+	dialog_power_required_error="TRUE"
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: dialog_power_required_error is: ${dialog_power_required_error}"
+unset dialog_alert_enabled
+}
+
 # Display an interactive dialog with restart and deferral options. This sets ${dialog_user_choice_restart} and if ${deferral_timer_menu_minutes} then also sets ${deferral_timer_minutes}.
 dialog_restart_or_defer() {
 set_display_strings_language
@@ -7463,7 +7502,7 @@ else # Instead, add a defer button containing the text based off ${deferral_time
 fi
 ibm_notifier_array+=(-main_button_label "${display_string_deferral_button}")
 
-# Evaluate ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
 { [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable_option}" | grep -c 'DEFER') -gt 0 ]]; } && display_unmovable_status="TEMP"
 { [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background_option}" | grep -c 'DEFER') -gt 0 ]]; } && display_hide_background_status="TEMP"
 { [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently_option}" | grep -c 'DEFER') -gt 0 ]]; } && display_silently_status="TEMP"
@@ -7595,7 +7634,7 @@ fi
 display_accessory_secure_payload="/title ${display_string_user_auth_password_title} /placeholder ${display_string_user_auth_password_placeholder} /required"
 [[ -n "${dialog_timeout_seconds}" ]] && display_string_dialog_timeout="${display_string_user_auth_timeout}"
 
-# Evaluate ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
 { [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable_option}" | grep -c 'USERAUTH') -gt 0 ]]; } && display_unmovable_status="TEMP"
 { [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background_option}" | grep -c 'USERAUTH') -gt 0 ]]; } && display_hide_background_status="TEMP"
 { [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently_option}" | grep -c 'USERAUTH') -gt 0 ]]; } && display_silently_status="TEMP"
@@ -7661,14 +7700,14 @@ unset dialog_user_auth_enabled
 if [[ "${dialog_user_auth_valid}" == "TRUE" ]]; then
 	log_super "Status: Credentials verified for current user: ${auth_local_account}"
 	if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-		sudo -u "${auth_local_account}" security add-generic-password -a "super_auth_user_password" -s "Super Update Service" -w "${auth_local_password}" > /dev/null 2>&1
+		sudo -u "${current_user_account_name}" security add-generic-password -a "super_auth_user_password" -s "Super Update Service" -w "${auth_local_password}" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
 		local auth_user_password_keychain
-		auth_user_password_keychain=$(sudo -u "${auth_local_account}" security find-generic-password -w -a "super_auth_user_password" 2> /dev/null)
+		auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" 2> /dev/null)
 		if [[ "${auth_local_password}" == "${auth_user_password_keychain}" ]]; then
 			log_super "Status: Saved new --auth-ask-user-to-save-password credentials for current user: ${auth_local_account}"
 		else
 			log_super "Warning: Unable to validate keychain item for --auth-ask-user-to-save-password, deleting keychain item."
-			sudo -u "${auth_local_account}" security delete-generic-password -a "super_auth_user_password" > /dev/null 2>&1
+			sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
 		fi
 	elif [[ "${mdm_enrolled}" == "TRUE" ]] && [[ "${auth_error_bootstrap_token}" == "TRUE" ]] && { [[ "${auth_mdm_failover}" == "TRUE" ]] || [[ "${auth_mdm_failover_bootstrap}" == "TRUE" ]]; }; then
 		bootstrap_token_attempt_fix="TRUE"
@@ -7735,14 +7774,13 @@ if [[ "${workflow_disable_update_check_option}" == "TRUE" ]]; then # Skip softwa
 		log_super "Test Mode: Simulating skip updates workflow."
 		{ [[ "${workflow_restart_without_updates_option}" != "TRUE" ]] && [[ -z "${workflow_jamf_policy_triggers_option}" ]]; } && log_super "Warning: When using the --skip-updates option you need to also use --workflow-restart-without-updates or --workflow-jamf-policy-triggers to simulate notification and dialog workflows."
 	fi
+	workflow_macos_version_target="FALSE"
 else # Default software update/upgrade workflows.
 	# Check for updates/upgrades.
 	if [[ "${test_mode_option}" != "TRUE" ]]; then
 		log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - CHECK SOFTWARE UPDATES/UPGRADE ****"
 		[[ "${workflow_software_full_check_required}" != "TRUE" ]] && check_software_stauts_caches
-		workflow_check_asu
-		workflow_check_macos_major_upgrades
-		check_macos_downloads
+		workflow_check_all_available
 	else # Test mode.
 		asu_non_system_update_available="FALSE"
 		macos_major_upgrade_version_major_target="FALSE"
@@ -7780,6 +7818,7 @@ else # Default software update/upgrade workflows.
 	fi
 	delete_unneeded_macos_installers # This function includes internal test mode logic.
 	# At this point all available updates/upgrades have been evaluated so report different workflow statuses.
+	workflow_macos_version_target="FALSE"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available is: ${asu_macos_minor_update_available}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
@@ -7793,6 +7832,7 @@ else # Default software update/upgrade workflows.
 			else # Default super workflow.
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - MACOS ${asu_macos_major_upgrade_version_target} MAJOR UPGRADE VIA SOFTWAREUPDATE ****"
 			fi
+			workflow_macos_version_target="${asu_macos_major_upgrade_version_target}"
 		else # macOS major upgrade only possible via installer application.
 			if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL NOW MACOS ${macos_installer_version_target} MAJOR UPGRADE VIA INSTALLER ****"
@@ -7801,10 +7841,11 @@ else # Default software update/upgrade workflows.
 			else # Default super workflow.
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - MACOS ${macos_installer_version_target} MAJOR UPGRADE VIA INSTALLER ****"
 			fi
+			workflow_macos_version_target="${macos_installer_version_target}"
 		fi
-		if [[ -n ${display_accessory_upgrade} ]]; then
+		if [[ -n "${display_accessory_upgrade}" ]]; then
 			display_accessory_content="${display_accessory_upgrade}"
-		elif [[ -n ${display_accessory_default} ]]; then
+		elif [[ -n "${display_accessory_default}" ]]; then
 			display_accessory_content="${display_accessory_default}"
 		fi
 	elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]]; then # macOS updates are available.
@@ -7815,36 +7856,34 @@ else # Default software update/upgrade workflows.
 		else # Default super workflow.
 			log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - MACOS ${asu_macos_minor_update_version} MINOR UPDATE ****"
 		fi
-		if [[ -n ${display_accessory_update} ]]; then
+		workflow_macos_version_target="${asu_macos_minor_update_version}"
+		if [[ -n "${display_accessory_update}" ]]; then
 			display_accessory_content="${display_accessory_update}"
-		elif [[ -n ${display_accessory_default} ]]; then
+		elif [[ -n "${display_accessory_default}" ]]; then
 			display_accessory_content="${display_accessory_default}"
 		fi
 	elif [[ "${asu_non_system_update_available}" == "TRUE" ]]; then # Only non-system Apple software updates are available.
-		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowAutomaticZeroDate 2> /dev/null
-		defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterFocus 2> /dev/null
-		defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterSoft 2> /dev/null
-		defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterHard 2> /dev/null
+		restart_workflow_automatic_zero_date
+		restart_deadline_counters
 		if [[ "${install_non_system_updates_without_restarting_option}" == "TRUE" ]]; then # Option to enforce all software updates is enabled.
 			if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL NOW NON-SYSTEM SOFTWARE UPDATE ****"
 				workflow_install_non_system_asu # This function includes internal install now and test mode logic.
 			elif [[ "${workflow_only_download_option}" == "TRUE" ]]; then
-				log_super "Warning: The --install-non-system-updates option is ignored when used with the --only-download option."
+				log_super "Warning: The --install-non-system-updates-without-restarting option is ignored when used with the --only-download option."
 			else # Default super workflow.
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - NON-SYSTEM SOFTWARE UPDATE ****"
 				workflow_install_non_system_asu # This function includes internal install now and test mode logic.
 			fi
 		else
-			log_super "Status: Available non-system Apple software updates are not enforced. You must use the --install-non-system-updates option for these items to install without a macOS update/upgrade."
+			log_super "Status: Available non-system Apple software updates are not enforced. You must use the --install-non-system-updates-without-restarting option for these items to install without a macOS update/upgrade."
 		fi
 	else # No software updates/upgrade needed so clean up any leftover deferral counters.
-		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowAutomaticZeroDate 2> /dev/null
-		defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterFocus 2> /dev/null
-		defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterSoft 2> /dev/null
-		defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterHard 2> /dev/null
+		restart_workflow_automatic_zero_date
+		restart_deadline_counters
 	fi
 fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_macos_version_target is: ${workflow_macos_version_target}"
 
 # This is the main logic for determining what to do in the case of available macOS updates, macOS upgrades, ${workflow_jamf_policy_triggers_option}, or the ${workflow_restart_without_updates_option}.
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available is: ${asu_macos_minor_update_available}"
@@ -7898,14 +7937,14 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 			# At this point all deferral and deadline options have been evaluated.
 			if [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_stauts}" == "HARD" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then # A hard deadline has passed, similar to no logged in user but with a notification.
 				[[ "${auth_mdm_failover_hard}" == "TRUE" ]] && auth_mdm_failover="TRUE"
-				# Evaluate ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+				# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
 				[[ $(echo "${display_unmovable_option}" | grep -c 'HARD') -gt 0 ]] && display_unmovable_status="TRUE"
 				[[ $(echo "${display_hide_background_option}" | grep -c 'HARD') -gt 0 ]] && display_hide_background_status="TRUE"
 				[[ $(echo "${display_silently_option}" | grep -c 'HARD') -gt 0 ]] && display_silently_status="TRUE"
 				workflow_install_macos_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 			elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_count_status}" == "SOFT" ]]; then # A soft deadline has passed.
 				[[ "${auth_mdm_failover_soft}" == "TRUE" ]] && auth_mdm_failover="TRUE"
-				# Evaluate ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
+				# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
 				[[ $(echo "${display_unmovable_option}" | grep -c 'SOFT') -gt 0 ]] && display_unmovable_status="TRUE"
 				[[ $(echo "${display_hide_background_option}" | grep -c 'SOFT') -gt 0 ]] && display_hide_background_status="TRUE"
 				[[ $(echo "${display_silently_option}" | grep -c 'SOFT') -gt 0 ]] && display_silently_status="TRUE"

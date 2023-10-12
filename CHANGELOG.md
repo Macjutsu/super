@@ -2,7 +2,7 @@
 
 ## [4.0.0-betaX]
 
-2023-09-27
+2023-09-??
 
 ### Highlights
 
@@ -13,6 +13,7 @@
 - New default "always on" behavior automatically checks for Apple software updates on a regular basis.
 - Support for Jamf Pro 10.48+ [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html).
 - Support for Jamf Pro 10.49+ [API Roles and Clients](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/API_Roles_and_Clients.html).
+- Please check out the [new `super` v4.0.0-beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki) for more details!
 
 ### Compatibility Notes
 
@@ -29,7 +30,19 @@
 ### Known Issues
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
-- There are reports of an issue affecting the legacy Jamf Pro API where requesting a minor update on macOS 13 systems results Jamf Pro unintentionally sending a command to install macOS 14.
+- MDM push commands are known to re-download and prepare a macOS update/upgrade even if the `super` workflow already completed that task.
+
+### Specific Changes (4.0.0-beta4)
+
+- First draft of the [new `super` v4.0.0-beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki)! Please note that this Wiki itself is also a "beta", so expect updates and corrections.
+- Rearchitected Jamf Pro API calls to specify the exact macOS update or upgrade version. This change avoids Jamf Pro/macOS product issues that are known to unintentionally upgrade macOS even when an update was requested.
+- Rearchitected automatic zero day now also saves the target macOS version along with the zero day date. This prevents the zero day date from unintentionally reseting when the available update caches are rechecked.
+- Rearchitected the insufficient storage and power required alerts as dialogs (previously used notification functions). This resolved several issues preventing those dialogs from respecting display timeouts.
+- Updated insufficient storage and power required alerts now support optional display customizations including the dialog timeout countdown, the help button, and the warning button.
+- Resolved (no really this time?) a permissions issue preventing display of the custom display icon cache. (Thanks to @master-vodawagner for helping with this one.)
+- Resolved an issue that prevented `super` from saving the user password to the keychain when a standard (non-admin) user was active.
+- Fixed a few typos and improved variable logging.
+- `super` 4.0.0-beta4 SHA-256: 574fb4822211e1efc136629310ffec89b14a4a5d7dc1477e4dd1e61ce4e3050c
 
 ### Specific Changes (4.0.0-beta3)
 
