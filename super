@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2024,SC2207
 
-SUPER_VERSION="4.0.0-beta4"
-SUPER_DATE="2023/10/11"
+SUPER_VERSION="4.0.0-beta5"
+SUPER_DATE="2023/10/18"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -72,6 +72,7 @@ echo "
   [--display-unmovable=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE]
   [--display-hide-background=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER]
   [--display-silently=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE]
+  [--display-notifications-centered=ALWAYS,SOFT,HARD,INSTALLNOW]
   
   Display Interface Options:
   [--display-icon-file=/local/path or URL]  [--display-icon-size=pixels]
@@ -143,6 +144,8 @@ echo "
   <string>ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER</string>
   <key>DisplaySilently</key>
   <string>ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE</string>
+  <key>DisplayNotificationsCentered</key>
+  <string>ALWAYS,SOFT,HARD,INSTALLNOW</string>
   <key>DisplayIconFile</key> <string>path</string>
   <key>DisplayIconSize</key> <string>pixels</string>
   <key>DisplayAccessoryType</key>
@@ -220,6 +223,14 @@ readonly SUPER_PID_FILE
 # Path to the super log folder:
 SUPER_LOG_FOLDER="${SUPER_FOLDER}/logs"
 readonly SUPER_LOG_FOLDER
+
+# Path to the super log archive folder:
+SUPER_LOG_ARCHIVE_FOLDER="${SUPER_FOLDER}/logs-archive"
+readonly SUPER_LOG_ARCHIVE_FOLDER
+
+# The maximum size (in KB) for any super log that triggers an archival of log files at startup:
+SUPER_LOG_ARCHIVE_SIZE="1000"
+readonly SUPER_LOG_ARCHIVE_SIZE
 
 # Path to the log for the main super workflow:
 SUPER_LOG="${SUPER_LOG_FOLDER}/super.log"
@@ -585,6 +596,9 @@ while [[ -n "$1" ]]; do
 		--display-silently=*)
 			display_silently_option="${1##*=}"
 			;;
+		--display-notifications-centered=*)
+			display_notifications_centered_option="${1##*=}"
+			;;
 		--display-icon-file=*)
 			display_icon_file_option="${1##*=}"
 			;;
@@ -865,6 +879,8 @@ if [[ -f "${SUPER_MANAGED_PLIST}.plist" ]]; then
 	display_hide_background_managed=$(defaults read "${SUPER_MANAGED_PLIST}" DisplayHideBackground 2> /dev/null)
 	local display_silently_managed
 	display_silently_managed=$(defaults read "${SUPER_MANAGED_PLIST}" DisplaySilently 2> /dev/null)
+	local display_notifications_centered_managed
+	display_notifications_centered_managed=$(defaults read "${SUPER_MANAGED_PLIST}" DisplayNotificationsCentered 2> /dev/null)
 	local display_icon_file_managed
 	display_icon_file_managed=$(defaults read "${SUPER_MANAGED_PLIST}" DisplayIconFile 2> /dev/null)
 	local display_icon_size_managed
@@ -974,6 +990,8 @@ if [[ -f "${SUPER_LOCAL_PLIST}.plist" ]]; then
 	display_hide_background_local=$(defaults read "${SUPER_LOCAL_PLIST}" DisplayHideBackground 2> /dev/null)
 	local display_silently_local
 	display_silently_local=$(defaults read "${SUPER_LOCAL_PLIST}" DisplaySilently 2> /dev/null)
+	local display_notifications_centered_local
+	display_notifications_centered_local=$(defaults read "${SUPER_LOCAL_PLIST}" DisplayNotificationsCentered 2> /dev/null)
 	local display_icon_file_local
 	display_icon_file_local=$(defaults read "${SUPER_LOCAL_PLIST}" DisplayIconFile 2> /dev/null)
 	local display_icon_size_local
@@ -1082,6 +1100,8 @@ fi
 { [[ -z "${display_hide_background_managed}" ]] && [[ -z "${display_hide_background_option}" ]] && [[ -n "${display_hide_background_local}" ]]; } && display_hide_background_option="${display_hide_background_local}"
 [[ -n "${display_silently_managed}" ]] && display_silently_option="${display_silently_managed}"
 { [[ -z "${display_silently_managed}" ]] && [[ -z "${display_silently_option}" ]] && [[ -n "${display_silently_local}" ]]; } && display_silently_option="${display_silently_local}"
+[[ -n "${display_notifications_centered_managed}" ]] && display_notifications_centered_option="${display_notifications_centered_managed}"
+{ [[ -z "${display_notifications_centered_managed}" ]] && [[ -z "${display_notifications_centered_option}" ]] && [[ -n "${display_notifications_centered_local}" ]]; } && display_notifications_centered_option="${display_notifications_centered_local}"
 [[ -n "${display_icon_file_managed}" ]] && display_icon_file_option="${display_icon_file_managed}"
 { [[ -z "${display_icon_file_managed}" ]] && [[ -z "${display_icon_file_option}" ]] && [[ -n "${display_icon_file_local}" ]]; } && display_icon_file_option="${display_icon_file_local}"
 [[ -n "${display_icon_size_managed}" ]] && display_icon_size_option="${display_icon_size_managed}"
@@ -1507,7 +1527,7 @@ elif [[ -n "${deadline_date_focus_option}" ]]; then
 	fi
 	if [[ "${calculated_deadline}" =~ ${REGEX_FULL_DATE_HOURS_MINUTES} ]]; then
 		deadline_date_focus="${calculated_deadline}"
-		deadline_date_focus_epoch=$(date -j -f "%Y-%m-%d:%H:%M" "${calculated_deadline}" +"%s")
+		deadline_date_focus_epoch=$(date -j -f "%Y-%m-%d:%H:%M:%S" "${calculated_deadline}:00" +"%s")
 	else
 		log_super "Parameter Error: The --deadline-date-focus value must be formatted as YYYY-MM-DD:hh:mm."; option_error="TRUE"
 	fi
@@ -1540,7 +1560,7 @@ elif [[ -n "${deadline_date_soft_option}" ]]; then
 	fi
 	if [[ "${calculated_deadline}" =~ ${REGEX_FULL_DATE_HOURS_MINUTES} ]]; then
 		deadline_date_soft="${calculated_deadline}"
-		deadline_date_soft_epoch=$(date -j -f "%Y-%m-%d:%H:%M" "${calculated_deadline}" +"%s")
+		deadline_date_soft_epoch=$(date -j -f "%Y-%m-%d:%H:%M:%S" "${calculated_deadline}:00" +"%s")
 	else
 		log_super "Parameter Error: The --deadline-date-soft value must be formatted as YYYY-MM-DD:hh:mm."; option_error="TRUE"
 	fi
@@ -1573,7 +1593,7 @@ elif [[ -n "${deadline_date_hard_option}" ]]; then
 	fi
 	if [[ "${calculated_deadline}" =~ ${REGEX_FULL_DATE_HOURS_MINUTES} ]]; then
 		deadline_date_hard="${calculated_deadline}"
-		deadline_date_hard_epoch=$(date -j -f "%Y-%m-%d:%H:%M" "${calculated_deadline}" +"%s")
+		deadline_date_hard_epoch=$(date -j -f "%Y-%m-%d:%H:%M:%S" "${calculated_deadline}:00" +"%s")
 	else
 		log_super "Parameter Error: The --deadline-date-hard value must be formatted as YYYY-MM-DD:hh:mm."; option_error="TRUE"
 	fi
@@ -1749,7 +1769,7 @@ fi
 # Validate ${display_hide_background_option} and if valid save to ${SUPER_LOCAL_PLIST}.
 if [[ "${display_hide_background_option}" == "X" ]]; then
 	log_super "Status: Deleting local preference for the --display-hide-background option, defaulting to visible background behind dialogs and notifications."
-	defaults delete "${SUPER_LOCAL_PLIST}" DisplayUnmovable 2> /dev/null
+	defaults delete "${SUPER_LOCAL_PLIST}" DisplayHideBackground 2> /dev/null
 elif [[ -n "${display_hide_background_option}" ]]; then
 	local previous_ifs
 	previous_ifs="${IFS}"; IFS=','
@@ -1772,7 +1792,7 @@ fi
 # Validate ${display_silently_option} and if valid save to ${SUPER_LOCAL_PLIST}.
 if [[ "${display_silently_option}" == "X" ]]; then
 	log_super "Status: Deleting local preference for the --display-silently option, defaulting to audible alert for dialogs and notifications."
-	defaults delete "${SUPER_LOCAL_PLIST}" DisplayUnmovable 2> /dev/null
+	defaults delete "${SUPER_LOCAL_PLIST}" DisplaySilently 2> /dev/null
 elif [[ -n "${display_silently_option}" ]]; then
 	previous_ifs="${IFS}"; IFS=','
 	local display_silently_array
@@ -1790,6 +1810,28 @@ elif [[ -n "${display_silently_option}" ]]; then
 fi
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${display_silently_option}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_silently_option is: ${display_silently_option}"
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${display_silently_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_silently_status is: ${display_silently_status}"
+
+# Validate ${display_notifications_centered_option} and if valid save to ${SUPER_LOCAL_PLIST}.
+if [[ "${display_notifications_centered_option}" == "X" ]]; then
+	log_super "Status: Deleting local preference for the --display-notifications-centered option, defaulting to all notifications are shown in top right corner."
+	defaults delete "${SUPER_LOCAL_PLIST}" DisplayNotificationsCentered 2> /dev/null
+elif [[ -n "${display_notifications_centered_option}" ]]; then
+	previous_ifs="${IFS}"; IFS=','
+	local display_notifications_centered_array
+	read -r -a display_notifications_centered_array <<< "${display_notifications_centered_option}"
+	for option_type in "${display_notifications_centered_array[@]}"; do
+		if ! [[ "${option_type}" =~ ^ALWAYS$|^SOFT$|^HARD$|^INSTALLNOW$ ]]; then
+			log_super "Parameter Error: Unrecognized --display-notifications-centered type of ${option_type}. You can only specify the following types separated by commas (no spaces): ALWAYS,SOFT,HARD,INSTALLNOW"; option_error="TRUE"
+		fi
+	done
+	IFS="${previous_ifs}"
+	if [[ "${option_error}" != "TRUE" ]]; then
+		defaults write "${SUPER_LOCAL_PLIST}" DisplayNotificationsCentered -string "${display_notifications_centered_option}"
+	fi
+	[[ $(echo "${display_notifications_centered_option}" | grep -c 'ALWAYS') -gt 0 ]] && display_notifications_centered_status="TRUE"
+fi
+{ [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${display_notifications_centered_option}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_notifications_centered_option is: ${display_notifications_centered_option}"
+{ [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${display_notifications_centered_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_notifications_centered_status is: ${display_notifications_centered_status}"
 
 # Verify the ${display_icon_file_option} and if valid copy it to the path at ${DISPLAY_ICON_FILE_CACHE} and save to ${SUPER_LOCAL_PLIST}. If there is no file at ${DISPLAY_ICON_FILE_CACHE} then copy the file at path ${DISPLAY_ICON_DEFAULT_FILE}.
 local sips_response
@@ -1980,8 +2022,8 @@ if [[ "${mac_cpu_architecture}" == "arm64" ]]; then
 	if [[ -z "${auth_jamf_client_option}" ]] && [[ -n "${auth_jamf_secret_option}" ]]; then
 		log_super "Auth Error: The --auth-jamf-secret option option requires that you also set the --auth-jamf-client."; option_error="TRUE"
 	fi
-	if [[ -n "${auth_jamf_client_option}" ]] && [[ "${jamf_version}" -lt 1049 ]]; then
-		log_super "Auth Error: The --auth-jamf-client option requires Jamf Pro version 10.49 or later, the currently installed version of Jamf Pro ${jamf_version_major}.${jamf_version_minor} does not support this option."; option_error="TRUE"
+	if [[ -n "${auth_jamf_client_option}" ]] && [[ "${jamf_version_number}" -lt 1049 ]]; then
+		log_super "Auth Error: The --auth-jamf-client option requires Jamf Pro version 10.49 or later, the currently installed version of Jamf Pro ${jamf_version_number_major}.${jamf_version_number_minor} does not support this option."; option_error="TRUE"
 	fi
 	
 	if [[ -n "${auth_jamf_account_option}" ]] && [[ -z "${auth_jamf_password_option}" ]]; then
@@ -1990,7 +2032,7 @@ if [[ "${mac_cpu_architecture}" == "arm64" ]]; then
 	if [[ -z "${auth_jamf_account_option}" ]] && [[ -n "${auth_jamf_password_option}" ]]; then
 		log_super "Auth Error: The --auth-jamf-password option option requires that you also set the --auth-jamf-account."; option_error="TRUE"
 	fi
-	if [[ -n "${auth_jamf_account_option}" ]] && [[ "${jamf_version}" -ge 1049 ]]; then
+	if [[ -n "${auth_jamf_account_option}" ]] && [[ "${jamf_version_number}" -ge 1049 ]]; then
 		log_super "Warning: The --auth-jamf-account option is not recommended for Jamf Pro version 10.49 or later. The recommended implementation is the more secure --auth-jamf-client option."
 	fi
 	
@@ -2182,7 +2224,8 @@ auth_error_new="FALSE"
 # Collect any previously saved credential states (including legacy methods) from ${SUPER_LOCAL_PLIST}.
 auth_user_account_saved="FALSE"
 if [[ "${current_user_account_name}" != "FALSE" ]]; then
-	auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" 2>&1)
+	auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
 	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
 		auth_user_account_saved="TRUE"
 	else
@@ -2226,7 +2269,7 @@ auth_legacy_jamf_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" JamfAccoun
 # If the user specified any new Apple silicon authentication option or the ${auth_delete_all_option} then delete any previously saved credentials.
 if [[ "${auth_user_account_saved}" == "TRUE" ]] && { [[ "${auth_ask_user_to_save_password}" == "FALSE" ]] || [[ -n "${auth_local_account_option}" ]] || [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; }; then
 	log_super "Status: Deleting saved credentials for the --auth-ask-user-to-save-password option."
-	sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
+	launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" > /dev/null 2>&1
 	defaults delete "${SUPER_LOCAL_PLIST}" AuthAskUserToSavePassword > /dev/null 2>&1
 	auth_ask_user_to_save_password="FALSE"
 	auth_user_account_saved="FALSE"
@@ -2356,12 +2399,16 @@ elif [[ -n "${auth_local_account_option}" ]]; then
 		security add-generic-password -a "super_auth_local_account" -s "Super Update Service" -w "$(echo "${auth_local_account_option}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_local_account_keychain=$(security find-generic-password -w -a "super_auth_local_account" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_local_account_option}" != "${auth_local_account_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_account_option is: ${auth_local_account_option}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_account_keychain is: ${auth_local_account_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for --auth-local-account, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_local_account" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
 		security add-generic-password -a "super_auth_local_password" -s "Super Update Service" -w "$(echo "${auth_local_password_option}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_local_password_keychain=$(security find-generic-password -w -a "super_auth_local_password" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_local_password_option}" != "${auth_local_password_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_password_option is: ${auth_local_password_option}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_password_keychain is: ${auth_local_password_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for --auth-local-password, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_local_password" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
@@ -2427,12 +2474,16 @@ elif [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ "${auth_legac
 		security add-generic-password -a "super_auth_service_account" -s "Super Update Service" -w "$(echo "${auth_service_account}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_service_account_keychain=$(security find-generic-password -w -a "super_auth_service_account" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_service_account}" != "${auth_service_account_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_service_account is: ${auth_service_account}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_service_account_keychain is: ${auth_service_account_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for the super service account, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_service_account" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
 		security add-generic-password -a "super_auth_service_password" -s "Super Update Service" -w "$(echo "${auth_service_password}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_service_password_keychain=$(security find-generic-password -w -a "super_auth_service_password" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_service_password}" != "${auth_service_password_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_service_password is: ${auth_service_password}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_service_password_keychain is: ${auth_service_password_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for the super service password, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_service_password" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
@@ -2494,12 +2545,16 @@ elif [[ -n "${auth_jamf_client_option}" ]]; then
 		security add-generic-password -a "super_auth_jamf_client" -s "Super Update Service" -w "$(echo "${auth_jamf_client_option}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_jamf_client_keychain=$(security find-generic-password -w -a "super_auth_jamf_client" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_jamf_client_option}" != "${auth_jamf_client_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_client_option is: ${auth_jamf_client_option}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_client_keychain is: ${auth_jamf_client_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for --auth-jamf-client, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_jamf_client" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
 		security add-generic-password -a "super_auth_jamf_secret" -s "Super Update Service" -w "$(echo "${auth_jamf_secret_option}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_jamf_secret_keychain=$(security find-generic-password -w -a "super_auth_jamf_secret" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_jamf_secret_option}" != "${auth_jamf_secret_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_secret_option is: ${auth_jamf_secret_option}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_secret_keychain is: ${auth_jamf_secret_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for --auth-jamf-secret, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_jamf_secret" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
@@ -2534,12 +2589,16 @@ elif [[ -n "${auth_jamf_account_option}" ]]; then
 		security add-generic-password -a "super_auth_jamf_account" -s "Super Update Service" -w "$(echo "${auth_jamf_account_option}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_jamf_account_keychain=$(security find-generic-password -w -a "super_auth_jamf_account" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_jamf_account_option}" != "${auth_jamf_account_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_account_option is: ${auth_jamf_account_option}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_account_keychain is: ${auth_jamf_account_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for --auth-jamf-account, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_jamf_account" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
 		security add-generic-password -a "super_auth_jamf_password" -s "Super Update Service" -w "$(echo "${auth_jamf_password_option}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		auth_jamf_password_keychain=$(security find-generic-password -w -a "super_auth_jamf_password" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		if [[ "${auth_jamf_password_option}" != "${auth_jamf_password_keychain}" ]]; then
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_password_option is: ${auth_jamf_password_option}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_jamf_password_keychain is: ${auth_jamf_password_keychain}"
 			log_super "Auth Error: Unable to validate keychain item for --auth-jamf-password, deleting keychain item."; auth_error_new="TRUE"
 			security delete-generic-password -a "super_auth_jamf_password" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 		fi
@@ -2683,7 +2742,7 @@ auth_jamf_account_valid="FALSE"
 
 # If there is a previously saved user account then validate the credentials and set ${auth_local_account} and ${auth_local_password}.
 if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-	[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" 2>&1)
+	[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
 	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
 		auth_local_account="${current_user_account_name}"
@@ -2696,7 +2755,7 @@ if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_sav
 			log_super "Warning: Unable to validate previously saved credentials for the current user: ${current_user_account_name}"
 			unset auth_local_account
 			unset auth_local_password
-			sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
+			launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" > /dev/null 2>&1
 			log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
 			auth_error_saved="TRUE"
 			auth_user_account_saved="FALSE"
@@ -2846,6 +2905,7 @@ fi
 workflow_installation() {
 [[ ! -d "${SUPER_FOLDER}" ]] && mkdir -p "${SUPER_FOLDER}"
 [[ ! -d "${SUPER_LOG_FOLDER}" ]] && mkdir -p "${SUPER_LOG_FOLDER}"
+[[ ! -d "${SUPER_LOG_ARCHIVE_FOLDER}" ]] && mkdir -p "${SUPER_LOG_ARCHIVE_FOLDER}"
 log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - SUPER INSTALLATION WORKFLOW ****"
 log_status "Running: Installation workflow."
 
@@ -3105,6 +3165,9 @@ local super_current_folder
 super_current_folder=$(dirname "$0")
 ! { [[ "${super_current_folder}" == "${SUPER_FOLDER}" ]] || [[ "${super_current_folder}" == $(dirname "${SUPER_LINK}") ]]; } && workflow_installation
 
+# Check for logs that need to be archived.
+archive_logs
+
 # After installation is verified, the startup workflow can begin.
 log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - SUPER STARTUP WORKFLOW ****"
 log_status "Running: Startup workflow."
@@ -3170,7 +3233,7 @@ get_preferences
 check_jamf_management_framework
 manage_parameter_options
 manage_helpers
-if [[ "${option_error}" == "TRUE" ]] || [[ "${helper_error}" == "TRUE" ]]; then
+if [[ "${check_error}" == "TRUE" ]] || [[ "${option_error}" == "TRUE" ]] || [[ "${helper_error}" == "TRUE" ]]; then
 	log_super "Exit: Initial startup validation failed."
 	log_status "Inactive Error: Initial startup validation failed."
 	exit_error
@@ -3185,6 +3248,7 @@ if [[ "${workflow_install_now_option}" == "TRUE" ]] || [[ -f "${WORKFLOW_INSTALL
 	[[ $(echo "${display_unmovable_option}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_unmovable_status="TRUE"
 	[[ $(echo "${display_hide_background_option}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_hide_background_status="TRUE"
 	[[ $(echo "${display_silently_option}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_silently_status="TRUE"
+	[[ $(echo "${display_notifications_centered_option}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_notifications_centered_status="TRUE"
 	if [[ "${current_user_account_name}" != "FALSE" ]]; then
 		notification_install_now_start
 		if [[ "${test_mode_option}" == "TRUE" ]]; then
@@ -3257,10 +3321,8 @@ fi
 # Configure super to automatically launch ${deferral_timer_minutes} from now by setting the NextAutoLaunch attribute in the ${SUPER_LOCAL_PLIST}.
 set_auto_launch_deferral() {
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_minutes is: ${deferral_timer_minutes}"
-local deferral_timer_seconds
-deferral_timer_seconds=$((deferral_timer_minutes * 60))
 local deferral_timer_epoch
-deferral_timer_epoch=$(($(date +%s) + deferral_timer_seconds))
+deferral_timer_epoch=$(( $(date +%s) + ( deferral_timer_minutes * 60 ) ))
 local deferral_timer_year
 deferral_timer_year=$(date -j -f "%s" "${deferral_timer_epoch}" "+%Y" | xargs)
 local deferral_timer_month
@@ -3271,10 +3333,8 @@ local deferral_timer_hour
 deferral_timer_hour=$(date -j -f "%s" "${deferral_timer_epoch}" "+%H" | xargs)
 local deferral_timer_minute
 deferral_timer_minute=$(date -j -f "%s" "${deferral_timer_epoch}" "+%M" | xargs)
-local deferral_timer_second
-deferral_timer_second=$(date -j -f "%s" "${deferral_timer_epoch}" "+%S" | xargs)
 local next_auto_launch
-next_auto_launch="${deferral_timer_year}-${deferral_timer_month}-${deferral_timer_day}:${deferral_timer_hour}:${deferral_timer_minute}:${deferral_timer_second}"
+next_auto_launch="${deferral_timer_year}-${deferral_timer_month}-${deferral_timer_day}:${deferral_timer_hour}:${deferral_timer_minute}:00"
 defaults write "${SUPER_LOCAL_PLIST}" NextAutoLaunch -string "${next_auto_launch}"
 log_super "Exit: super is scheduled to automatically relaunch at: ${next_auto_launch}"
 exit_clean
@@ -3341,6 +3401,64 @@ log_status() {
 defaults write "${SUPER_LOCAL_PLIST}" SuperStatus -string "$(date +"%a %b %d %T"): $*"
 }
 
+
+# Archive all legacy log files to the ${SUPER_LOG_ARCHIVE_FOLDER}, and if needed, archive larger current logs.
+archive_logs() {
+# First, archive any legacy super logs.
+if [[ -f "${SUPER_FOLDER}/super.log" ]]; then
+	local log_archive_legacy_name
+	log_archive_legacy_name=$(date +"%Y-%m-%d.%H-%M-%S.legacy")
+	log_super "Status: Archiving legacy super logs to: ${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}.zip"
+	mkdir -p "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}"
+	mv "${SUPER_FOLDER}/super.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/super.log"
+	[[ -f "${SUPER_FOLDER}/asuList.log" ]] && rm -f "${SUPER_FOLDER}/asuList.log" 2> /dev/null
+	[[ -f "${SUPER_FOLDER}/installerList.log" ]] && rm -f "${SUPER_FOLDER}/installerList.log" 2> /dev/null
+	[[ -f "${SUPER_FOLDER}/asu.log" ]] && mv "${SUPER_FOLDER}/asu.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/asu.log"
+	[[ -f "${SUPER_FOLDER}/installer.log" ]] && mv "${SUPER_FOLDER}/installer.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/installer.log"
+	[[ -f "${SUPER_FOLDER}/mdmCommand.log" ]] && mv "${SUPER_FOLDER}/mdmCommand.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/mdmCommand.log"
+	[[ -f "${SUPER_FOLDER}/mdmCommandDebug.log" ]] && mv "${SUPER_FOLDER}/mdmCommandDebug.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/mdmCommandDebug.log"
+	[[ -f "${SUPER_FOLDER}/mdmWorkflow.log" ]] && mv "${SUPER_FOLDER}/mdmWorkflow.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/mdmWorkflow.log"
+	[[ -f "${SUPER_FOLDER}/mdmWorkflowDebug.log" ]] && mv "${SUPER_FOLDER}/mdmWorkflowDebug.log" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}/mdmWorkflowDebug.log"
+	zip -r -j "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}.zip" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}" > /dev/null 2>&1
+	rm -rf "${SUPER_LOG_ARCHIVE_FOLDER:?}/${log_archive_legacy_name}" 2> /dev/null
+	chown -R root:wheel "${SUPER_LOG_ARCHIVE_FOLDER}"
+	chmod -R a+r "${SUPER_LOG_ARCHIVE_FOLDER}"
+fi
+
+# Check to see if any log file is larger than $SUPER_LOG_ARCHIVE_SIZE.
+local archive_logs_needed
+archive_logs_needed="FALSE"
+[[ $(du -k "${SUPER_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(du -k "${ASU_WORKFLOW_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(du -k "${INSTALLER_WORKFLOW_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(du -k "${MDM_COMMAND_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(du -k "${MDM_COMMAND_DEBUG_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(du -k "${MDM_WORKFLOW_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(du -k "${MDM_WORKFLOW_DEBUG_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+
+# A super log has become to large, archival is required.
+if [[ "${archive_logs_needed}" == "TRUE" ]]; then
+	local log_archive_name
+	log_archive_name=$(date +"%Y-%m-%d.%H-%M-%S")
+	log_super "Status: A super log is larger than ${SUPER_LOG_ARCHIVE_SIZE} KB, archiving super logs to: ${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}.zip"
+	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - LOGS ARCHIVAL ****"
+	mkdir -p "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}"
+	mv "${SUPER_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${SUPER_LOG})"
+	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - LOGS ARCHIVAL ****"
+	log_super "Status: A super log was larger than ${SUPER_LOG_ARCHIVE_SIZE} KB, previous super logs archived to: ${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}.zip"
+	[[ -f "${ASU_WORKFLOW_LOG}" ]] && mv "${ASU_WORKFLOW_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${ASU_WORKFLOW_LOG})"
+	[[ -f "${INSTALLER_WORKFLOW_LOG}" ]] && mv "${INSTALLER_WORKFLOW_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${INSTALLER_WORKFLOW_LOG})"
+	[[ -f "${MDM_COMMAND_LOG}" ]] && mv "${MDM_COMMAND_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_COMMAND_LOG})"
+	[[ -f "${MDM_COMMAND_DEBUG_LOG}" ]] && mv "${MDM_COMMAND_DEBUG_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_COMMAND_DEBUG_LOG})"
+	[[ -f "${MDM_WORKFLOW_LOG}" ]] && mv "${MDM_WORKFLOW_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_WORKFLOW_LOG})"
+	[[ -f "${MDM_WORKFLOW_DEBUG_LOG}" ]] && mv "${MDM_COMMAND_DEBUG_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_WORKFLOW_DEBUG_LOG})"
+	zip -r -j "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}.zip" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}" > /dev/null 2>&1
+	rm -rf "${SUPER_LOG_ARCHIVE_FOLDER:?}/${log_archive_name}" 2> /dev/null
+	chown -R root:wheel "${SUPER_LOG_ARCHIVE_FOLDER}"
+	chmod -R a+r "${SUPER_LOG_ARCHIVE_FOLDER}"
+fi
+}
+
 # MARK: *** Local System Validation ***
 ################################################################################
 
@@ -3348,7 +3466,7 @@ defaults write "${SUPER_LOCAL_PLIST}" SuperStatus -string "$(date +"%a %b %d %T"
 # If the current user is a normal account then this also sets ${current_user_id}, ${current_user_guid}, ${current_user_real_name}, ${current_user_is_admin}, ${current_user_has_secure_token}, and ${current_user_is_volume_owner}
 check_current_user() {
 local current_user_account_name_response
-current_user_account_name_response=$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ { print $3 }')
+current_user_account_name_response=$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ {$1=$2="";print $0;}' | xargs)
 
 # If this function was already run earlier then check to see if ${current_user_account_name} and ${current_user_id} are the same as before, if so then it's not necessary to continue this function.
 if [[ "${current_user_account_name}" == "${current_user_account_name_response}" ]]; then
@@ -3399,34 +3517,39 @@ fi
 
 # Collect parameters for detailed system information setting a variety of parameters including ${macos_version_minor}, ${macos_version_number}, ${macos_version_extra}, ${macos_build}, ${macos_marketing_name}, ${mac_cpu_architecture}, ${mac_model_name}, ${mac_is_portable}, and ${mac_last_startup}.
 check_system() {
+check_error="FALSE"
 macos_version_minor=$(sw_vers -productVersion | cut -d'.' -f2) # Expected output: 14, 15, 06, 01
-macos_version_number=${macos_version_major}$(printf "%02d" "${macos_version_minor}") # Expected output: 1014, 1015, 1106, 1203
+macos_version_number="${macos_version_major}$(printf "%02d" "${macos_version_minor}")" # Expected output: 1014, 1015, 1106, 1203
 [[ "${macos_version_major}" -ge 13 ]] && macos_version_extra=$(sw_vers -productVersionExtra | cut -d'.' -f2) # Expected output: (a), (b), (c)
 macos_build=$(sw_vers -buildVersion) # Expected output: 22D68
 macos_marketing_name="macOS $(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')" # Expected output: macOS Ventura
 mac_cpu_architecture=$(arch) # Expected output: i386, arm64
-mac_model_name=$(system_profiler SPHardwareDataType | grep 'Model Name' | awk -F ': ' '{print $2}') # Expected output: MacBook Pro
+mac_model_name=$(system_profiler SPHardwareDataType | grep 'Model Name' | awk -F ': ' '{print $2;}') # Expected output: MacBook Pro
 [[ $(echo "${mac_model_name}" | grep -c 'Book') -gt 0 ]] && mac_is_portable="TRUE" # Expected output: TRUE
-local last_reboot_response
-if [[ "$macos_version_major" -ge 14 ]]; then
-	last_reboot_response=$(last -1 reboot | cut -c 48- | xargs) # Expected output: Aug 25 00:16
-else
-	last_reboot_response=$(last -1 reboot | cut -c 41- | xargs) # Expected output: Aug 25 00:16
-fi
-mac_last_startup=$(date -j -f "%b %d %H:%M:%S" "${last_reboot_response}:00" +"%Y-%m-%d:%H:%M:%S") # Expected output: 2023-08-25:00:16:00
-defaults write "${SUPER_LOCAL_PLIST}" MacLastStartup -string "${mac_last_startup}"
 if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Mac computers with Apple Silicon.
 	[[ -z "${macos_version_extra}" ]] && log_super "Status: Mac computer with Apple silicon running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}-${macos_build}"
 	[[ -n "${macos_version_extra}" ]] && log_super "Status: Mac computer with Apple silicon running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}${macos_version_extra}-${macos_build}"
-	
 else # Mac computers with Intel.
 	[[ -z "${macos_version_extra}" ]] && log_super "Status: Mac computer with Intel running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}-${macos_build}"
 	[[ -n "${macos_version_extra}" ]] && log_super "Status: Mac computer with Intel running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}${macos_version_extra}-${macos_build}"
 fi
-log_super "Status: Last macOS startup was: ${mac_last_startup}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_version_number is: ${macos_version_number}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mac_model_name is: ${mac_model_name}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mac_is_portable is: ${mac_is_portable}"
+local last_reboot_response
+last_reboot_response=$(last -1 reboot | sed -e 's/  */ /g' | awk '{print $4" "$5" "$6;}') # Expected output: Aug 25 00:16 or 25 Aug 00:16
+if [[ "${last_reboot_response}" =~ ^[a-zA-Z]{3}\ [0-9]{2}\ [0-9]{2}:[0-9]{2}$ ]]; then
+	mac_last_startup=$(date -j -f "%b %d %H:%M:%S" "${last_reboot_response}:00" +"%Y-%m-%d:%H:%M:%S") # Expected output: 2023-08-25:00:16:00
+elif [[ "${last_reboot_response}" =~ ^[0-9]{2}\ [a-zA-Z]{3}\ [0-9]{2}:[0-9]{2}$ ]]; then
+	mac_last_startup=$(date -j -f "%d %b %H:%M:%S" "${last_reboot_response}:00" +"%Y-%m-%d:%H:%M:%S") # Expected output: 2023-08-25:00:16:00
+else # Unknown format.
+	log_super "Error: Unregonized last reboot date format: ${last_reboot_response}"; check_error="TRUE"
+fi
+if [[ -n "${mac_last_startup}" ]]; then
+	log_super "Status: Last macOS startup was: ${mac_last_startup}"
+	defaults write "${SUPER_LOCAL_PLIST}" MacLastStartup -string "${mac_last_startup}"
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: check_error is: ${check_error}"
 }
 
 # Validate that the account ${auth_local_account} and ${auth_local_password} are valid credentials to a volume owner. If not set ${auth_error_local}.
@@ -3454,7 +3577,7 @@ check_storage_available_error="FALSE"
 storage_ready="FALSE"
 [[ -z "${current_user_account_name}" ]] && check_current_user
 [[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
-[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
+[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3;}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: storage_available_gigabytes: ${storage_available_gigabytes}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target: ${macos_major_upgrade_version_major_target}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available: ${asu_macos_minor_update_available}"
@@ -3529,7 +3652,7 @@ if [[ "${mac_is_portable}" == "TRUE" ]]; then
 	if [[ "${power_required_charger_connected}" == "TRUE" ]]; then
 		power_ready="TRUE"
 	else # Not plugged into AC power.
-		power_battery_percent=$(pmset -g ps | grep '%' | awk '{print $3}' | sed -e 's/%;//g')
+		power_battery_percent=$(pmset -g ps | grep '%' | awk '{print $3;}' | sed -e 's/%;//g')
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: power_battery_percent: ${power_battery_percent}"
 		if [[ -z "${power_battery_percent}" ]] || [[ ! "${power_battery_percent}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
 			log_super "Error: Unable to determine battery power level."
@@ -3558,7 +3681,7 @@ profiles_response=$(profiles status -type enrollment 2>&1)
 if [[ $(echo "${profiles_response}" | grep -c 'MDM server') -gt 0 ]]; then
 	mdm_enrolled="TRUE"
 	[[ $(echo "${profiles_response}" | grep 'Enrolled via DEP:' | grep -c 'Yes') -gt 0 ]] && mdm_automatically_enrolled="TRUE"
-	mdm_service_url="https://$(echo "${profiles_response}" | grep 'MDM server' | awk -F '/' '{print $3}')"
+	mdm_service_url="https://$(echo "${profiles_response}" | grep 'MDM server' | awk -F '/' '{print $3;}')"
 	local curl_response
 	curl_response=$(curl -Is "${mdm_service_url}" | head -n 1)
 	if [[ $(echo "${curl_response}" | grep -c 'HTTP') -gt 0 ]] && [[ $(echo "${curl_response}" | grep -c -e '400' -e '40[4-9]' -e '4[1-9][0-9]' -e '5[0-9][0-9]') -eq 0 ]]; then
@@ -3657,7 +3780,7 @@ if [[ -z "${workflow_zero_date}" ]]; then
 fi
 
 # Set remaining zero date parameters.
-workflow_zero_date_epoch=$(date -j -f "%Y-%m-%d:%H:%M" "${workflow_zero_date}" +"%s")
+workflow_zero_date_epoch=$(date -j -f "%Y-%m-%d:%H:%M:%S" "${workflow_zero_date}:00" +"%s")
 local display_string_workflow_zero_date_only_date
 display_string_workflow_zero_date_only_date=$(date -r "${workflow_zero_date_epoch}" "${DISPLAY_STRING_FORMAT_DATE}")
 local display_string_workflow_zero_date_only_time
@@ -3671,6 +3794,279 @@ fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_workflow_zero_date_only_date: ${display_string_workflow_zero_date_only_date}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_workflow_zero_date_only_time: ${display_string_workflow_zero_date_only_time}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_workflow_zero_date: ${display_string_workflow_zero_date}"
+}
+
+# Evaluate ${deadline_days_focus}, ${deadline_days_soft}, and ${deadline_days_hard}, then set ${deadline_days_stauts}, ${deadline_days_epoch}, ${display_string_deadline_days}, ${display_string_deadline}, and ${deadline_epoch} accordingly.
+
+# Evaluate ${deadline_date_focus}, ${deadline_date_soft}, and ${deadline_date_hard}, then set ${deadline_date_status}, ${deadline_date_epoch}, and ${display_string_deadline_date} accordingly.
+check_deadlines_days_date() {
+deadline_days_stauts="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
+deadline_date_status="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
+local current_epoch
+current_epoch=$(date +%s)
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_epoch is: ${current_epoch}"
+
+# Evaluate days deadlines and set ${deadline_days_stauts}, ${deadline_days_epoch}, and ${display_string_deadline_days}.
+if [[ -n "${deadline_days_focus}" ]]; then
+	local deadline_days_focus_epoch
+	deadline_days_focus_epoch=$(( workflow_zero_date_epoch + deadline_days_focus_seconds ))
+	local deadline_days_focus_date
+	deadline_days_focus_date=$(date -r "${deadline_days_focus_epoch}" +%Y-%m-%d:%H:%M)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_focus_epoch: ${deadline_days_focus_epoch}"
+	if [[ "${deadline_days_focus_epoch}" -lt "${current_epoch}" ]]; then
+		log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) HAS passed."
+		deadline_days_stauts="FOCUS"
+	else
+		local deadline_days_focus_difference
+		deadline_days_focus_difference=$(( deadline_days_focus_epoch - current_epoch ))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_focus_difference is: ${deadline_days_focus_difference}"
+		if [[ "${deadline_days_focus_difference}" -le 120 ]]; then
+			log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) is only ${deadline_days_focus_difference} seconds away, waiting for deadline to pass..."
+			sleep $(( deadline_days_focus_difference + 1 ))
+			log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) HAS passed."
+			deadline_days_stauts="FOCUS"
+		else
+			log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) NOT passed."
+		fi
+	fi
+fi
+if [[ -n "${deadline_days_soft}" ]]; then
+	local deadline_days_soft_epoch
+	deadline_days_soft_epoch=$(( workflow_zero_date_epoch + deadline_days_soft_seconds ))
+	local deadline_days_soft_date
+	deadline_days_soft_date=$(date -r "${deadline_days_soft_epoch}" +%Y-%m-%d:%H:%M)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_soft_epoch: ${deadline_days_soft_epoch}"
+	if [[ "${deadline_days_soft_epoch}" -lt "${current_epoch}" ]]; then
+		log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) HAS passed."
+		deadline_days_stauts="SOFT"
+	else
+		local deadline_days_soft_difference
+		deadline_days_soft_difference=$(( deadline_days_soft_epoch - current_epoch ))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_soft_difference is: ${deadline_days_soft_difference}"
+		if [[ "${deadline_days_soft_difference}" -le 120 ]]; then
+			log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) is only ${deadline_days_soft_difference} seconds away, waiting for deadline to pass..."
+			sleep $(( deadline_days_soft_difference + 1 ))
+			log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) HAS passed."
+			deadline_days_stauts="SOFT"
+		else
+			log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) NOT passed."
+		fi
+	fi
+fi
+if [[ -n "${deadline_days_hard}" ]]; then
+	local deadline_days_hard_epoch
+	deadline_days_hard_epoch=$(( workflow_zero_date_epoch + deadline_days_hard_seconds ))
+	local deadline_days_hard_date
+	deadline_days_hard_date=$(date -r "${deadline_days_hard_epoch}" +%Y-%m-%d:%H:%M)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_hard_epoch: ${deadline_days_hard_epoch}"
+	if [[ "${deadline_days_hard_epoch}" -lt "${current_epoch}" ]]; then
+		log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) HAS passed."
+		deadline_days_stauts="HARD"
+	else
+		local deadline_days_hard_difference
+		deadline_days_hard_difference=$(( deadline_days_hard_epoch - current_epoch ))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_hard_difference is: ${deadline_days_hard_difference}"
+		if [[ "${deadline_days_hard_difference}" -le 120 ]]; then
+			log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) is only ${deadline_days_hard_difference} seconds away, waiting for deadline to pass..."
+			sleep $(( deadline_days_hard_difference + 1 ))
+			log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) HAS passed."
+			deadline_days_stauts="HARD"
+		else
+			log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) NOT passed."
+		fi
+	fi
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_stauts is: ${deadline_days_stauts}"
+[[ -n ${deadline_days_hard} ]] && deadline_days_epoch="${deadline_days_hard_epoch}"
+[[ -n ${deadline_days_soft} ]] && deadline_days_epoch="${deadline_days_soft_epoch}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_epoch is: ${deadline_days_epoch}"
+if [[ -n "${deadline_days_epoch}" ]]; then
+	local display_string_deadline_days_only_date
+	display_string_deadline_days_only_date=$(date -r "${deadline_days_epoch}" "${DISPLAY_STRING_FORMAT_DATE}")
+	local display_string_deadline_days_only_time
+	display_string_deadline_days_only_time=$(date -r "${deadline_days_epoch}" "${DISPLAY_STRING_FORMAT_TIME}" | sed 's/^ *//g')
+	if [[ $(date -r "${deadline_days_epoch}" "+%H:%M") == "00:00" ]]; then
+		display_string_deadline_days="${display_string_deadline_days_only_date}"
+	else
+		display_string_deadline_days="${display_string_deadline_days_only_date} - ${display_string_deadline_days_only_time}"
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_days_only_date is: ${display_string_deadline_days_only_date}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_days_only_time is: ${display_string_deadline_days_only_time}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_days is: ${display_string_deadline_days}"
+fi
+
+# Evaluate date deadlines and set ${deadline_date_status}, ${deadline_date_epoch}, and ${display_string_deadline_date}.
+if [[ -n "${deadline_date_focus}" ]]; then
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_focus_epoch is: ${deadline_date_focus_epoch}"
+	if [[ "${deadline_date_focus_epoch}" -lt "${current_epoch}" ]]; then
+		log_super "Status: Focus deadline date of ${deadline_date_focus} HAS passed."
+		deadline_date_status="FOCUS"
+	else
+		local deadline_date_focus_difference
+		deadline_date_focus_difference=$(( deadline_date_focus_epoch - current_epoch ))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_focus_difference is: ${deadline_date_focus_difference}"
+		if [[ "${deadline_date_focus_difference}" -le 120 ]]; then
+			log_super "Status: Focus deadline date of ${deadline_date_focus} is only ${deadline_date_focus_difference} seconds away, waiting for deadline to pass..."
+			sleep $(( deadline_date_focus_difference + 1 ))
+			log_super "Status: Focus deadline date of ${deadline_date_focus} HAS passed."
+			deadline_date_status="FOCUS"
+		else
+			log_super "Status: Focus deadline date of ${deadline_date_focus} NOT passed."
+		fi
+	fi
+fi
+if [[ -n "${deadline_date_soft}" ]]; then
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_soft_epoch is: ${deadline_date_soft_epoch}"
+	if [[ "${deadline_date_soft_epoch}" -lt "${current_epoch}" ]]; then
+		log_super "Status: Soft deadline date of ${deadline_date_soft} HAS passed."
+		deadline_date_status="SOFT"
+	else
+		local deadline_date_soft_difference
+		deadline_date_soft_difference=$(( deadline_date_soft_epoch - current_epoch ))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_soft_difference is: ${deadline_date_soft_difference}"
+		if [[ "${deadline_date_soft_difference}" -le 120 ]]; then
+			log_super "Status: Soft deadline date of ${deadline_date_soft} is only ${deadline_date_soft_difference} seconds away, waiting for deadline to pass..."
+			sleep $(( deadline_date_soft_difference + 1 ))
+			log_super "Status: Soft deadline date of ${deadline_date_soft} HAS passed."
+			deadline_date_status="SOFT"
+		else
+			log_super "Status: Soft deadline date of ${deadline_date_soft} NOT passed."
+		fi
+	fi
+fi
+if [[ -n "${deadline_date_hard}" ]]; then
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_hard_epoch is: ${deadline_date_hard_epoch}"
+	if [[ "${deadline_date_hard_epoch}" -lt "${current_epoch}" ]]; then
+		log_super "Status: Hard deadline date of ${deadline_date_hard} HAS passed."
+		deadline_date_status="HARD"
+	else
+		local deadline_date_hard_difference
+		deadline_date_hard_difference=$(( deadline_date_hard_epoch - current_epoch ))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_hard_difference is: ${deadline_date_hard_difference}"
+		if [[ "${deadline_date_hard_difference}" -le 120 ]]; then
+			log_super "Status: Hard deadline date of ${deadline_date_soft} is only ${deadline_date_hard_difference} seconds away, waiting for deadline to pass..."
+			sleep $(( deadline_date_hard_difference + 1 ))
+			log_super "Status: Hard deadline date of ${deadline_date_soft} HAS passed."
+			deadline_date_status="HARD"
+		else
+			log_super "Status: Hard deadline date of ${deadline_date_hard} NOT passed."
+		fi
+	fi
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_status is: ${deadline_date_status}"
+[[ -n "${deadline_date_hard}" ]] && deadline_date_epoch="${deadline_date_hard_epoch}"
+[[ -n "${deadline_date_soft}" ]] && deadline_date_epoch="${deadline_date_soft_epoch}" #
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_epoch is: ${deadline_date_epoch}"
+if [[ -n "${deadline_date_epoch}" ]]; then
+	local display_string_deadline_date_only_date
+	display_string_deadline_date_only_date=$(date -r "${deadline_date_epoch}" "${DISPLAY_STRING_FORMAT_DATE}")
+	local display_string_deadline_date_only_time
+	display_string_deadline_date_only_time=$(date -r "${deadline_date_epoch}" "${DISPLAY_STRING_FORMAT_TIME}" | sed 's/^ *//g')
+	if [[ $(date -r "${deadline_date_epoch}" "+%H:%M") == "00:00" ]]; then
+		display_string_deadline_date="${display_string_deadline_date_only_date}"
+	else
+		display_string_deadline_date="${display_string_deadline_date_only_date} - ${display_string_deadline_date_only_time}"
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_date_only_date is: ${display_string_deadline_date_only_date}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_date_only_time is: ${display_string_deadline_date_only_time}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_date is: ${display_string_deadline_date}"
+fi
+
+# Set ${deadline_epoch} and ${display_string_deadline} to the soonest of either days or date deadlines.
+if [[ -n "${deadline_days_epoch}" ]] && [[ -n "${deadline_date_epoch}" ]]; then
+	if [[ "${deadline_days_epoch}" -le "${deadline_date_epoch}" ]]; then
+		deadline_epoch="${deadline_days_epoch}"
+		display_string_deadline="${display_string_deadline_days}"
+	else
+		deadline_epoch="${deadline_date_epoch}"
+		display_string_deadline="${display_string_deadline_date}"
+	fi
+elif [[ -n "${deadline_days_epoch}" ]]; then
+	deadline_epoch="${deadline_days_epoch}"
+	display_string_deadline="${display_string_deadline_days}"
+elif [[ -n "${deadline_date_epoch}" ]]; then
+	deadline_epoch="${deadline_date_epoch}"
+	display_string_deadline="${display_string_deadline_date}"
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_epoch is: ${deadline_epoch}"
+
+# If there is a ${deadline_epoch}, then make sure no user deferral timer or display timeout exceeds the deadline.
+if [[ -n "${deadline_epoch}" ]]; then
+	local deferral_timer_deadline_minutes
+	deferral_timer_deadline_minutes=$(( ( deadline_epoch - current_epoch ) / 60 ))
+	local deferral_timer_deadline_active
+	deferral_timer_deadline_active="FALSE"
+	[[ $deferral_timer_deadline_minutes -lt 2 ]] && deferral_timer_deadline_minutes=2
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_deadline_minutes is: ${deferral_timer_deadline_minutes}"
+	if [[ -n "${deferral_timer_menu_minutes}" ]]; then
+		local previous_ifs
+		previous_ifs="${IFS}"; IFS=','
+		local deferral_timer_menu_array
+		read -r -a deferral_timer_menu_array <<< "${deferral_timer_menu_minutes}"
+		local deferral_timer_menu_reduced_array
+		deferral_timer_menu_reduced_array=()
+		local deferral_timer_menu_reduced
+		deferral_timer_menu_reduced="FALSE"
+		for deferral_timer_menu_item in "${deferral_timer_menu_array[@]}"; do
+			if [[ $deferral_timer_deadline_minutes -le $deferral_timer_menu_item ]]; then
+				if [[ "${deferral_timer_menu_reduced}" == "FALSE" ]]; then
+					deferral_timer_menu_reduced_array+=("${deferral_timer_deadline_minutes}")
+					deferral_timer_menu_reduced="TRUE"
+					deferral_timer_deadline_active="TRUE"
+				fi
+			else
+				deferral_timer_menu_reduced_array+=("${deferral_timer_menu_item}")
+			fi
+		done
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_menu_reduced is: ${deferral_timer_menu_reduced}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_menu_reduced_array is: ${deferral_timer_menu_reduced_array[*]}"
+		if [[ "${deferral_timer_menu_reduced}" == "TRUE" ]]; then
+			if [[ ${#deferral_timer_menu_reduced_array[@]} -gt 1 ]]; then
+				deferral_timer_menu_minutes="${deferral_timer_menu_reduced_array[*]}"
+				log_super "Warning: The deferral timer menu list has been reduced to ${deferral_timer_menu_minutes} minutes given the deferral deadline of: ${display_string_deadline}"
+			else
+				unset deferral_timer_menu_minutes
+				log_super "Warning: Not showing the deferral timer menu given the deferral deadline of: ${display_string_deadline}"
+			fi
+		fi
+		IFS="${previous_ifs}"
+	fi
+	if [[ -z "${deferral_timer_menu_minutes}" ]]; then
+		if [[ $deferral_timer_deadline_minutes -lt $deferral_timer_minutes ]]; then
+			log_super "Warning: Reducing user deferral timers to ${deferral_timer_deadline_minutes} minutes given the deferral deadline of: ${display_string_deadline}"
+			deferral_timer_minutes="${deferral_timer_deadline_minutes}"
+			[[ -n "${deferal_timer_focus_minutes}" ]] && deferal_timer_focus_minutes="${deferral_timer_deadline_minutes}"
+			deferral_timer_deadline_active="TRUE"
+		fi
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_deadline_active is: ${deferral_timer_deadline_active}"
+	if [[ "${deferral_timer_deadline_active}" == "TRUE" ]]; then
+		if [[ -n "${dialog_timeout_default_seconds}" ]] && [[ $dialog_timeout_default_seconds -gt 120 ]]; then
+			dialog_timeout_default_seconds=120
+			log_super "Warning: Reducing the --dialog-timeout-default option to ${dialog_timeout_default_seconds} seconds given the approaching deferral deadline."
+		fi
+		if [[ -n "${dialog_timeout_restart_or_defer_seconds}" ]] && [[ $dialog_timeout_restart_or_defer_seconds -gt 120 ]]; then
+			dialog_timeout_restart_or_defer_seconds=120
+			log_super "Warning: Reducing the --dialog-timeout-restart-or-defer option to ${dialog_timeout_restart_or_defer_seconds} seconds given the approaching deferral deadline."
+		fi
+		if [[ -n "${dialog_timeout_soft_deadline_seconds}" ]] && [[ $dialog_timeout_soft_deadline_seconds -gt 120 ]]; then
+			dialog_timeout_soft_deadline_seconds=120
+			log_super "Warning: Reducing the --dialog-timeout-soft-deadline option to ${dialog_timeout_soft_deadline_seconds} seconds given the approaching deferral deadline."
+		fi
+		if [[ -n "${dialog_timeout_user_auth_seconds}" ]] && [[ $dialog_timeout_user_auth_seconds -gt 120 ]]; then
+			dialog_timeout_user_auth_seconds=120
+			log_super "Warning: Reducing the --dialog-timeout-user-auth option to ${dialog_timeout_user_auth_seconds} seconds given the approaching deferral deadline."
+		fi
+		if [[ -n "${dialog_timeout_insufficient_storage_seconds}" ]] && [[ $dialog_timeout_insufficient_storage_seconds -gt 120 ]]; then
+			dialog_timeout_insufficient_storage_seconds=120
+			log_super "Warning: Reducing the --dialog-timeout-insufficient-storage option to ${dialog_timeout_insufficient_storage_seconds} seconds given the approaching deferral deadline."
+		fi
+		if [[ -n "${dialog_timeout_power_required_seconds}" ]] && [[ $dialog_timeout_power_required_seconds -gt 120 ]]; then
+			dialog_timeout_power_required_seconds=120
+			log_super "Warning: Reducing the --dialog-timeout-power-required option to ${dialog_timeout_power_required_seconds} seconds given the approaching deferral deadline."
+		fi
+	fi
+fi
 }
 
 # Evaluate if a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb, and set ${user_focus_active} accordingly.
@@ -3691,140 +4087,13 @@ if [[ -n "${deadline_count_focus}" ]] || [[ -n "${deadline_days_focus}" ]] || [[
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_assertions_array is:\n${display_assertions_array[*]}"
 	if [[ -n "${display_assertions_array[*]}" ]]; then
 		for display_assertion in "${display_assertions_array[@]}"; do
-			log_super "Status: The following Display Sleep Assertion was found: $(echo "${display_assertion}" | awk -F ':' '{print $1}')"
+			log_super "Status: The following Display Sleep Assertion was found: $(echo "${display_assertion}" | awk -F ':' '{print $1;}')"
 		done
 		user_focus_active="TRUE"
 	fi
 	IFS="${previous_ifs}"
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: user_focus_active is: ${user_focus_active}"
-}
-
-# Evaluate ${deadline_date_focus}, ${deadline_date_soft}, and ${deadline_date_hard}, then set ${deadline_date_status}, ${deadline_date_epoch}, and ${display_string_deadline_date} accordingly.
-check_deadlines_dates() {
-deadline_date_status="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
-if [[ -n "${deadline_date_focus}" ]]; then
-	if [[ "${deadline_date_focus_epoch}" -lt $(date +%s) ]]; then
-		log_super "Status: Focus deadline date of ${deadline_date_focus} HAS passed."
-		deadline_date_status="FOCUS"
-	else
-		log_super "Status: Focus deadline date of ${deadline_date_focus} NOT passed."
-	fi
-fi
-if [[ -n "${deadline_date_soft}" ]]; then
-	if [[ "${deadline_date_soft_epoch}" -lt $(date +%s) ]]; then
-		log_super "Status: Soft deadline date of ${deadline_date_soft} HAS passed."
-		deadline_date_status="SOFT"
-	else
-		log_super "Status: Soft deadline date of ${deadline_date_soft} NOT passed."
-	fi
-fi
-if [[ -n "${deadline_date_hard}" ]]; then
-	if [[ "${deadline_date_hard_epoch}" -lt $(date +%s) ]]; then
-		log_super "Status: Hard deadline date of ${deadline_date_hard} HAS passed."
-		deadline_date_status="HARD"
-	else
-		log_super "Status: Hard deadline date of ${deadline_date_hard} NOT passed."
-	fi
-fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_status is: ${deadline_date_status}"
-
-# For display the ${deadline_date_soft} always results in a sooner date than the ${deadline_date_hard}.
-[[ -n "${deadline_date_hard}" ]] && deadline_date_epoch="${deadline_date_hard_epoch}"
-[[ -n "${deadline_date_soft}" ]] && deadline_date_epoch="${deadline_date_soft_epoch}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_date_epoch is: ${deadline_date_epoch}"
-if [[ -n "${deadline_date_epoch}" ]]; then
-	local display_string_deadline_date_only_date
-	display_string_deadline_date_only_date=$(date -r "${deadline_date_epoch}" "${DISPLAY_STRING_FORMAT_DATE}")
-	local display_string_deadline_date_only_time
-	display_string_deadline_date_only_time=$(date -r "${deadline_date_epoch}" "${DISPLAY_STRING_FORMAT_TIME}" | sed 's/^ *//g')
-	if [[ $(date -r "${deadline_date_epoch}" "+%H:%M") == "00:00" ]]; then
-		display_string_deadline_date="${display_string_deadline_date_only_date}"
-	else
-		display_string_deadline_date="${display_string_deadline_date_only_date} - ${display_string_deadline_date_only_time}"
-	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_date_only_date is: ${display_string_deadline_date_only_date}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_date_only_time is: ${display_string_deadline_date_only_time}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_date is: ${display_string_deadline_date}"
-fi
-}
-
-# Evaluate ${deadline_days_focus}, ${deadline_days_soft}, and ${deadline_days_hard}, then set ${deadline_days_stauts}, ${deadline_days_epoch}, and ${display_string_deadline_days} accordingly.
-check_deadlines_days() {
-deadline_days_stauts="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
-if [[ -n "${deadline_days_focus}" ]]; then
-	local deadline_days_focus_epoch
-	deadline_days_focus_epoch=$((workflow_zero_date_epoch + deadline_days_focus_seconds))
-	local deadline_days_focus_date
-	deadline_days_focus_date=$(date -r "${deadline_days_focus_epoch}" +%Y-%m-%d:%H:%M)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_focus_epoch: ${deadline_days_focus_epoch}"
-	if [[ "${deadline_days_focus_epoch}" -lt $(date +%s) ]]; then
-		log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) HAS passed."
-		deadline_days_stauts="FOCUS"
-	else
-		log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) NOT passed."
-	fi
-fi
-if [[ -n "${deadline_days_soft}" ]]; then
-	local deadline_days_soft_epoch
-	deadline_days_soft_epoch=$((workflow_zero_date_epoch + deadline_days_soft_seconds))
-	local deadline_days_soft_date
-	deadline_days_soft_date=$(date -r "${deadline_days_soft_epoch}" +%Y-%m-%d:%H:%M)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_soft_epoch: ${deadline_days_soft_epoch}"
-	if [[ "${deadline_days_soft_epoch}" -lt $(date +%s) ]]; then
-		log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) HAS passed."
-		deadline_days_stauts="SOFT"
-	else
-		log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) NOT passed."
-	fi
-fi
-if [[ -n "${deadline_days_hard}" ]]; then
-	local deadline_days_hard_epoch
-	deadline_days_hard_epoch=$((workflow_zero_date_epoch + deadline_days_hard_seconds))
-	local deadline_days_hard_date
-	deadline_days_hard_date=$(date -r "${deadline_days_hard_epoch}" +%Y-%m-%d:%H:%M)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_hard_epoch: ${deadline_days_hard_epoch}"
-	if [[ "${deadline_days_hard_epoch}" -lt $(date +%s) ]]; then
-		log_super "Status: Days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) HAS passed."
-		deadline_days_stauts="HARD"
-	else
-		log_super "Status: Days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) NOT passed."
-	fi
-fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_stauts is: ${deadline_days_stauts}"
-
-# For display the ${deadline_days_soft} always results in a sooner date than the ${deadline_days_hard}.
-[[ -n ${deadline_days_hard} ]] && deadline_days_epoch="${deadline_days_hard_epoch}"
-[[ -n ${deadline_days_soft} ]] && deadline_days_epoch="${deadline_days_soft_epoch}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_epoch is: ${deadline_days_epoch}"
-if [[ -n "${deadline_days_epoch}" ]]; then
-	local display_string_deadline_days_only_date
-	display_string_deadline_days_only_date=$(date -r "${deadline_days_epoch}" "${DISPLAY_STRING_FORMAT_DATE}")
-	local display_string_deadline_days_only_time
-	display_string_deadline_days_only_time=$(date -r "${deadline_days_epoch}" "${DISPLAY_STRING_FORMAT_TIME}" | sed 's/^ *//g')
-	if [[ $(date -r "${deadline_days_epoch}" "+%H:%M") == "00:00" ]]; then
-		display_string_deadline_days="${display_string_deadline_days_only_date}"
-	else
-		display_string_deadline_days="${display_string_deadline_days_only_date} - ${display_string_deadline_days_only_time}"
-	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_days_only_date is: ${display_string_deadline_days_only_date}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_days_only_time is: ${display_string_deadline_days_only_time}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline_days is: ${display_string_deadline_days}"
-fi
-
-# For display this sets ${display_string_deadline} based on the soonest available date or days deadline.
-if [[ -n "${display_string_deadline_date}" ]] && [[ -n "${display_string_deadline_days}" ]]; then
-	if [[ "${deadline_date_epoch}" -le "${deadline_days_epoch}" ]]; then
-		display_string_deadline="${display_string_deadline_date}"
-	else
-		display_string_deadline="${display_string_deadline_days}"
-	fi
-elif [[ -n "${display_string_deadline_date}" ]]; then
-	display_string_deadline="${display_string_deadline_date}"
-elif [[ -n "${display_string_deadline_days}" ]]; then
-	display_string_deadline="${display_string_deadline_days}"
-fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_deadline is: ${display_string_deadline}"
 }
 
 # Evaluate ${deadline_count_focus}, ${deadline_count_soft}, and ${deadline_count_hard}, then set ${user_focus_active}, ${deadline_count_status}, ${display_string_deadline_count}, and ${display_string_deadline_count_maximum} accordingly.
@@ -4232,24 +4501,24 @@ if [[ "${workflow_check_asu_error}" == "FALSE" ]]; then
 		# Parse ${asu_list} for software update labels, titles, and macOS updates.
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_list is:\n${asu_list}"
 		if [[ "${macos_version_number}" -ge 1203 ]]; then # For macOS 12.03 or newer softwareupdate can list multiple macOS updates/upgrades.
-			asu_all_labels_array=($(echo "${asu_list}" | awk -F ': ' '/Label:/{print $2}'))
-			asu_all_titles_array=($(echo "${asu_list}" | awk -F ',' '/Title:/{print $1}' | cut -d ' ' -f 2-))
+			asu_all_labels_array=($(echo "${asu_list}" | awk -F ': ' '/Label:/{print $2;}'))
+			asu_all_titles_array=($(echo "${asu_list}" | awk -F ',' '/Title:/{print $1;}' | cut -d ' ' -f 2-))
 			asu_macos_all_labels_array=($(echo "${asu_list}" | grep 'Label: macOS' | sed -e 's/* Label: //' | sort -t '-' -k2 -r -V))
-			asu_macos_all_titles_array=($(echo "${asu_list}" | grep 'Title: macOS' | tr ',' ':' | sort -t ':' -k4 -r -V | awk -F ': ' '{print $2}'))
-			asu_macos_all_versions_array=($(echo "${asu_list}" | grep 'Title: macOS' | tr ',' ':' | sort -t ':' -k4 -r -V | awk -F ': ' '{print $4}'))
-			asu_macos_all_sizes_array=($(echo "${asu_list}" | grep 'Title: macOS' | tr ',' ':' | sort -t ':' -k4 -r -V | awk -F ': ' '{print $6}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc))
+			asu_macos_all_titles_array=($(echo "${asu_list}" | grep 'Title: macOS' | tr ',' ':' | sort -t ':' -k4 -r -V | awk -F ': ' '{print $2;}'))
+			asu_macos_all_versions_array=($(echo "${asu_list}" | grep 'Title: macOS' | tr ',' ':' | sort -t ':' -k4 -r -V | awk -F ': ' '{print $4;}'))
+			asu_macos_all_sizes_array=($(echo "${asu_list}" | grep 'Title: macOS' | tr ',' ':' | sort -t ':' -k4 -r -V | awk -F ': ' '{print $6;}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc))
 			asu_macos_minor_update_label=$(echo "${asu_macos_all_labels_array[*]}" | grep "${macos_version_major}.\d")
 			asu_macos_minor_update_title=$(echo "${asu_macos_all_titles_array[*]}" | grep "${macos_version_major}.\d")
 			asu_macos_minor_update_version=$(echo "${asu_macos_all_versions_array[*]}" | grep "${macos_version_major}.\d")
-			asu_macos_minor_update_size=$(echo "${asu_list}" | grep 'Title: macOS' | grep "Version: ${macos_version_major}.\d" | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
+			asu_macos_minor_update_size=$(echo "${asu_list}" | grep 'Title: macOS' | grep "Version: ${macos_version_major}.\d" | awk -F ': ' '{print $4;}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
 		else # macOS version prior to macOS 12.3.
-			asu_all_labels_array=($(echo "${asu_list}" | awk -F ': ' '/Label:/{print $2}'))
-			asu_all_titles_array=($(echo "${asu_list}" | awk -F ',' '/Title:/{print $1}' | cut -d ' ' -f 2-))
+			asu_all_labels_array=($(echo "${asu_list}" | awk -F ': ' '/Label:/{print $2;}'))
+			asu_all_titles_array=($(echo "${asu_list}" | awk -F ',' '/Title:/{print $1;}' | cut -d ' ' -f 2-))
 			asu_macos_minor_update_label=$(echo "${asu_list}" | grep 'Label: macOS' | sed -e 's/* Label: //')
-			asu_macos_minor_update_title=$(echo "${asu_list}" | grep 'Title: macOS' | sed -e 's/,/:/g' | awk -F ': ' '{print $2}')
+			asu_macos_minor_update_title=$(echo "${asu_list}" | grep 'Title: macOS' | sed -e 's/,/:/g' | awk -F ': ' '{print $2;}')
 			[[ "${macos_version_major}" -eq 12 ]] && asu_macos_minor_update_version=$(echo "${asu_macos_minor_update_label}" | grep -o '12.\d*.\d*')
 			[[ "${macos_version_major}" -eq 11 ]] && asu_macos_minor_update_version=$(echo "${asu_macos_minor_update_label}" | grep -o '11.\d*.\d*')
-			asu_macos_minor_update_size=$(echo "${asu_list}" | grep 'Title: macOS' | awk -F ': ' '{print $4}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
+			asu_macos_minor_update_size=$(echo "${asu_list}" | grep 'Title: macOS' | awk -F ': ' '{print $4;}' | grep -o -E '[0-9]+' | awk '{print $1"/1000000 +1"}' | bc)
 		fi
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_all_labels_array is:\n${asu_all_labels_array[*]}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_all_titles_array is:\n${asu_all_titles_array[*]}"
@@ -4369,13 +4638,13 @@ fi
 
 # Parse and validate mdmclient response.
 if [[ -n "${mdmclient_macos_major_upgrade}" ]]; then
-	macos_major_upgrade_marketing_name=$(echo "${mdmclient_macos_major_upgrade}"| awk -F ':' '{print $1}' | sed -e 's/[0-9]*//g' -e 's/\.*//g' | xargs)
+	macos_major_upgrade_marketing_name=$(echo "${mdmclient_macos_major_upgrade}"| awk -F ':' '{print $1;}' | sed -e 's/[0-9]*//g' -e 's/\.*//g' | xargs)
 	if [[ ! $(echo "${macos_major_upgrade_marketing_name}" | grep -c 'macOS') -gt 0 ]]; then
 			log_super "mdmclient Error: Response did not include a valid macOS upgrade marketing name."
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_marketing_name is: ${macos_major_upgrade_marketing_name}"
 			return 0
 	fi
-	macos_major_upgrade_version=$(echo "${mdmclient_macos_major_upgrade}"| awk -F ':' '{print $2}')
+	macos_major_upgrade_version=$(echo "${mdmclient_macos_major_upgrade}"| awk -F ':' '{print $2;}')
 	macos_major_upgrade_version_major=$(echo "${macos_major_upgrade_version}" | cut -d '.' -f1)
 	if [[ -n "${macos_major_upgrade_version}" ]] && [[ "${macos_major_upgrade_version_major}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
 		get_macos_major_upgrade_error="FALSE"
@@ -4707,7 +4976,7 @@ else
 fi
 
 # For computers managed via Jamf Pro, submit inventory and check for policies.
-if [[ "${jamf_version}" != "FALSE" ]]; then
+if [[ "${jamf_version_number}" != "FALSE" ]]; then
 	if [[ "${auth_error_jamf}" != "TRUE" ]]; then
 		log_super "Status: Submitting updated inventory to Jamf Pro. Use --verbose-mode or check /var/log/jamf.log for more detail..."
 		local jamf_response
@@ -4804,10 +5073,10 @@ elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_
 			update_asset_attributes=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null)
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: update_asset_attributes is:\n${update_asset_attributes}"
 			local prepared_macos_version
-			prepared_macos_version=$(echo "${update_asset_attributes}" | grep -w 'OSVersion' | awk -F '"' '{print $2}')
+			prepared_macos_version=$(echo "${update_asset_attributes}" | grep -w 'OSVersion' | awk -F '"' '{print $2;}')
 			if [[ ${macos_version_major} -ge 13 ]]; then
 				local prepared_macos_version_extra
-				prepared_macos_version_extra=$(echo "${update_asset_attributes}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2}')
+				prepared_macos_version_extra=$(echo "${update_asset_attributes}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2;}')
 				[[ -n "${prepared_macos_version_extra}" ]] && prepared_macos_version="${prepared_macos_version} ${prepared_macos_version_extra}"
 				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: prepared_macos_version_extra is: ${prepared_macos_version_extra}"
 			fi
@@ -5051,10 +5320,10 @@ if [[ "${download_macos_asu_start_error}" == "FALSE" ]] && [[ "${download_macos_
 		update_asset_attributes=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null)
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: update_asset_attributes is:\n${update_asset_attributes}"
 		local prepared_macos_version
-		prepared_macos_version=$(echo "${update_asset_attributes}" | grep -w 'OSVersion' | awk -F '"' '{print $2}')
+		prepared_macos_version=$(echo "${update_asset_attributes}" | grep -w 'OSVersion' | awk -F '"' '{print $2;}')
 		if [[ "${macos_version_major}" -ge 13 ]]; then
 			local prepared_macos_version_extra
-			prepared_macos_version_extra=$(echo "${update_asset_attributes}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2}')
+			prepared_macos_version_extra=$(echo "${update_asset_attributes}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2;}')
 			[[ -n "${prepared_macos_version_extra}" ]] && prepared_macos_version="${prepared_macos_version} ${prepared_macos_version_extra}"
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: prepared_macos_version_extra is: ${prepared_macos_version_extra}"
 		fi
@@ -5161,7 +5430,7 @@ while read -t "${download_macos_installer_timeout_seconds}" -r log_line ; do
 		download_macos_installer_start_error="FALSE"
 		download_macos_installer_start_timeout="FALSE"
 	elif [[ "${download_macos_installer_phase}" == "DOWNLOADING" ]] && [[ $(echo "${log_line}" | grep -c 'InstallAssistant.pkg' ) -gt 0 ]]; then
-		download_macos_installer_complete_percent=$(echo "${log_line}" | awk -F '(' '{print $2}' | awk -F '.' '{print $1}' | tr -d -c 0-9)
+		download_macos_installer_complete_percent=$(echo "${log_line}" | awk -F '(' '{print $2;}' | awk -F '.' '{print $1;}' | tr -d -c 0-9)
 		download_macos_installer_complete_percent=${download_macos_installer_complete_percent#0}
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_installer_complete_percent is: ${download_macos_installer_complete_percent}"
 		if [[ $download_macos_installer_complete_percent -ge 100 ]]; then
@@ -5377,7 +5646,7 @@ while read -t "${install_non_system_asu_timeout_seconds}" -r log_line ; do
 		install_non_system_asu_start_timeout="FALSE"
 		break
 	elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]]; then
-		downloaded_macos_asu_title=$(echo "${log_line}" | sed -e 's/://' | awk -F 'Downloading ' '{print $2}')
+		downloaded_macos_asu_title=$(echo "${log_line}" | sed -e 's/://' | awk -F 'Downloading ' '{print $2;}')
 		log_super "softwareupdate: ${downloaded_macos_asu_title} is downloading..."
 		log_asu "**** TIMESTAMP ****"
 		install_non_system_asu_timeout_seconds="${TIMEOUT_NON_SYSTEM_ASU_SECONDS}"
@@ -5385,7 +5654,7 @@ while read -t "${install_non_system_asu_timeout_seconds}" -r log_line ; do
 		install_non_system_asu_start_timeout="FALSE"
 		install_non_system_asu_start_error="FALSE"
 	elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]]; then
-		downloaded_macos_asu_title=$(echo "${log_line}" | sed -e 's/://' | awk -F 'Downloaded ' '{print $2}')
+		downloaded_macos_asu_title=$(echo "${log_line}" | sed -e 's/://' | awk -F 'Downloaded ' '{print $2;}')
 		log_super "softwareupdate: ${downloaded_macos_asu_title} download complete."
 		install_non_system_asu_timeout_seconds="${TIMEOUT_NON_SYSTEM_ASU_SECONDS}"
 		log_asu "**** TIMESTAMP ****"
@@ -5393,7 +5662,7 @@ while read -t "${install_non_system_asu_timeout_seconds}" -r log_line ; do
 		install_non_system_asu_start_timeout="FALSE"
 		install_non_system_asu_start_error="FALSE"
 	elif [[ $(echo "${log_line}" | grep -c 'Done with') -gt 0 ]]; then
-		install_non_system_asu_installed_title=$(echo "${log_line}" | sed -e 's/://' | awk -F 'Done with ' '{print $2}')
+		install_non_system_asu_installed_title=$(echo "${log_line}" | sed -e 's/://' | awk -F 'Done with ' '{print $2;}')
 		log_super "softwareupdate: ${install_non_system_asu_installed_title} installed."
 		install_non_system_asu_installed_titles_array+=("${install_non_system_asu_installed_title}")
 		log_asu "**** TIMESTAMP ****"
@@ -5913,7 +6182,7 @@ if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" 
 					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
 					install_macos_mdm_phase="DOWNLOADING"
 				fi
-				install_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
+				install_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17;}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
 				install_macos_mdm_complete_percent=${install_macos_mdm_complete_percent#0}
 				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_macos_mdm_complete_percent is: ${install_macos_mdm_complete_percent}"
 				if [[ $install_macos_mdm_complete_percent -ge 60 ]]; then
@@ -5934,7 +6203,7 @@ if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" 
 					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
 					install_macos_mdm_phase="PREPARING"
 				fi
-				install_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
+				install_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17;}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
 				install_macos_mdm_complete_percent=${install_macos_mdm_complete_percent#0}
 				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_macos_mdm_complete_percent is: ${install_macos_mdm_complete_percent}"
 				if [[ $install_macos_mdm_complete_percent -ge 98 ]]; then
@@ -6272,7 +6541,7 @@ killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 if [[ "${asu_non_system_update_available}" == "FALSE" ]]; then
 	log_super "Status: Completed installation of all non-system Apple software updates!"
 	# For computers managed via Jamf Pro, submit inventory.
-	if [[ "${jamf_version}" != "FALSE" ]]; then
+	if [[ "${jamf_version_number}" != "FALSE" ]]; then
 		if [[ "${auth_error_jamf}" != "TRUE" ]]; then
 			log_super "Status: Submitting updated inventory to Jamf Pro. Use --verbose-mode or check /var/log/jamf.log for more detail..."
 			if [[ "${verbose_mode_option}" == "TRUE" ]]; then
@@ -6574,34 +6843,35 @@ fi
 # MARK: *** Jamf Pro ***
 ################################################################################
 
-# Validate connectivity to Jamf Pro service and set ${jamf_version}, ${jamf_management_url}, and ${jamf_api_url}.
+# Validate connectivity to Jamf Pro service and set ${jamf_version_number}, ${jamf_management_url}, and ${jamf_api_url}.
 check_jamf_management_framework() {
-jamf_version="FALSE"
+jamf_version_number="FALSE"
 auth_error_jamf="FALSE"
 if [[ -f "${JAMF_PRO_BINARY}" ]]; then
-	local jamf_response
-	jamf_response=$("${JAMF_PRO_BINARY}" -version)
-	jamf_version_major="${jamf_response:8:2}" # Expected output: 10
-	jamf_version_minor="${jamf_response:11:2}" # Expected output: 30, 31, 32, etc.
-	jamf_version="${jamf_version_major}$(printf "%02d" "${jamf_version_minor}")" # Expected output: 1030, 1031, 1032, etc.
-	if [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${jamf_version}" -lt 1038 ]]; then
-		log_super "Error: super requires Jamf Pro version 10.38 or later, the currently installed version of Jamf Pro ${jamf_version_major}.${jamf_version_minor} is not supported."; auth_error_jamf="TRUE"
-	elif [[ "${mac_cpu_architecture}" != "arm64" ]] && [[ "${jamf_version}" -lt 1000 ]]; then
-		log_super "Error: super requires Jamf Pro version 10.00 or later, the currently installed version of Jamf Pro ${jamf_version_major}.${jamf_version_minor} is not supported."; auth_error_jamf="TRUE"
+	jamf_version_number_full=$("${JAMF_PRO_BINARY}" -version | sed -e 's/version=//' -e 's/-.*//')
+	jamf_version_number_major=$(echo "${jamf_version_number_full}" | cut -d'.' -f1) # Expected output: 10, 11
+	jamf_version_number_minor=$(echo "${jamf_version_number_full}" | cut -d'.' -f2) # Expected output: 0, 30, 31, 32, etc.
+	jamf_version_number="${jamf_version_number_major}$(printf "%02d" "${jamf_version_number_minor}")" # Expected output: 1030, 1031, 1032, 1100, etc.
+	if [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${jamf_version_number}" -lt 1038 ]]; then
+		log_super "Error: super requires Jamf Pro version 10.38 or later, the currently installed version of Jamf Pro ${jamf_version_number_major}.${jamf_version_number_minor} is not supported."; auth_error_jamf="TRUE"
+	elif [[ "${mac_cpu_architecture}" != "arm64" ]] && [[ "${jamf_version_number}" -lt 1000 ]]; then
+		log_super "Error: super requires Jamf Pro version 10.00 or later, the currently installed version of Jamf Pro ${jamf_version_number_major}.${jamf_version_number_minor} is not supported."; auth_error_jamf="TRUE"
 	else # Jamf Pro version is supported.
+		local jamf_response
 		jamf_response=$("${JAMF_PRO_BINARY}" checkJSSConnection -retry 1 2>/dev/null)
 		if [[ $(echo "${jamf_response}" | grep -c 'available') -gt 0 ]]; then
 			jamf_management_url=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
-			log_super "Status: System is managed by Jamf Pro ${jamf_version_major}.${jamf_version_minor} hosted at: ${jamf_management_url}"
+			log_super "Status: System is managed by Jamf Pro ${jamf_version_number_full} hosted at: ${jamf_management_url}"
 			jamf_api_url="${jamf_management_url}"
 		else
 			log_super "Error: Jamf Pro service is unavailable with response:\n${jamf_response}"; auth_error_jamf="TRUE"
 		fi
 	fi
 fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: jamf_version_number is: ${jamf_version_number}"
 
 # Check for ${auth_jamf_custom_url} and sets ${jamf_api_url} accordingly.
-if [[ "${jamf_version}" != "FALSE" ]] && [[ "${auth_error_jamf}" != "TRUE" ]] && [[ -n "${auth_jamf_custom_url}" ]]; then
+if [[ "${jamf_version_number}" != "FALSE" ]] && [[ "${auth_error_jamf}" != "TRUE" ]] && [[ -n "${auth_jamf_custom_url}" ]]; then
 	local curl_response
 	curl_response=$(curl -Is "${auth_jamf_custom_url}" | head -n 1)
 	if [[ $(echo "${curl_response}" | grep -c 'HTTP') -gt 0 ]] && [[ $(echo "${curl_response}" | grep -c -e '400' -e '40[4-9]' -e '4[1-9][0-9]' -e '5[0-9][0-9]') -eq 0 ]]; then
@@ -6654,13 +6924,13 @@ if [[ $(echo "${curl_response}" | grep -c 'token') -gt 0 ]]; then
 		if [[ "${macos_version_major}" -ge 12 ]]; then
 			jamf_access_token=$(echo "${curl_response}" | plutil -extract access_token raw -)
 		else # macOS 11.
-			jamf_access_token=$(echo "${curl_response}" | awk -F '"' '{print $4}' | xargs)
+			jamf_access_token=$(echo "${curl_response}" | awk -F '"' '{print $4;}' | xargs)
 		fi
 	else # Legacy ${auth_jamf_account} authentication.
 		if [[ "${macos_version_major}" -ge 12 ]]; then
 			jamf_access_token=$(echo "${curl_response}" | plutil -extract token raw -)
 		else # macOS 11.
-			jamf_access_token=$(echo "${curl_response}" | grep 'token' | awk -F '"' '{print $4}' | xargs)
+			jamf_access_token=$(echo "${curl_response}" | grep 'token' | awk -F '"' '{print $4;}' | xargs)
 		fi
 	fi
 else # There was no access token.
@@ -6723,7 +6993,7 @@ fi
 # Validate if Jamf Pro 10.48 or later is using "the new software updates experience" and set ${jamf_api_update_workflow} accordingly.
 check_jamf_api_update_workflow() {
 jamf_api_update_workflow="LEGACY"
-if [[ "${jamf_version}" -ge 1048 ]]; then
+if [[ "${jamf_version_number}" -ge 1048 ]]; then
 	local curl_response
 	curl_response=$(curl --silent --write-out "%{http_code}" --location --request GET "${jamf_api_url}api/v1/managed-software-updates/plans/feature-toggle" --header "Authorization: Bearer ${jamf_access_token}" --header "Content-Type: application/json")
 	if [[ $(echo "${curl_response}" | grep -c '200') -gt 0 ]]; then
@@ -7020,6 +7290,11 @@ set_display_strings_optional_buttons
 { [[ "${display_unmovable_status}" == "TRUE" ]] || [[ "${display_unmovable_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-unmovable)
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
+if [[ "${display_notifications_centered_status}" == "TRUE" ]]; then
+	ibm_notifier_array+=(-always_on_top -position center)
+else # The default interactive notification location.
+	ibm_notifier_array+=(-always_on_top -position top_right)
+fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
 # Kill any previous notifications so new ones can take its place.
@@ -7128,6 +7403,7 @@ set_display_strings_optional_buttons
 { [[ "${display_unmovable_status}" == "TRUE" ]] || [[ "${display_unmovable_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-unmovable)
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
+ibm_notifier_array+=(-always_on_top -position center)
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
 # Kill any previous notifications so new ones can take its place.
@@ -7162,7 +7438,7 @@ done
 notification_install_now_start() {
 set_display_strings_language
 log_super "IBM Notifier: Install now start notification."
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_install_now_start_title}" -subtitle "${display_string_install_now_start_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_start_title}" -subtitle "${display_string_install_now_start_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 open_notification_ibm_notifier &
 }
@@ -7171,7 +7447,7 @@ open_notification_ibm_notifier &
 notification_install_now_download() {
 set_display_strings_language
 log_super "IBM Notifier: Install now downloading notification."
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_install_now_download_title}" -subtitle "${display_string_install_now_download_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_download_title}" -subtitle "${display_string_install_now_download_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 open_notification_ibm_notifier &
 }
@@ -7181,7 +7457,7 @@ notification_install_now_up_to_date() {
 rm -f "${WORKFLOW_INSTALL_NOW_FILE}" 2> /dev/null
 set_display_strings_language
 log_super "IBM Notifier: Install now Apple software is already up to date notification."
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_install_now_up_to_date_title}" -subtitle "${display_string_install_now_up_to_date_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_up_to_date_title}" -subtitle "${display_string_install_now_up_to_date_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 open_notification_ibm_notifier &
 disown -a
@@ -7192,7 +7468,7 @@ notification_install_now_failed() {
 rm -f "${WORKFLOW_INSTALL_NOW_FILE}" 2> /dev/null
 set_display_strings_language
 log_super "IBM Notifier: Install now failure notification."
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_install_now_failed_title}" -subtitle "${display_string_install_now_failed_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_failed_title}" -subtitle "${display_string_install_now_failed_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 open_notification_ibm_notifier &
 disown -a
@@ -7206,7 +7482,7 @@ notification_prepare() {
 set_display_strings_language
 
 # The initial ${ibm_notifier_array} settings for the preparing update notification.
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_prepare_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+ibm_notifier_array=(-type popup -bar_title "${display_string_prepare_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 
 # Variations for the main body text of the preparing update notification.
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
@@ -7232,7 +7508,7 @@ notification_restart() {
 set_display_strings_language
 
 # The initial ${ibm_notifier_array} settings for the restart notification.
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_restart_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+ibm_notifier_array=(-type popup -bar_title "${display_string_restart_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 
 # Variations for the main body text of the restart notification.
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
@@ -7257,7 +7533,7 @@ open_notification_ibm_notifier &
 notification_non_system_updates() {
 set_display_strings_language
 log_super "IBM Notifier: Installing non-system Apple software updates notification."
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_non_system_updates_title}" -subtitle "${display_string_non_system_updates_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
+ibm_notifier_array=(-type popup -bar_title "${display_string_non_system_updates_title}" -subtitle "${display_string_non_system_updates_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 open_notification_ibm_notifier &
 }
@@ -7267,7 +7543,7 @@ notification_failed() {
 set_display_strings_language
 set_display_strings_deferral_button
 log_super "IBM Notifier: Failure notification."
-ibm_notifier_array=(-type popup -always_on_top -position top_right -bar_title "${display_string_failed_title}" -subtitle "${display_string_failed_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_deferral_button}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_failed_title}" -subtitle "${display_string_failed_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_deferral_button}")
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 open_notification_ibm_notifier &
 disown -a
@@ -7288,7 +7564,7 @@ unset dialog_timeout_seconds
 { [[ -z "${dialog_timeout_insufficient_storage_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
 
 # The initial ${ibm_notifier_array} settings for the insufficient storage dialog.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_insufficient_storage_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_insufficient_storage_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 
 # Variations for the main body text of the insufficient storage dialog.
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
@@ -7378,7 +7654,7 @@ unset dialog_timeout_seconds
 { [[ -z "${dialog_timeout_power_required_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
 
 # The initial ${ibm_notifier_array} settings for the power required dialog.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_power_required_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_power_required_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 
 # Variations for the main body text of the power required dialog.
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
@@ -7451,7 +7727,7 @@ unset dialog_timeout_seconds
 [[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Restart or defer dialog with no timeout."
 
 # Create initial ${ibm_notifier_array} settings for the dialog.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_restart_or_defer_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -secondary_button_label "${display_string_restart_button}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_restart_or_defer_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -secondary_button_label "${display_string_restart_button}")
 
 # Body text variations based on deadline options.
 if [[ -n "${display_string_deadline}" ]] && [[ -n "${display_string_deadline_count}" ]]; then # Show both date and maximum deferral count deadlines.
@@ -7555,7 +7831,7 @@ unset dialog_timeout_seconds
 { [[ -z "${dialog_timeout_soft_deadline_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
 
 # The initial ${ibm_notifier_array} settings for the soft deadline dialog.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_soft_deadline_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_soft_deadline_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
 
 # Variations for the main body text of the soft deadline dialog.
 if [[ "${deadline_date_status}" == "SOFT" ]]; then
@@ -7607,7 +7883,7 @@ unset dialog_timeout_seconds
 { [[ -z "${dialog_timeout_user_auth_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
 
 # The initial ${ibm_notifier_array} settings for the initial run of the user authentication dialog.
-ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_user_auth_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
+ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
 
 # Variations for the main body text of the initial run of the user authentication dialog.
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
@@ -7654,7 +7930,7 @@ dialog_user_auth_attempt=0
 while true; do
 	if [[ "${dialog_user_auth_attempt}" -eq 1 ]]; then
 		# Re-create ${ibm_notifier_array} settings for the user authentication dialog when the user authentication fails.
-		ibm_notifier_array=(-type popup -always_on_top -bar_title "${display_string_user_auth_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
+		ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
 		if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 			ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_date_body}")
 		elif [[ "${deadline_days_stauts}" == "SOFT" ]]; then
@@ -7700,14 +7976,18 @@ unset dialog_user_auth_enabled
 if [[ "${dialog_user_auth_valid}" == "TRUE" ]]; then
 	log_super "Status: Credentials verified for current user: ${auth_local_account}"
 	if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-		sudo -u "${current_user_account_name}" security add-generic-password -a "super_auth_user_password" -s "Super Update Service" -w "${auth_local_password}" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
+		local auth_user_save_password_response
+		auth_user_save_password_response=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security add-generic-password -a "super_auth_user_password" -s "Super Update Service" -w "${auth_local_password}" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1 )
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_save_password_response is: ${auth_user_save_password_response}"
 		local auth_user_password_keychain
-		auth_user_password_keychain=$(sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" 2> /dev/null)
+		auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_local_password is: ${auth_local_password}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain is: ${auth_user_password_keychain}"
 		if [[ "${auth_local_password}" == "${auth_user_password_keychain}" ]]; then
 			log_super "Status: Saved new --auth-ask-user-to-save-password credentials for current user: ${auth_local_account}"
 		else
 			log_super "Warning: Unable to validate keychain item for --auth-ask-user-to-save-password, deleting keychain item."
-			sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain-db" > /dev/null 2>&1
+			launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" > /dev/null 2>&1
 		fi
 	elif [[ "${mdm_enrolled}" == "TRUE" ]] && [[ "${auth_error_bootstrap_token}" == "TRUE" ]] && { [[ "${auth_mdm_failover}" == "TRUE" ]] || [[ "${auth_mdm_failover_bootstrap}" == "TRUE" ]]; }; then
 		bootstrap_token_attempt_fix="TRUE"
@@ -7911,7 +8191,14 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 			workflow_install_macos_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 		fi
 	elif [[ "${workflow_only_download_option}" == "TRUE" ]]; then # Only download workflow doesn't matter if the user is logged in.
-		workflow_download_macos # This function only downloads if needed and includes internal storage checks and test mode logic.
+		if [[ "${current_user_account_name}" == "FALSE" ]]; then # A normal user is not logged in, the only download workflow can not continue.
+			deferral_timer_minutes="${deferral_timer_error_minutes}"
+			log_super "Error: No current active user, due to limitations in macOS the only download workflow can not continue, trying again in ${deferral_timer_minutes} minutes."
+			log_status "Pending: No current active user, due to limitations in macOS the only download workflow can not continue, trying again in ${deferral_timer_minutes} minutes."
+			set_auto_launch_deferral
+		else # A normal user is currently logged in.
+			workflow_download_macos # This function only downloads if needed and includes internal storage checks and test mode logic.
+		fi
 	else # Default super workflow, can run with or without logged in user.
 		if [[ "${current_user_account_name}" == "FALSE" ]]; then # A normal user is not logged in, start installations immediately.
 			workflow_install_macos_no_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
@@ -7925,8 +8212,7 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 			fi
 			# Check deadlines.
 			check_zero_date
-			check_deadlines_dates
-			check_deadlines_days
+			check_deadlines_days_date
 			# User Focus only needs to be checked if there are no date or day deadlines.
 			if [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_stauts}" == "FALSE" ]]; then
 				check_user_focus
@@ -7941,6 +8227,7 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 				[[ $(echo "${display_unmovable_option}" | grep -c 'HARD') -gt 0 ]] && display_unmovable_status="TRUE"
 				[[ $(echo "${display_hide_background_option}" | grep -c 'HARD') -gt 0 ]] && display_hide_background_status="TRUE"
 				[[ $(echo "${display_silently_option}" | grep -c 'HARD') -gt 0 ]] && display_silently_status="TRUE"
+				[[ $(echo "${display_notifications_centered_option}" | grep -c 'HARD') -gt 0 ]] && display_notifications_centered_status="TRUE"
 				workflow_install_macos_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 			elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_count_status}" == "SOFT" ]]; then # A soft deadline has passed.
 				[[ "${auth_mdm_failover_soft}" == "TRUE" ]] && auth_mdm_failover="TRUE"
@@ -7948,6 +8235,7 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 				[[ $(echo "${display_unmovable_option}" | grep -c 'SOFT') -gt 0 ]] && display_unmovable_status="TRUE"
 				[[ $(echo "${display_hide_background_option}" | grep -c 'SOFT') -gt 0 ]] && display_hide_background_status="TRUE"
 				[[ $(echo "${display_silently_option}" | grep -c 'SOFT') -gt 0 ]] && display_silently_status="TRUE"
+				[[ $(echo "${display_notifications_centered_option}" | grep -c 'SOFT') -gt 0 ]] && display_notifications_centered_status="TRUE"
 				[[ "${workflow_auth_macos}" != "USER" ]] && dialog_soft_deadline
 				workflow_install_macos_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 			elif [[ "${user_focus_active}" == "TRUE" ]]; then # No deadlines have passed but a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb.
@@ -7982,7 +8270,7 @@ else # The super workflow did not complete a macOS update/upgrade workflow.
 	fi
 	# Wrap-up for the ${workflow_only_download_option}.
 	if [[ "${workflow_only_download_option}" == "TRUE" ]] && [[ "${workflow_download_macos_error}" == "FALSE" ]]; then
-		if [[ "${jamf_version}" != "FALSE" ]]; then
+		if [[ "${jamf_version_number}" != "FALSE" ]]; then
 			if [[ "${auth_error_jamf}" != "TRUE" ]]; then
 				log_super "Status: Submitting updated inventory to Jamf Pro. Use --verbose-mode or check /var/log/jamf.log for more detail..."
 				if [[ "${verbose_mode_option}" == "TRUE" ]]; then

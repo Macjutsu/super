@@ -2,7 +2,7 @@
 
 ## [4.0.0-betaX]
 
-2023-10-11
+2023-10-18
 
 ### Highlights
 
@@ -21,16 +21,36 @@
 - All `super` 4.x code has been refactored for [style](https://google.github.io/styleguide/shellguide.html), clarity, and uniformity. __As such nearly every single option name has been changed.__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 4.x__
 - __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
-- It is safe to mix `super` version 3.0 and 4.x managed preferences in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta3/Super-Friends/super-3to4-migration-options.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta3/Super-Friends/super-3to4-migration-managed-preferences.tsv).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta3/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-beta3/Example-MDM).
+- It is safe to mix `super` version 3.0 and 4.x managed preferences (except for the DisplaySilently key) in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/super-3to4-migration-options.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
+- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-beta5/Example-MDM).
 
 ### Known Issues
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
-- MDM push commands are known to re-download and prepare a macOS update/upgrade even if the `super` workflow already completed that task.
+- Since the release of macOS Sonoma 14, the Apple `softwareupdate` command on macOS 12.3 - 12.7 is no longer able to list, download, or upgrade to any version of macOS 13 (upgrading to macOS 14+ works fine). A future version of `super` is planned to work around this new unexpected limitation in macOS.
+
+### Specific Changes (4.0.0-beta5)
+
+- New automatic archival of active `super` logs to the "logs-archive" folder if any individual `super` log file grows larger than 1000 KB in size. This new default behavior can be modified by manually editing parameters in the `set_defaults()` function.
+- New automatic archival of any legacy `super` logs to the "logs-archive" folder.
+- New deadline behavior, users are no longer allowed to chose a deferral past a days or date deadline. If a deadline is sooner than any user deferral option then the deferral times are reduced to match the closest deadline.
+- New deadline behavior, if a deadline is soon then any dialog timeout option times above 120 seconds (2 minutes) are reduced to 120 seconds.
+- New deadline behavior, if the `super` workflow is running within 120 seconds of a deadline, it waits for the deadline to expire instead of offering any deferral.
+- The new `--display-notifications-centered` option shows non-interactive notifications in the center of the screen (as opposed to the top right) via the following types:
+	- ALWAYS - Always show non-interactive notifications in the center of the screen.
+	- SOFT - Show non-interactive notifications in the center of the screen during a soft deadline.
+	- HARD - Show non-interactive notifications in the center of the screen during a soft deadline.
+	- INSTALLNOW - Show non-interactive notifications in the center of the screen during the install now workflow.
+- New support for local user account names if they have spaces. (Thanks to Emmanuel Ergand on on MacAdmins Slack for testing this one!)
+- New automatic error deferral when the "only download" workflow is enabled, but there is no active user. This is necessary because `softwareupdate` is unable to "only" download macOS updates (but it can fully install them) if there is no active user.
+- Rearchitected last startup date collection to support multiple time formats. (Thanks to @ofirgalcon for helping with this one!)
+- Rearchitected Jamf Pro version detection to provide more accurate version numbers.
+- Resolved several issues preventing the user's password from being saved or retrieved from Keychain.
+- Resolved issues preventing the [super-Deadline-Counter-Soft-Jamf-Pro-EA.sh](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/super-Deadline-Counter-Soft-Jamf-Pro-EA.sh) script from working properly.
+- `super` 4.0.0-beta5 SHA-256: ffd6e599a399109e9d2d881ef9f92ffdd96bb6c1bc8d8c80b267f28282f73079
 
 ### Specific Changes (4.0.0-beta4)
 

@@ -14,8 +14,8 @@ S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides admini
 
 ## Learn More
 
-Please visit the [S.U.P.E.R.M.A.N. Wiki](https://github.com/Macjutsu/super/wiki) for detailed documentation!
+Please visit the [S.U.P.E.R.M.A.N. Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki) for detailed documentation!
 
-Detailed `super` version progress can be found in the [Change Log](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md).
+Detailed `super` version progress can be found in the [Change Log](https://github.com/Macjutsu/super/blob/4.0.0-beta5/CHANGELOG.md).
 
 You can also join the conversation at the [Mac Admins Foundation Slack](https://www.macadmins.org) in channel [#super](https://macadmins.slack.com/archives/C03LKQ8EN2C).

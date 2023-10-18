@@ -114,6 +114,8 @@
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconSize</key>
                   <string>128</string>
+                  <key>DisplayNotificationsCentered</key>
+                  <string>HARD,INSTALLNOW</string>
                   <key>DisplaySilently</key>
                   <string>INSTALLNOW</string>
                   <key>DisplayUnmovable</key>

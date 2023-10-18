@@ -70,6 +70,8 @@
 	<string>HARD,POWER</string>
 	<key>DisplaySilently</key>
 	<string>INSTALLNOW</string>
+	<key>DisplayNotificationsCentered</key>
+	<string>HARD,INSTALLNOW</string>
 	<key>DisplayIconFile</key>
 	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
 	<key>DisplayIconSize</key>
