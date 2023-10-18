@@ -22,15 +22,20 @@
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 4.x__
 - __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
 - It is safe to mix `super` version 3.0 and 4.x managed preferences (except for the DisplaySilently key) in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/super-3to4-migration-options.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/super-3to4-migration-managed-preferences.tsv).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta5/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-beta5/Example-MDM).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta6/Super-Friends/super-3to4-migration-options.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta6/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta6/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
+- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-beta6/Example-MDM).
 
 ### Known Issues
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
 - Since the release of macOS Sonoma 14, the Apple `softwareupdate` command on macOS 12.3 - 12.7 is no longer able to list, download, or upgrade to any version of macOS 13 (upgrading to macOS 14+ works fine). A future version of `super` is planned to work around this new unexpected limitation in macOS.
+
+### Specific Changes (4.0.0-beta6)
+
+- Resolved issues preventing the last startup date collection from working properly. (Thanks to Michael Z on on MacAdmins Slack for helping on this one!)
+- `super` 4.0.0-beta6 SHA-256: a57710bb200e7bd702be87019b87675c8f1afefcabc284eeff63a966eeaf79ba
 
 ### Specific Changes (4.0.0-beta5)
 
