@@ -22,10 +22,10 @@
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 4.x__
 - __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
 - It is safe to mix `super` version 3.0 and 4.x managed preferences (except for the DisplaySilently key) in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta6/Super-Friends/super-3to4-migration-options.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta6/Super-Friends/super-3to4-migration-managed-preferences.tsv).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta6/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-beta6/Example-MDM).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta7/Super-Friends/super-3to4-migration-options.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-beta7/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-beta7/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
+- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-beta7/Example-MDM).
 
 ### Known Issues
 
@@ -35,7 +35,7 @@
 ### Specific Changes (4.0.0-beta7)
 
 - Resolved (third time's a charm?) issues preventing the last startup date collection from working properly. (Thanks to @ofirgalcon for testing this time!)
-- `super` 4.0.0-beta6 SHA-256: fa3cc35a0224169128b5388fec1c2d09f3627597dd569bcc8e928e8966e0f242
+- `super` 4.0.0-beta7 SHA-256: fa3cc35a0224169128b5388fec1c2d09f3627597dd569bcc8e928e8966e0f242
 
 ### Specific Changes (4.0.0-beta6)
 
