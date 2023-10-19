@@ -2,7 +2,7 @@
 
 ## [4.0.0-betaX]
 
-2023-10-18
+2023-10-19
 
 ### Highlights
 
@@ -31,6 +31,11 @@
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
 - Since the release of macOS Sonoma 14, the Apple `softwareupdate` command on macOS 12.3 - 12.7 is no longer able to list, download, or upgrade to any version of macOS 13 (upgrading to macOS 14+ works fine). A future version of `super` is planned to work around this new unexpected limitation in macOS.
+
+### Specific Changes (4.0.0-beta7)
+
+- Resolved (third time's a charm?) issues preventing the last startup date collection from working properly. (Thanks to @ofirgalcon for testing this time!)
+- `super` 4.0.0-beta6 SHA-256: fa3cc35a0224169128b5388fec1c2d09f3627597dd569bcc8e928e8966e0f242
 
 ### Specific Changes (4.0.0-beta6)
 
