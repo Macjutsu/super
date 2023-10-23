@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2024,SC2207
 
-SUPER_VERSION="4.0.0-beta7"
-SUPER_DATE="2023/10/19"
+SUPER_VERSION="4.0.0-rc1"
+SUPER_DATE="2023/10/23"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -1166,7 +1166,7 @@ elif [[ -n "${install_macos_major_version_target_option}" ]] && ! [[ "${install_
 elif [[ -n "${install_macos_major_version_target_option}" ]] && [[ "${install_macos_major_version_target_option}" =~ ${REGEX_MACOS_MAJOR_VERSION} ]]; then
 	if [[ "${install_macos_major_upgrades_option}" == "TRUE" ]]; then
 		install_major_system_target="${install_macos_major_version_target_option}"
-		defaults write "${SUPER_LOCAL_PLIST}" InstallMacOSMajorVersionTarget -string "${install_macos_major_version_target_option}"
+		defaults write "${SUPER_LOCAL_PLIST}" InstallMacOSMajorVersionTarget -string "${install_major_system_target}"
 	else
 		log_super "Parameter Error: To use the --install-macos-major-version-target option you must also use the --install-macos-major-upgrades option."; option_error="TRUE"
 		defaults delete "${SUPER_LOCAL_PLIST}" InstallMacOSMajorVersionTarget 2> /dev/null
@@ -2074,7 +2074,7 @@ if [[ "${mac_cpu_architecture}" == "arm64" ]]; then
 		read -r -a auth_mdm_failover_to_user_array <<< "${auth_mdm_failover_to_user_option}"
 		for option_type in "${auth_mdm_failover_to_user_array[@]}"; do
 			if [[ "${option_type}" =~ ^ALWAYS$ ]]; then
-				auth_mdm_failover_always="TRUE"
+				auth_mdm_failover="TRUE"
 			elif [[ "${option_type}" =~ ^NOSERVICE$ ]]; then
 				auth_mdm_failover_no_service="TRUE"
 			elif [[ "${option_type}" =~ ^SOFT$ ]]; then
@@ -2700,7 +2700,7 @@ else # Authentication validation errors.
 				auth_error_user="TRUE"
 			fi
 		fi
-	elif { [[ "${auth_jamf_client_saved}" -eq 1 ]] || [[ "${auth_jamf_account_saved}" -eq 1 ]]; } && { [[ "${auth_mdm_failover_always}" == "TRUE" ]] || [[ "${auth_mdm_failover_no_service}" == "TRUE" ]] || { [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${auth_mdm_failover_install_now}" == "TRUE" ]]; }; }; then
+	elif { [[ "${auth_jamf_client_saved}" -eq 1 ]] || [[ "${auth_jamf_account_saved}" -eq 1 ]]; } && { [[ "${auth_mdm_failover}" == "TRUE" ]] || [[ "${auth_mdm_failover_no_service}" == "TRUE" ]] || { [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${auth_mdm_failover_install_now}" == "TRUE" ]]; }; }; then
 		if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
 			log_super "Warning: Previously saved Apple silicon MDM credentials could not be validated, failing over to manual user authenticated workflow."
 			workflow_auth_macos="FAILOVER"
@@ -3586,6 +3586,7 @@ if [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigaby
 	check_storage_available_error="TRUE"
 elif [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_macos_minor_update_available}" == "TRUE" ]]; then
 	{ [[ -z "${test_storage_update_option}" ]] && [[ "${asu_macos_minor_update_size}" -lt 5 ]]; } && storage_required_update_gb=$((asu_macos_minor_update_size*2))
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_macos_type: ${workflow_macos_type}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required: ${download_maocs_asu_required}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_size: ${asu_macos_minor_update_size}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: storage_required_update_gb: ${storage_required_update_gb}"
@@ -3594,33 +3595,17 @@ elif [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_major_upgrade_size_target: ${asu_macos_major_upgrade_size_target}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_installer_size_target: ${macos_installer_size_target}"
 	if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-		if [[ "${workflow_auth_macos}" == "LOCAL" ]] || [[ "${workflow_auth_macos}" == "USER" ]] || [[ "${workflow_auth_macos}" == "FAILOVER" ]]; then
-			if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "FAILOVER" ]]; }; then # macOS 13 or newer always upgrades via softwareupdate. macOS 12.3 or newer can as well but not when the MDM workflow fails.
-				if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
-					storage_required_gigabytes=$((storage_required_upgrade_gb+asu_macos_major_upgrade_size_target))
-				else # Download calculation is not required.
-					storage_required_gigabytes="${storage_required_upgrade_gb}"
-				fi
-			else # Systems older than macOS 12.3 upgrade via installer application, or when the MDM workflow fails.
-				if [[ "${download_macos_installer_required}" == "TRUE" ]]; then
-					storage_required_gigabytes=$((storage_required_upgrade_gb+macos_installer_size_target))
-				else # Download calculation is not required.
-					storage_required_gigabytes="${storage_required_upgrade_gb}"
-				fi
+		if [[ "${workflow_macos_type}" == "ASU" ]]; then # macOS major upgrade via softwareupdate.
+			if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+				storage_required_gigabytes=$((storage_required_upgrade_gb+asu_macos_major_upgrade_size_target))
+			else # Download calculation is not required.
+				storage_required_gigabytes="${storage_required_upgrade_gb}"
 			fi
-		elif [[ "${workflow_auth_macos}" == "JAMF" ]]; then
-			if [[ "${macos_version_major}" -ge 13 ]]; then
-				if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
-					storage_required_gigabytes=$((storage_required_upgrade_gb+asu_macos_major_upgrade_size_target))
-				else # Download calculation is not required.
-					storage_required_gigabytes="${storage_required_upgrade_gb}"
-				fi
-			else # macOS major upgrade via MDM only possible via installer application.
-				if [[ "${download_macos_installer_required}" == "TRUE" ]]; then
-					storage_required_gigabytes=$((storage_required_upgrade_gb+macos_installer_size_target))
-				else # Download calculation is not required.
-					storage_required_gigabytes="${storage_required_upgrade_gb}"
-				fi
+		else # macOS major upgrade via installer.
+			if [[ "${download_macos_installer_required}" == "TRUE" ]]; then
+				storage_required_gigabytes=$((storage_required_upgrade_gb+macos_installer_size_target))
+			else # Download calculation is not required.
+				storage_required_gigabytes="${storage_required_upgrade_gb}"
 			fi
 		fi
 	else # macOS updates are available.
@@ -4305,9 +4290,10 @@ fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version is: ${macos_major_upgrade_version}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major is: ${macos_major_upgrade_version_major}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_available is: ${macos_major_upgrade_available}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_software_full_check_required is: ${workflow_software_full_check_required}"
 
 # If needed, check macOS installer list cache.
-if [[ "${macos_major_upgrade_available}" == "TRUE" ]] && [[ "${install_macos_major_upgrades_option}" == "TRUE" ]] && [[ "${macos_version_major}" -lt 13 ]] && { [[ "${macos_version_number}" -lt 1203 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" == "JAMF" ]]; }; }; then # macOS major upgrade only possible via installer application.
+if [[ "${macos_major_upgrade_available}" == "TRUE" ]] && [[ "${install_macos_major_upgrades_option}" == "TRUE" ]] && [[ "${macos_version_major}" -lt 13 ]]; then
 	macos_installers_list=$(<"${INSTALLER_LIST_LOG}") 2> /dev/null
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_installers_list is:\n${macos_installers_list}"
 	if [[ -n "${macos_installers_list}" ]];then # Cached macOS installer list exists.
@@ -4777,11 +4763,16 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
 	previous_ifs="${IFS}"; IFS=$'\n'
 	
 	# If macOS major upgrade possible via Apple software update then validate if ${asu_macos_all_versions_array[0]} is newer than ${macos_version_major}.
-	if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then # macOS major upgrade possible via Apple software update.
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_major_system_target is: ${install_major_system_target}"
+	if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 		[[ $(echo "${asu_macos_all_versions_array[0]}" | cut -d '.' -f1) -gt "${macos_version_major}" ]] && asu_macos_major_upgrade_available="TRUE"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_all_versions_array is:\n${asu_macos_all_versions_array[*]}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_major_upgrade_available is: ${asu_macos_major_upgrade_available}"
-	else # macOS major upgrade only possible via installer application, so get ${macos_installers_list_array}.
+	fi
+	
+	# macOS major upgrade may be needed via installer application, so get ${macos_installers_list_array}.
+	if [[ "${macos_version_major}" -lt 13 ]]; then
 		if [[ "${workflow_software_full_check_required}" == "TRUE" ]]; then
 			get_macos_installers_list
 			
@@ -4815,22 +4806,24 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
 	fi
 	
 	# Evaluate conditions necessary to set ${macos_major_upgrade_version_major_target}.
-	if [[ -n "${install_macos_major_version_target_option}" ]] && [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
-		if [[ "${install_macos_major_version_target_option}" -lt "${macos_version_major}" ]] || [[ "${install_macos_major_version_target_option}" -eq "${macos_version_major}" ]]; then
-			[[ "${install_macos_major_version_target_option}" -lt "${macos_version_major}" ]] && log_super "Warning: The --install-macos-major-version-target=${install_macos_major_version_target_option} is less than currently installed macOS ${macos_version_major}."
-			[[ "${install_macos_major_version_target_option}" -eq "${macos_version_major}" ]] && log_super "Status: The --install-macos-major-version-target=${install_macos_major_version_target_option} is the same as currently installed macOS ${macos_version_major}."
+	if [[ -n "${install_major_system_target}" ]] && [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
+		if [[ "${install_major_system_target}" -lt "${macos_version_major}" ]] || [[ "${install_major_system_target}" -eq "${macos_version_major}" ]]; then
+			[[ "${install_major_system_target}" -lt "${macos_version_major}" ]] && log_super "Warning: The --install-macos-major-version-target=${install_major_system_target} is less than currently installed macOS ${macos_version_major}."
+			[[ "${install_major_system_target}" -eq "${macos_version_major}" ]] && log_super "Status: The --install-macos-major-version-target=${install_major_system_target} is the same as currently installed macOS ${macos_version_major}."
 			macos_major_upgrade_version_major_target="FALSE"
-			if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then
+			if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 				log_super "Status: A macOS major upgrade is available via Apple software update but not allowed: ${asu_macos_all_titles_array[0]}"
-			else
+			else # macOS major upgrade only possible via installer application.
 				log_super "Status: A macOS major upgrade is available via installer application but not allowed: ${macos_major_upgrade_marketing_name} ${macos_major_upgrade_version}"
 			fi
 		else # The ${macos_major_upgrade_version_major_target} is greater than current macOS version, so validate target.
-			if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then # macOS major upgrade possible via Apple software update.
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_major_system_target is: ${install_major_system_target}"
+			if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 				asu_macos_major_upgrade_version_major_target=$(echo "${asu_macos_all_versions_array[0]}" | cut -d '.' -f1)
 				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_major_upgrade_version_major_target is: ${asu_macos_major_upgrade_version_major_target}"
-				if [[ "${install_macos_major_version_target_option}" -gt "${asu_macos_major_upgrade_version_major_target}" ]]; then  # The ${macos_major_upgrade_version_major_target} is greater than the newest available macOS major upgrade via Apple software update.
-					log_super "Warning: Requested --install-macos-major-version-target=${install_macos_major_version_target_option} is greater than the currently available Apple software update version of ${asu_macos_major_upgrade_version_major_target}."
+				if [[ "${install_major_system_target}" -gt "${asu_macos_major_upgrade_version_major_target}" ]]; then  # The ${macos_major_upgrade_version_major_target} is greater than the newest available macOS major upgrade via Apple software update.
+					log_super "Warning: Requested --install-macos-major-version-target=${install_major_system_target} is greater than the currently available Apple software update version of ${asu_macos_major_upgrade_version_major_target}."
 					asu_macos_major_upgrade_label_target="${asu_macos_all_labels_array[0]}"
 					asu_macos_major_upgrade_title_target="${asu_macos_all_titles_array[0]}"
 					asu_macos_major_upgrade_version_target="${asu_macos_all_versions_array[0]}"
@@ -4840,7 +4833,7 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
 					for array_index in "${!asu_macos_all_versions_array[@]}"; do
 						asu_macos_major_upgrade_version_major_target=$(echo "${asu_macos_all_versions_array[array_index]}" | cut -d '.' -f1)
 						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_major_upgrade_version_major_target is: ${asu_macos_major_upgrade_version_major_target}"
-						if [[ "${install_macos_major_version_target_option}" == "${asu_macos_major_upgrade_version_major_target}" ]]; then
+						if [[ "${install_major_system_target}" == "${asu_macos_major_upgrade_version_major_target}" ]]; then
 							asu_macos_major_upgrade_label_target="${asu_macos_all_labels_array[array_index]}"
 							asu_macos_major_upgrade_title_target="${asu_macos_all_titles_array[array_index]}"
 							asu_macos_major_upgrade_version_target="${asu_macos_all_versions_array[array_index]}"
@@ -4854,8 +4847,8 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
 			else # macOS major upgrade only possible via installer application.
 				macos_installer_version_major_target=$(echo "${macos_installers_list_array[0]}" | awk -F ',' '{print $3;}' | cut -d '.' -f1)
 				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_installer_version_major_target is: ${macos_installer_version_major_target}"
-				if [[ "${install_macos_major_version_target_option}" -gt "${macos_installer_version_major_target}" ]]; then # macOS upgrade target is greater than the newest available macOS installer.
-					log_super "Warning: Requested --install-macos-major-version-target=${install_macos_major_version_target_option} is greater than the currently available macOS installer version of ${macos_installer_version_major_target}."
+				if [[ "${install_major_system_target}" -gt "${macos_installer_version_major_target}" ]]; then # macOS upgrade target is greater than the newest available macOS installer.
+					log_super "Warning: Requested --install-macos-major-version-target=${install_major_system_target} is greater than the currently available macOS installer version of ${macos_installer_version_major_target}."
 					macos_installer_id_target=$(echo "${macos_installers_list_array[0]}" | awk -F ',' '{print $1;}')
 					macos_installer_marketing_name_target=$(echo "${macos_installers_list_array[0]}" | awk -F ',' '{print $2;}')
 					macos_installer_version_target=$(echo "${macos_installers_list_array[0]}" | awk -F ',' '{print $3;}')
@@ -4867,7 +4860,7 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
 					for macos_installers_list_line in "${macos_installers_list_array[@]}"; do
 						macos_installer_version_major_target=$(echo "${macos_installers_list_line}" | awk -F ',' '{print $3;}' | cut -d '.' -f1)
 						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_installer_version_major_target is: ${macos_installer_version_major_target}"
-						if [[ "${install_macos_major_version_target_option}" == "${macos_installer_version_major_target}" ]]; then
+						if [[ "${install_major_system_target}" == "${macos_installer_version_major_target}" ]]; then
 							macos_installer_id_target=$(echo "${macos_installers_list_line}" | awk -F ',' '{print $1;}')
 							macos_installer_marketing_name_target=$(echo "${macos_installers_list_line}" | awk -F ',' '{print $2;}')
 							macos_installer_version_target=$(echo "${macos_installers_list_line}" | awk -F ',' '{print $3;}')
@@ -4883,7 +4876,7 @@ if [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then
 			fi
 		fi
 	elif [[ "${workflow_check_macos_major_upgrades_error}" == "FALSE" ]]; then # There is no ${macos_major_upgrade_version_major_target}, so assume newest available macOS major upgrade is the target.
-		if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then # macOS major upgrade possible via Apple software update.
+		if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 			asu_macos_major_upgrade_label_target="${asu_macos_all_labels_array[0]}"
 			asu_macos_major_upgrade_title_target="${asu_macos_all_titles_array[0]}"
 			asu_macos_major_upgrade_version_target="${asu_macos_all_versions_array[0]}"
@@ -5011,44 +5004,48 @@ fi
 check_macos_downloads() {
 download_macos_installer_required="FALSE"
 download_maocs_asu_required="FALSE"
-unset asu_macos_label_target
-unset asu_macos_title_target
+asu_macos_label_target="FALSE"
+asu_macos_title_target="FALSE"
 
-# If needed, evaluate previously downloaded macOS installer and set ${download_macos_installer_required} accordingly.
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_version_number is: ${macos_version_number}"
+# If needed, evaluate the type of download needed, if an installer is needed then evaluate local installer and set ${download_macos_installer_required}, otherwise set ${asu_macos_label_target} and ${asu_macos_title_target}.
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available is: ${asu_macos_minor_update_available}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_available is: ${macos_major_upgrade_available}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
-if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] && { [[ "${macos_version_number}" -lt 1203 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_version_major}" -lt 13 ]] && [[ "${workflow_auth_macos}" == "JAMF" ]]; }; }; then
-	local downloaded_macos_installer
-	downloaded_macos_installer=$(defaults read "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: downloaded_macos_installer is: ${downloaded_macos_installer}"
-	if [[ -d "/Applications/Install ${macos_installer_marketing_name_target}.app" ]]; then
-		check_macos_installer
-		if [[ "${macos_installer_error}" == "TRUE" ]]; then
-			[[ -n "${downloaded_macos_installer}" ]] && log_super "Warning: Previously downloaded macOS installer failed local validations, removing installer: /Applications/Install ${macos_installer_marketing_name_target}.app."
-			[[ -z "${downloaded_macos_installer}" ]] && log_super "Warning: Existing macOS installer failed local validations, removing installer: /Applications/Install ${macos_installer_marketing_name_target}.app."
-			download_macos_installer_required="TRUE"
-			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
-			rm -Rf "/Applications/Install ${macos_installer_marketing_name_target}.app" > /dev/null 2>&1
-		fi
-		defaults write "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller -string "${macos_installer_marketing_name_target} ${macos_installer_version_target}-${macos_installer_build_target}"
-	else # No local macOS installer.
-		[[ -n "${downloaded_macos_installer}" ]] && log_super "Warning: Previously downloaded macOS installer could not be found."
-		download_macos_installer_required="TRUE"
-		defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
-	fi
-elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_upgrade_available}" == "TRUE" ]]; then # Evaluate previously downloaded macOS updates or upgrades and compare them to currently available, setting ${download_maocs_asu_required} accordingly.
-	if [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 12.3 or newer can upgrade via softwareupdate.
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_major_system_target is: ${install_major_system_target}"
+if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
+	if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 		asu_macos_label_target="${asu_macos_major_upgrade_label_target}"
 		asu_macos_title_target="${asu_macos_major_upgrade_title_target}"
-	else # macOS minor update.
-		asu_macos_label_target="${asu_macos_minor_update_label}"
-		asu_macos_title_target="${asu_macos_minor_update_title}"
+	else # macOS major upgrade only possible via installer application.
+		local downloaded_macos_installer
+		downloaded_macos_installer=$(defaults read "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: downloaded_macos_installer is: ${downloaded_macos_installer}"
+		if [[ -d "/Applications/Install ${macos_installer_marketing_name_target}.app" ]]; then
+			check_macos_installer
+			if [[ "${macos_installer_error}" == "TRUE" ]]; then
+				[[ -n "${downloaded_macos_installer}" ]] && log_super "Warning: Previously downloaded macOS installer failed local validations, removing installer: /Applications/Install ${macos_installer_marketing_name_target}.app."
+				[[ -z "${downloaded_macos_installer}" ]] && log_super "Warning: Existing macOS installer failed local validations, removing installer: /Applications/Install ${macos_installer_marketing_name_target}.app."
+				download_macos_installer_required="TRUE"
+				defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
+				rm -Rf "/Applications/Install ${macos_installer_marketing_name_target}.app" > /dev/null 2>&1
+			fi
+			defaults write "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller -string "${macos_installer_marketing_name_target} ${macos_installer_version_target}-${macos_installer_build_target}"
+		else # No local macOS installer.
+			[[ -n "${downloaded_macos_installer}" ]] && log_super "Warning: Previously downloaded macOS installer could not be found."
+			download_macos_installer_required="TRUE"
+			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
+		fi
 	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_label_target is: ${asu_macos_label_target}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_title_target is: ${asu_macos_title_target}"
+elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]]; then # macOS updates are available.
+	asu_macos_label_target="${asu_macos_minor_update_label}"
+	asu_macos_title_target="${asu_macos_minor_update_title}"
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_label_target is: ${asu_macos_label_target}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_title_target is: ${asu_macos_title_target}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_installer_required is: ${download_macos_installer_required}"
+
+# If a softwareupdate is required then evaluate cached macOS update/upgrade.
+if [[ "${asu_macos_label_target}" != "FALSE" ]] && [[ "${asu_macos_title_target}" != "FALSE" ]]; then
 	downloaded_macos_asu_label=$(defaults read "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel 2> /dev/null)
 	local downloaded_macos_asu_last_startup
 	downloaded_macos_asu_last_startup=$(defaults read "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULastStartup 2> /dev/null)
@@ -5067,8 +5064,7 @@ elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_
 			log_super "Warning: The system has been restarted without applying the previously downloaded macOS update/upgrade, download workflow needs to run again."
 			downloaded_asu_error="TRUE"
 		fi
-		# Only validate prepared macOS update/upgrade if needed.
-		if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; }; then
+		if [[ "${downloaded_asu_error}" == "FALSE" ]]; then
 			local update_asset_attributes
 			update_asset_attributes=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null)
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: update_asset_attributes is:\n${update_asset_attributes}"
@@ -5088,7 +5084,7 @@ elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_
 				log_super "Warning: Previously downloaded macOS update/upgrade is no longer valid, download workflow needs to run again."
 				downloaded_asu_error="TRUE"
 			else
-				if { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; } && [[ "${prepared_macos_version}" != "${asu_macos_major_upgrade_version_target}" ]]; then
+				if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] && [[ "${prepared_macos_version}" != "${asu_macos_major_upgrade_version_target}" ]]; then
 					log_super "Warning: Previously downloaded macOS upgrade version ${prepared_macos_version} doesn't match expected version ${asu_macos_major_upgrade_version_target}, download workflow needs to run again."
 					downloaded_asu_error="TRUE"
 				fi
@@ -5097,24 +5093,23 @@ elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_
 					downloaded_asu_error="TRUE"
 				fi
 			fi
-			if [[ "${downloaded_asu_error}" == "TRUE" ]]; then
-				download_maocs_asu_required="TRUE"
-				defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel 2> /dev/null
-				defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULastStartup 2> /dev/null
-			fi
+		fi
+		if [[ "${downloaded_asu_error}" == "TRUE" ]]; then
+			download_maocs_asu_required="TRUE"
+			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel 2> /dev/null
+			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULastStartup 2> /dev/null
 		fi
 	else
 		download_maocs_asu_required="TRUE"
 	fi
 fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_installer_required is: ${download_macos_installer_required}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required is: ${download_maocs_asu_required}"
 }
 
 # This function checks the macOS installer to be used for upgrades matches the ${macos_installer_build_target} and passes Gatekeeper validation.
 check_macos_installer() {
 macos_installer_error="FALSE"
-log_super "Status: Validating macOS major upgrade /Applications/Install ${macos_installer_marketing_name_target}.app..."
+log_super "Status: Gatekeeper and version validation of /Applications/Install ${macos_installer_marketing_name_target}.app..."
 
 # First check to see if the downloaded macOS installer build version matches the ${macos_installer_build_target}.
 [[ -d "/Volumes/Shared Support" ]] && diskutil unmount force "/Volumes/Shared Support" > /dev/null 2>&1
@@ -5151,7 +5146,7 @@ if [[ "${macos_installer_error}" == "FALSE" ]]; then
 	local startosinstall_response
 	startosinstall_response=$("/Applications/Install ${macos_installer_marketing_name_target}.app/Contents/Resources/startosinstall" --usage 2>&1)
 	if [[ $(echo "${startosinstall_response}" | grep -c 'Usage: startosinstall') -eq 0 ]]; then
-		log_super "Status: Currently downloaded macOS installer failed Gatekeepr validation."; macos_installer_error="TRUE"
+		log_super "Status: Currently downloaded macOS installer failed Gatekeeper validation."; macos_installer_error="TRUE"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: startosinstall_response is:\n${startosinstall_response}"
 	fi
 fi
@@ -5548,8 +5543,11 @@ if [[ "${workflow_download_macos_error}" == "FALSE" ]]; then
 	fi
 	
 	# A macOS upgrade is available and option to allow upgrade is enabled.
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_major_system_target is: ${install_major_system_target}"
 	if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then
-		if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then # macOS major upgrade possible via Apple software update.
+		if [[ "${workflow_macos_type}" == "ASU" ]]; then # macOS major upgrade via softwareupdate.
 			if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
 				{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_download
 				download_macos_asu
@@ -6628,10 +6626,10 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_m
 	if [[ "${workflow_install_macos_no_user_error}" == "FALSE" ]]; then
 		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS major upgrade is available and option to allow upgrade is enabled.
 			if [[ "${workflow_auth_macos}" == "LOCAL" ]]; then
-				if [[ "${macos_version_number}" -ge 1203 ]]; then # macOS 12.3 or newer upgrade locally via softwareupdate.
+				if [[ "${workflow_macos_type}" == "ASU" ]]; then # macOS major upgrade via softwareupdate.
 					[[ -n "${workflow_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
 					install_macos_asu
-				else # Systems older than macOS 12.3 upgrade via installer application.
+				else # macOS major upgrade via installer.
 					download_macos_installer
 					if [[ "${download_macos_installer_error}" == "FALSE" ]]; then
 						[[ -n "${workflow_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
@@ -6696,6 +6694,7 @@ workflow_install_macos_active_user_error="FALSE"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available is: ${asu_macos_minor_update_available}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_install_now_option is: ${workflow_install_now_option}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_mdm_failover is: ${auth_mdm_failover}"
 
 # A macOS update/upgrade is expected.
 if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_macos_minor_update_available}" == "TRUE" ]]; then
@@ -6772,11 +6771,11 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_m
 		# Logic to start the appropriate update/upgrade workflow.
 		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS major upgrade is available and option to allow upgrade is enabled.
 			if [[ "${workflow_auth_macos}" == "LOCAL" ]] || [[ "${workflow_auth_macos}" == "USER" ]] || [[ "${workflow_auth_macos}" == "FAILOVER" ]]; then
-				if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "FAILOVER" ]]; }; then # macOS 13 or newer always upgrades via softwareupdate. macOS 12.3 or newer can as well but not when the MDM workflow fails.
+				if [[ "${workflow_macos_type}" == "ASU" ]]; then # macOS major upgrade via softwareupdate.
 					notification_restart
 					[[ -n "${workflow_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
 					install_macos_asu
-				else # Systems older than macOS 12.3 upgrade via installer application, or when the MDM workflow fails.
+				else # macOS major upgrade via installer.
 					display_string_prepare_time_estimate="15-25"
 					notification_prepare
 					[[ -n "${workflow_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
@@ -7096,9 +7095,9 @@ display_string_and="and"
 
 #### This code generates the ${display_string_workflow_title} variable to include the appropriate macOS update or upgrade.
 if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-	if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then # macOS 13 or newer always upgrades via softwareupdate. macOS 12.3 or later can upgrade via softwareupdate unless via MDM workflow.
+	if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 		display_string_workflow_title="${asu_macos_major_upgrade_title_target} Major Upgrade"
-	else # Systems older than macOS 12.3 or older than macOS 13 and using the MDM workflow upgrade via installer application.
+	else # macOS major upgrade only possible via installer application.
 		display_string_workflow_title="macOS ${macos_installer_marketing_name_target} ${macos_installer_version_target} Major Upgrade"
 	fi
 elif [[ "${asu_macos_minor_update_available}" == "TRUE" ]]; then # macOS updates are available.
@@ -7171,7 +7170,7 @@ display_string_failed_body="The ${display_string_workflow_title} failed to compl
 #### Language for dialog_insufficient_storage(), a dialog informing the user that there is insufficient storage for macOS update/upgrade.
 # This is used for both non-deadline and deadline workflows.
 display_string_insufficient_storage_title="Insufficient Storage For ${display_string_workflow_title}"
-display_string_insufficient_storage_timeout="Please remove unecissary items in"
+display_string_insufficient_storage_timeout="Please remove unecessary items in"
 display_string_insufficient_storage_default_body="A required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
 display_string_insufficient_storage_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
 display_string_insufficient_storage_deadline_days_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
@@ -8055,6 +8054,7 @@ if [[ "${workflow_disable_update_check_option}" == "TRUE" ]]; then # Skip softwa
 		{ [[ "${workflow_restart_without_updates_option}" != "TRUE" ]] && [[ -z "${workflow_jamf_policy_triggers_option}" ]]; } && log_super "Warning: When using the --skip-updates option you need to also use --workflow-restart-without-updates or --workflow-jamf-policy-triggers to simulate notification and dialog workflows."
 	fi
 	workflow_macos_version_target="FALSE"
+	workflow_macos_type="FALSE"
 else # Default software update/upgrade workflows.
 	# Check for updates/upgrades.
 	if [[ "${test_mode_option}" != "TRUE" ]]; then
@@ -8099,12 +8099,13 @@ else # Default software update/upgrade workflows.
 	delete_unneeded_macos_installers # This function includes internal test mode logic.
 	# At this point all available updates/upgrades have been evaluated so report different workflow statuses.
 	workflow_macos_version_target="FALSE"
+	workflow_macos_type="FALSE"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available is: ${asu_macos_minor_update_available}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_non_system_update_available is: ${asu_non_system_update_available}"
 	if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
-		if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]]; }; then # macOS major upgrade possible via Apple software update.
+		if [[ "${macos_version_major}" -ge 13 ]] || { [[ "${macos_version_number}" -ge 1203 ]] && [[ "${workflow_auth_macos}" != "JAMF" ]] && { [[ -z "${install_major_system_target}" ]] || [[ "${install_major_system_target}" -ge 14 ]]; }; }; then # macOS major upgrade possible via Apple software update.
 			if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL NOW MACOS ${asu_macos_major_upgrade_version_target} MAJOR UPGRADE VIA SOFTWAREUPDATE ****"
 			elif [[ "${workflow_only_download_option}" == "TRUE" ]]; then
@@ -8113,6 +8114,7 @@ else # Default software update/upgrade workflows.
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - MACOS ${asu_macos_major_upgrade_version_target} MAJOR UPGRADE VIA SOFTWAREUPDATE ****"
 			fi
 			workflow_macos_version_target="${asu_macos_major_upgrade_version_target}"
+			workflow_macos_type="ASU"
 		else # macOS major upgrade only possible via installer application.
 			if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL NOW MACOS ${macos_installer_version_target} MAJOR UPGRADE VIA INSTALLER ****"
@@ -8122,6 +8124,7 @@ else # Default software update/upgrade workflows.
 				log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - MACOS ${macos_installer_version_target} MAJOR UPGRADE VIA INSTALLER ****"
 			fi
 			workflow_macos_version_target="${macos_installer_version_target}"
+			workflow_macos_type="INSTALLER"
 		fi
 		if [[ -n "${display_accessory_upgrade}" ]]; then
 			display_accessory_content="${display_accessory_upgrade}"
@@ -8137,6 +8140,7 @@ else # Default software update/upgrade workflows.
 			log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - MACOS ${asu_macos_minor_update_version} MINOR UPDATE ****"
 		fi
 		workflow_macos_version_target="${asu_macos_minor_update_version}"
+		workflow_macos_type="ASU"
 		if [[ -n "${display_accessory_update}" ]]; then
 			display_accessory_content="${display_accessory_update}"
 		elif [[ -n "${display_accessory_default}" ]]; then
@@ -8164,6 +8168,7 @@ else # Default software update/upgrade workflows.
 	fi
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_macos_version_target is: ${workflow_macos_version_target}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_macos_type is: ${workflow_macos_type}"
 
 # This is the main logic for determining what to do in the case of available macOS updates, macOS upgrades, ${workflow_jamf_policy_triggers_option}, or the ${workflow_restart_without_updates_option}.
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_available is: ${asu_macos_minor_update_available}"
