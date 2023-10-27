@@ -25,7 +25,7 @@
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-3to4-migration-options.tsv).
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-3to4-migration-managed-preferences.tsv).
 - Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/main/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` v4.0.0](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 
 ### Known Issues
 
@@ -39,7 +39,7 @@
 - Resolved an issue where setting the `--workflow-jamf-policy-triggers` was unintentionally running the dialog workflows again.
 - Improved logging when using the `--auth-ask-user-to-save-password` option.
 - Fixed typos.
-- [The main `super` Wiki has also been updated to 4.0.0](https://github.com/Macjutsu/super/wiki).
+- [The main `super` Wiki has also been updated to v4.0.0](https://github.com/Macjutsu/super/wiki).
 - `super` 4.0.0 SHA-256: fc82babefa316afeaf6507b1babae0f7fb6f499c0e0b1d3dedecd3fa53f16eb2
 
 ### Specific Changes (4.0.0-rc1)
