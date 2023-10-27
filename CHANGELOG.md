@@ -13,7 +13,7 @@
 - New default "always on" behavior automatically checks for Apple software updates on a regular basis.
 - Support for Jamf Pro 10.48+ [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html).
 - Support for Jamf Pro 10.49+ [API Roles and Clients](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/API_Roles_and_Clients.html).
-- Please check out the [updated `super` 4.0.0 Wiki](https://github.com/Macjutsu/super/wiki) for more details!
+- Please check out the [updated `super` v4.0.0 Wiki](https://github.com/Macjutsu/super/wiki) for more details!
 
 ### Compatibility Notes
 
