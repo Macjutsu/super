@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2024,SC2207
 
-SUPER_VERSION="4.0.0-rc1"
-SUPER_DATE="2023/10/23"
+SUPER_VERSION="4.0.0"
+SUPER_DATE="2023/10/28"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -1342,26 +1342,26 @@ elif [[ -n "${deferral_timer_menu_option}" ]] && ! [[ "${deferral_timer_menu_opt
 fi
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${deferral_timer_menu_minutes}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_menu_minutes is: ${deferral_timer_menu_minutes}"
 
-# Validate ${deferral_timer_focus_option} input and if valid set ${deferal_timer_focus_minutes} and save to ${SUPER_LOCAL_PLIST}. If there is no ${deferal_timer_focus_minutes} then set it to ${deferral_timer_minutes}.
+# Validate ${deferral_timer_focus_option} input and if valid set ${deferral_timer_focus_minutes} and save to ${SUPER_LOCAL_PLIST}. If there is no ${deferral_timer_focus_minutes} then set it to ${deferral_timer_minutes}.
 if [[ "${deferral_timer_focus_option}" == "X" ]]; then
 	log_super "Status: Deleting local preference for the --deferral-timer-focus option, defaulting to ${deferral_timer_minutes} minutes."
 	defaults delete "${SUPER_LOCAL_PLIST}" DeferralTimerFocus 2> /dev/null
 elif [[ -n "${deferral_timer_focus_option}" ]] && [[ "${deferral_timer_focus_option}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
 	if [[ "${deferral_timer_focus_option}" -lt 2 ]]; then
 		log_super "Warning: Specified --deferral-timer-focus=minutes value of ${deferral_timer_focus_option} minutes is too low, rounding up to 2 minutes."
-		deferal_timer_focus_minutes=2
+		deferral_timer_focus_minutes=2
 	elif [[ "${deferral_timer_focus_option}" -gt 10080 ]]; then
 		log_super "Warning: Specified --deferral-timer-focus=minutes value of ${deferral_timer_focus_option} minutes is too high, rounding down to 1440 minutes (1 week)."
-		deferal_timer_focus_minutes=10080
+		deferral_timer_focus_minutes=10080
 	else
-		deferal_timer_focus_minutes="${deferral_timer_focus_option}"
+		deferral_timer_focus_minutes="${deferral_timer_focus_option}"
 	fi
-	defaults write "${SUPER_LOCAL_PLIST}" DeferralTimerFocus -string "${deferal_timer_focus_minutes}"
+	defaults write "${SUPER_LOCAL_PLIST}" DeferralTimerFocus -string "${deferral_timer_focus_minutes}"
 elif [[ -n "${deferral_timer_focus_option}" ]] && ! [[ "${deferral_timer_focus_option}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
 	log_super "Parameter Error: The --deferral-timer-focus=minutes value must only be a number."; option_error="TRUE"
 fi
-[[ -z "${deferal_timer_focus_minutes}" ]] && deferal_timer_focus_minutes="${deferral_timer_minutes}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferal_timer_focus_minutes is: ${deferal_timer_focus_minutes}"
+[[ -z "${deferral_timer_focus_minutes}" ]] && deferral_timer_focus_minutes="${deferral_timer_minutes}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_focus_minutes is: ${deferral_timer_focus_minutes}"
 
 # Validate ${deferral_timer_error_option} input and if valid set ${deferral_timer_error_minutes} and save to ${SUPER_LOCAL_PLIST}. If there is no ${deferral_timer_error_minutes} then set it to ${deferral_timer_minutes}.
 if [[ "${deferral_timer_error_option}" == "X" ]]; then
@@ -1984,7 +1984,7 @@ elif [[ -n "${display_warning_button_string_option}" ]]; then
 fi
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ -n "${display_warning_button_string}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_warning_button_string is: ${display_warning_button_string}"
 
-# This initial round of authentication option validation simply checks to make sure the user entered logicially correct option combinations.
+# This initial round of authentication option validation simply checks to make sure the user entered logically correct option combinations.
 # Additional authentication validation is handled by the manage_authentication_options() function.
 if [[ "${mac_cpu_architecture}" == "arm64" ]]; then
 	if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_delete_all_option}" != "TRUE" ]]; then
@@ -2744,7 +2744,16 @@ auth_jamf_account_valid="FALSE"
 if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
 	[[ -z "${auth_user_password_keychain}" ]] && auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
-	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
+	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -ge 1 ]]; then
+		log_super "Status: The --auth-ask-user-to-save-password option is enabled but a user password is not currently saved."
+		log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+		auth_error_saved="TRUE"
+		auth_user_account_saved="FALSE"
+	elif [[ $(echo "${auth_user_password_keychain}" | grep -c 'Failed to get user context') -ge 1 ]]; then
+		log_super "Warning: The user's keychain is not currently available, unable to validate saved credentials for user: ${current_user_account_name}."
+		auth_error_saved="TRUE"
+		auth_user_account_saved="FALSE"
+	else
 		auth_local_account="${current_user_account_name}"
 		auth_local_password="${auth_user_password_keychain}"
 		check_auth_local_account
@@ -2760,11 +2769,6 @@ if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_sav
 			auth_error_saved="TRUE"
 			auth_user_account_saved="FALSE"
 		fi
-	else
-		log_super "Status: The --auth-ask-user-to-save-password option is enabled but a user password is not currently saved."
-		log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
-		auth_error_saved="TRUE"
-		auth_user_account_saved="FALSE"
 	fi
 	unset auth_user_password_keychain
 fi
@@ -3495,7 +3499,7 @@ fi
 if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" != "FALSE" ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 	current_user_id=$(id -u "${current_user_account_name}" 2> /dev/null)
 	current_user_guid=$(dscl . read "/Users/${current_user_account_name}" GeneratedUID 2> /dev/null | awk '{print $2;}')
-	current_user_real_name=$(dscl . read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/RealName: //g' | xargs)
+	current_user_real_name=$(dscl . read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/^ //g')
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_id is: ${current_user_id}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_guid is: ${current_user_guid}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_real_name is: ${current_user_real_name}"
@@ -3587,7 +3591,7 @@ if [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigaby
 elif [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu_macos_minor_update_available}" == "TRUE" ]]; then
 	{ [[ -z "${test_storage_update_option}" ]] && [[ "${asu_macos_minor_update_size}" -lt 5 ]]; } && storage_required_update_gb=$((asu_macos_minor_update_size*2))
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_macos_type: ${workflow_macos_type}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required: ${download_maocs_asu_required}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_asu_required: ${download_macos_asu_required}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_minor_update_size: ${asu_macos_minor_update_size}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: storage_required_update_gb: ${storage_required_update_gb}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_installer_required: ${download_macos_installer_required}"
@@ -3596,7 +3600,7 @@ elif [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_installer_size_target: ${macos_installer_size_target}"
 	if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # A macOS upgrade is available and option to allow upgrade is enabled.
 		if [[ "${workflow_macos_type}" == "ASU" ]]; then # macOS major upgrade via softwareupdate.
-			if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+			if [[ "${download_macos_asu_required}" == "TRUE" ]]; then
 				storage_required_gigabytes=$((storage_required_upgrade_gb+asu_macos_major_upgrade_size_target))
 			else # Download calculation is not required.
 				storage_required_gigabytes="${storage_required_upgrade_gb}"
@@ -3609,7 +3613,7 @@ elif [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${asu
 			fi
 		fi
 	else # macOS updates are available.
-		if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+		if [[ "${download_macos_asu_required}" == "TRUE" ]]; then
 			storage_required_gigabytes=$((storage_required_update_gb+asu_macos_minor_update_size))
 		else # Download calculation is not required.
 			storage_required_gigabytes="${storage_required_update_gb}"
@@ -3655,7 +3659,7 @@ fi
 }
 
 # Validate the computer's MDM service status and set ${mdm_enrolled}, ${mdm_automatically_enrolled}, ${mdm_service_url}, and ${auth_error_mdm}.
-# Unlike other MDM validation functions, this function is MDM-vednor agnostic.
+# Unlike other MDM validation functions, this function is MDM-vendor agnostic.
 check_mdm_service() {
 mdm_enrolled="FALSE"
 mdm_automatically_enrolled="FALSE"
@@ -4020,7 +4024,7 @@ if [[ -n "${deadline_epoch}" ]]; then
 		if [[ $deferral_timer_deadline_minutes -lt $deferral_timer_minutes ]]; then
 			log_super "Warning: Reducing user deferral timers to ${deferral_timer_deadline_minutes} minutes given the deferral deadline of: ${display_string_deadline}"
 			deferral_timer_minutes="${deferral_timer_deadline_minutes}"
-			[[ -n "${deferal_timer_focus_minutes}" ]] && deferal_timer_focus_minutes="${deferral_timer_deadline_minutes}"
+			[[ -n "${deferral_timer_focus_minutes}" ]] && deferral_timer_focus_minutes="${deferral_timer_deadline_minutes}"
 			deferral_timer_deadline_active="TRUE"
 		fi
 	fi
@@ -4937,7 +4941,7 @@ if [[ "${workflow_software_full_check_required}" == "TRUE" ]]; then
 	check_macos_beta_program
 fi
 
-# The main battery of software checks. These functions all have internal handaling for ${workflow_software_full_check_required}.
+# The main battery of software checks. These functions all have internal handling for ${workflow_software_full_check_required}.
 check_asu
 check_macos_major_upgrades
 check_macos_downloads
@@ -5000,10 +5004,10 @@ fi
 # MARK: *** Downloads ***
 ################################################################################
 
-# This function determines which macOS updates, upgrades, or installers should be downloaded and validates any previously downloaded macOS updates, upgrades, or installers and sets ${download_macos_installer_required}, ${download_maocs_asu_required}, ${asu_macos_label_target}, and ${asu_macos_title_target} accordingly.
+# This function determines which macOS updates, upgrades, or installers should be downloaded and validates any previously downloaded macOS updates, upgrades, or installers and sets ${download_macos_installer_required}, ${download_macos_asu_required}, ${asu_macos_label_target}, and ${asu_macos_title_target} accordingly.
 check_macos_downloads() {
 download_macos_installer_required="FALSE"
-download_maocs_asu_required="FALSE"
+download_macos_asu_required="FALSE"
 asu_macos_label_target="FALSE"
 asu_macos_title_target="FALSE"
 
@@ -5095,15 +5099,15 @@ if [[ "${asu_macos_label_target}" != "FALSE" ]] && [[ "${asu_macos_title_target}
 			fi
 		fi
 		if [[ "${downloaded_asu_error}" == "TRUE" ]]; then
-			download_maocs_asu_required="TRUE"
+			download_macos_asu_required="TRUE"
 			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel 2> /dev/null
 			defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULastStartup 2> /dev/null
 		fi
 	else
-		download_maocs_asu_required="TRUE"
+		download_macos_asu_required="TRUE"
 	fi
 fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required is: ${download_maocs_asu_required}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_asu_required is: ${download_macos_asu_required}"
 }
 
 # This function checks the macOS installer to be used for upgrades matches the ${macos_installer_build_target} and passes Gatekeeper validation.
@@ -5336,7 +5340,7 @@ fi
 if [[ "${download_macos_asu_start_error}" == "FALSE" ]] || [[ "${download_macos_asu_start_timeout}" == "FALSE" ]] || [[ "${download_macos_asu_timeout_error}" == "FALSE" ]] || [[ "${download_macos_asu_title_error}" == "FALSE" ]] || [[ "${download_macos_asu_validation_error}" == "FALSE" ]]; then
 	log_asu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE COMPLETED ****"
 	download_maocs_asu_error="FALSE"
-	download_maocs_asu_required="FALSE"
+	download_macos_asu_required="FALSE"
 	defaults write "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel -string "${asu_macos_label_target}"
 	defaults write "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULastStartup -string "${mac_last_startup}"
 else # Some part of the softwareupdate download workflow failed.
@@ -5376,7 +5380,7 @@ else # Some part of the softwareupdate download workflow failed.
 	download_maocs_asu_error="TRUE"
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_error is: ${download_maocs_asu_error}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required is: ${download_maocs_asu_required}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_asu_required is: ${download_macos_asu_required}"
 }
 
 # Download macOS installer via ${MIST_CLI_BINARY}, and also save results to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
@@ -5548,7 +5552,7 @@ if [[ "${workflow_download_macos_error}" == "FALSE" ]]; then
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: install_major_system_target is: ${install_major_system_target}"
 	if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then
 		if [[ "${workflow_macos_type}" == "ASU" ]]; then # macOS major upgrade via softwareupdate.
-			if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+			if [[ "${download_macos_asu_required}" == "TRUE" ]]; then
 				{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_download
 				download_macos_asu
 				[[ "${download_maocs_asu_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
@@ -5567,7 +5571,7 @@ if [[ "${workflow_download_macos_error}" == "FALSE" ]]; then
 			fi
 		fi
 	else # Only macOS updates are available.
-		if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+		if [[ "${download_macos_asu_required}" == "TRUE" ]]; then
 			{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_download
 			download_macos_asu
 			[[ "${download_maocs_asu_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
@@ -5726,7 +5730,7 @@ fi
 # Start with log and status updates.
 if [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 12.3 or newer upgrade via softwareupdate.
 	asu_macos_label_target="${asu_macos_major_upgrade_label_target}"
-	if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then # If no ${current_user_account_name} then the sytem update was not pre-downloaded.
+	if [[ "${download_macos_asu_required}" == "TRUE" ]]; then # If no ${current_user_account_name} then the sytem update was not pre-downloaded.
 		log_super "softwareupdate: Starting ${asu_macos_major_upgrade_label_target} download and upgrade workflow, check ${ASU_WORKFLOW_LOG} for more detail."
 		log_status "Running: softwareupdate: Starting ${asu_macos_major_upgrade_label_target} download and upgrade workflow."
 		log_asu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD AND UPGRADE ${asu_macos_major_upgrade_label_target} VIA SOFTWAREUPDATE START ****"
@@ -5737,7 +5741,7 @@ if [[ "${macos_version_number}" -ge 1203 ]] && [[ "${macos_major_upgrade_version
 	fi
 else # Older than macOS 12 and/or only macOS updates available.
 	asu_macos_label_target="${asu_macos_minor_update_label}"
-	if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then # If no ${current_user_account_name} then the sytem update was not pre-downloaded.
+	if [[ "${download_macos_asu_required}" == "TRUE" ]]; then # If no ${current_user_account_name} then the sytem update was not pre-downloaded.
 		log_super "softwareupdate: Starting ${asu_macos_minor_update_label} download and update workflow, check ${ASU_WORKFLOW_LOG} for more detail."
 		log_status "Running: softwareupdate: Starting ${asu_macos_minor_update_label} download and update workflow."
 		log_asu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD AND UPDATE ${asu_macos_minor_update_label} VIA SOFTWAREUPDATE START ****"
@@ -5930,7 +5934,7 @@ fi
 
 # Start with log and status updates.
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_maocs_asu_required is: ${download_maocs_asu_required}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_asu_required is: ${download_macos_asu_required}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_mdm_failover is: ${auth_mdm_failover}"
 local install_macos_mdm_workflow_type
 local install_macos_mdm_version
@@ -5938,7 +5942,7 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 
 	if [[ "${macos_version_major}" -ge 13 ]]; then # macOS major upgrade possible via MDM with Apple software update.
 		install_macos_mdm_workflow_type="UPGRADE"
 		install_macos_mdm_version="${asu_macos_major_upgrade_version_target}"
-		if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+		if [[ "${download_macos_asu_required}" == "TRUE" ]]; then
 			if [[ "${auth_mdm_failover}" == "TRUE" ]]; then
 				log_super "MDM: Starting macOS ${asu_macos_major_upgrade_version_target} download and upgrade workflow with user authenticated failover."
 				log_status "Running: MDM: Starting macOS ${asu_macos_major_upgrade_version_target} download and upgrade workflow with user authenticated failover."
@@ -5975,7 +5979,7 @@ if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS 
 else # macOS minor update.
 	install_macos_mdm_workflow_type="UPDATE"
 	install_macos_mdm_version="${asu_macos_minor_update_version}"
-	if [[ "${download_maocs_asu_required}" == "TRUE" ]]; then
+	if [[ "${download_macos_asu_required}" == "TRUE" ]]; then
 		if [[ "${auth_mdm_failover}" == "TRUE" ]]; then
 			log_super "MDM: Starting macOS ${asu_macos_minor_update_version} download and update workflow with user authenticated failover."
 			log_status "Running: MDM: Starting macOS ${asu_macos_minor_update_version} download and update workflow with user authenticated failover."
@@ -6043,7 +6047,11 @@ if [[ "${auth_error_jamf}" == "FALSE" ]]; then
 	local jamf_api_update_json
 	if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then # Jamf Pro API new managed update workflow.
 		jamf_api_update_url="${jamf_api_url}api/v1/managed-software-updates/plans"
-		jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "SPECIFIC_VERSION", "specificVersion": "'${install_macos_mdm_version}'" } }'
+		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS major upgrade.
+			jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MAJOR" } }'
+		else # macOS minor update.
+			jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MINOR" } }'
+		fi
 	else # Jamf Pro API legacy managed update workflow.
 		jamf_api_update_url="${jamf_api_url}api/v1/macos-managed-software-updates/send-updates"
 		if [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]]; then # macOS major upgrade errors when also sending "forceRestart".
@@ -7290,9 +7298,9 @@ set_display_strings_optional_buttons
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
 if [[ "${display_notifications_centered_status}" == "TRUE" ]]; then
-	ibm_notifier_array+=(-always_on_top -position center)
+	ibm_notifier_array+=(-position center -always_on_top)
 else # The default interactive notification location.
-	ibm_notifier_array+=(-always_on_top -position top_right)
+	ibm_notifier_array+=(-position top_right -always_on_top)
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
@@ -7402,7 +7410,7 @@ set_display_strings_optional_buttons
 { [[ "${display_unmovable_status}" == "TRUE" ]] || [[ "${display_unmovable_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-unmovable)
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
-ibm_notifier_array+=(-always_on_top -position center)
+ibm_notifier_array+=(-position center -always_on_top)
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
 # Kill any previous notifications so new ones can take its place.
@@ -8081,7 +8089,7 @@ else # Default software update/upgrade workflows.
 			macos_installer_build_target="${macos_build}"
 			macos_major_upgrade_version_major_target="${macos_version_major}"
 			macos_installer_size_target=15
-			download_maocs_asu_required="TRUE"
+			download_macos_asu_required="TRUE"
 			download_macos_installer_required="TRUE"
 			log_super "Test Mode: Simulating macOS ${macos_major_upgrade_version_major_target} upgrade workflow."
 		elif [[ "${workflow_restart_without_updates_option}" == "TRUE" ]]; then
@@ -8092,7 +8100,7 @@ else # Default software update/upgrade workflows.
 			asu_macos_minor_update_title="${macos_marketing_name} ${macos_version_major}.${macos_version_minor}"
 			asu_macos_minor_update_version="${macos_version_major}.${macos_version_minor}"
 			asu_macos_minor_update_size=5
-			download_maocs_asu_required="TRUE"
+			download_macos_asu_required="TRUE"
 			log_super "Test Mode: Simulating a macOS ${asu_macos_minor_update_version} update workflow."
 		fi
 	fi
@@ -8175,7 +8183,7 @@ fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_major_upgrade_version_major_target is: ${macos_major_upgrade_version_major_target}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_jamf_policy_triggers_option is: ${workflow_jamf_policy_triggers_option}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_restart_without_updates_option is: ${workflow_restart_without_updates_option}"
-if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ -n "${workflow_jamf_policy_triggers_option}" ]] || [[ "${workflow_restart_without_updates_option}" == "TRUE" ]]; then
+if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_upgrade_version_major_target}" != "FALSE" ]] || [[ "${workflow_restart_without_updates_option}" == "TRUE" ]]; then
 	if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
 		if [[ "${current_user_account_name}" == "FALSE" ]]; then # A normal user is not logged in, start installations immediately.
 			workflow_install_macos_no_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
@@ -8244,7 +8252,7 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 				[[ "${workflow_auth_macos}" != "USER" ]] && dialog_soft_deadline
 				workflow_install_macos_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 			elif [[ "${user_focus_active}" == "TRUE" ]]; then # No deadlines have passed but a process has told the display to not sleep or the user has enabled Focus or Do Not Disturb.
-				deferral_timer_minutes="${deferal_timer_focus_minutes}"
+				deferral_timer_minutes="${deferral_timer_focus_minutes}"
 				log_status "Pending: Automatic user focus deferral, trying again in ${deferral_timer_minutes} minutes."
 				set_auto_launch_deferral
 			else # Logically, this is the only time the choice dialog is shown.

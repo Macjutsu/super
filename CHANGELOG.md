@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [4.0.0-RC]
+## [4.0.0]
 
-2023-10-23
+2023-10-28
 
 ### Highlights
 
@@ -13,24 +13,34 @@
 - New default "always on" behavior automatically checks for Apple software updates on a regular basis.
 - Support for Jamf Pro 10.48+ [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html).
 - Support for Jamf Pro 10.49+ [API Roles and Clients](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/API_Roles_and_Clients.html).
-- Please check out the [new `super` v4.0.0-beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki) for more details!
+- Please check out the [updated `super` 4.0.0 Wiki](https://github.com/Macjutsu/super/wiki) for more details!
 
 ### Compatibility Notes
 
-- `super` version 4.x requires macOS 11 or newer (all code supporting macOS 10.x has been removed).
+- `super` 4.x requires macOS 11 or newer (all code supporting macOS 10.x has been removed).
 - All `super` 4.x code has been refactored for [style](https://google.github.io/styleguide/shellguide.html), clarity, and uniformity. __As such nearly every single option name has been changed.__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 4.x__
 - __Previously saved `super` 3.0 Apple silicon authentication credentials are automatically migrated the first time `super` 4.x runs.__
 - It is safe to mix `super` version 3.0 and 4.x managed preferences (except for the DisplaySilently key) in a single configuration profile. However each version only recognizes the managed preference keys that are compatible for that version.
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-rc1/Super-Friends/super-3to4-migration-options.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/4.0.0-rc1/Super-Friends/super-3to4-migration-managed-preferences.tsv).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/4.0.0-rc1/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/4.0.0-rc1/Example-MDM).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-3to4-migration-options.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-3to4-migration-managed-preferences.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/main/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
+- Updated [example MDM configuration profiles for `super` 4.0.0-beta](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 
 ### Known Issues
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
-- [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/193) where unmovable dialogs and notifications are not opening on top of other windows or able to position in the top right corner of the screen. Until this issue is resolved you can use the `--display-hide-background` option to prevent the user from ignoring dialogs and notifications.
+
+### Specific Changes (4.0.0)
+
+- Resolved an issue where the `--display-unmovable` option was preventing IBM Notifier dialogs from appearing on top of other windows or in the correct location on the screen. (Thanks to @SMartorelli for the workaround!)
+- Resolved an issue preventing the Jamf Pro [(Beta) Managed Software Update API](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) from installing macOS beta updates and upgrades.
+- Resolved an issue where an apostrophe in a user's "real name" was causing `super` to error.
+- Resolved an issue where setting the `--workflow-jamf-policy-triggers` was unintentionally running the dialog workflows again.
+- Improved logging when using the `--auth-ask-user-to-save-password` option.
+- Fixed typos.
+- [The main `super` Wiki has also been updated to 4.0.0](https://github.com/Macjutsu/super/wiki).
+- `super` 4.0.0 SHA-256: 
 
 ### Specific Changes (4.0.0-rc1)
 
