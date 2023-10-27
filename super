@@ -6922,7 +6922,7 @@ fi
 get_jamf_api_access_token() {
 local curl_response
 if [[ -n "${auth_jamf_client}" ]]; then
-	curl_response=$(curl --silent --location --request POST "${jamf_api_url}/api/oauth/token" --header "Content-Type: application/x-www-form-urlencoded" --data-urlencode "client_id=${auth_jamf_client}" --data-urlencode "grant_type=client_credentials" --data-urlencode "client_secret=${auth_jamf_secret}")
+	curl_response=$(curl --silent --location --request POST "${jamf_api_url}api/oauth/token" --header "Content-Type: application/x-www-form-urlencoded" --data-urlencode "client_id=${auth_jamf_client}" --data-urlencode "grant_type=client_credentials" --data-urlencode "client_secret=${auth_jamf_secret}")
 else # Legacy ${auth_jamf_account} authentication.
 	curl_response=$(curl --silent --location --request POST "${jamf_api_url}api/v1/auth/token" --user "${auth_jamf_account}:${auth_jamf_password}")
 fi
