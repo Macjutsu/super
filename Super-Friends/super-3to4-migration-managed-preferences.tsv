@@ -1,4 +1,4 @@
-super 3.0	super 4.0.0-beta1
+super 3.0	super 4.0.0
 <key>JamfProID</key> <string>$JSSID</string>	<key>AuthJamfComputerID</key> <string>$JSSID</string>
 <key>DefaultDefer</key> <string>seconds</string>	<key>DeferralTimerDefault</key> <string>minutes</string>
 <key>FocusDefer</key> <string>seconds</string>	<key>DeferralTimerFocus</key> <string>minutes</string>
