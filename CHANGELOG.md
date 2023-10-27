@@ -40,7 +40,7 @@
 - Improved logging when using the `--auth-ask-user-to-save-password` option.
 - Fixed typos.
 - [The main `super` Wiki has also been updated to 4.0.0](https://github.com/Macjutsu/super/wiki).
-- `super` 4.0.0 SHA-256: 
+- `super` 4.0.0 SHA-256: fc82babefa316afeaf6507b1babae0f7fb6f499c0e0b1d3dedecd3fa53f16eb2
 
 ### Specific Changes (4.0.0-rc1)
 
