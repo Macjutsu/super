@@ -2,104 +2,112 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>JamfProID</key>
+	<key>AuthJamfComputerID</key>
 	<string>$JSSID</string>
-	<key>DefaultDefer</key>
-	<string>120</string>
-	<key>FocusDefer</key>
-	<string>120</string>
-	<key>MenuDefer</key>
-	<string>120,200,300</string>
-	<key>RecheckDefer</key>
-	<string>120</string>
-	<key>ErrorDefer</key>
-	<string>120</string>
-	<key>FocusCount</key>
-	<string>5</string>
-	<key>SoftCount</key>
-	<string>5</string>
-	<key>HardCount</key>
-	<string>5</string>
-	<key>FocusDays</key>
-	<string>2</string>
-	<key>SoftDays</key>
-	<string>4</string>
-	<key>HardDays</key>
-	<string>6</string>
-	<key>ZeroDay</key>
-	<string>2022-07-01</string>
-	<key>FocusDate</key>
-	<string>2022-07-01</string>
-	<key>SoftDate</key>
-	<string>2022-07-02:02</string>
-	<key>HardDate</key>
-	<string>2022-07-03:03:03</string>
-	<key>DeferDialogTimeout</key>
+	<key>InstallMacOSMajorUpgrades</key>
+	<true/>
+	<key>InstallMacOSMajorVersionTarget</key>
+	<string>13</string>
+	<key>InstallRapidSecurityResponses</key>
+	<true/>
+	<key>InstallNonSystemUpdatesWithoutRestarting</key>
+	<true/>
+	<key>WorkflowOnlyDownload</key>
+	<false/>
+	<key>WorkflowZeroDateManual</key>
+	<string>2023-09-19:14:45</string>
+	<key>WorkflowDisableUpdateCheck</key>
+	<false/>
+	<key>WorkflowDisableRelaunch</key>
+	<false/>
+	<key>WorkflowJamfPolicyTriggers</key>
+	<string>trigger1,trigger2,trigger3</string>
+	<key>WorkflowRestartWithoutUpdates</key>
+	<false/>
+	<key>DeferralTimerDefault</key>
 	<string>60</string>
-	<key>SoftDialogTimeout</key>
+	<key>DeferralTimerMenu</key>
+	<string>15,60,240,1440</string>
+	<key>DeferralTimerFocus</key>
 	<string>60</string>
-	<key>DisplayRedraw</key>
-	<string>20</string>
-	<key>DisplayIcon</key>
+	<key>DeferralTimerError</key>
+	<string>60</string>
+	<key>DeferralTimerWorkflowRelaunch</key>
+	<string>360</string>
+	<key>DeadlineCountFocus</key>
+	<string>5</string>
+	<key>DeadlineCountSoft</key>
+	<string>5</string>
+	<key>DeadlineCountHard</key>
+	<string>5</string>
+	<key>DeadlineDaysFocus</key>
+	<string>3</string>
+	<key>DeadlineDaysSoft</key>
+	<string>5</string>
+	<key>DeadlineDaysHard</key>
+	<string>7</string>
+	<key>DeadlineDateFocus</key>
+	<string>2023-09-21:00:00</string>
+	<key>DeadlineDateSoft</key>
+	<string>2023-09-25:00:00</string>
+	<key>DeadlineDateHard</key>
+	<string>2023-09-27:00:00</string>
+	<key>DialogTimeoutDefault</key>
+	<string>600</string>
+	<key>DialogTimeoutRestartOrDefer</key>
+	<string>600</string>
+	<key>DialogTimeoutSoftDeadline</key>
+	<string>600</string>
+	<key>DialogTimeoutUserAuth</key>
+	<string>600</string>
+	<key>DialogTimeoutInsufficientStorage</key>
+	<string>600</string>
+	<key>DialogTimeoutPowerRequired</key>
+	<string>600</string>
+	<key>DisplayUnmovable</key>
+	<string>ALWAYS</string>
+	<key>DisplayHideBackground</key>
+	<string>HARD,POWER</string>
+	<key>DisplaySilently</key>
+	<string>INSTALLNOW</string>
+	<key>DisplayNotificationsCentered</key>
+	<string>HARD,INSTALLNOW</string>
+	<key>DisplayIconFile</key>
 	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
-	<key>IconSizeIbm</key>
-	<string>128</string>
-	<key>IconSizeJamf</key>
+	<key>DisplayIconSize</key>
 	<string>128</string>
 	<key>DisplayAccessoryType</key>
 	<string>HTML</string>
-	<key>DisplayAccessoryDefault</key>
+	<key>DisplayAccessoryDefaultFile</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryUpdate</key>
+	<key>DisplayAccessoryUpdateFile</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryUpgrade</key>
+	<key>DisplayAccessoryUpgradeFile</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryUserAuth</key>
+	<key>DisplayAccessoryUserAuthFile</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>HelpButton</key>
+	<key>DisplayHelpButtonString</key>
 	<string>https://support.apple.com/en-us/HT201541</string>
-	<key>WarningButton</key>
+	<key>DisplayWarningButtonString</key>
 	<string>https://support.apple.com/en-us/HT201222</string>
-	<key>DisplaySilently</key>
-	<false/>
-	<key>PreferJamfHelper</key>
-	<false/>
-	<key>UserAuthTimeout</key>
-	<string>600</string>
-	<key>UserAuthMDMFailover</key>
-	<string>HARD,INSTALLNOW,BOOTSTRAP</string>
-	<key>AllowUpgrade</key>
+	<key>AuthAskUserToSavePassword</key>
 	<true/>
-	<key>TargetUpgrade</key>
-	<string>12</string>
-	<key>AllowRSRUpdates</key>
+	<key>AuthJamfCustomURL</key>
+	<string>https://jamf-api.domain.com</string>
+	<key>AuthCredentialFailoverToUser</key>
 	<true/>
-	<key>EnforceNonSystemUpdates</key>
-	<true/>
-	<key>OnlyDownload</key>
-	<true/>
-	<key>InstallNow</key>
-	<true/>
-	<key>PolicyTriggers</key>
-	<string>trigger1,trigger2</string>
-	<key>SkipUpdates</key>
-	<true/>
-	<key>RestartWithoutUpdates</key>
-	<true/>
-	<key>FreeSpaceUpdate</key>
-	<string>15</string>
-	<key>FreeSpaceUpgrade</key>
-	<string>35</string>
-	<key>FreeSpaceTimeout</key>
-	<string>3600</string>
-	<key>BatteryLevel</key>
-	<string>50</string>
-	<key>BatteryTimeout</key>
-	<string>3600</string>
+	<key>AuthMDMFailoverToUser</key>
+	<string>NOSERVICE,BOOTSTRAP</string>
 	<key>TestMode</key>
 	<true/>
 	<key>TestModeTimeout</key>
 	<string>60</string>
+	<key>TestStorageUpdate</key>
+	<string>25</string>
+	<key>TestStorageUpgrade</key>
+	<string>25</string>
+	<key>TestBatteryLevel</key>
+	<string>75</string>
 	<key>VerboseMode</key>
 	<true/>
 </dict>

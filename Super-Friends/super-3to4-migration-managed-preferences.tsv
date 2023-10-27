@@ -1,0 +1,51 @@
+super 3.0	super 4.0.0-beta1
+<key>JamfProID</key> <string>$JSSID</string>	<key>AuthJamfComputerID</key> <string>$JSSID</string>
+<key>DefaultDefer</key> <string>seconds</string>	<key>DeferralTimerDefault</key> <string>minutes</string>
+<key>FocusDefer</key> <string>seconds</string>	<key>DeferralTimerFocus</key> <string>minutes</string>
+<key>MenuDefer</key> <string>seconds,seconds,etc...</string>	<key>DeferralTimerMenu</key> <string>minutes,minutes,etc...</string>
+<key>RecheckDefer</key> <string>seconds</string>	<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>
+<key>ErrorDefer</key> <string>seconds</string>	<key>DeferralTimerError</key> <string>minutes</string>
+<key>FocusCount</key> <string>number</string>	<key>DeadlineCountFocus</key> <string>number</string>
+<key>SoftCount</key> <string>number</string>	<key>DeadlineCountSoft</key> <string>number</string>
+<key>HardCount</key> <string>number</string>	<key>DeadlineCountHard</key> <string>number</string>
+<key>FocusDays</key> <string>number</string>	<key>DeadlineDaysFocus</key> <string>number</string>
+<key>SoftDays</key> <string>number</string>	<key>DeadlineDaysSoft</key> <string>number</string>
+<key>HardDays</key> <string>number</string>	<key>DeadlineDaysHard</key> <string>number</string>
+<key>ZeroDay</key> <string>YYYY-MM-DD:hh:mm</string>	<key>WorkflowZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>FocusDate</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateFocus</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>SoftDate</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>HardDate</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>DeferDialogTimeout</key> <string>seconds</string>	<key>DialogTimeoutRestartOrDefer</key> <string>seconds</string>
+<key>SoftDialogTimeout</key> <string>seconds</string>	<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>
+<key>DisplayRedraw</key> <string>seconds</string>	REMOVED
+<key>DisplayIcon</key> <string>path</string>	<key>DisplayIconFile</key> <string>path</string>
+<key>IconSizeIbm</key> <string>pixels</string>	<key>DisplayIconSize</key> <string>pixels</string>
+<key>IconSizeJamf</key> <string>pixels</string>	REMOVED
+<key>DisplayAccessoryType</key> <string>TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO</string>	<key>DisplayAccessoryType</key> <string>TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO</string>
+<key>DisplayAccessoryDefault</key> <string>path or URL</string>	<key>DisplayAccessoryDefaultFile</key> <string>path or URL</string>
+<key>DisplayAccessoryUpdate</key> <string>path or URL</string>	<key>DisplayAccessoryUpdateFile</key> <string>path or URL</string>
+<key>DisplayAccessoryUpgrade</key> <string>path or URL</string>	<key>DisplayAccessoryUpgradeFile</key> <string>path or URL</string>
+<key>DisplayAccessoryUserAuth</key> <string>path or URL</string>	<key>DisplayAccessoryUserAuthFile</key> <string>path or URL</string>
+<key>HelpButton</key> <string>plain text or URL</string>	<key>DisplayHelpButtonString</key> <string>plain text or URL</string>
+<key>WarningButton</key> <string>plain text or URL</string>	<key>DisplayWarningButtonString</key> <string>plain text or URL</string>
+<key>DisplaySilently</key> <true/> | <false/>	<key>DisplaySilently</key> <string>ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE</string>
+<key>PreferJamfHelper</key> <true/> | <false/>	REMOVED
+<key>UserAuthTimeout</key> <string>seconds</string>	<key>DialogTimeoutUserAuth</key> <string>seconds</string>
+<key>UserAuthMDMFailover</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>	<key>AuthMDMFailoverToUser</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>
+<key>AllowUpgrade</key> <true/> | <false/>	<key>InstallMacOSMajorUpgrades</key> <true/> | <false/>
+<key>TargetUpgrade</key> <string>version</string>	<key>InstallMacOSMajorVersionTarget</key> <string>version</string>
+<key>AllowRSRUpdates</key> <true/> | <false/>	<key>InstallRapidSecurityResponses</key> <true/> | <false/>
+<key>EnforceNonSystemUpdates</key> <true/> | <false/>	<key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>
+<key>OnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>
+<key>InstallNow</key> <true/> | <false/>	REMOVED
+<key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>	<key>WorkflowJamfPolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>
+<key>SkipUpdates</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>
+<key>RestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>
+<key>FreeSpaceUpdate</key> <string>gigabytes</string>	<key>TestStorageUpdate</key> <string>gigabytes</string>
+<key>FreeSpaceUpgrade</key> <string>gigabytes</string>	<key>TestStorageUpgrade</key> <string>gigabytes</string>
+<key>FreeSpaceTimeout</key> <string>seconds</string>	<key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>
+<key>BatteryLevel</key> <string>percentage</string>	<key>TestBatteryLevel</key> <string>percentage</string>
+<key>BatteryTimeout</key> <string>seconds</string>	<key>DialogTimeoutPowerRequired</key> <string>seconds</string>
+<key>TestMode</key> <true/> | <false/>	<key>TestMode</key> <true/> | <false/>
+<key>TestModeTimeout</key> <string>seconds</string>	<key>TestModeTimeout</key> <string>seconds</string>
+<key>VerboseMode</key> <true/> | <false/>	<key>VerboseMode</key> <true/> | <false/>
