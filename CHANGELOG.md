@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [4.0.0]
+## [4.0.1]
 
-2023-10-28
+2023-10-31
 
 ### Highlights
 
@@ -13,7 +13,7 @@
 - New default "always on" behavior automatically checks for Apple software updates on a regular basis.
 - Support for Jamf Pro 10.48+ [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html).
 - Support for Jamf Pro 10.49+ [API Roles and Clients](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/API_Roles_and_Clients.html).
-- Please check out the [updated `super` v4.0.0 Wiki](https://github.com/Macjutsu/super/wiki) for more details!
+- Please check out the [updated `super` Wiki](https://github.com/Macjutsu/super/wiki) for more details!
 
 ### Compatibility Notes
 
@@ -25,11 +25,23 @@
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 command line options to version 4.x](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-3to4-migration-options.tsv).
 - Refer to this [spreadsheet (tab separated values) for migrating `super` 3.0 managed preferences to version 4.x](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-3to4-migration-managed-preferences.tsv).
 - Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/blob/main/Super-Friends/) now supports both `super` versions 3.0 and 4.x.
-- Updated [example MDM configuration profiles for `super` v4.0.0](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` v4.x](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 
 ### Known Issues
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
+
+### Specific Changes (4.0.1)
+
+- New super.log behavior, if there is a current active user then the UID is now also shown in the log.
+- Reduced the minium storage space required for a macOS major upgrade to 25 GB plus the size of the download (previously it was 35 GB plus the size of the download).
+- Resolved a regression issue that wasn't installing the latest version of [IBM Notifier 3.0.3](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-3.0.3-b-108).
+- Resolved an issue preventing reliable detection of a system currently at the login window, thus causing download workflow errors.
+- Resolved an issue preventing the successful installation of macOS updates when there is no current active user.
+- Resolved an issue where some `softwareupdate` errors were not being reported accurately.
+- Resolved an issue where some authentication log entries were not being reported. (Thanks to @blakeusblade for finding this one!)
+- Fixed a small typo in a Jamf Pro API call. (Thanks to @master-vodawagner for finding this one!)
+- `super` 4.0.1 SHA-256: 49de57115dc6c280e30edc20023c4376f9a52da99fba44610f055a0cd51164dd
 
 ### Specific Changes (4.0.0)
 

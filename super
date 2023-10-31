@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2024,SC2207
 
-SUPER_VERSION="4.0.0"
-SUPER_DATE="2023/10/28"
+SUPER_VERSION="4.0.1"
+SUPER_DATE="2023/10/31"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -293,11 +293,11 @@ readonly JAMF_PRO_BINARY
 # IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the jamf binary.
 
 # URL to the IBM Notifier.app download:
-IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.0.2-b-107/IBM.Notifier.zip"
+IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.0.3-b-108/IBM.Notifier.zip"
 readonly IBM_NOTIFIER_DOWNLOAD_URL
 
 # Target version for IBM Notifier.app:
-IBM_NOTIFIER_TARGET_VERSION="3.0.2"
+IBM_NOTIFIER_TARGET_VERSION="3.0.3"
 readonly IBM_NOTIFIER_TARGET_VERSION
 
 # Path to the local IBM Notifier.app:
@@ -362,7 +362,7 @@ STORAGE_REQUIRED_UPDATE_DEFAULT_GB=15
 readonly STORAGE_REQUIRED_UPDATE_DEFAULT_GB
 
 # The default minium storage space in gigabytes required for a macOS upgrade.
-STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=35
+STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=25
 readonly STORAGE_REQUIRED_UPGRADE_DEFAULT_GB
 
 # The number of seconds between storage checks when displaying the insufficient storage notification via the dialog_insufficient_storage() function.
@@ -2306,20 +2306,20 @@ if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] || [[ -n "${auth_local_ac
 		auth_jamf_account_saved="FALSE"
 	fi
 	if [[ -n "${auth_legacy_local_account_saved}" ]]; then
-		sendToLog "Status: Deleting saved credentials for legacy local account."
+		log_super "Status: Deleting saved credentials for legacy local account."
 		defaults delete "${SUPER_LOCAL_PLIST}" LocalAccount > /dev/null 2>&1
 		security delete-generic-password -a "${auth_legacy_local_account_saved}" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 		unset auth_legacy_local_account_saved
 	fi
 	if [[ -n "${auth_legacy_super_account_saved}" ]]; then
-		sendToLog "Status: Deleting local account and saved credentials for legacy super service account."
+		log_super "Status: Deleting local account and saved credentials for legacy super service account."
 		sysadminctl -deleteUser "${auth_legacy_super_account_saved}" > /dev/null 2>&1
 		defaults delete "${SUPER_LOCAL_PLIST}" SuperAccount > /dev/null 2>&1
 		security delete-generic-password -a "${auth_legacy_super_account_saved}" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 		unset auth_legacy_super_account_saved
 	fi
 	if [[ -n "${auth_legacy_jamf_account_saved}" ]]; then
-		sendToLog "Status: Deleting saved credentials for legacy Jamf Pro API account."
+		log_super "Status: Deleting saved credentials for legacy Jamf Pro API account."
 		defaults delete "${SUPER_LOCAL_PLIST}" JamfAccount > /dev/null 2>&1
 		security delete-generic-password -a "${auth_legacy_jamf_account_saved}" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 		unset auth_legacy_jamf_account_saved
@@ -2329,7 +2329,7 @@ fi
 
 # Start migration of any legacy authentication items new keychain storage method.
 if [[ -n "${auth_legacy_local_account_saved}" ]]; then
-	sendToLog "Status: Migrating saved legacy local account credentials..."
+	log_super "Status: Migrating saved legacy local account credentials..."
 	local auth_legacy_local_password_saved
 	auth_legacy_local_password_saved=$(security find-generic-password -w -a "${auth_legacy_local_account_saved}" -s "Super Local Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n "${auth_legacy_local_password_saved}" ]]; then
@@ -2342,7 +2342,7 @@ if [[ -n "${auth_legacy_local_account_saved}" ]]; then
 	fi
 fi
 if [[ -n "${auth_legacy_super_account_saved}" ]]; then
-	sendToLog "Status: Migrating saved legacy super service account credentials..."
+	log_super "Status: Migrating saved legacy super service account credentials..."
 	local auth_legacy_super_password_saved
 	auth_legacy_super_password_saved=$(security find-generic-password -w -a "${auth_legacy_super_account_saved}" -s "Super Service Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n "${auth_legacy_super_password_saved}" ]]; then
@@ -2355,7 +2355,7 @@ if [[ -n "${auth_legacy_super_account_saved}" ]]; then
 	fi
 fi
 if [[ -n "${auth_legacy_jamf_account_saved}" ]]; then
-	sendToLog "Status: Migrating saved legacy Jamf Pro API account credentials..."
+	log_super "Status: Migrating saved legacy Jamf Pro API account credentials..."
 	local auth_legacy_jamf_password_saved
 	auth_legacy_jamf_password_saved=$(security find-generic-password -w -a "${auth_legacy_jamf_account_saved}" -s "Super MDM Account" /Library/Keychains/System.keychain 2> /dev/null)
 	if [[ -n "${auth_legacy_jamf_password_saved}" ]]; then
@@ -2629,17 +2629,17 @@ fi
 # Delete any migrated legacy credentials.
 if [[ "${auth_error_new}" == "FALSE" ]]; then
 	if [[ "${auth_legacy_local_migrate}" == "TRUE" ]]; then
-		sendToLog "Status: Deleting saved credentials for legacy local account."
+		log_super "Status: Deleting saved credentials for legacy local account."
 		defaults delete "${SUPER_LOCAL_PLIST}" LocalAccount > /dev/null 2>&1
 		security delete-generic-password -a "${auth_legacy_local_account_saved}" -s "Super Local Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	fi
 	if [[ "${auth_legacy_service_migrate}" == "TRUE" ]]; then
-		sendToLog "Status: Deleting saved credentials for legacy super service account."
+		log_super "Status: Deleting saved credentials for legacy super service account."
 		defaults delete "${SUPER_LOCAL_PLIST}" SuperAccount > /dev/null 2>&1
 		security delete-generic-password -a "${auth_legacy_super_account_saved}" -s "Super Service Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	fi
 	if [[ "${auth_legacy_jamf_migrate}" == "TRUE" ]]; then
-		sendToLog "Status: Deleting saved credentials for legacy Jamf Pro API account."
+		log_super "Status: Deleting saved credentials for legacy Jamf Pro API account."
 		defaults delete "${SUPER_LOCAL_PLIST}" JamfAccount > /dev/null 2>&1
 		security delete-generic-password -a "${auth_legacy_jamf_account_saved}" -s "Super MDM Account" /Library/Keychains/System.keychain > /dev/null 2>&1
 	fi
@@ -3469,38 +3469,42 @@ fi
 # Set ${current_user_account_name} to the currently logged in GUI user or "FALSE" if there is none or a system account.
 # If the current user is a normal account then this also sets ${current_user_id}, ${current_user_guid}, ${current_user_real_name}, ${current_user_is_admin}, ${current_user_has_secure_token}, and ${current_user_is_volume_owner}
 check_current_user() {
+[[ -z "${current_user_account_name}" ]] && current_user_account_name="FALSE"
+[[ -z "${current_user_id}" ]] && current_user_id="FALSE"
 local current_user_account_name_response
 current_user_account_name_response=$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ {$1=$2="";print $0;}' | xargs)
-
-# If this function was already run earlier then check to see if ${current_user_account_name} and ${current_user_id} are the same as before, if so then it's not necessary to continue this function.
-if [[ "${current_user_account_name}" == "${current_user_account_name_response}" ]]; then
-	local current_user_id_response
-	current_user_id_response=$(id -u "${current_user_account_name_response}" 2> /dev/null)
-	[[ "${current_user_id}" == "${current_user_id_response}" ]] && return 0
-fi
+local current_user_id_response
+current_user_id_response=$(id -u "${current_user_account_name_response}" 2> /dev/null)
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_account_name is: ${current_user_account_name}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_id is: ${current_user_id}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_account_name_response is: ${current_user_account_name_response}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_id_response is: ${current_user_id_response}"
 
+# If this function was already run earlier then check to see if ${current_user_account_name} and ${current_user_id} are the same as before, if so then it's not necessary to continue this function.
+if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" != "FALSE" ]] && [[ "${current_user_account_name}" == "${current_user_account_name_response}" ]] && [[ "${current_user_id}" == "${current_user_id_response}" ]]; then
+	return 0
+fi
+
+# Make sure we have a "normal" logged in user.
 if [[ -z "${current_user_account_name_response}" ]]; then
 	{ [[ $(id -u) -eq 0 ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; } && log_super "Status: No GUI user currently logged in."
 	{ [[ $(id -u) -ne 0 ]] || [[ ! -d "${SUPER_LOG_FOLDER}" ]]; } && log_echo "Status: No GUI user currently logged in."
-	current_user_account_name="FALSE"
-	current_user_id="FALSE"
 elif [[ "${current_user_account_name_response}" = "root" ]] || [[ "${current_user_account_name_response}" = "_mbsetupuser" ]] || [[ "${current_user_account_name_response}" = "loginwindow" ]]; then
 	{ [[ $(id -u) -eq 0 ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; } && log_super "Status: Current GUI user is system account: ${current_user_account_name_response}"
 	{ [[ $(id -u) -ne 0 ]] || [[ ! -d "${SUPER_LOG_FOLDER}" ]]; } && log_echo "Status: Current GUI user is system account: ${current_user_account_name_response}"
-	current_user_account_name="FALSE"
-	current_user_id="FALSE"
 else # Normal locally logged in user.
 	current_user_account_name="${current_user_account_name_response}"
-	{ [[ $(id -u) -eq 0 ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; } && log_super "Status: Current GUI user name: ${current_user_account_name}"
-	{ [[ $(id -u) -ne 0 ]] || [[ ! -d "${SUPER_LOG_FOLDER}" ]]; } && log_echo "Status: Current GUI user name: ${current_user_account_name}"
-fi
-if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" != "FALSE" ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 	current_user_id=$(id -u "${current_user_account_name}" 2> /dev/null)
+	{ [[ $(id -u) -eq 0 ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; } && log_super "Status: Current active GUI user is: ${current_user_account_name} (${current_user_id})"
+	{ [[ $(id -u) -ne 0 ]] || [[ ! -d "${SUPER_LOG_FOLDER}" ]]; } && log_echo "Status: Current active GUI user is: ${current_user_account_name} (${current_user_id})"
+fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_account_name is: ${current_user_account_name}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_id is: ${current_user_id}"
+
+# Only collect user details if it's a "normal" GUI user.
+if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" != "FALSE" ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 	current_user_guid=$(dscl . read "/Users/${current_user_account_name}" GeneratedUID 2> /dev/null | awk '{print $2;}')
 	current_user_real_name=$(dscl . read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/^ //g')
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_id is: ${current_user_id}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_guid is: ${current_user_guid}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_real_name is: ${current_user_real_name}"
 	current_user_is_admin="FALSE"
@@ -5245,7 +5249,7 @@ unset downloaded_macos_asu_title
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: download_macos_asu_timeout_seconds is: ${download_macos_asu_timeout_seconds}"
 while read -t "${download_macos_asu_timeout_seconds}" -r log_line ; do
 	# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-	if [[ $(echo "${log_line}" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate" ) -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'No such update' ) -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Failed to download' ) -gt 0 ]]; then
+	if [[ $(echo "${log_line}" | grep -c "Can’t connect" ) -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate" ) -gt 0 ]]; then
 		download_macos_asu_start_error="CONNECT"
 		break
 	elif [[ $(echo "${log_line}" | grep -c 'No such update' ) -gt 0 ]]; then
@@ -5254,7 +5258,7 @@ while read -t "${download_macos_asu_timeout_seconds}" -r log_line ; do
 	elif [[ $(echo "${log_line}" | grep -c 'Not enough free disk space' ) -gt 0 ]]; then
 		download_macos_asu_start_error="SPACE"
 		break
-	elif [[ $(echo "${log_line}" | grep -c 'Failed to download & prepare' ) -gt 0 ]]; then
+	elif [[ $(echo "${log_line}" | grep -c 'Failed to download' ) -gt 0 ]]; then
 		download_macos_asu_start_error="FAILED"
 		break
 	elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_asu_phase}" == "START" ]]; then
@@ -5853,7 +5857,9 @@ while read -t "${install_macos_asu_timeout_seconds}" -r log_line ; do
 		if [[ $install_macos_asu_complete_percent -ge 100 ]]; then
 			log_echo_replace_line "${downloaded_macos_asu_title} preparing progress: 100%\n"
 			log_asu "**** TIMESTAMP ****"
+			install_macos_asu_start_error="FALSE"
 			install_macos_asu_start_timeout="FALSE"
+			install_macos_asu_timeout_error="FALSE"
 			break
 		elif [[ $install_macos_asu_complete_percent -gt $install_macos_asu_complete_percent_previous ]]; then
 			install_macos_asu_complete_percent_display=$(((install_macos_asu_complete_percent-60)*2))
@@ -6126,10 +6132,14 @@ if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" 
 	while read -t "${TIMEOUT_MDM_COMMAND_SECONDS}" -r log_line ; do
 		# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
 		if [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
-			log_super "MDM: Workflow error detected."
-			log_mdm_command "**** TIMESTAMP ****"
-			install_macos_mdm_start_error="TRUE"
-			break
+			if [[ $(echo "${log_line}" | grep -c 'DeclarativeManagement') -gt 0 ]] && [[ "${macos_version_major}" -lt 14 ]]; then
+				log_super "MDM: DDM error detected but it should be ignored by older versions of macOS."
+			else
+				log_super "MDM: Command error detected."
+				log_mdm_command "**** TIMESTAMP ****"
+				install_macos_mdm_start_error="TRUE"
+				break
+			fi
 		elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Idle\]') -gt 0 ]]; then
 			log_super "MDM: Received blank push."
 			log_mdm_command "**** TIMESTAMP ****"
