@@ -37,7 +37,7 @@
 - Improved `--open-logs` option behavior now opens all possible `super` logs.
 - Improved Apple silicon authentication options behavior when there is no actively logged in user. In most cases, if user authentication is required but there is no active user, the `super` workflow automatically tries again later.
 - New error detection for the combination of the Jamf Pro [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) workflow with the `--install-macos-major-version-target` option.
-- Improved non-macOS updates workflow has better handling of errors and user notifications.
+- Improved non-system updates workflow has better handling of errors and user notifications.
 - Resolved issues causing inaccurate log file size estimates and recursively larger log archives. This recursion issue was exacerbated by prolonged use of the `--verbose-mode` option, as such the [`super` Wiki has also been updated](https://github.com/Macjutsu/super/wiki/Troubleshooting#use-super-verbose-mode).
 - New failsafe log archive mechanism automatically removes any files larger than 10000 KB (10 MB) in the log archive folder. Given that the `super` logs are automatically archived once any individual log reaches just 1000 KB (1 MB), no compressed log archive should ever reach 10 MB.
 - Resolved an issue causing erroneous text in the current user's "real name".
