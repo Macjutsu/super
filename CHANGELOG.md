@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [4.0.1]
+## [4.0.2]
 
-2023-10-31
+2023-11-15
 
 ### Highlights
 
@@ -30,6 +30,19 @@
 ### Known Issues
 
 - [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
+- The Jamf Pro [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) workflow is not compatible with the `--install-macos-major-version-target` option. Until this issue is resolved you can revert your Jamf Pro service back to the current macOS software update workflow.
+
+### Specific Changes (4.0.2)
+
+- Improved `--open-logs` option behavior now opens all possible `super` logs.
+- Improved Apple silicon authentication options behavior when there is no actively logged in user. In most cases, if user authentication is required but there is no active user, the `super` workflow automatically tries again later.
+- New error detection for the combination of the Jamf Pro [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) workflow with the `--install-macos-major-version-target` option.
+- Resolved issues causing inaccurate log file size estimates and recursively larger log archives. This recursion issue was exacerbated by prolonged use of the `--verbose-mode` option, as such the [`super` Wiki has also been updated](https://github.com/Macjutsu/super/wiki/Troubleshooting#use-super-verbose-mode).
+- New failsafe log archive mechanism automatically removes any files larger than 10000 KB (10 MB) in the log archive folder. Given that the `super` logs are automatically archived once any individual log reaches just 1000 KB (1 MB), no compressed log archive should ever reach 10 MB.
+- Resolved an issue causing erroneous text in the current user's "real name".
+- Fixed various typos and improved a few log reporting behaviors.
+- New Jamf Pro API testing scripts in the [Super Friends folder](https://github.com/Macjutsu/super/tree/main/Super-Friends): Create-MDM-Logs.sh, Create-MDM-Update-Jamf-API-Latest.sh, and Create-MDM-Update-Jamf-API-Version.sh
+- `super` 4.0.2 SHA-256: a3568c093bd220a642c1bd9f51f8bf98d474b9e57a6f827fb7733d3dde2dbf6b
 
 ### Specific Changes (4.0.1)
 

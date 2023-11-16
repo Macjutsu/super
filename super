@@ -5,10 +5,10 @@
 # by Kevin M. White
 
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
-# shellcheck disable=SC2024,SC2207
+# shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="4.0.1"
-SUPER_DATE="2023/10/31"
+SUPER_VERSION="4.0.2"
+SUPER_DATE="2023/11/15"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -229,7 +229,7 @@ SUPER_LOG_ARCHIVE_FOLDER="${SUPER_FOLDER}/logs-archive"
 readonly SUPER_LOG_ARCHIVE_FOLDER
 
 # The maximum size (in KB) for any super log that triggers an archival of log files at startup:
-SUPER_LOG_ARCHIVE_SIZE="1000"
+SUPER_LOG_ARCHIVE_SIZE=1000
 readonly SUPER_LOG_ARCHIVE_SIZE
 
 # Path to the log for the main super workflow:
@@ -756,9 +756,7 @@ if [[ "${reset_super_option}" == "TRUE" ]]; then
 	rm -f "${WORKFLOW_RESTART_VALIDATE_FILE}" 2> /dev/null
 	rm -r "${DISPLAY_ICON_FILE_CACHE}" > /dev/null 2>&1
 	rm -f "${ASU_LIST_LOG}" 2> /dev/null
-	touch "${ASU_LIST_LOG}"
 	rm -f "${INSTALLER_LIST_LOG}" 2> /dev/null
-	touch "${INSTALLER_LIST_LOG}"
 	workflow_software_full_check_required="TRUE"
 	defaults write "${SUPER_LOCAL_PLIST}" SuperVersion -string "${SUPER_VERSION}"
 	defaults write "${SUPER_LOCAL_PLIST}" MacLastStartup -string "${mac_last_startup}"
@@ -2223,16 +2221,18 @@ auth_error_new="FALSE"
 
 # Collect any previously saved credential states (including legacy methods) from ${SUPER_LOCAL_PLIST}.
 auth_user_account_saved="FALSE"
-if [[ "${current_user_account_name}" != "FALSE" ]]; then
-	auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
-	if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
-		auth_user_account_saved="TRUE"
-	else
-		unset auth_user_password_keychain
+if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
+	if [[ "${current_user_account_name}" != "FALSE" ]]; then
+		auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: auth_user_password_keychain: ${auth_user_password_keychain}"
+		if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -eq 0 ]]; then
+			auth_user_account_saved="TRUE"
+		else
+			unset auth_user_password_keychain
+		fi
+	else # No ${current_user_account_name}
+		log_super "Warning: No currently logged in user, unable to the check status of the --auth-ask-user-to-save-password option."
 	fi
-else # No ${current_user_account_name}
-	log_super "Warning: No currently logged in user, cannot check status of the --auth-ask-user-to-save-password option."
 fi
 auth_local_account_saved=$(defaults read "${SUPER_LOCAL_PLIST}" AuthLocalAccount 2> /dev/null)
 [[ "${auth_local_account_saved}" -eq 1 ]] && auth_local_account_saved="TRUE"
@@ -2376,7 +2376,7 @@ if [[ "${auth_ask_user_to_save_password}" -eq 1 ]] || [[ "${auth_ask_user_to_sav
 	[[ -n "${auth_service_add_via_admin_account_option}" ]] && log_super "Warning: Ignoring the --auth-service-add-via-admin-account option."
 	[[ -n "${auth_jamf_client_option}" ]] && log_super "Warning: Ignoring the --auth-jamf-client option."
 	[[ -n "${auth_jamf_account_option}" ]] && log_super "Warning: Ignoring the --auth-jamf-account option."
-	[[ "${auth_user_account_saved}" == "FALSE" ]] && log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+	[[ "${current_user_account_name}" != "FALSE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
 	# The ${auth_ask_user_to_save_password} option is saved later via the dialog_user_auth() function.
 elif [[ -n "${auth_local_account_option}" ]]; then
 	{ [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]]; } && log_super "Warning: The --auth-local-account option overrides the --auth-service-add-via-admin-account option and any other Apple silicon MDM authentication methods."
@@ -2648,8 +2648,7 @@ fi
 
 # This function determines what ${workflow_auth_macos} workflows are possible given the architecture and authentication options during startup.
 manage_workflow_options() {
-auth_error_user="FALSE"
-workflow_error="FALSE"
+workflow_auth_error="FALSE"
 
 # If the ${workflow_disable_update_check_option} is enabled then there is no reason to continue this function.
 [[ "${workflow_disable_update_check_option}" == "TRUE" ]] && return 0
@@ -2672,63 +2671,70 @@ if [[ "${auth_error_new}" != "TRUE" ]]; then
 				workflow_auth_macos="JAMF"
 			else # Systems older than macOS 11.3.
 				log_super "Warning: Automatic macOS update/upgrade enforcement via MDM is only available on macOS 11.3 or newer."
-				log_super "Status: Manual user authentication is required to perform a macOS update/upgrade."
 				if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
+					log_super "Status: User authentication is required to perform a macOS update/upgrade."
 					workflow_auth_macos="USER"
 				else # No valid current user to authenticate workflow.
-					auth_error_user="TRUE"
+					workflow_auth_error="TRUE"
 				fi
 			fi
 		else # No Apple silicon authentication options were provided.
-			log_super "Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires saved authentication credentials."
-			log_super "Status: Manual user authentication is required to perform a macOS update/upgrade."
+			log_super "Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials."
 			if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
+				log_super "Status: User authentication is required to perform a macOS update/upgrade."
 				workflow_auth_macos="USER"
 			else # No valid current user to authenticate workflow.
-				auth_error_user="TRUE"
+				workflow_auth_error="TRUE"
 			fi
 		fi
 	fi
-else # Authentication validation errors.
+else # New authentication validation errors.
 	if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]]; then
 		if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
-			[[ "${auth_error_new}" == "TRUE" ]] && log_super "Warning: Apple silicon authentication options could not be validated, failing over to manual user authenticated workflow."
+			log_super "Warning: Apple silicon authentication options could not be validated, failing over to user authenticated workflow."
 			workflow_auth_macos="FAILOVER"
 		else # No valid current user to authenticate workflow.
-			if [[ "${auth_error_new}" == "TRUE" ]]; then
-				log_super "Auth Error: Apple silicon authentication options could not be validated and manual user authentication failover is not currently possible, workflow can not continue."
-				auth_error_user="TRUE"
-			fi
+			log_super "Auth Error: Apple silicon authentication options could not be validated and user authentication failover is not currently possible."
+			workflow_auth_error="TRUE"
 		fi
 	elif { [[ "${auth_jamf_client_saved}" -eq 1 ]] || [[ "${auth_jamf_account_saved}" -eq 1 ]]; } && { [[ "${auth_mdm_failover}" == "TRUE" ]] || [[ "${auth_mdm_failover_no_service}" == "TRUE" ]] || { [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${auth_mdm_failover_install_now}" == "TRUE" ]]; }; }; then
 		if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
-			log_super "Warning: Previously saved Apple silicon MDM credentials could not be validated, failing over to manual user authenticated workflow."
+			log_super "Warning: Apple silicon MDM credentials could not be validated, failing over to user authenticated workflow."
 			workflow_auth_macos="FAILOVER"
 		else # No valid current user to authenticate workflow.
-			deferral_timer_minutes="${deferral_timer_error_minutes}"
-			log_super "Auth Error: Previously saved Apple silicon MDM credentials could not be validated and manual user authentication failover is not currently possible, trying again in ${deferral_timer_minutes} minutes."
-			log_status "Pending: Auth Error: Previously saved Apple silicon MDM credentials could not be validated and manual user authentication failover is not currently possible, trying again in ${deferral_timer_minutes} minutes."
-			set_auto_launch_deferral
+			log_super "Auth Error: Apple silicon MDM credentials could not be validated and user authentication failover is not currently possible."
+			workflow_auth_error="TRUE"
 		fi
 	else # No authentication failover options.
-		if [[ "${auth_error_new}" == "TRUE" ]]; then
-			log_super "Auth Error: Apple silicon authentication options could not be validated and no failover option was specified, workflow can not continue."
-			log_status "Inactive Error: Apple silicon authentication option could not be validated and no failover option was specified, workflow can not continue."
-			workflow_error="TRUE"
-		fi
+		log_super "Exit: Apple silicon authentication options could not be validated and no failover option was specified, the workflow cannot continue."
+		log_status "Inactive Error: Apple silicon authentication options could not be validated and no failover option was specified, the workflow cannot continue."
+		{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_failed
+		exit_error
 	fi
 fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: auth_error_user is: ${auth_error_user}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_error is: ${workflow_auth_error}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_auth_macos is: ${workflow_auth_macos}"
 
-# Handle the ${auth_error_user} condition, which at this point is a workflow-stopper.
-if [[ "${auth_error_user}" == "TRUE" ]]; then
-	[[ "${current_user_account_name}" == "FALSE" ]] && log_super "Auth Error: No current user to provide local authentication, workflow can not continue."
-	[[ "${current_user_has_secure_token}" == "FALSE" ]] && log_super "Auth Error: The current user \"${current_user_account_name}\" does not have a secure token, workflow can not continue."
-	[[ "${current_user_is_volume_owner}" == "TRUE" ]] && log_super "Auth Error: The current user \"${current_user_account_name}\" is not a system volume owner, workflow can not continue."
-	workflow_error="TRUE"
+# Provide logging for the ${workflow_auth_error} condition, which at this point is a workflow-stopper.
+if [[ "${workflow_auth_error}" == "TRUE" ]]; then
+	if [[ "${current_user_account_name}" == "FALSE" ]]; then
+		log_super "Auth Error: No current active user to provide local authentication."
+	else
+		[[ "${current_user_has_secure_token}" == "FALSE" ]] && log_super "Auth Error: The user \"${current_user_account_name}\" does not have a secure token."
+		[[ "${current_user_is_volume_owner}" == "FALSE" ]] && log_super "Auth Error: The user \"${current_user_account_name}\" is not a system volume owner."
+	fi
 fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: workflow_error is: ${workflow_error}"
+
+# The Jamf Pro (Beta) Managed Software Updates workflow is not currently compatible with the --install-macos-major-version-target option.
+if [[ "${workflow_auth_macos}" == "JAMF" ]] && [[ -n "${install_major_system_target}" ]]; then
+	get_saved_authentication
+	check_jamf_api_access_token
+	check_jamf_api_update_workflow
+	if [[ "${auth_error_jamf}" == "TRUE" ]] || [[ "${jamf_api_update_workflow}" == "NEW" ]]; then
+		log_super "Auth Error: The Jamf Pro (Beta) Managed Software Updates workflow is not compatible with the --install-macos-major-version-target option."
+		workflow_auth_error="TRUE"
+	fi
+fi
 }
 
 # For Apple Silicon computers this function validates previously saved update/upgrade credentials given the various --auth_* options. Any error will set ${auth_error_saved}.
@@ -2948,8 +2954,6 @@ echo "\$(date +"%a %b %d %T") \$(hostname -s) \$(basename "\$0")[\$\$]: **** S.U
 disown -a
 exit 0
 EOSS
-
-touch "${ASU_LIST_LOG}" "${INSTALLER_LIST_LOG}" "${ASU_WORKFLOW_LOG}" "${INSTALLER_WORKFLOW_LOG}" "${MDM_COMMAND_LOG}" "${MDM_WORKFLOW_LOG}"
 
 if [[ -f "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" ]]; then
 	log_super "Installation: Removing previous super LaunchDaemon: /Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist"
@@ -3219,9 +3223,13 @@ if [[ "${open_logs_option}" == "TRUE" ]]; then
 	if [[ "${current_user_account_name}" != "FALSE" ]]; then
 		log_super "Status: Opening logs for current user: ${current_user_account_name}."
 		if [[ "${mac_cpu_architecture}" == "arm64" ]]; then
+			touch "${MDM_WORKFLOW_LOG}" "${MDM_WORKFLOW_DEBUG_LOG}" "${MDM_COMMAND_LOG}" "${MDM_COMMAND_DEBUG_LOG}"
 			sudo -u "${current_user_account_name}" open "${MDM_WORKFLOW_LOG}"
+			sudo -u "${current_user_account_name}" open "${MDM_WORKFLOW_DEBUG_LOG}"
 			sudo -u "${current_user_account_name}" open "${MDM_COMMAND_LOG}"
+			sudo -u "${current_user_account_name}" open "${MDM_COMMAND_DEBUG_LOG}"
 		fi
+		touch "${INSTALLER_WORKFLOW_LOG}" "${ASU_WORKFLOW_LOG}" "${INSTALLER_LIST_LOG}" "${ASU_LIST_LOG}" "${SUPER_LOG}"
 		sudo -u "${current_user_account_name}" open "${INSTALLER_WORKFLOW_LOG}"
 		sudo -u "${current_user_account_name}" open "${ASU_WORKFLOW_LOG}"
 		sudo -u "${current_user_account_name}" open "${INSTALLER_LIST_LOG}"
@@ -3270,15 +3278,7 @@ fi
 # Apple silicon authentication and workflow validations.
 [[ "${mac_cpu_architecture}" == "arm64" ]] && manage_authentication_options
 manage_workflow_options
-{ [[ "${workflow_error}" != "TRUE" ]] && [[ "${verbose_mode_option}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file after startup validation: ${SUPER_LOCAL_PLIST}:\n$(defaults read "${SUPER_LOCAL_PLIST}" 2> /dev/null)"
-
-# This is the last point where a parent installation process would have a chance to collect log/echo information. If there are any significant workflow issues then exit returning an error.
-if [[ "${workflow_error}" == "TRUE" ]]; then
-	{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_failed
-	log_super "Exit: Workflow validation failed."
-	log_status "Inactive Error: Workflow validation failed."
-	exit_error
-fi
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file after startup validation: ${SUPER_LOCAL_PLIST}:\n$(defaults read "${SUPER_LOCAL_PLIST}" 2> /dev/null)"
 
 # If super is running via Jamf, then restart via LaunchDaemon to release the jamf parent process.
 if [[ "${parent_process_is_jamf}" == "TRUE" ]]; then
@@ -3294,6 +3294,15 @@ if ! { [[ "${super_current_folder}" == "${SUPER_FOLDER}" ]] || [[ "${super_curre
 	{ sleep 5; launchctl bootstrap system "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist"; } &
 	disown -a
 	exit_clean
+fi
+
+# Handle the ${workflow_auth_error} condition, which at this point is a workflow-stopper.
+if [[ "${workflow_auth_error}" == "TRUE" ]]; then
+	{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_failed
+	deferral_timer_minutes="${deferral_timer_error_minutes}"
+	log_super "Workflow Error: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
+	log_status "Pending: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
+	set_auto_launch_deferral
 fi
 
 # Wait for a valid network connection. If there is still no network after two minutes, an automatic deferral is started.
@@ -3324,6 +3333,7 @@ fi
 
 # Configure super to automatically launch ${deferral_timer_minutes} from now by setting the NextAutoLaunch attribute in the ${SUPER_LOCAL_PLIST}.
 set_auto_launch_deferral() {
+{ [[ "${notification_non_system_updates_active}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_failed
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deferral_timer_minutes is: ${deferral_timer_minutes}"
 local deferral_timer_epoch
 deferral_timer_epoch=$(( $(date +%s) + ( deferral_timer_minutes * 60 ) ))
@@ -3432,13 +3442,13 @@ fi
 # Check to see if any log file is larger than $SUPER_LOG_ARCHIVE_SIZE.
 local archive_logs_needed
 archive_logs_needed="FALSE"
-[[ $(du -k "${SUPER_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
-[[ $(du -k "${ASU_WORKFLOW_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
-[[ $(du -k "${INSTALLER_WORKFLOW_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
-[[ $(du -k "${MDM_COMMAND_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
-[[ $(du -k "${MDM_COMMAND_DEBUG_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
-[[ $(du -k "${MDM_WORKFLOW_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
-[[ $(du -k "${MDM_WORKFLOW_DEBUG_LOG}" 2> /dev/null | sed 's/[^0-9]*//g') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${SUPER_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${ASU_WORKFLOW_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${INSTALLER_WORKFLOW_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${MDM_COMMAND_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${MDM_COMMAND_DEBUG_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${MDM_WORKFLOW_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+[[ $(ls -l "${MDM_WORKFLOW_DEBUG_LOG}" 2> /dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
 
 # A super log has become to large, archival is required.
 if [[ "${archive_logs_needed}" == "TRUE" ]]; then
@@ -3455,12 +3465,20 @@ if [[ "${archive_logs_needed}" == "TRUE" ]]; then
 	[[ -f "${MDM_COMMAND_LOG}" ]] && mv "${MDM_COMMAND_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_COMMAND_LOG})"
 	[[ -f "${MDM_COMMAND_DEBUG_LOG}" ]] && mv "${MDM_COMMAND_DEBUG_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_COMMAND_DEBUG_LOG})"
 	[[ -f "${MDM_WORKFLOW_LOG}" ]] && mv "${MDM_WORKFLOW_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_WORKFLOW_LOG})"
-	[[ -f "${MDM_WORKFLOW_DEBUG_LOG}" ]] && mv "${MDM_COMMAND_DEBUG_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_WORKFLOW_DEBUG_LOG})"
-	zip -r -j "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}.zip" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_legacy_name}" > /dev/null 2>&1
+	[[ -f "${MDM_WORKFLOW_DEBUG_LOG}" ]] && mv "${MDM_WORKFLOW_DEBUG_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_WORKFLOW_DEBUG_LOG})"
+	zip -r -j "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}.zip" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}" > /dev/null 2>&1
 	rm -rf "${SUPER_LOG_ARCHIVE_FOLDER:?}/${log_archive_name}" 2> /dev/null
 	chown -R root:wheel "${SUPER_LOG_ARCHIVE_FOLDER}"
 	chmod -R a+r "${SUPER_LOG_ARCHIVE_FOLDER}"
 fi
+
+# This is a fail-safe to remove any excessively large files from the ${SUPER_LOG_ARCHIVE_FOLDER}.
+for log_archive_file in "${SUPER_LOG_ARCHIVE_FOLDER}"/*; do
+	if [[ $(ls -l "${log_archive_file}" 2> /dev/null | awk '{print int($5/1000)}') -gt $((SUPER_LOG_ARCHIVE_SIZE*10)) ]]; then
+		log_super "Warning: A file in the super log archive folder was larger than $((SUPER_LOG_ARCHIVE_SIZE*10)) KB, deleting file to save space: ${log_archive_file}"
+		rm -rf "${log_archive_file:?}" 2> /dev/null
+	fi
+done
 }
 
 # MARK: *** Local System Validation ***
@@ -3504,7 +3522,7 @@ fi
 # Only collect user details if it's a "normal" GUI user.
 if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" != "FALSE" ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 	current_user_guid=$(dscl . read "/Users/${current_user_account_name}" GeneratedUID 2> /dev/null | awk '{print $2;}')
-	current_user_real_name=$(dscl . read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/^ //g')
+	current_user_real_name=$(dscl . read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/^RealName: //g' -e 's/^ //g')
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_guid is: ${current_user_guid}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_user_real_name is: ${current_user_real_name}"
 	current_user_is_admin="FALSE"
@@ -3680,7 +3698,7 @@ if [[ $(echo "${profiles_response}" | grep -c 'MDM server') -gt 0 ]]; then
 	if [[ $(echo "${curl_response}" | grep -c 'HTTP') -gt 0 ]] && [[ $(echo "${curl_response}" | grep -c -e '400' -e '40[4-9]' -e '4[1-9][0-9]' -e '5[0-9][0-9]') -eq 0 ]]; then
 		log_super "Status: MDM service is currently available at: ${mdm_service_url}"
 	else
-		log_super "Warning: MDM service at ${mdm_service_url} is currently unavailable with stauts: ${curl_response}"; auth_error_mdm="TRUE"
+		log_super "Warning: MDM service at ${mdm_service_url} is currently unavailable with status: ${curl_response}"; auth_error_mdm="TRUE"
 	fi
 else
 	log_super "Warning: System is not enrolled with a MDM service."; auth_error_mdm="TRUE"
@@ -3789,17 +3807,17 @@ fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: display_string_workflow_zero_date: ${display_string_workflow_zero_date}"
 }
 
-# Evaluate ${deadline_days_focus}, ${deadline_days_soft}, and ${deadline_days_hard}, then set ${deadline_days_stauts}, ${deadline_days_epoch}, ${display_string_deadline_days}, ${display_string_deadline}, and ${deadline_epoch} accordingly.
+# Evaluate ${deadline_days_focus}, ${deadline_days_soft}, and ${deadline_days_hard}, then set ${deadline_days_status}, ${deadline_days_epoch}, ${display_string_deadline_days}, ${display_string_deadline}, and ${deadline_epoch} accordingly.
 
 # Evaluate ${deadline_date_focus}, ${deadline_date_soft}, and ${deadline_date_hard}, then set ${deadline_date_status}, ${deadline_date_epoch}, and ${display_string_deadline_date} accordingly.
 check_deadlines_days_date() {
-deadline_days_stauts="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
+deadline_days_status="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
 deadline_date_status="FALSE" # Deadline status modes: FALSE, SOFT, or HARD
 local current_epoch
 current_epoch=$(date +%s)
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: current_epoch is: ${current_epoch}"
 
-# Evaluate days deadlines and set ${deadline_days_stauts}, ${deadline_days_epoch}, and ${display_string_deadline_days}.
+# Evaluate days deadlines and set ${deadline_days_status}, ${deadline_days_epoch}, and ${display_string_deadline_days}.
 if [[ -n "${deadline_days_focus}" ]]; then
 	local deadline_days_focus_epoch
 	deadline_days_focus_epoch=$(( workflow_zero_date_epoch + deadline_days_focus_seconds ))
@@ -3808,7 +3826,7 @@ if [[ -n "${deadline_days_focus}" ]]; then
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_focus_epoch: ${deadline_days_focus_epoch}"
 	if [[ "${deadline_days_focus_epoch}" -lt "${current_epoch}" ]]; then
 		log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) HAS passed."
-		deadline_days_stauts="FOCUS"
+		deadline_days_status="FOCUS"
 	else
 		local deadline_days_focus_difference
 		deadline_days_focus_difference=$(( deadline_days_focus_epoch - current_epoch ))
@@ -3817,7 +3835,7 @@ if [[ -n "${deadline_days_focus}" ]]; then
 			log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) is only ${deadline_days_focus_difference} seconds away, waiting for deadline to pass..."
 			sleep $(( deadline_days_focus_difference + 1 ))
 			log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) HAS passed."
-			deadline_days_stauts="FOCUS"
+			deadline_days_status="FOCUS"
 		else
 			log_super "Status: Focus days deadline of ${deadline_days_focus_date} (${deadline_days_focus} day(s) after ${workflow_zero_date}) NOT passed."
 		fi
@@ -3831,7 +3849,7 @@ if [[ -n "${deadline_days_soft}" ]]; then
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_soft_epoch: ${deadline_days_soft_epoch}"
 	if [[ "${deadline_days_soft_epoch}" -lt "${current_epoch}" ]]; then
 		log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) HAS passed."
-		deadline_days_stauts="SOFT"
+		deadline_days_status="SOFT"
 	else
 		local deadline_days_soft_difference
 		deadline_days_soft_difference=$(( deadline_days_soft_epoch - current_epoch ))
@@ -3840,7 +3858,7 @@ if [[ -n "${deadline_days_soft}" ]]; then
 			log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) is only ${deadline_days_soft_difference} seconds away, waiting for deadline to pass..."
 			sleep $(( deadline_days_soft_difference + 1 ))
 			log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) HAS passed."
-			deadline_days_stauts="SOFT"
+			deadline_days_status="SOFT"
 		else
 			log_super "Status: Soft days deadline of ${deadline_days_soft_date} (${deadline_days_soft} day(s) after ${workflow_zero_date}) NOT passed."
 		fi
@@ -3854,7 +3872,7 @@ if [[ -n "${deadline_days_hard}" ]]; then
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_hard_epoch: ${deadline_days_hard_epoch}"
 	if [[ "${deadline_days_hard_epoch}" -lt "${current_epoch}" ]]; then
 		log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) HAS passed."
-		deadline_days_stauts="HARD"
+		deadline_days_status="HARD"
 	else
 		local deadline_days_hard_difference
 		deadline_days_hard_difference=$(( deadline_days_hard_epoch - current_epoch ))
@@ -3863,13 +3881,13 @@ if [[ -n "${deadline_days_hard}" ]]; then
 			log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) is only ${deadline_days_hard_difference} seconds away, waiting for deadline to pass..."
 			sleep $(( deadline_days_hard_difference + 1 ))
 			log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) HAS passed."
-			deadline_days_stauts="HARD"
+			deadline_days_status="HARD"
 		else
 			log_super "Status: Hard days deadline of ${deadline_days_hard_date} (${deadline_days_hard} day(s) after ${workflow_zero_date}) NOT passed."
 		fi
 	fi
 fi
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_stauts is: ${deadline_days_stauts}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_status is: ${deadline_days_status}"
 [[ -n ${deadline_days_hard} ]] && deadline_days_epoch="${deadline_days_hard_epoch}"
 [[ -n ${deadline_days_soft} ]] && deadline_days_epoch="${deadline_days_soft_epoch}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: deadline_days_epoch is: ${deadline_days_epoch}"
@@ -4177,15 +4195,13 @@ defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel 2> /dev/null
 defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULastStartup 2> /dev/null
 defaults delete "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null
 rm -f "${ASU_LIST_LOG}" 2> /dev/null
-touch "${ASU_LIST_LOG}"
 rm -f "${INSTALLER_LIST_LOG}" 2> /dev/null
-touch "${INSTALLER_LIST_LOG}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Local preference file after reset_software_status_caches: ${SUPER_LOCAL_PLIST}:\n$(defaults read "${SUPER_LOCAL_PLIST}" 2> /dev/null)"
 }
 
 # This function checks the validity of recently run software updates/upgrade caches and sets ${workflow_software_full_check_required}.
 # If cached information is valid this also sets ${macos_beta_program}, ${asu_available}, ${asu_list}, ${macos_major_upgrade_available}, ${macos_major_upgrade_marketing_name}, ${macos_major_upgrade_version}, ${macos_major_upgrade_version_major}, and ${macos_installers_list} accordingly.
-check_software_stauts_caches() {
+check_software_status_caches() {
 workflow_software_full_check_required="FALSE"
 
 # Check to when the last successful Apple software check update was.
@@ -4477,7 +4493,7 @@ fi
 if [[ "${workflow_check_asu_error}" == "FALSE" ]]; then
 	# Extract software update information from from ${ASU_PLIST} and ${ASU_LIST_LOG}.
 	if [[ "${asu_available}" == "TRUE" ]]; then
-		# Extract softare update list cache from ${ASU_PLIST} and save to ${SUPER_LOCAL_PLIST}. This is to be used in future runs of the check_software_stauts_caches() function.
+		# Extract softare update list cache from ${ASU_PLIST} and save to ${SUPER_LOCAL_PLIST}. This is to be used in future runs of the check_software_status_caches() function.
 		local previous_ifs
 		previous_ifs="${IFS}"; IFS=$'\n'
 		local asu_recommended_updates_array
@@ -5199,7 +5215,7 @@ download_macos_asu() {
 log_super "softwareupdate: Starting ${asu_macos_title_target} download workflow, check ${ASU_WORKFLOW_LOG} for more detail."
 log_status "Running: softwareupdate: Starting ${asu_macos_title_target} download workflow."
 log_asu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${asu_macos_title_target} VIA SOFTWAREUPDATE START ****"
-[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_label_target is:\n${asu_macos_label_target[*]}"
+[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: asu_macos_label_target is: ${asu_macos_label_target}"
 
 # The softwareupdate download process is backgrounded and is watched via a while loop later on. Also note the difference between macOS versions.
 local download_macos_asu_pid
@@ -6523,39 +6539,25 @@ if [[ "${test_mode_option}" == "TRUE" ]]; then
 	return 0
 fi
 
-# Install and Double-check to make sure all updates are complete.
+# Install and check to make sure all updates are complete.
 install_non_system_asu
 workflow_software_full_check_required="TRUE"
 workflow_check_all_available
 
-# If we had failures, then try again.
-if [[ "${install_non_system_asu_error}" == "TRUE" ]]; then
-	log_super "Warning: Failed to install all non-system Apple software updates."
-	[[ "${asu_non_system_update_available}" == "TRUE" ]] && install_non_system_asu
-	# If it failed twice, then try again later.
-	if [[ "${install_non_system_asu_error}" == "TRUE" ]]; then
-		if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
-			log_super "Error: Failed to install all non-system Apple software updates after multiple attempts, install now workflow can not continue."
-			log_status "Inactive Error: Failed to install all non-system Apple software updates after multiple attempts, install now workflow can not continue."
-			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
-			exit_error
-		else
-			deferral_timer_minutes="${deferral_timer_error_minutes}"
-			log_super "Warning: Failed to install all non-system Apple software updates after multiple attempts, trying again in ${deferral_timer_minutes} minutes."
-			log_status "Pending: Failed to install all non-system Apple software updates after multiple attempts, trying again in ${deferral_timer_minutes} minutes."
-			set_auto_launch_deferral
-		fi
-	else # Installation did not fail.
-		workflow_software_full_check_required="TRUE"
-		workflow_check_all_available
-	fi
+# If we had failures or there are still more non-system updates, then try again.
+if [[ "${install_non_system_asu_error}" == "TRUE" ]] && [[ "${asu_non_system_update_available}" == "TRUE" ]]; then
+	log_super "Warning: Failed to install all non-system Apple software updates, re-trying installation workflow."
+	install_non_system_asu
+	workflow_software_full_check_required="TRUE"
+	workflow_check_all_available
 fi
 
 # Log status of non-system update completion.
 rm -f "${WORKFLOW_INSTALL_NOW_FILE}" 2> /dev/null
-killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-if [[ "${asu_non_system_update_available}" == "FALSE" ]]; then
+unset notification_non_system_updates_active
+if [[ "${install_non_system_asu_error}" == "FALSE" ]] && [[ "${asu_non_system_update_available}" == "FALSE" ]]; then
 	log_super "Status: Completed installation of all non-system Apple software updates!"
+	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 	# For computers managed via Jamf Pro, submit inventory.
 	if [[ "${jamf_version_number}" != "FALSE" ]]; then
 		if [[ "${auth_error_jamf}" != "TRUE" ]]; then
@@ -6568,14 +6570,7 @@ if [[ "${asu_non_system_update_available}" == "FALSE" ]]; then
 				"${JAMF_PRO_BINARY}" recon > /dev/null 2>&1
 			fi
 		else # There was an earlier Jamf Pro validation error.
-			if [[ "${workflow_install_now_option}" == "TRUE" ]]; then
-				log_super "Warning: Unable to submit inventory to Jamf Pro."
-			else
-				deferral_timer_minutes="${deferral_timer_error_minutes}"
-				log_super "Error: Unable to submit inventory to Jamf Pro, trying again in ${deferral_timer_minutes} minutes."
-				log_status "Pending: Unable to submit inventory to Jamf Pro, trying again in ${deferral_timer_minutes} minutes."
-				set_auto_launch_deferral
-			fi
+			log_super "Warning: Unable to submit inventory to Jamf Pro."
 		fi
 	fi
 else # Some software updates did not complete
@@ -6588,6 +6583,7 @@ else # Some software updates did not complete
 		deferral_timer_minutes="${deferral_timer_error_minutes}"
 		log_super "Warning: Some non-system Apple software updates did not complete, trying again in ${deferral_timer_minutes} minutes."
 		log_status "Pending: Some non-system Apple software updates did not complete, trying again in ${deferral_timer_minutes} minutes."
+		[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
 		set_auto_launch_deferral
 	fi
 fi
@@ -6868,7 +6864,7 @@ if [[ -f "${JAMF_PRO_BINARY}" ]]; then
 	jamf_version_number_full=$("${JAMF_PRO_BINARY}" -version | sed -e 's/version=//' -e 's/-.*//')
 	jamf_version_number_major=$(echo "${jamf_version_number_full}" | cut -d'.' -f1) # Expected output: 10, 11
 	jamf_version_number_minor=$(echo "${jamf_version_number_full}" | cut -d'.' -f2) # Expected output: 0, 30, 31, 32, etc.
-	jamf_version_number="${jamf_version_number_major}$(printf "%02d" "${jamf_version_number_minor}")" # Expected output: 1030, 1031, 1032, 1100, etc.
+	jamf_version_number="${jamf_version_number_major}$(printf "%02d" "${jamf_version_number_minor}")" # Expected output: 1048, 1100, etc.
 	if [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${jamf_version_number}" -lt 1038 ]]; then
 		log_super "Error: super requires Jamf Pro version 10.38 or later, the currently installed version of Jamf Pro ${jamf_version_number_major}.${jamf_version_number_minor} is not supported."; auth_error_jamf="TRUE"
 	elif [[ "${mac_cpu_architecture}" != "arm64" ]] && [[ "${jamf_version_number}" -lt 1000 ]]; then
@@ -7272,7 +7268,7 @@ if [[ -n "${display_help_button_string}" ]]; then
 			if [[ $(echo "${curl_response}" | grep -c '200') -gt 0 ]] || [[ $(echo "${curl_response}" | grep -c '302') -gt 0 ]]; then
 				ibm_notifier_array+=(-help_button_cta_type link -help_button_cta_payload "${display_help_button_string}")
 			else
-				log_super "Warning: Help button not shown because URL cannot be reached: ${display_help_button_string}"
+				log_super "Warning: Help button not shown because URL is unreachable: ${display_help_button_string}"
 			fi
 		else
 			ibm_notifier_array+=(-help_button_cta_type link -help_button_cta_payload "${display_help_button_string}")
@@ -7289,7 +7285,7 @@ if [[ -n "${display_warning_button_string}" ]]; then
 			if [[ $(echo "${curl_response}" | grep -c '200') -gt 0 ]] || [[ $(echo "${curl_response}" | grep -c '302') -gt 0 ]]; then
 				ibm_notifier_array+=(-warning_button_cta_type link -warning_button_cta_payload "${display_warning_button_string}")
 			else
-				log_super "Warning: Warning button not shown because URL cannot be reached: ${display_warning_button_string}"
+				log_super "Warning: Warning button not shown because URL is unreachable: ${display_warning_button_string}"
 			fi
 		else
 			ibm_notifier_array+=(-warning_button_cta_type link -warning_button_cta_payload "${display_warning_button_string}")
@@ -7352,7 +7348,7 @@ if [[ -n "${display_accessory_content}" ]] && [[ "${dialog_alert_enabled}" != "T
 			if [[ -n "${display_accessory_payload}" ]]; then
 				display_accessory_enabled="TRUE"
 			else
-				log_super "Warning: Custom display accessory not shown because URL cannot be downloaded: ${display_accessory_content}"
+				log_super "Warning: Custom display accessory not shown because URL failed to download: ${display_accessory_content}"
 			fi
 		else # ${display_accessory_type} is IMAGE or VIDEO or VIDEOAUTO.
 			curl_response=$(curl -Is "${display_accessory_content}" | head -1)
@@ -7361,7 +7357,7 @@ if [[ -n "${display_accessory_content}" ]] && [[ "${dialog_alert_enabled}" != "T
 				display_accessory_payload="${display_accessory_content}"
 				display_accessory_enabled="TRUE"
 			else
-				log_super "Warning: Custom display accessory not shown because URL cannot be found: ${display_accessory_content}"
+				log_super "Warning: Custom display accessory not shown because URL is unreachable: ${display_accessory_content}"
 			fi
 		fi
 	else # Assume it's a local path.
@@ -7371,14 +7367,14 @@ if [[ -n "${display_accessory_content}" ]] && [[ "${dialog_alert_enabled}" != "T
 			if [[ -n "${display_accessory_payload}" ]]; then
 				display_accessory_enabled="TRUE"
 			else
-				log_super "Warning: Custom display accessory not shown because file path cannot be read: ${display_accessory_content}"
+				log_super "Warning: Custom display accessory not shown because file path could not be read: ${display_accessory_content}"
 			fi
 		else # ${display_accessory_type} is IMAGE or VIDEO or VIDEOAUTO.
 			if [[ -f "${display_accessory_content}" ]]; then
 				display_accessory_payload="${display_accessory_content}"
 				display_accessory_enabled="TRUE"
 			else
-				log_super "Warning: Custom display accessory not shown because file path cannot be found: ${display_accessory_content}"
+				log_super "Warning: Custom display accessory not shown because file path does not exist: ${display_accessory_content}"
 			fi
 		fi
 	fi
@@ -7505,7 +7501,7 @@ ibm_notifier_array=(-type popup -bar_title "${display_string_prepare_title}" -ic
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 	log_super "IBM Notifier: Preparing update/upgrade deadline date notification showing a ${display_string_prepare_time_estimate} minute estimate."
 	ibm_notifier_array+=(-subtitle "${display_string_prepare_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
+elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]]; then
 	log_super "IBM Notifier: Preparing update/upgrade deadline days notification showing a ${display_string_prepare_time_estimate} minute estimate."
 	ibm_notifier_array+=(-subtitle "${display_string_prepare_deadline_days_body}")
 elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
@@ -7531,7 +7527,7 @@ ibm_notifier_array=(-type popup -bar_title "${display_string_restart_title}" -ic
 if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 	log_super "IBM Notifier: Restart deadline date notification."
 	ibm_notifier_array+=(-subtitle "${display_string_restart_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
+elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]]; then
 	log_super "IBM Notifier: Restart deadline days notification."
 	ibm_notifier_array+=(-subtitle "${display_string_restart_deadline_days_body}")
 elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
@@ -7548,6 +7544,7 @@ open_notification_ibm_notifier &
 
 # Display a non-interactive notification informing the user that the install now workflow is installing non-system Apple software updates.
 notification_non_system_updates() {
+notification_non_system_updates_active="TRUE"
 set_display_strings_language
 log_super "IBM Notifier: Installing non-system Apple software updates notification."
 ibm_notifier_array=(-type popup -bar_title "${display_string_non_system_updates_title}" -subtitle "${display_string_non_system_updates_body}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -7588,7 +7585,7 @@ if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == 
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline date dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
+elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]]; then
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline days dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline days dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_days_body}")
@@ -7678,7 +7675,7 @@ if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == 
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline date dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "HARD" ]]; then
+elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]]; then
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline days dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline days dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_days_body}")
@@ -7855,7 +7852,7 @@ if [[ "${deadline_date_status}" == "SOFT" ]]; then
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Soft deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Soft deadline date dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_soft_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]]; then
+elif [[ "${deadline_days_status}" == "SOFT" ]]; then
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Soft deadline days dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Soft deadline days dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_soft_deadline_days_body}")
@@ -7907,11 +7904,11 @@ if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == 
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline date dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_user_auth_deadline_date_body}")
-elif [[ "${deadline_days_stauts}" == "SOFT" ]]; then
+elif [[ "${deadline_days_status}" == "SOFT" ]]; then
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline soft days dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline soft days dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_user_auth_deadline_days_soft_body}")
-elif [[ "${deadline_days_stauts}" == "HARD" ]]; then
+elif [[ "${deadline_days_status}" == "HARD" ]]; then
 	[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline hard days dialog with a ${dialog_timeout_seconds} second timeout."
 	[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline hard days dialog with no timeout."
 	ibm_notifier_array+=(-subtitle "${display_string_user_auth_deadline_days_hard_body}")
@@ -7950,9 +7947,9 @@ while true; do
 		ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${DISPLAY_ICON_FILE_CACHE}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_button}")
 		if [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 			ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_date_body}")
-		elif [[ "${deadline_days_stauts}" == "SOFT" ]]; then
+		elif [[ "${deadline_days_status}" == "SOFT" ]]; then
 			ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_days_soft_body}")
-		elif [[ "${deadline_days_stauts}" == "HARD" ]]; then
+		elif [[ "${deadline_days_status}" == "HARD" ]]; then
 			ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_days_hard_body}")
 		elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
 			ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_count_body}")
@@ -8077,7 +8074,7 @@ else # Default software update/upgrade workflows.
 	# Check for updates/upgrades.
 	if [[ "${test_mode_option}" != "TRUE" ]]; then
 		log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - CHECK SOFTWARE UPDATES/UPGRADE ****"
-		[[ "${workflow_software_full_check_required}" != "TRUE" ]] && check_software_stauts_caches
+		[[ "${workflow_software_full_check_required}" != "TRUE" ]] && check_software_status_caches
 		workflow_check_all_available
 	else # Test mode.
 		asu_non_system_update_available="FALSE"
@@ -8237,14 +8234,14 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 			check_zero_date
 			check_deadlines_days_date
 			# User Focus only needs to be checked if there are no date or day deadlines.
-			if [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_stauts}" == "FALSE" ]]; then
+			if [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]]; then
 				check_user_focus
 			else # At this point any date or days deadline would rule out any ${user_focus_active} option.
 				user_focus_active="FALSE"
 			fi
 			check_deadlines_count
 			# At this point all deferral and deadline options have been evaluated.
-			if [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_stauts}" == "HARD" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then # A hard deadline has passed, similar to no logged in user but with a notification.
+			if [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then # A hard deadline has passed, similar to no logged in user but with a notification.
 				[[ "${auth_mdm_failover_hard}" == "TRUE" ]] && auth_mdm_failover="TRUE"
 				# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
 				[[ $(echo "${display_unmovable_option}" | grep -c 'HARD') -gt 0 ]] && display_unmovable_status="TRUE"
@@ -8252,7 +8249,7 @@ if [[ "${asu_macos_minor_update_available}" == "TRUE" ]] || [[ "${macos_major_up
 				[[ $(echo "${display_silently_option}" | grep -c 'HARD') -gt 0 ]] && display_silently_status="TRUE"
 				[[ $(echo "${display_notifications_centered_option}" | grep -c 'HARD') -gt 0 ]] && display_notifications_centered_status="TRUE"
 				workflow_install_macos_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
-			elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_days_stauts}" == "SOFT" ]] || [[ "${deadline_count_status}" == "SOFT" ]]; then # A soft deadline has passed.
+			elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "SOFT" ]]; then # A soft deadline has passed.
 				[[ "${auth_mdm_failover_soft}" == "TRUE" ]] && auth_mdm_failover="TRUE"
 				# Manage ${display_unmovable_option}, ${display_hide_background_option}, and ${display_silently_option} options.
 				[[ $(echo "${display_unmovable_option}" | grep -c 'SOFT') -gt 0 ]] && display_unmovable_status="TRUE"
