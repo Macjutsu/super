@@ -25,18 +25,18 @@
 # 6. From any macOS computer (it doesn't have to be the test client) run this script.
 
 # Hostname for the Jamf Pro Server WITH A TRAILING SLASH. For example: https://myorg.jamfcloud.com/
-JAMF_API_URL="https://macjutsu.jamfcloud.com/"
+JAMF_API_URL=""
 
 # Jamf Pro client computer ID to send the macOS update/upgrade MDM command. You can find this on the client computer by running: sudo jamf recon.
-JAMF_COMPUTER_ID="89"
+JAMF_COMPUTER_ID=""
 
 # You mus specify a full macOS version target. For example: 14.1.1
-MACOS_TARGET_VERSION="13.6.1"
+MACOS_TARGET_VERSION=""
 
 # Jamf Pro API client ID and client secret (recommended method).
 # See the super Wiki for the required privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-required-privileges
-JAMF_API_CLIENT_ID="9d3cc794-91ae-4334-bd5b-b7c86b620314"
-JAMF_API_CLIENT_SECRET="RVCpZpOds-gBVJVHJBGCmP8_ikb9JM-4fLJz5l85TiSwV1RlOHRogSxyhbgq9LHT"
+JAMF_API_CLIENT_ID=""
+JAMF_API_CLIENT_SECRET=""
 
 # Jamf Pro API account username and password (legacy method). Avoid special characters; ${}[]|/\
 # See the super Wiki for the required privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-required-privileges
