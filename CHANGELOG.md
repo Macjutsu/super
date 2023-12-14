@@ -38,7 +38,7 @@
 - Improved IBM Notifier behavior now fully ignores the Command-Q keyboard shortcut. Previously `super` had to restart IBM Notifier when a user quit with the Command-Q keyboard shortcut.
 - Resolved a workflow issue that could prevent the restart validation workflow from installing non-system updates.
 - Resolved an issue preventing accurate reporting of the current macOS version.
-- Resolved an issue where macOS installers on any non-system volume was being accidentally deleted.
+- Resolved an issue where macOS installers on any non-system volume were being accidentally deleted.
 - `super` 4.0.3 SHA-256: 2c7411a4bfa84a63e20955d18d6c6ba19933b2cf35b04f91bbcac98c666e335c
 
 ### Specific Changes (4.0.2)
