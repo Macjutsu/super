@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [4.0.2]
+## [4.0.3]
 
-2023-11-15
+2023-12-14
 
 ### Highlights
 
@@ -29,8 +29,17 @@
 
 ### Known Issues
 
-- [IBM Notifier is currently exhibiting an issue](https://github.com/IBM/mac-ibm-notifications/issues/189) where line wrapped text is clipped when the display icon is set for sizes larger than 60 pixels. Until this issue is resolved you can use the `--display-icon-size=60` option to prevent text clipping.
 - The Jamf Pro [(Beta) Managed Software Updates](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) workflow is not compatible with the `--install-macos-major-version-target` option. Until this issue is resolved you can revert your Jamf Pro service back to the current macOS software update workflow.
+
+### Specific Changes (4.0.3)
+
+- New [IBM Notifier 3.1.0](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-3.1.0-b-110) is automatically installed. (Thanks to @SMartorelli for his dedication to the project!)
+- Improved IBM Notifier behavior no longer clips the end of line wrapped text.
+- Improved IBM Notifier behavior now fully ignores the Command-Q keyboard shortcut. Previously `super` had to restart IBM Notifier when a user quit with the Command-Q keyboard shortcut.
+- Resolved a workflow issue that could prevent the restart validation workflow from installing non-system updates.
+- Resolved an issue preventing accurate reporting of the current macOS version.
+- Resolved an issue where macOS installers on any non-system volume was being accidentally deleted.
+- `super` 4.0.3 SHA-256: 2c7411a4bfa84a63e20955d18d6c6ba19933b2cf35b04f91bbcac98c666e335c
 
 ### Specific Changes (4.0.2)
 

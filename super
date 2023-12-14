@@ -7,8 +7,8 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="4.0.2"
-SUPER_DATE="2023/11/15"
+SUPER_VERSION="4.0.3"
+SUPER_DATE="2023/12/14"
 
 # MARK: *** Documentation ***
 ################################################################################
@@ -283,9 +283,11 @@ readonly SUPER_MANAGED_PLIST
 
 # Path to the "hidden" file that triggers the macOS update/upgrade restart validation workflow (This method is used because the defaults command is unreliable when the system is about to restart):
 WORKFLOW_INSTALL_NOW_FILE="${SUPER_FOLDER}/.WorkflowInstallNow"
+readonly WORKFLOW_INSTALL_NOW_FILE
 
 # Path to the "hidden" file that triggers the macOS update/upgrade install now workflow (This method is used because the defaults command is unreliable when the system is about to restart):
 WORKFLOW_RESTART_VALIDATE_FILE="${SUPER_FOLDER}/.WorkflowRestartValidate"
+readonly WORKFLOW_RESTART_VALIDATE_FILE
 
 # Path to the jamf binary:
 JAMF_PRO_BINARY="/usr/local/bin/jamf"
@@ -293,11 +295,11 @@ readonly JAMF_PRO_BINARY
 # IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the jamf binary.
 
 # URL to the IBM Notifier.app download:
-IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.0.3-b-108/IBM.Notifier.zip"
+IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.1.0-b-110/IBM.Notifier.zip"
 readonly IBM_NOTIFIER_DOWNLOAD_URL
 
 # Target version for IBM Notifier.app:
-IBM_NOTIFIER_TARGET_VERSION="3.0.3"
+IBM_NOTIFIER_TARGET_VERSION="3.1.0"
 readonly IBM_NOTIFIER_TARGET_VERSION
 
 # Path to the local IBM Notifier.app:
@@ -3296,13 +3298,17 @@ if ! { [[ "${super_current_folder}" == "${SUPER_FOLDER}" ]] || [[ "${super_curre
 	exit_clean
 fi
 
-# Handle the ${workflow_auth_error} condition, which at this point is a workflow-stopper.
+# Handle the ${workflow_auth_error} condition, which is a workflow-stopper unless the restart validate workflow is active.
 if [[ "${workflow_auth_error}" == "TRUE" ]]; then
-	{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_failed
-	deferral_timer_minutes="${deferral_timer_error_minutes}"
-	log_super "Workflow Error: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
-	log_status "Pending: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
-	set_auto_launch_deferral
+	if [[ -f "${WORKFLOW_RESTART_VALIDATE_FILE}" ]]; then
+		log_super "Warning: Configured authentication workflow can not currently install macOS updates/upgrades."
+	else
+		{ [[ "${workflow_install_now_option}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_failed
+		deferral_timer_minutes="${deferral_timer_error_minutes}"
+		log_super "Workflow Error: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
+		set_auto_launch_deferral
+	fi
 fi
 
 # Wait for a valid network connection. If there is still no network after two minutes, an automatic deferral is started.
@@ -3541,10 +3547,11 @@ if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" !=
 fi
 }
 
-# Collect parameters for detailed system information setting a variety of parameters including ${macos_version_minor}, ${macos_version_number}, ${macos_version_extra}, ${macos_build}, ${macos_marketing_name}, ${mac_cpu_architecture}, ${mac_model_name}, ${mac_is_portable}, and ${mac_last_startup}.
+# Collect parameters for detailed system information setting a variety of parameters including ${macos_version_minor}, ${macos_version_patch}, ${macos_version_number}, ${macos_version_extra}, ${macos_build}, ${macos_marketing_name}, ${macos_version_full}, ${mac_cpu_architecture}, ${mac_model_name}, ${mac_is_portable}, and ${mac_last_startup}.
 check_system() {
 check_error="FALSE"
-macos_version_minor=$(sw_vers -productVersion | cut -d'.' -f2) # Expected output: 14, 15, 06, 01
+macos_version_minor=$(sw_vers -productVersion | cut -d'.' -f2) # Expected output: 6, 1
+macos_version_patch=$(sw_vers -productVersion | cut -d'.' -f3) # Expected output: 6, 1
 macos_version_number="${macos_version_major}$(printf "%02d" "${macos_version_minor}")" # Expected output: 1014, 1015, 1106, 1203
 [[ "${macos_version_major}" -ge 13 ]] && macos_version_extra=$(sw_vers -productVersionExtra | cut -d'.' -f2) # Expected output: (a), (b), (c)
 macos_build=$(sw_vers -buildVersion) # Expected output: 22D68
@@ -3552,12 +3559,17 @@ macos_marketing_name="macOS $(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/Sys
 mac_cpu_architecture=$(arch) # Expected output: i386, arm64
 mac_model_name=$(system_profiler SPHardwareDataType | grep 'Model Name' | awk -F ': ' '{print $2;}') # Expected output: MacBook Pro
 [[ $(echo "${mac_model_name}" | grep -c 'Book') -gt 0 ]] && mac_is_portable="TRUE" # Expected output: TRUE
+if [[ -n "${macos_version_patch}" ]]; then # macOS version has a patch number.
+	[[ -n "${macos_version_extra}" ]] && macos_version_full="${macos_marketing_name} ${macos_version_major}.${macos_version_minor}.${macos_version_patch}${macos_version_extra}-${macos_build}"
+	[[ -z "${macos_version_extra}" ]] && macos_version_full="${macos_marketing_name} ${macos_version_major}.${macos_version_minor}.${macos_version_patch}-${macos_build}"
+else # macOS version does not have a patch number.
+	[[ -n "${macos_version_extra}" ]] && macos_version_full="${macos_marketing_name} ${macos_version_major}.${macos_version_minor}${macos_version_extra}-${macos_build}"
+	[[ -z "${macos_version_extra}" ]] && macos_version_full="${macos_marketing_name} ${macos_version_major}.${macos_version_minor}-${macos_build}"
+fi
 if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Mac computers with Apple Silicon.
-	[[ -z "${macos_version_extra}" ]] && log_super "Status: Mac computer with Apple silicon running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}-${macos_build}"
-	[[ -n "${macos_version_extra}" ]] && log_super "Status: Mac computer with Apple silicon running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}${macos_version_extra}-${macos_build}"
+	log_super "Status: Mac computer with Apple silicon running: ${macos_version_full}"
 else # Mac computers with Intel.
-	[[ -z "${macos_version_extra}" ]] && log_super "Status: Mac computer with Intel running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}-${macos_build}"
-	[[ -n "${macos_version_extra}" ]] && log_super "Status: Mac computer with Intel running: ${macos_marketing_name} ${macos_version_major}.${macos_version_minor}${macos_version_extra}-${macos_build}"
+	log_super "Status: Mac computer with Intel running: ${macos_version_full}"
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: macos_version_number is: ${macos_version_number}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mac_model_name is: ${mac_model_name}"
@@ -3762,7 +3774,7 @@ check_zero_date() {
 if [[ -n "${workflow_zero_date_manual}" ]]; then # If there is a ${workflow_zero_date_manual} then use that first.
 	workflow_zero_date="${workflow_zero_date_manual}"
 	log_super "Status: Using manually set zero date of: ${workflow_zero_date}."
-	defaults write "${SUPER_LOCAL_PLIST}" WorkflowZeroDateMacOSVersion -string "${workflow_macos_version_target}"
+	defaults write "${SUPER_LOCAL_PLIST}" -string "${workflow_macos_version_target}"
 else # Using an automatically set zero date.
 	local workflow_zero_date_previous
 	workflow_zero_date_previous=$(defaults read "${SUPER_LOCAL_PLIST}" WorkflowZeroDateAutomatic 2> /dev/null)
@@ -5186,7 +5198,7 @@ mdfind_macos_installers_array=($(mdfind kind:app -name "Install macOS" 2> /dev/n
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: mdfind_macos_installers_array is:\n${mdfind_macos_installers_array[*]}"
 if [[ -n "${mdfind_macos_installers_array[*]}" ]]; then
 	for macos_installer_path in "${mdfind_macos_installers_array[@]}"; do
-		if [[ $(echo "${macos_installer_path}" | grep -c '/Users/') -gt 0 ]] && [[ $(echo "${macos_installer_path}" | grep -c '/Users/.*/Applications/') -eq 0 ]] && [[ $(echo "${macos_installer_path}" | grep -c '/Users/.*/Desktop/') -eq 0 ]] && [[ $(echo "${macos_installer_path}" | grep -c '/Users/.*/Downloads/') -eq 0 ]]; then
+		if [[ $(echo "${macos_installer_path}" | grep -c '/Volumes/') -gt 0 ]] || { [[ $(echo "${macos_installer_path}" | grep -c '/Users/') -gt 0 ]] && [[ $(echo "${macos_installer_path}" | grep -c '/Users/.*/Applications/') -eq 0 ]] && [[ $(echo "${macos_installer_path}" | grep -c '/Users/.*/Desktop/') -eq 0 ]] && [[ $(echo "${macos_installer_path}" | grep -c '/Users/.*/Downloads/') -eq 0 ]]; }; then
 			log_super "Status: Skipping deletion of assumed archived macOS installer at: ${macos_installer_path}"
 		else
 			if [[ "${macos_major_upgrade_version_major_target}" == "FALSE" ]]; then
@@ -7304,9 +7316,9 @@ set_display_strings_optional_buttons
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
 if [[ "${display_notifications_centered_status}" == "TRUE" ]]; then
-	ibm_notifier_array+=(-position center -always_on_top)
+	ibm_notifier_array+=(-position center -always_on_top -disable_quit)
 else # The default interactive notification location.
-	ibm_notifier_array+=(-position top_right -always_on_top)
+	ibm_notifier_array+=(-position top_right -always_on_top -disable_quit)
 fi
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
@@ -7320,17 +7332,6 @@ notification_response=$("${IBM_NOTIFIER_BINARY}" "${ibm_notifier_array[@]}")
 notification_return="$?"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_response is: ${notification_response}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_return is: ${notification_return}"
-
-# Restart IBM Notifier if the user quits.
-while [[ "${notification_return}" -eq 239 ]]; do
-	log_super "Warning: User attempted to quit IBM Notifier.app via Command-Q keyboard shortcut."
-	unset notification_response
-	unset notification_return
-	notification_response=$("${IBM_NOTIFIER_BINARY}" "${ibm_notifier_array[@]}")
-	notification_return="$?"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_response is: ${notification_response}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: notification_return is: ${notification_return}"
-done
 }
 
 # Open ${IBM_NOTIFIER_BINARY} for interactive dialogs using the ${ibm_notifier_array} options, also handle any ${dialog_timeout_seconds}, ${display_accessory_content}, and ${display_accessory_payload} options, and set ${dialog_response} and ${dialog_return}.
@@ -7416,7 +7417,7 @@ set_display_strings_optional_buttons
 { [[ "${display_unmovable_status}" == "TRUE" ]] || [[ "${display_unmovable_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-unmovable)
 { [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-background_panel translucent)
 { [[ "${display_silently_status}" == "TRUE" ]] || [[ "${display_silently_status}" == "TEMP" ]]; } && ibm_notifier_array+=(-silent)
-ibm_notifier_array+=(-position center -always_on_top)
+ibm_notifier_array+=(-position center -always_on_top -disable_quit)
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 
 # Kill any previous notifications so new ones can take its place.
@@ -7430,18 +7431,6 @@ dialog_return="$?"
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ "${dialog_user_auth_enabled}" != "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: dialog_response is: ${dialog_response}"
 { [[ "${verbose_mode_option}" == "TRUE" ]] && [[ "${dialog_user_auth_enabled}" == "TRUE" ]]; } && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: dialog_response is: ${dialog_response}"
 [[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: dialog_return is: ${dialog_return}"
-
-# Restart IBM Notifier if the user quits.
-while [[ "${dialog_return}" -eq 239 ]]; do
-	log_super "Warning: User attempted to quit IBM Notifier.app via Command-Q keyboard shortcut."
-	unset dialog_response
-	unset dialog_return
-	dialog_response=$("${IBM_NOTIFIER_BINARY}" "${ibm_notifier_array[@]}")
-	dialog_return="$?"
-	{ [[ "${verbose_mode_option}" == "TRUE" ]] && [[ "${dialog_user_auth_enabled}" != "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: dialog_response is: ${dialog_response}"
-	{ [[ "${verbose_mode_option}" == "TRUE" ]] && [[ "${dialog_user_auth_enabled}" == "TRUE" ]]; } && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: dialog_response is: ${dialog_response}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: dialog_return is: ${dialog_return}"
-done
 }
 
 # MARK: *** Install Now Notifications ***
@@ -8051,6 +8040,13 @@ if [[ -f "${WORKFLOW_RESTART_VALIDATE_FILE}" ]]; then
 	log_status "Running: macOS update/upgrade restart validation."
 	workflow_restart_validate
 	rm -f "${WORKFLOW_RESTART_VALIDATE_FILE}" 2> /dev/null
+	# At this point the ${workflow_auth_error} condition is a workflow-stopper, so try again later.
+	if [[ "${workflow_auth_error}" == "TRUE" ]]; then
+		deferral_timer_minutes="${deferral_timer_error_minutes}"
+		log_super "Workflow Error: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
+		set_auto_launch_deferral
+	fi
 fi
 
 # If requested then restart counters.
