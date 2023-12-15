@@ -7,7 +7,7 @@
 ### Highlights
 
 - New option to save the user's password for future automatic macOS updates and upgrades. Literally, "Save Password" but for automatic macOS updates and upgrades.
-- New display customization options including unmovable dialogs and hide background mode courtesy of [IBM Notifier 3.0.3](https://github.com/IBM/mac-ibm-notifications/releases/tag/v-3.0.3-b-108).
+- New display customization options including unmovable dialogs and hide background mode courtesy of [IBM Notifier 3.x](https://github.com/IBM/mac-ibm-notifications).
 - New macOS installer workflows are now handled by [`mist-cli`](https://github.com/ninxsoft/mist-cli) integration, thus removing all `python` dependencies.
 - New LaunchDaemon architecture significantly improves automatic launch and deferment reliability for all `super` workflows.
 - New default "always on" behavior automatically checks for Apple software updates on a regular basis.
