@@ -5649,10 +5649,10 @@ previous_ifs="${IFS}"; IFS=$' '
 local download_macos_asu_pid
 if [[ ${macos_version_major} -ge 12 ]]; then
 	if [[ "${current_user_account_name}" == "FALSE" ]]; then
-		sudo -i softwareupdate --install "${asu_non_system_update_labels_array[@]}" --agree-to-license >> "${ASU_WORKFLOW_LOG}" 2>&1 &
+		sudo -u root softwareupdate --install "${asu_non_system_update_labels_array[@]}" --agree-to-license >> "${ASU_WORKFLOW_LOG}" 2>&1 &
 		download_macos_asu_pid="$!"
 	else # Local user is logged in.
-		launchctl asuser "${current_user_id}" sudo -i softwareupdate --install "${asu_non_system_update_labels_array[@]}" --agree-to-license >> "${ASU_WORKFLOW_LOG}" 2>&1 &
+		launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" softwareupdate --install "${asu_non_system_update_labels_array[@]}" --agree-to-license >> "${ASU_WORKFLOW_LOG}" 2>&1 &
 		download_macos_asu_pid="$!"
 	fi
 else # macOS 11
