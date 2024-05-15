@@ -16,6 +16,10 @@
 	<false/>
 	<key>WorkflowZeroDateManual</key>
 	<string>2023-09-19:14:45</string>
+	<key>WorkflowZeroDateRelease</key>
+	<true/>
+	<key>WorkflowZeroDateSOFACustomURL</key>
+	<string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
 	<key>WorkflowDisableUpdateCheck</key>
 	<false/>
 	<key>WorkflowDisableRelaunch</key>
@@ -70,6 +74,8 @@
 	<string>HARD,POWER</string>
 	<key>DisplaySilently</key>
 	<string>INSTALLNOW</string>
+	<key>DisplayHideProgressBar</key>
+	<string>HARD,INSTALLNOW</string>
 	<key>DisplayNotificationsCentered</key>
 	<string>HARD,INSTALLNOW</string>
 	<key>DisplayIconFile</key>
@@ -93,7 +99,7 @@
 	<key>AuthAskUserToSavePassword</key>
 	<true/>
 	<key>AuthJamfCustomURL</key>
-	<string>https://jamf-api.domain.com</string>
+	<string>https://jamf-api.example.domain.com</string>
 	<key>AuthCredentialFailoverToUser</key>
 	<true/>
 	<key>AuthMDMFailoverToUser</key>

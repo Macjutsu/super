@@ -11,7 +11,7 @@
     <key>PayloadIdentifier</key>
     <string>D819E6B3-72BA-4202-874D-FE7C6783C984</string>
     <key>PayloadDisplayName</key>
-    <string>S.U.P.E.R.M.A.N. All Settings Example</string>
+    <string>super | All Settings Example</string>
     <key>PayloadDescription</key>
     <string>This is an example of all possible super managed preferences. DO NOT DEPLOY. THIS EXAMPLE CONTAINS CONFLICTING SETTINGS THAT WILL CAUSE ERRORS IF DEPLOYED.</string>
     <key>PayloadVersion</key>
@@ -53,7 +53,7 @@
                   <key>AuthJamfComputerID</key>
                   <string>$JSSID</string>
                   <key>AuthJamfCustomURL</key>
-                  <string>https://jamf-api.domain.com</string>
+                  <string>https://jamf-api.example.domain.com</string>
                   <key>AuthMDMFailoverToUser</key>
                   <string>NOSERVICE,BOOTSTRAP</string>
                   <key>DeadlineCountFocus</key>
@@ -110,6 +110,8 @@
                   <string>https://support.apple.com/en-us/HT201541</string>
                   <key>DisplayHideBackground</key>
                   <string>HARD,POWER</string>
+                  <key>DisplayHideProgressBar</key>
+                  <string>HARD,INSTALLNOW</string>
                   <key>DisplayIconFile</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconSize</key>
@@ -154,6 +156,10 @@
                   <false/>
                   <key>WorkflowZeroDateManual</key>
                   <string>2023-09-19:14:45</string>
+                  <key>WorkflowZeroDateRelease</key>
+                  <true/>
+                  <key>WorkflowZeroDateSOFACustomURL</key>
+                  <string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
                 </dict>
               </dict>
             </array>
