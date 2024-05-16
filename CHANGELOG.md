@@ -6,7 +6,7 @@
 
 ## [4.1.x] Highlights
 
-- In addition to the features introduced in [`super` 4.0](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md#40x-highlights)...
+- In addition to the features introduced in [`super` 4.0](https://github.com/Macjutsu/super/blob/4.1.0-beta1/CHANGELOG.md#40x-highlights)...
 - Completely rearchitected software update/upgrade discovery workflow significantly improves reliability, performance, and includes full support for native macOS software update/upgrade deferral restrictions.
 - New [MacAdmin's SOFA](https://sofa.macadmins.io) integration allows deadline date workflows to align with macOS release dates (as opposed to when `super` discovers a macOS release).
 - Even more user interface customization options.
@@ -14,7 +14,7 @@
 
 ### Compatibility Notes (4.1.x)
 
-- The same as [`super` 4.0.x](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md#compatibility-notes-40x).
+- The same as [`super` 4.0.x](https://github.com/Macjutsu/super/blob/4.1.0-beta1/CHANGELOG.md#compatibility-notes-40x).
 
 ### Known Issues (4.1.0-beta1)
 
@@ -43,7 +43,7 @@
 - All functions are now properly indented per shell style recommendations. (Thanks to @Honestpuck for the recommendation.)
 - The "installer-list.log" is renamed to the more-specific "macos-installers-list.log".
 - Countless typo fixes and improvements to both regular and verbose log output.
-- Updated [example MDM configuration profiles for `super` v4.1.x](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [example MDM configuration profiles for `super` v4.1.x](https://github.com/Macjutsu/super/tree/4.1.0-beta1/Example-MDM).
 - `super` 4.1.0-beta1 SHA-256: 6ccac94d886680d02d7ee19bf5ca6f9f0b045e4e1aae8e0f9ab69581847d9150
 
 ## [4.0.x] Highlights
