@@ -43,7 +43,8 @@
 - All functions are now properly indented per shell style recommendations. (Thanks to @Honestpuck for the recommendation.)
 - The "installer-list.log" is renamed to the more-specific "macos-installers-list.log".
 - Countless typo fixes and improvements to both regular and verbose log output.
-- Updated [example MDM configuration profiles for `super` v4.1.x](https://github.com/Macjutsu/super/tree/4.1.0-beta1/Example-MDM).
+- Updated [example MDM configuration profiles for `super` v4.1.0-beta1](https://github.com/Macjutsu/super/tree/4.1.0-beta1/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema for `super` v4.1.0-beta1](https://github.com/Macjutsu/super/tree/4.1.0-beta1/Example-MDM). (Huge thanks to @tonyyo11 for taking this on!)
 - `super` 4.1.0-beta1 SHA-256: 6ccac94d886680d02d7ee19bf5ca6f9f0b045e4e1aae8e0f9ab69581847d9150
 
 ## [4.0.x] Highlights
