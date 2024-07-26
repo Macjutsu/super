@@ -15,7 +15,17 @@ SUPER_LOCAL_PLIST="${SUPER_FOLDER}/com.macjutsu.super" # No trailing ".plist"
 # Report if the super preference file exists.
 if [[ -f "${SUPER_LOCAL_PLIST}.plist" ]]; then
 	super_version_local=$(defaults read "${SUPER_LOCAL_PLIST}" SuperVersion 2> /dev/null)
-	if [[ $(echo "${super_version_local}" | cut -c 1) -ge 4 ]]; then
+	if [[ $(echo "${super_version_local}" | cut -c 1) -ge 5 ]]; then
+		downloaded_macos_installer=$(defaults read "${SUPER_LOCAL_PLIST}" MacOSInstallerDownloaded 2> /dev/null)
+		downloaded_macos_asu_label=$(defaults read "${SUPER_LOCAL_PLIST}" MacOSMSULabelDownloaded 2> /dev/null)
+		if [[ -n "${downloaded_macos_installer}" ]]; then
+			echo "<result>${downloaded_macos_installer}</result>"
+		elif [[ -n "${downloaded_macos_asu_label}" ]]; then
+			echo "<result>${downloaded_macos_asu_label}</result>"
+		else
+			echo "<result>No downloaded macOS minor update or major upgrade.</result>"
+		fi
+	elif [[ $(echo "${super_version_local}" | cut -c 1) -eq 4 ]]; then
 		downloaded_macos_installer=$(defaults read "${SUPER_LOCAL_PLIST}" DownloadedMacOSInstaller 2> /dev/null)
 		downloaded_macos_asu_label=$(defaults read "${SUPER_LOCAL_PLIST}" DownloadedMacOSASULabel 2> /dev/null)
 		if [[ -n "${downloaded_macos_installer}" ]]; then

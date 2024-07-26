@@ -1,26 +1,72 @@
 # CHANGELOG
 
-## [4.1.0-beta1]
+## [5.0.0-beta2]
 
-2023-5-15
+2023-7-26
 
-## [4.1.x] Highlights
+## [5.x] Highlights
 
-- In addition to the features introduced in [`super` 4.0](https://github.com/Macjutsu/super/blob/4.1.0-beta1/CHANGELOG.md#40x-highlights)...
-- Completely rearchitected software update/upgrade discovery workflow significantly improves reliability, performance, and includes full support for native macOS software update/upgrade deferral restrictions.
-- New [MacAdmin's SOFA](https://sofa.macadmins.io) integration allows deadline date workflows to align with macOS release dates (as opposed to when `super` discovers a macOS release).
+- Suport for macOS 15 Sequoia.
+- New scheduled installation workflows allow administrators or the end user to specify a date and time for the installation of macOS updates/upgrades, Jamf Pro Policies, or enforced system restarts.
+- Completely rearchitected main `super` logic so all workflow options can be permanent (via managed preferences) or temporary until the requested workflow is completed.
+- Completely rearchitected software update/upgrade discovery to significantly improve reliability, performance, and improve support for native macOS software update/upgrade deferral restrictions.
+- [MacAdmin's SOFA](https://sofa.macadmins.io) integration allows deadline date workflows to align with macOS release dates (as opposed to when `super` discovers a macOS release).
 - Even more user interface customization options.
-- More scheduling and user interface features coming soon...
+- More new features coming soon...
+- Beta Wiki coming soon...
 
-### Compatibility Notes (4.1.x)
+### Compatibility Notes (5.x)
 
-- The same as [`super` 4.0.x](https://github.com/Macjutsu/super/blob/4.1.0-beta1/CHANGELOG.md#compatibility-notes-40x).
+- `super` 5.x requires macOS 11 or newer.
+- __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
+- __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
+- __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Super-Friends/super-migration-options-v5.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Super-Friends/super-migration-managed-preferences-v5.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Super-Friends/) now supports `super` versions 3.0, 4.x, and 5.x.
+- Updated [example MDM configuration profiles for `super` v5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Example-MDM).
 
-### Known Issues (4.1.0-beta1)
 
-- Still experiencing reliability issues when calling the Jamf Pro API [(Beta) managed software updates feature](https://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html). In the mean time, the classic Jamf API remains stable and local authentication is always the most reliable.
+### Known Issues (5.0.0-beta2)
 
-### Specific Changes (4.1.0-beta1)
+- Still experiencing reliability issues when calling the [Jamf Pro API via the new managed software updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html). In the mean time, the classic Jamf Pro API remains stable and local authentication is always the most reliable.
+
+### Specific Changes (5.0.0-beta2)
+
+- New `--workflow-reset-super-after-completion` option can be combined with other local options to define a "temporary" workflow that resets `super` after the workflow has successfully completed. For example, you can combine this option with the `--install-macos-major-upgrades` option to begin a macOS major upgrade workflow that, upon completion, resets `super` to the default behavior of only installing macOS minor updates. Note that managed preferences (via configuration profile) still override any local settings.
+- Updated install now workflow behavior returns the `--workflow-install-now-off` option and associated managed preference `WorkflowInstallNow`. This allows you to once again define a "permanent" install now workflow behavior. Obviously, for a temporary install now workflow you can leverage the new `--workflow-reset-super-after-completion` option.
+- New `--install-jamf-policy-triggers-without-restarting` option allows for installation of Jamf Pro Policies even if there are no available macOS update/upgrades. Alternately you can force this workflow when also used with the `--workflow-disable-update-check` option. Further, this can be combined with the new `--workflow-reset-super-after-completion` option for a "temporary" workflow.
+- New Jamf Pro Policy installation notification is displayed when a Jamf Pro Policy is running.
+- All relevant dialogs and notifications updated to accommodate workflows that only include Jamf Pro Policy installations. For example, the "Restart Now" button would read "Install Now".
+- The `--install-jamf-policy-triggers` option replaces the `--workflow-jamf-policy-triggers` option.
+- New "scheduled install" options override the standard deferral workflow options and the `--workflow-only-download` option in favor of installation taking place at a specific date and time. Note however, the `--workflow-install-now` option still overrides all workflows including any scheduled installation workflow.
+- New `--scheduled-install-days` option allows you to specify the number of days after the zero date that a scheduled installation takes place.
+- New `--scheduled-install-date` option allows you to specify a date and time that a scheduled installation takes place.
+- New `--scheduled-install-user-choice` option adds a "Schedule" button to the standard deferral dialog. When clicked, this button opens a scheduled installation dialog that allows the user to select a date and time for installation. If any day or date deadlines are also specified, then the user is not allowed to select an installation date later than the soonest deadline.
+- New `--scheduled-install-reminder` option allows you to specify a list of minutes separated by commas (no spaces) that define how often a scheduled installation reminder dialog appears prior to a scheduled installation. For example, if you were to specify `--scheduled-install-reminder=120,60,5` then a scheduled installation reminder dialog would appear at two hours, then at one hour, and then at five minutes prior to the scheduled installation. Further, if the user is allowed to reschedule for another time, then they can do so from the scheduled installation reminder dialog.
+- The `--schedule-zero-date-release` option replaces the `--workflow-zero-date-release` option.
+- The `--schedule-zero-date-sofa-custom-url` option replaces the `--workflow-zero-date-sofa-custom-url` option.
+- The `--schedule-zero-date-manual` option replaces the `--workflow-zero-date-manual` option.
+- All workflows options (except for install now and download only) now fully support zero date and scheduled restart workflows.
+- All options that support multiple workflow types now share the same simplified types. The affected options are `--display-unmovable`, `--display-hide-background`, `--display-silently`, `--display-hide-progress-bar`, `--display-notifications-centered`, and `--auth-mdm-failover-to-user`. These options now all share the following workflow types:
+	- ALWAYS - Always apply the option to all dialogs and notifications.
+	- DIALOG - Apply the option to all dialogs that require end user interaction.
+	- DEADLINE - Apply the option to dialogs and notifications if a deadline has passed.
+	- SCHEDULED - Apply the option to dialogs and notifications if there is a scheduled installation.
+	- INSTALLNOW - Apply the option to dialogs and notifications during an install now workflow.
+	- ERROR - Apply the option to dialogs and notifications if there is any workflow error.
+- New [mist-cli 2.1.1](https://github.com/ninxsoft/mist-cli/releases/tag/v2.1.1) is automatically installed if required to facilitate macOS installer workflows. (Thanks to @ninxsoft for his dedication to the project!)
+- Improved SOFA macOS releases feed workflow now implements an HTTP Etag comparison to ensure that new feeds are only downloaded if different from the local cache. (Thanks to Henry @zentral for this suggestion and sample code!)
+- Significant updates to the `set_display_strings_language()` function to facliate new Jamf Pro Policy and scheduled installation workflows.
+- Resolved several issues preventing the restart validation workflow from completing properly.
+- Resolved issues where the "OK" button was not appearing at an appropriate time.
+- Resolved issues where the progress bar indicator was not appearing at an appropriate time.
+- Resolved an issue preventing non-system installations from completing while a user is currently logged in. (Thanks to @kenchan0130 for providing a solution!)
+- Countless typo fixes and improvements to both regular and verbose log output.
+- Updated [example MDM configuration profiles for `super` v5.0.0-beta2](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Example-MDM).
+- `super` 5.0.0-beta2 SHA-256: 
+
+### Specific Changes (5.0.0-beta1 formerly 4.1.0-beta1)
 
 - New software update/upgrade status checking workflow leverages `mdmclient` as the primary source for availability information. This significantly improves reliability, performance, and allows for confirmed discovery of native macOS software update/upgrade deferrals.
 - New software update/upgrade deferral parsing and reporting workflow ensures that native macOS deferral rules (when managed via macOS configuration profile) are always followed. Further, deferred items are reported in the super.log for reference.
@@ -43,9 +89,8 @@
 - All functions are now properly indented per shell style recommendations. (Thanks to @Honestpuck for the recommendation.)
 - The "installer-list.log" is renamed to the more-specific "macos-installers-list.log".
 - Countless typo fixes and improvements to both regular and verbose log output.
-- Updated [example MDM configuration profiles for `super` v4.1.0-beta1](https://github.com/Macjutsu/super/tree/4.1.0-beta1/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema for `super` v4.1.0-beta1](https://github.com/Macjutsu/super/tree/4.1.0-beta1/Example-MDM). (Huge thanks to @tonyyo11 for taking this on!)
-- `super` 4.1.0-beta1 SHA-256: 6ccac94d886680d02d7ee19bf5ca6f9f0b045e4e1aae8e0f9ab69581847d9150
+- Updated [example MDM configuration profiles for `super` v5.0.0-beta1](https://github.com/Macjutsu/super/tree/5.0.0-beta1/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.0.0-beta1](https://github.com/Macjutsu/super/tree/5.0.0-beta1/Example-MDM). (Huge thanks to @tonyyo11 for taking this on!)
 
 ## [4.0.x] Highlights
 

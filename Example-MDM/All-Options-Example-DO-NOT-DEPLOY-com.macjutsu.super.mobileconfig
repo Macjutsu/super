@@ -55,7 +55,7 @@
                   <key>AuthJamfCustomURL</key>
                   <string>https://jamf-api.example.domain.com</string>
                   <key>AuthMDMFailoverToUser</key>
-                  <string>NOSERVICE,BOOTSTRAP</string>
+                  <string>ERROR</string>
                   <key>DeadlineCountFocus</key>
                   <string>5</string>
                   <key>DeadlineCountHard</key>
@@ -109,21 +109,25 @@
                   <key>DisplayHelpButtonString</key>
                   <string>https://support.apple.com/en-us/HT201541</string>
                   <key>DisplayHideBackground</key>
-                  <string>HARD,POWER</string>
+                  <string>DEADLINE,INSTALLNOW</string>
                   <key>DisplayHideProgressBar</key>
-                  <string>HARD,INSTALLNOW</string>
+                  <string>DEADLINE,INSTALLNOW</string>
                   <key>DisplayIconFile</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconSize</key>
                   <string>128</string>
                   <key>DisplayNotificationsCentered</key>
-                  <string>HARD,INSTALLNOW</string>
+                  <string>DEADLINE,INSTALLNOW</string>
                   <key>DisplaySilently</key>
                   <string>INSTALLNOW</string>
                   <key>DisplayUnmovable</key>
                   <string>ALWAYS</string>
                   <key>DisplayWarningButtonString</key>
                   <string>https://support.apple.com/en-us/HT201222</string>
+                  <key>InstallJamfPolicyTriggers</key>
+                  <string>trigger1,trigger2,trigger3</string>
+                  <key>InstallJamfPolicyTriggersWithoutRestarting</key>
+                  <true/>
                   <key>InstallMacOSMajorUpgrades</key>
                   <true/>
                   <key>InstallMacOSMajorVersionTarget</key>
@@ -131,6 +135,20 @@
                   <key>InstallNonSystemUpdatesWithoutRestarting</key>
                   <true/>
                   <key>InstallRapidSecurityResponses</key>
+                  <true/>
+                  <key>ScheduleZeroDateManual</key>
+                  <string>2023-09-21:00:00</string>
+                  <key>ScheduleZeroDateRelease</key>
+                  <true/>
+                  <key>ScheduleZeroDateSOFACustomURL</key>
+                  <string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
+                  <key>ScheduledInstallDate</key>
+                  <string>2023-09-21:00:00</string>
+                  <key>ScheduledInstallDays</key>
+                  <string>3</string>
+                  <key>ScheduledInstallReminder</key>
+                  <string>15,60,240,1440</string>
+                  <key>ScheduledInstallUserChoice</key>
                   <true/>
                   <key>TestBatteryLevel</key>
                   <string>75</string>
@@ -145,21 +163,15 @@
                   <key>VerboseMode</key>
                   <true/>
                   <key>WorkflowDisableRelaunch</key>
-                  <false/>
-                  <key>WorkflowDisableUpdateCheck</key>
-                  <false/>
-                  <key>WorkflowJamfPolicyTriggers</key>
-                  <string>trigger1,trigger2,trigger3</string>
-                  <key>WorkflowOnlyDownload</key>
-                  <false/>
-                  <key>WorkflowRestartWithoutUpdates</key>
-                  <false/>
-                  <key>WorkflowZeroDateManual</key>
-                  <string>2023-09-19:14:45</string>
-                  <key>WorkflowZeroDateRelease</key>
                   <true/>
-                  <key>WorkflowZeroDateSOFACustomURL</key>
-                  <string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
+                  <key>WorkflowDisableUpdateCheck</key>
+                  <true/>
+                  <key>WorkflowInstallNow</key>
+                  <true/>
+                  <key>WorkflowOnlyDownload</key>
+                  <true/>
+                  <key>WorkflowRestartWithoutUpdates</key>
+                  <true/>
                 </dict>
               </dict>
             </array>

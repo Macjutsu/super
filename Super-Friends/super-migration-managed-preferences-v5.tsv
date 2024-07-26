@@ -1,0 +1,68 @@
+super 5.0.x	super 4.0.x	super 3.0
+<key>AuthJamfComputerID</key> <string>$JSSID</string>	<key>AuthJamfComputerID</key> <string>$JSSID</string>	<key>JamfProID</key> <string>$JSSID</string>
+<key>InstallMacOSMajorUpgrades</key> <true/> | <false/>	<key>InstallMacOSMajorUpgrades</key> <true/> | <false/>	<key>AllowUpgrade</key> <true/> | <false/>
+<key>InstallMacOSMajorVersionTarget</key> <string>version</string>	<key>InstallMacOSMajorVersionTarget</key> <string>version</string>	<key>TargetUpgrade</key> <string>version</string>
+<key>InstallRapidSecurityResponses</key> <true/> | <false/>	<key>InstallRapidSecurityResponses</key> <true/> | <false/>	<key>AllowRSRUpdates</key> <true/> | <false/>
+<key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>	<key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>	<key>EnforceNonSystemUpdates</key> <true/> | <false/>
+<key>InstallJamfPolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc…</string>	<key>WorkflowJamfPolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>	<key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>
+<key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	N/A	N/A
+<key>WorkflowInstallNow</key> <true/> | <false/>	REMOVED	<key>InstallNow</key> <true/> | <false/>
+<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>OnlyDownload</key> <true/> | <false/>
+<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>RestartWithoutUpdates</key> <true/> | <false/>
+<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>SkipUpdates</key> <true/> | <false/>
+<key>WorkflowDisableRelaunch</key> <true/> | <false/>	<key>WorkflowDisableRelaunch</key> <true/> | <false/>	N/A
+<key>DeferralTimerDefault</key> <string>minutes</string>	<key>DeferralTimerDefault</key> <string>minutes</string>	<key>DefaultDefer</key> <string>seconds</string>
+<key>DeferralTimerMenu</key> <string>minutes,minutes,etc...</string>	<key>DeferralTimerMenu</key> <string>minutes,minutes,etc...</string>	<key>MenuDefer</key> <string>seconds,seconds,etc...</string>
+<key>DeferralTimerFocus</key> <string>minutes</string>	<key>DeferralTimerFocus</key> <string>minutes</string>	<key>FocusDefer</key> <string>seconds</string>
+<key>DeferralTimerError</key> <string>minutes</string>	<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>RecheckDefer</key> <string>seconds</string>
+<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>DeferralTimerError</key> <string>minutes</string>	<key>ErrorDefer</key> <string>seconds</string>
+<key>ScheduledInstallDays</key> <string>number</string>	N/A	N/A
+<key>ScheduledInstallDate</key> <string>YYYY-MM-DD:hh:mm</string>	N/A	N/A
+<key>ScheduledInstallUserChoice</key> <true/> | <false/>	N/A	N/A
+<key>ScheduledInstallReminder</key> <string>minutes,minutes,etc...</string>	N/A	N/A
+<key>ScheduleZeroDateRelease</key> <true/> | <false/>	N/A	N/A
+<key>ScheduleZeroDateSOFACustomURL</key> <string>URL</string>	N/A	N/A
+<key>ScheduleZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>	<key>WorkflowZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>	<key>ZeroDay</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>DeadlineCountFocus</key> <string>number</string>	<key>DeadlineCountFocus</key> <string>number</string>	<key>FocusCount</key> <string>number</string>
+<key>DeadlineCountSoft</key> <string>number</string>	<key>DeadlineCountSoft</key> <string>number</string>	<key>SoftCount</key> <string>number</string>
+<key>DeadlineCountHard</key> <string>number</string>	<key>DeadlineCountHard</key> <string>number</string>	<key>HardCount</key> <string>number</string>
+<key>DeadlineDaysFocus</key> <string>number</string>	<key>DeadlineDaysFocus</key> <string>number</string>	<key>FocusDays</key> <string>number</string>
+<key>DeadlineDaysSoft</key> <string>number</string>	<key>DeadlineDaysSoft</key> <string>number</string>	<key>SoftDays</key> <string>number</string>
+<key>DeadlineDaysHard</key> <string>number</string>	<key>DeadlineDaysHard</key> <string>number</string>	<key>HardDays</key> <string>number</string>
+<key>DeadlineDateFocus</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateFocus</key> <string>YYYY-MM-DD:hh:mm</string>	<key>FocusDate</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>	<key>SoftDate</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>	<key>HardDate</key> <string>YYYY-MM-DD:hh:mm</string>
+<key>DialogTimeoutDefault</key> <string>seconds</string>	<key>DialogTimeoutDefault</key> <string>seconds</string>	N/A
+<key>DialogTimeoutUserChoice</key> <string>seconds</string>	<key>DialogTimeoutRestartOrDefer</key> <string>seconds</string>	<key>DeferDialogTimeout</key> <string>seconds</string>
+<key>DialogTimeoutUserSchedule</key> <string>seconds</string>	N/A	N/A
+<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>	<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>	<key>SoftDialogTimeout</key> <string>seconds</string>
+<key>DialogTimeoutUserAuth</key> <string>seconds</string>	<key>DialogTimeoutUserAuth</key> <string>seconds</string>	<key>UserAuthTimeout</key> <string>seconds</string>
+<key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>	<key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>	<key>FreeSpaceTimeout</key> <string>seconds</string>
+<key>DialogTimeoutPowerRequired</key> <string>seconds</string>	<key>DialogTimeoutPowerRequired</key> <string>seconds</string>	<key>BatteryTimeout</key> <string>seconds</string>
+<key>DisplayUnmovable</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>	<key>DisplayUnmovable</key> <string>ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE</string>	N/A
+<key>DisplayHideBackground</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>	<key>DisplayHideBackground</key> <string>ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER</string>	N/A
+<key>DisplaySilently</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>	<key>DisplaySilently</key> <string>ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE</string>	<key>DisplaySilently</key> <true/> | <false/>
+<key>DisplayHideProgressBar</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>	N/A	N/A
+<key>DisplayNotificationsCentered</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>	<key>DisplayNotificationsCentered</key> <string>ALWAYS,SOFT,HARD,INSTALLNOW</string>	N/A
+<key>DisplayIconFile</key> <string>path</string>	<key>DisplayIconFile</key> <string>path</string>	<key>DisplayIcon</key> <string>path</string>
+<key>DisplayIconSize</key> <string>pixels</string>	<key>DisplayIconSize</key> <string>pixels</string>	<key>IconSizeIbm</key> <string>pixels</string>
+<key>DisplayAccessoryType</key> <string>TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO</string>	<key>DisplayAccessoryType</key> <string>TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO</string>	<key>DisplayAccessoryType</key> <string>TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO</string>
+<key>DisplayAccessoryDefaultFile</key> <string>path or URL</string>	<key>DisplayAccessoryDefaultFile</key> <string>path or URL</string>	<key>DisplayAccessoryDefault</key> <string>path or URL</string>
+<key>DisplayAccessoryUpdateFile</key> <string>path or URL</string>	<key>DisplayAccessoryUpdateFile</key> <string>path or URL</string>	<key>DisplayAccessoryUpdate</key> <string>path or URL</string>
+<key>DisplayAccessoryUpgradeFile</key> <string>path or URL</string>	<key>DisplayAccessoryUpgradeFile</key> <string>path or URL</string>	<key>DisplayAccessoryUpgrade</key> <string>path or URL</string>
+<key>DisplayAccessoryUserAuthFile</key> <string>path or URL</string>	<key>DisplayAccessoryUserAuthFile</key> <string>path or URL</string>	<key>DisplayAccessoryUserAuth</key> <string>path or URL</string>
+<key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>HelpButton</key> <string>plain text or URL</string>
+<key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>WarningButton</key> <string>plain text or URL</string>
+<key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	N/A
+<key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	N/A
+<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	N/A
+<key>AuthMDMFailoverToUser</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>	<key>AuthMDMFailoverToUser</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>	<key>UserAuthMDMFailover</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>
+<key>TestMode</key> <true/> | <false/>	<key>TestMode</key> <true/> | <false/>	<key>TestMode</key> <true/> | <false/>
+<key>TestModeTimeout</key> <string>seconds</string>	<key>TestModeTimeout</key> <string>seconds</string>	<key>TestModeTimeout</key> <string>seconds</string>
+<key>TestStorageUpdate</key> <string>gigabytes</string>	<key>TestStorageUpdate</key> <string>gigabytes</string>	<key>FreeSpaceUpdate</key> <string>gigabytes</string>
+<key>TestStorageUpgrade</key> <string>gigabytes</string>	<key>TestStorageUpgrade</key> <string>gigabytes</string>	<key>FreeSpaceUpgrade</key> <string>gigabytes</string>
+<key>TestBatteryLevel</key> <string>percentage</string>	<key>TestBatteryLevel</key> <string>percentage</string>	<key>BatteryLevel</key> <string>percentage</string>
+<key>VerboseMode</key> <true/> | <false/>	<key>VerboseMode</key> <true/> | <false/>	<key>VerboseMode</key> <true/> | <false/>
+REMOVED	REMOVED	<key>DisplayRedraw</key> <string>seconds</string>
+REMOVED	REMOVED	<key>IconSizeJamf</key> <string>pixels</string>
+REMOVED	REMOVED	<key>PreferJamfHelper</key> <true/> | <false/>
