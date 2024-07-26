@@ -14,8 +14,8 @@ super 5.0.x	super 4.0.x	super 3.0
 <key>DeferralTimerDefault</key> <string>minutes</string>	<key>DeferralTimerDefault</key> <string>minutes</string>	<key>DefaultDefer</key> <string>seconds</string>
 <key>DeferralTimerMenu</key> <string>minutes,minutes,etc...</string>	<key>DeferralTimerMenu</key> <string>minutes,minutes,etc...</string>	<key>MenuDefer</key> <string>seconds,seconds,etc...</string>
 <key>DeferralTimerFocus</key> <string>minutes</string>	<key>DeferralTimerFocus</key> <string>minutes</string>	<key>FocusDefer</key> <string>seconds</string>
-<key>DeferralTimerError</key> <string>minutes</string>	<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>RecheckDefer</key> <string>seconds</string>
-<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>DeferralTimerError</key> <string>minutes</string>	<key>ErrorDefer</key> <string>seconds</string>
+<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>RecheckDefer</key> <string>seconds</string>
+<key>DeferralTimerError</key> <string>minutes</string>	<key>DeferralTimerError</key> <string>minutes</string>	<key>ErrorDefer</key> <string>seconds</string>
 <key>ScheduledInstallDays</key> <string>number</string>	N/A	N/A
 <key>ScheduledInstallDate</key> <string>YYYY-MM-DD:hh:mm</string>	N/A	N/A
 <key>ScheduledInstallUserChoice</key> <true/> | <false/>	N/A	N/A
