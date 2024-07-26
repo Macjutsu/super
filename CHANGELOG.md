@@ -64,7 +64,7 @@
 - Resolved an issue preventing non-system installations from completing while a user is currently logged in. (Thanks to @kenchan0130 for providing a solution!)
 - Countless typo fixes and improvements to both regular and verbose log output.
 - Updated [example MDM configuration profiles for `super` v5.0.0-beta2](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Example-MDM).
-- `super` 5.0.0-beta2 SHA-256: 
+- `super` 5.0.0-beta2 SHA-256: 52a9a9c25a9283935dc46086700aa5ec1faab3bc1c58c26058e0893b847a257a
 
 ### Specific Changes (5.0.0-beta1 formerly 4.1.0-beta1)
 
