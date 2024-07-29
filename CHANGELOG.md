@@ -65,6 +65,7 @@
 - Countless typo fixes and improvements to both regular and verbose log output.
 - Updated [example MDM configuration profiles for `super` v5.0.0-beta2](https://github.com/Macjutsu/super/tree/5.0.0-beta2/Example-MDM).
 - Updated [Jamf Pro External Application Custom Schema for `super` v5.0.0-beta2](https://github.com/Macjutsu/super/blob/5.0.0-beta2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0-beta2.json).  (Huge thanks to @tonyyo11 for taking this on!)
+- New [super.checksum.txt](https://github.com/Macjutsu/super/blob/5.0.0-beta2/super.checksum.txt) file added to root of repository for those who wish to automate the installation of `super` directly from GitHub.
 - `super` 5.0.0-beta2 SHA-256: 52a9a9c25a9283935dc46086700aa5ec1faab3bc1c58c26058e0893b847a257a
 
 ### Specific Changes (5.0.0-beta1 formerly 4.1.0-beta1)
