@@ -35,7 +35,7 @@
         },
         "DeferralTimerMenu": {
             "title": "Menu Defer Timer",
-            "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DeferralTimerDefault time. It must be between 2 and 1440. Put X to diable this option.",
+            "description": "Display a deferral time pop-up menu in the non-deadline update restart dialog that allows the user to overide the DeferralTimerDefault time. It must be between 2 and 1440. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -45,7 +45,7 @@
         },
         "DeferralTimerWorkflowRelaunch": {
             "title": "Workflow Relaunch Defer Timer",
-            "description": "The number of minutes to defer if no software updates are found. It must be between 2 and 43804. Put X to diable this option.",
+            "description": "The number of minutes to defer if no software updates are found. It must be between 2 and 43804. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -101,37 +101,37 @@
         },
         "DeadlineCountFocus": {
             "title": "Focus Count Deadline",
-            "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+            "description": "The maximum number of automatic deferrals allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to disable this option.",
             "type": "string"
         },
         "DeadlineCountSoft": {
             "title": "Soft Count Deadline",
-            "description": "The maximum number of user selected deferrals allowed before the soft deadline automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+            "description": "The maximum number of user selected deferrals allowed before the soft deadline automatically restarts for updates without asking the user for approval. Put X to disable this option.",
             "type": "string"
         },
         "DeadlineCountHard": {
             "title": "Hard Count Deadline",
-            "description": "The maximum number of user selected deferrals allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+            "description": "The maximum number of user selected deferrals allowed before the computer automatically restarts for updates without asking the user for approval. Put X to disable this option.",
             "type": "string"
         },
         "DeadlineDaysFocus": {
             "title": "Focus Days Deadline",
-            "description": "The maximum number of days that automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+            "description": "The maximum number of days that automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to disable this option.",
             "type": "string"
         },
         "DeadlineDaysSoft": {
             "title": "Soft Days Deadline",
-            "description": "The maximum number of days allowed before the soft deadline dialog. The soft deadline is an interactive update restart dialog indicating that no more deferrals are allowed. Put X to diable this option.",
+            "description": "The maximum number of days allowed before the soft deadline dialog. The soft deadline is an interactive update restart dialog indicating that no more deferrals are allowed. Put X to disable this option.",
             "type": "string"
         },
         "DeadlineDaysHard": {
             "title": "Hard Days Deadline",
-            "description": "The maximum number of days allowed before the computer automatically restarts for updates without asking the user for approval. Put X to diable this option.",
+            "description": "The maximum number of days allowed before the computer automatically restarts for updates without asking the user for approval. Put X to disable this option.",
             "type": "string"
         },
         "ScheduleZeroDateManual": {
             "title": "Manual Zero Day Workflow Date",
-            "description": "Instead of having the days deadline counter, automatically select the day zero date. PutX to diable this option.",
+            "description": "Instead of having the days deadline counter, automatically select the day zero date. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -169,7 +169,7 @@
         },
         "DeadlineDateFocus": {
             "title": "Focus Date Deadline",
-            "description": "This is the last date and time when automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to diable this option.",
+            "description": "This is the last date and time when automatic deferrals are allowed if the system is in user-enabled Focus/Do Not Disturb or when a process has requested that the display not go to sleep (for example, during an active meeting). Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -189,7 +189,7 @@
         },
         "DeadlineDateHard": {
             "title": "Hard Date Deadline",
-            "description": "If this date has passed, the computer restarts and udpates without asking the user for approval. Put X to diable this option.",
+            "description": "If this date has passed, the computer restarts and udpates without asking the user for approval. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -209,7 +209,7 @@
         },
         "DialogTimeoutUserChoice": {
             "title": "User Choice Restart or Defer Display Timeout",
-            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
+            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -219,7 +219,7 @@
         },
         "DialogTimeoutUserSchedule": {
             "title": "User Choice Dialog Schedule",
-            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
+            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -229,12 +229,12 @@
         },
         "DialogTimeoutSoftDeadline": {
             "title": "Soft Display Timeout",
-            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to diable this option.",
+            "description": "Sets an automatic timeout for interactive update restart dialogs in seconds. The countdown of the timeout is displayed in the update restart dialog. Put X to disable this option.",
             "type": "string"
         },
         "DisplayUnmovable": {
             "title": "Display Unmovable Dialogs and Notifications",
-            "description": "Prevents the user from moving dialogs and notifications. Put X to diable this option.",
+            "description": "Prevents the user from moving dialogs and notifications. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -244,7 +244,7 @@
         },
         "DisplayHideBackground": {
             "title": "Display Hide Background",
-            "description": "Hide the background while displaying super dialogs and notifications. Using this option hides all other windows (including full screen mode) and the background via blur effect while displaying super dialogs and notifications. Put X to diable this option.",
+            "description": "Hide the background while displaying super dialogs and notifications. Using this option hides all other windows (including full screen mode) and the background via blur effect while displaying super dialogs and notifications. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -254,7 +254,7 @@
         },
         "DisplayHideProgressBar": {
             "title": "Display Hide Progress Bar",
-            "description": "This option hides the animated progress bar (as opposed showing it) for notifications and alerts. Put X to diable this option.",
+            "description": "This option hides the animated progress bar (as opposed to showing it) for notifications and alerts. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -264,7 +264,7 @@
         },
         "DisplayNotificationsCentered": {
             "title": "Display Notifications Centered",
-            "description": "Shows non-interactive notifications in the center of the screen as opposed to the top right. Put X to diable this option.",
+            "description": "Shows non-interactive notifications in the center of the screen as opposed to the top right. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -274,7 +274,7 @@
         },
         "DisplayIconFile": {
             "title": "Display Icon",
-            "description": "Local path or http(s) URL to a file that is the picture to display in  notifications or dialogs. Put X to reset this to default.",
+            "description": "Local path or http(s) URL to a file that is the picture to display in notifications or dialogs. Put X to reset this to default.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -284,7 +284,7 @@
         },
         "DisplayIconSize": {
             "title": "Icon Size",
-            "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs. The value must be in between 96 and 150. Put X to reset this to default.",
+            "description": "Number of pixels for the DisplayIcon in IBM Notifier dialogs. The value must be between 96 and 150. Put X to reset this to default.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -371,7 +371,7 @@
         },
         "DialogTimeoutUserAuth": {
             "title": "User Authentication Timeout",
-            "description": "On Mac computers with Apple Silicon, the number of seconds to wait for the user to successfully authenticate when presented with the user authenticated dialog. This dialog does not show a visual countdown of the timeout. Default time is 3600seconds (1 hour).",
+            "description": "On Mac computers with Apple Silicon, the number of seconds to wait for the user to successfully authenticate when presented with the user authenticated dialog. This dialog does not show a visual countdown of the timeout. Default time is 3600 seconds (1 hour).",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -397,7 +397,7 @@
         },
         "AuthMDMFailoverToUser": {
             "title": "User Authentication MDM Failover",
-            "description": "The MDM workflow can be unreliable due to its complexity, and super will automatically try again upon failure, however this settings allows super to try other options. For more information see https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#user-authentication-mdm-failover. Put X to diable this option.",
+            "description": "The MDM workflow can be unreliable due to its complexity, and super will automatically try again upon failure. However, this settings allows super to try other options. For more information see https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#user-authentication-mdm-failover. Put X to disable this option.",
             "type": "string",
             "options": {
                 "inputAttributes": {
@@ -413,7 +413,7 @@
         },
         "InstallMacOSMajorUpgrades": {
             "title": "Allow Upgrades",
-            "description": "macOS now presents some Upgrades options as updates, super detects and ignores them by default (objective update over upgrade). Enabling this setting will allow the upgrades.",
+            "description": "macOS now presents some Upgrades options as updates. super detects and ignores them by default (objective update over upgrade). Enabling this setting will allow the upgrades.",
             "type": "boolean"
         },
         "InstallMacOSMajorVersionTarget": {
@@ -428,7 +428,7 @@
         },
         "InstallRapidSecurityResponses": {
             "title": "Allow Rapid Security Response Updates",
-            "description": "macOS 13.3+ Ventura support Rapid Security Response updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions.",
+            "description": "macOS 13.3+ Ventura supports Rapid Security Response updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions.",
             "type": "boolean"
         },
         "InstallNonSystemUpdatesWithoutRestarting": {
