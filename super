@@ -288,7 +288,7 @@ set_defaults() {
 	readonly MSU_LIST_LOG
 	
 	# URL to the default SOFA macOS machine readable json feed:
-	SOFA_MACOS_DEFAULT_URL="https://sofa.macadmins.io/v1/macos_data_feed.json"
+	SOFA_MACOS_DEFAULT_URL="https://sofafeed.macadmins.io/v1/macos_data_feed.json"
 	readonly SOFA_MACOS_DEFAULT_URL
 	
 	# Path to the local copy of the SOFA machine readable feed:
