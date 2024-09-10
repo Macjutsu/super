@@ -1,4 +1,4 @@
-super 5.x	super 4.0.x	super 3.0
+super 5.0.x	super 4.0.x	super 3.0
 --install-macos-major-upgrades	--install-macos-major-upgrades	--allow-upgrade
 --install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--allow-upgrade-off
 --install-macos-major-version-target=number	--install-macos-major-version-target=number	--target-upgrade=version
