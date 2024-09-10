@@ -90,29 +90,39 @@
                   <string>600</string>
                   <key>DialogTimeoutPowerRequired</key>
                   <string>600</string>
-                  <key>DialogTimeoutRestartOrDefer</key>
-                  <string>600</string>
                   <key>DialogTimeoutSoftDeadline</key>
                   <string>600</string>
                   <key>DialogTimeoutUserAuth</key>
                   <string>600</string>
+                  <key>DialogTimeoutUserChoice</key>
+                  <string>600</string>
+                  <key>DialogTimeoutUserSchedule</key>
+                  <string>600</string>
                   <key>DisplayAccessoryDefaultFile</key>
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+                  <key>DisplayAccessoryJamfPolicyTriggersFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryMacOSMajorUpgradeFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryMacOSMinorUpdateFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryNonSystemUpdatesFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryRestartWithoutUpdatesFile</key>
+                  <string>path or URL</string>
                   <key>DisplayAccessoryType</key>
                   <string>HTML</string>
-                  <key>DisplayAccessoryUpdateFile</key>
-                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-                  <key>DisplayAccessoryUpgradeFile</key>
-                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-                  <key>DisplayAccessoryUserAuthFile</key>
-                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayHelpButtonString</key>
                   <string>https://support.apple.com/en-us/HT201541</string>
                   <key>DisplayHideBackground</key>
                   <string>DEADLINE,INSTALLNOW</string>
                   <key>DisplayHideProgressBar</key>
                   <string>DEADLINE,INSTALLNOW</string>
+                  <key>DisplayIconDarkFile</key>
+                  <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconFile</key>
+                  <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
+                  <key>DisplayIconLightFile</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconSize</key>
                   <string>128</string>
@@ -131,11 +141,13 @@
                   <key>InstallMacOSMajorUpgrades</key>
                   <true/>
                   <key>InstallMacOSMajorVersionTarget</key>
-                  <string>13</string>
+                  <string>14</string>
                   <key>InstallNonSystemUpdatesWithoutRestarting</key>
                   <true/>
                   <key>InstallRapidSecurityResponses</key>
                   <true/>
+                  <key>ScheduleWorkflowActive</key>
+                  <string>TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00</string>
                   <key>ScheduleZeroDateManual</key>
                   <string>2023-09-21:00:00</string>
                   <key>ScheduleZeroDateRelease</key>

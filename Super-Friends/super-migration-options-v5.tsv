@@ -26,16 +26,17 @@ super 5.x	super 4.0.x	super 3.0
 --deferral-timer-error=minutes	--deferral-timer-error=minutes	--error-defer=seconds
 --deferral-timer-workflow-relaunch=minutes	--deferral-timer-workflow-relaunch=minutes	--recheck-defer=seconds
 --deferral-timer-reset-all	--deferral-timer-reset-all	--delete-deferrals
+--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...	N/A	N/A
+--schedule-zero-date-release	N/A	N/A
+--schedule-zero-date-release-off	N/A	N/A
+--schedule-zero-date-sofa-custom-url=URL	N/A	N/A
+--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--workflow-zero-date-manual=YYYY-MM-DD:hh:mm	--zero-day=YYYY-MM-DD:hh:mm
 --scheduled-install-days=number	N/A	N/A
 --scheduled-install-date=YYYY-MM-DD:hh:mm	N/A	N/A
 --scheduled-install-user-choice	N/A	N/A
 --scheduled-install-user-choice-off	N/A	N/A
 --scheduled-install-reminder=minutes,minutes,etc...	N/A	N/A
 --scheduled-install-delete-all	N/A	N/A
---schedule-zero-date-release	N/A	N/A
---schedule-zero-date-release-off	N/A	N/A
---schedule-zero-date-sofa-custom-url=URL	N/A	N/A
---schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--workflow-zero-date-manual=YYYY-MM-DD:hh:mm	--zero-day=YYYY-MM-DD:hh:mm
 --deadline-count-focus=number	--deadline-count-focus=number	--focus-count=number
 --deadline-count-soft=number	--deadline-count-soft=number	--soft-count=number
 --deadline-count-hard=number	--deadline-count-hard=number	--hard-count=number
@@ -51,10 +52,10 @@ super 5.x	super 4.0.x	super 3.0
 --deadline-date-hard=YYYY-MM-DD:hh:mm	--deadline-date-hard=YYYY-MM-DD:hh:mm	--hard-date=YYYY-MM-DD:hh:mm
 --deadline-date-delete-all	--deadline-date-delete-all	--delete-dates
 --dialog-timeout-default=seconds	--dialog-timeout-default=seconds	N/A
---dialog-timeout-soft-deadline=seconds	--dialog-timeout-soft-deadline=seconds	--soft-dialog-timeout=seconds
+--dialog-timeout-user-auth=seconds	--dialog-timeout-user-auth=seconds	--user-auth-timeout=seconds
 --dialog-timeout-user-choice=seconds	--dialog-timeout-restart-or-defer=seconds	--defer-dialog-timeout=seconds
 --dialog-timeout-user-schedule=seconds	N/A	N/A
---dialog-timeout-user-auth=seconds	--dialog-timeout-user-auth=seconds	--user-auth-timeout=seconds
+--dialog-timeout-soft-deadline=seconds	--dialog-timeout-soft-deadline=seconds	--soft-dialog-timeout=seconds
 --dialog-timeout-insufficient-storage=seconds	--dialog-timeout-insufficient-storage=seconds	--free-space-timeout=seconds
 --dialog-timeout-power-required=seconds	--dialog-timeout-power-required=seconds	--battery-timeout=seconds
 --dialog-timeout-delete-all	--dialog-timeout-delete-all	N/A
@@ -63,13 +64,17 @@ super 5.x	super 4.0.x	super 3.0
 --display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-silently=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE	--display-silently (—display-silently-off)
 --display-hide-progress-bar=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	N/A	N/A
 --display-notifications-centered=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-notifications-centered=ALWAYS,SOFT,HARD,INSTALLNOW	N/A
---display-icon-file=/local/path or URL	--display-icon-file=/local/path or URL	--display-icon=/local/path or URL
 --display-icon-size=pixels	--display-icon-size=pixels	--icon-size-ibm=pixels
+--display-icon-file=/local/path or URL	--display-icon-file=/local/path or URL	--display-icon=/local/path or URL
+--display-icon-light-file=/local/path or URL	N/A	N/A
+--display-icon-dark-file=/local/path or URL	N/A	N/A
 --display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO	--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO	--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO
 --display-accessory-default-file=/local/path or URL	--display-accessory-default-file=/local/path or URL	--display-accessory-default=/local/path or URL
---display-accessory-update-file=/local/path or URL	--display-accessory-update-file=/local/path or URL	--display-accessory-update=/local/path or URL
---display-accessory-upgrade-file=/local/path or URL	--display-accessory-upgrade-file=/local/path or URL	--display-accessory-upgrade=/local/path or URL
---display-accessory-user-auth-file=/local/path or URL	--display-accessory-user-auth-file=/local/path or URL	--display-accessory-user-auth=/local/path or URL
+--display-accessory-macos-minor-update-file=/local/path or URL	--display-accessory-update-file=/local/path or URL	--display-accessory-update=/local/path or URL
+--display-accessory-macos-major-upgrade-file=/local/path or URL	--display-accessory-upgrade-file=/local/path or URL	--display-accessory-upgrade=/local/path or URL
+--display-accessory-non-system-updates-file=/local/path or URL	N/A	N/A
+--display-accessory-jamf-policy-triggers-file=/local/path or URL	N/A	N/A
+--display-accessory-restart-without-updates-file=/local/path or URL	N/A	N/A
 --display-help-button-string=plain text or URL	--display-help-button-string=plain text or URL	--help-button=plain text or URL
 --display-warning-button-string=plain text or URL	--display-warning-button-string=plain text or URL	--warning-button=plain text or URL
 --auth-ask-user-to-save-password	--auth-ask-user-to-save-password	N/A
@@ -101,6 +106,7 @@ super 5.x	super 4.0.x	super 3.0
 --verbose-mode-off	--verbose-mode-off	--verbose-mode-off
 --usage	--usage	--usage
 --help	--help	--help
+REMOVED	--display-accessory-user-auth-file=/local/path or URL	--display-accessory-user-auth=/local/path or URL
 REMOVED	REMOVED	--display-redraw=seconds
 REMOVED	REMOVED	--icon-size-jamf=pixels
 REMOVED	REMOVED	--prefer-jamf-helper
