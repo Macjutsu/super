@@ -26,6 +26,7 @@
 - Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Super-Friends/super-migration-managed-preferences-v5.tsv).
 - Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Super-Friends/) now supports `super` versions 3.0, 4.x, and 5.x.
 - Updated [example MDM configuration profiles for `super` v5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.0.0-beta3](https://github.com/Macjutsu/super/blob/5.0.0-beta3/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0-beta3.json).  (Huge thanks to @tonyyo11 for taking this on!)
 
 ### Known Issues (5.0.0-beta3)
 
