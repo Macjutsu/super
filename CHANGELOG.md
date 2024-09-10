@@ -14,7 +14,6 @@
 - Completely rearchitected software update/upgrade discovery to significantly improve reliability, performance, and improve support for native macOS software update/upgrade deferral restrictions.
 - Significantly improved behavior for alternate workflow targets (non-system updates, Jamf Pro Policies, and enforced system restarts) now support all deferral, schedule, deadline, and display options.
 - Even more user interface customization options.
-- More new features coming soon...
 - Beta Wiki coming soon...
 
 ### Compatibility Notes (5.x)
