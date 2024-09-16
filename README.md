@@ -6,7 +6,7 @@ S.U.P.E.R.M.A.N. optimizes the macOS software upgrade and upgrade experience.
 
 by Kevin M. White
 
-### Please use [the newest version of `super`](https://github.com/Macjutsu/super/releases) for the best experience when using or upgrading to macOS 14 Sonoma. Older versions of `super` are not tested against macOS 14 Sonoma update/upgrade workflows.
+### Please use [the newest version of `super`](https://github.com/Macjutsu/super/releases) for the best experience when using or upgrading to macOS 15 Sequoia. Older versions of `super` are not tested against macOS 15 Sequioa update/upgrade workflows.
 
 ## Introduction
 
