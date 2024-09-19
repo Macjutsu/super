@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.0.0-beta3"
+SUPER_VERSION="5.0.0-beta4"
 readonly SUPER_VERSION
-SUPER_DATE="2024/09/09"
+SUPER_DATE="2024/09/11"
 readonly SUPER_DATE
 
 # MARK: *** Documentation ***
@@ -2411,7 +2411,7 @@ manage_parameter_options() {
 	[[ -z "${display_icon_size}" ]] && display_icon_size="${DISPLAY_ICON_DEFAULT_SIZE}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_icon_size is: ${display_icon_size}"
 	
-	# Initial validation for the ${display_icon_file_option}, ${display_icon_light_file_option}, and ${display_icon_dark_file_option} to set ${display_icon_light_file_path} and ${display_icon_dark_file_path}. Handaling of the actual display icon files themseves is in the manage_helpers() funciton.
+	# Initial validation for the ${display_icon_file_option}, ${display_icon_light_file_option}, and ${display_icon_dark_file_option} to set ${display_icon_light_file_path} and ${display_icon_dark_file_path}. Handling of the actual display icon files themselves is in the manage_helpers() function.
 	display_icon_light_file_path="FALSE"
 	display_icon_dark_file_path="FALSE"
 	if [[ "${display_icon_light_file_option}" == "X" ]]; then
@@ -2617,11 +2617,6 @@ manage_parameter_options() {
 		fi
 		if [[ -n "${auth_jamf_account_option}" ]] && [[ "${jamf_version_number}" -ge 1049 ]]; then
 			log_super "Parameter Warning: The --auth-jamf-account option is not recommended for Jamf Pro version 10.49 or later. The recommended implementation is the more secure --auth-jamf-client option."
-		fi
-		
-		if [[ "${scheduled_install_option_counter}" -gt 0 ]] && [[ "${auth_ask_user_to_save_password}" == "FALSE" ]] && [[ -z "${auth_local_account_option}" ]] && [[ -z "${auth_service_add_via_admin_account_option}" ]] && [[ -z "${auth_jamf_client_option}" ]] && [[ -z "${auth_jamf_account_option}" ]]; then
-			log_super "Parameter Error: All --scheduled-install-* options require that you also specify a saved --auth-* option."
-			option_error="TRUE"
 		fi
 		
 		# Validate ${auth_jamf_custom_url_option} input and save to ${SUPER_LOCAL_PLIST}.
@@ -2976,7 +2971,7 @@ manage_authentication_options() {
 		[[ -n "${auth_service_add_via_admin_account_option}" ]] && log_super "Auth Warning: Ignoring the --auth-service-add-via-admin-account option."
 		[[ -n "${auth_jamf_client_option}" ]] && log_super "Auth Warning: Ignoring the --auth-jamf-client option."
 		[[ -n "${auth_jamf_account_option}" ]] && log_super "Auth Warning: Ignoring the --auth-jamf-account option."
-		[[ "${current_user_account_name}" != "FALSE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+		[[ "${current_user_account_name}" != "FALSE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates."
 		# The ${auth_ask_user_to_save_password} option is saved later via the dialog_user_auth() function.
 	elif [[ -n "${auth_local_account_option}" ]]; then
 		{ [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_jamf_client_option}" ]] || [[ -n "${auth_jamf_account_option}" ]]; } && log_super "Auth Warning: The --auth-local-account option overrides the --auth-service-add-via-admin-account option and any other Apple silicon MDM authentication methods."
@@ -3102,7 +3097,7 @@ manage_authentication_options() {
 				auth_service_uid=$((auth_service_uid + 1))
 			done
 			local sysadminctl_response
-			sysadminctl_response=$(sysadminctl -addUser "${auth_service_account}" -fullName "${auth_service_real_name}" -password "${auth_service_password}" -UID "${auth_service_uid}" -GID 20 -shell "/dev/null" -home "/dev/null" -picture "${DISPLAY_ICON_FILE_CACHE}" -adminUser "${auth_service_add_via_admin_account_option}" -adminPassword "${auth_service_add_via_admin_password_option}" 2>&1)
+			sysadminctl_response=$(sysadminctl -addUser "${auth_service_account}" -fullName "${auth_service_real_name}" -password "${auth_service_password}" -UID "${auth_service_uid}" -GID 20 -shell "/dev/null" -home "/dev/null" -picture "${display_icon_light}" -adminUser "${auth_service_add_via_admin_account_option}" -adminPassword "${auth_service_add_via_admin_password_option}" 2>&1)
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: sysadminctl_response is:\n${sysadminctl_response}"
 			dscl . create /Users/"${auth_service_account}" IsHidden 1
 		fi
@@ -3326,7 +3321,7 @@ manage_workflow_options() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_auth_error is: ${workflow_auth_error}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_macos_auth is: ${workflow_macos_auth}"
 	
-	# Provide logging for the ${workflow_auth_error} condition, which at this point is a workflow-stopper.
+	# Provide logging for ${workflow_auth_error} conditions, which at this point is a workflow-stopper.
 	if [[ "${workflow_auth_error}" == "TRUE" ]]; then
 		if [[ "${current_user_account_name}" == "FALSE" ]]; then
 			log_super "Auth Error: No current active user to provide local authentication."
@@ -3334,6 +3329,18 @@ manage_workflow_options() {
 			[[ "${current_user_has_secure_token}" == "FALSE" ]] && log_super "Auth Error: The user \"${current_user_account_name}\" does not have a secure token."
 			[[ "${current_user_is_volume_owner}" == "FALSE" ]] && log_super "Auth Error: The user \"${current_user_account_name}\" is not a system volume owner."
 		fi
+	fi
+	
+	# Provide logging if there is a scheduled installation option that will fail without saved authentication, which at this point is a workflow-stopper.
+	if { [[ -n "${scheduled_install_days}" ]] || [[ -n "${scheduled_install_date}" ]]; } && { [[ "${workflow_auth_error}" == "TRUE" ]] || [[ "${workflow_macos_auth}" == "USER" ]]; }; then
+		log_super "Auth Error: The --scheduled-install-date and --scheduled-install-days options require valid saved authentication."
+		workflow_auth_error="TRUE"
+	fi
+	
+	# Provide logging for workflow conditions related to the ${scheduled_install_user_choice_option}.
+	if [[ "${scheduled_install_user_choice_option}" == "TRUE" ]] && { [[ "${workflow_auth_error}" == "TRUE" ]] || [[ "${workflow_macos_auth}" == "USER" ]]; } && { ! [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]]; }; then
+		log_super "Warning: The --scheduled-install-user-choice option requires valid saved authenticion. This option will not be show in the user choice dialog."
+		scheduled_install_user_choice_option="FALSE"
 	fi
 }
 
@@ -3352,7 +3359,7 @@ get_saved_authentication() {
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_user_password_keychain: ${auth_user_password_keychain}"
 		if [[ $(echo "${auth_user_password_keychain}" | grep -c 'The specified item could not be found in the keychain.') -ge 1 ]]; then
 			log_super "Status: The --auth-ask-user-to-save-password option is enabled but a user password is not currently saved."
-			log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+			log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates."
 			auth_error_saved="TRUE"
 			auth_user_account_saved="FALSE"
 		elif [[ $(echo "${auth_user_password_keychain}" | grep -c 'Failed to get user context') -ge 1 ]]; then
@@ -3371,7 +3378,7 @@ get_saved_authentication() {
 				unset auth_local_account
 				unset auth_local_password
 				launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" >/dev/null 2>&1
-				log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates a macOS update/upgrade."
+				log_super "Status: A new automatic authentication password will be saved the next time a valid user succesfully authenticates."
 				auth_error_saved="TRUE"
 				auth_user_account_saved="FALSE"
 			fi
@@ -3941,7 +3948,7 @@ workflow_startup() {
 		log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Uptime is: $(uptime)"
 	fi
 	
-	# In case super is running at system startup, wait for the loginwindow process befor continuing.
+	# In case super is running at system startup, wait for the loginwindow process before continuing.
 	local startup_timeout
 	startup_timeout=0
 	while [[ ! $(pgrep "loginwindow") ]] && [[ "${startup_timeout}" -lt 600 ]]; do
@@ -4096,7 +4103,7 @@ workflow_startup() {
 # MARK: *** Process Management ***
 ################################################################################
 
-# This function is only used for debuging from the command line to interrupt the workflow and wait for the user to press Enter to continue. Insert the following line wherver you want an interrupt to occour:
+# This function is only used for debugging from the command line to interrupt the workflow and wait for the user to press Enter to continue. Insert the following line wherever you want an interrupt to occur:
 # [[ "${current_user_account_name}" != "FALSE" ]] && interactive_interrupt
 interactive_interrupt() {
 	# shellcheck disable=SC2317
@@ -4316,6 +4323,8 @@ check_current_user() {
 		current_user_is_admin="FALSE"
 		current_user_has_secure_token="FALSE"
 		current_user_is_volume_owner="FALSE"
+		current_user_password_policies="FALSE"
+		current_user_system_password_policies="FALSE"
 		if [[ -n "${current_user_id}" ]] && [[ -n "${current_user_guid}" ]] && [[ -n "${current_user_real_name}" ]]; then
 			[[ $(groups "${current_user_account_name}" 2>/dev/null | grep -c 'admin') -gt 0 ]] && current_user_is_admin="TRUE"
 			[[ $(dscl . read "/Users/${current_user_account_name}" AuthenticationAuthority 2>/dev/null | grep -c 'SecureToken') -gt 0 ]] && current_user_has_secure_token="TRUE"
@@ -4325,14 +4334,14 @@ check_current_user() {
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_appearance_mode_response is: ${current_user_appearance_mode_response}"
 			[[ "${current_user_appearance_mode_response}" == "NSAppearanceNameAqua" ]] && current_user_appearance_mode="LIGHT"
 			[[ "${current_user_appearance_mode_response}" == "NSAppearanceNameDarkAqua" ]] && current_user_appearance_mode="DARK"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_is_admin is: ${current_user_is_admin}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_has_secure_token is: ${current_user_has_secure_token}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_is_volume_owner is: ${current_user_is_volume_owner}"
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_appearance_mode is: ${current_user_appearance_mode}"
 		else
 			log_super "Parameter Error: Unable to determine account details for current user: ${current_user_account_name}"
 			option_error="TRUE"
 		fi
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_is_admin is: ${current_user_is_admin}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_has_secure_token is: ${current_user_has_secure_token}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_is_volume_owner is: ${current_user_is_volume_owner}"
 	fi
 }
 
@@ -5088,7 +5097,7 @@ check_schedule_zero_date() {
 			if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${sofa_macos_json}" == "FALSE" ]]; then
 				get_sofa_macos_json
 				
-				# Error handaling if curl is misbehaving.
+				# Error handling if curl is misbehaving.
 				if [[ "${sofa_macos_json}" == "FALSE" ]]; then
 					log_super "Warning: Re-starting downloading SOFA macOS releases feed..."
 					get_sofa_macos_json
@@ -5105,7 +5114,7 @@ check_schedule_zero_date() {
 		fi
 	fi
 	
-	# If no ${schedule_zero_date} yet and the ${schedule_zero_date_release_option} is enabled and there is a ${schedule_zero_date_version_target} and there appears to be a vaild ${SOFA_MACOS_JSON_CACHE}, then attempt to parse and find the release date associated with ${schedule_zero_date_version_target}
+	# If no ${schedule_zero_date} yet and the ${schedule_zero_date_release_option} is enabled and there is a ${schedule_zero_date_version_target} and there appears to be a valid ${SOFA_MACOS_JSON_CACHE}, then attempt to parse and find the release date associated with ${schedule_zero_date_version_target}
 	if [[ "${schedule_zero_date}" == "FALSE" ]] && [[ "${schedule_zero_date_version_target}" != "FALSE" ]] && [[ "${schedule_zero_date_release_option}" == "TRUE" ]] && [[ "${sofa_macos_json}" == "TRUE" ]]; then
 		local sofa_osversions_array_index
 		for array_index in $(seq 0 "$(sqlite3 /dev/null "SELECT json_array_length(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions')"-1 2>/dev/null)"); do
@@ -5165,7 +5174,7 @@ check_schedule_zero_date() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_schedule_zero_date: ${display_string_schedule_zero_date}"
 }
 
-# Evaulate any previously set ${workflow_scheduled_install_active}, ${scheduled_install_days}, and ${scheduled_install_date} options.
+# Evaluate any previously set ${workflow_scheduled_install_active}, ${scheduled_install_days}, and ${scheduled_install_date} options.
 # If needed will set ${workflow_scheduled_install}, ${workflow_scheduled_install_epoch}, ${workflow_scheduled_install_active}, ${workflow_scheduled_install_now}, ${scheduled_install_past_deadline}, ${scheduled_install_suppress_reminder}, ${scheduled_install_final_reminder}, and ${scheduled_install_user_choice_active}.
 check_scheduled_install() {
 	workflow_scheduled_install_now="FALSE"
@@ -5241,9 +5250,9 @@ check_scheduled_install() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_epoch: ${workflow_scheduled_install_epoch}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_active: ${workflow_scheduled_install_active}"
 	
-	# If a scheduled install is active then set display strings and evaulate ${workflow_scheduled_install_now}.
+	# If a scheduled install is active then set display strings and evaluate ${workflow_scheduled_install_now}.
 	if [[ "${workflow_scheduled_install_active}" == "TRUE" ]]; then
-		# Set varoius display options for scheduled installation dialogs.
+		# Set various display options for scheduled installation dialogs.
 		[[ $(echo "${display_unmovable_option}" | grep -c 'SCHEDULED') -gt 0 ]] && display_unmovable_status="TRUE"
 		[[ $(echo "${display_hide_background_option}" | grep -c 'SCHEDULED') -gt 0 ]] && display_hide_background_status="TRUE"
 		[[ $(echo "${display_silently_option}" | grep -c 'SCHEDULED') -gt 0 ]] && display_silently_status="TRUE"
@@ -5262,7 +5271,7 @@ check_scheduled_install() {
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_scheduled_install_only_time: ${display_string_scheduled_install_only_time}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_scheduled_install: ${display_string_scheduled_install}"
 		
-		# Evaulate if the scheduled installation should take place now or later.
+		# Evaluate if the scheduled installation should take place now or later.
 		if [[ "${schedule_workflow_active_matches_now}" == "TRUE" ]] || [[ $workflow_scheduled_install_epoch -lt $workflow_time_epoch ]]; then
 			log_super "Status: Scheduled installation date of ${workflow_scheduled_install} has passed."
 			workflow_scheduled_install_now="TRUE"
@@ -5291,7 +5300,7 @@ check_scheduled_install() {
 	fi
 }
 
-# Evaulate ${workflow_scheduled_install} and ${scheduled_install_reminder_minutes} to set a new ${deferral_timer_minutes}.
+# Evaluate ${workflow_scheduled_install} and ${scheduled_install_reminder_minutes} to set a new ${deferral_timer_minutes}.
 set_scheduled_install_deferral() {
 	[[ -z "${workflow_scheduled_install_epoch}" ]] && workflow_scheduled_install_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_epoch: ${workflow_scheduled_install_epoch}"
@@ -5753,7 +5762,7 @@ check_software_update_status_cached() {
 	
 	# Check macOS beta program status cache.
 	local macos_beta_program_cache
-	macos_beta_program_cache=$(defaults read "${SUPER_LOCAL_PLIST}" macOSBetaProgramCache 2>/dev/null)
+	macos_beta_program_cache=$(defaults read "${SUPER_LOCAL_PLIST}" MacOSBetaProgramCache 2>/dev/null)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_beta_program_cache is: ${macos_beta_program_cache}"
 	if [[ -n "${macos_beta_program_cache}" ]]; then
 		if [[ "${macos_beta_program_cache}" == "1" ]]; then
@@ -5850,7 +5859,7 @@ reset_software_update_status() {
 	# Externally stored items.
 	defaults delete "${SUPER_LOCAL_PLIST}" DeferralRestrictionsChecksum 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" DeferralRestrictionsCache 2>/dev/null
-	defaults delete "${SUPER_LOCAL_PLIST}" macOSBetaProgramCache 2>/dev/null
+	defaults delete "${SUPER_LOCAL_PLIST}" MacOSBetaProgramCache 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" MDMClientListChecksum 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" MDMClientAvailableCache 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" MacOSInstallerDownloaded 2>/dev/null
@@ -5907,9 +5916,9 @@ check_macos_beta_program() {
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_beta_program is: ${macos_beta_program}"
 	if [[ "${macos_beta_program}" == "FALSE" ]]; then
-		defaults write "${SUPER_LOCAL_PLIST}" macOSBetaProgramCache -bool false
+		defaults write "${SUPER_LOCAL_PLIST}" MacOSBetaProgramCache -bool false
 	else # "${macos_beta_program}" == "TRUE"
-		defaults write "${SUPER_LOCAL_PLIST}" macOSBetaProgramCache -bool true
+		defaults write "${SUPER_LOCAL_PLIST}" MacOSBetaProgramCache -bool true
 	fi
 }
 
@@ -6127,7 +6136,7 @@ workflow_check_software_status() {
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${check_software_status_required}" == "TRUE" ]]; then
 		get_mdmclient_list
 	
-		# Error handaling if mdmclient is misbehaving.
+		# Error handling if mdmclient is misbehaving.
 		if [[ "${get_mdmclient_list_error}" == "TRUE" ]] || [[ "${get_mdmclient_list_timeout}" == "TRUE" ]]; then
 			log_super "Warning: Re-starting mdmclient available updates listing..."
 			kick_softwareupdated
@@ -6166,7 +6175,7 @@ workflow_check_software_status() {
 		local mdmclient_macos_msu_array
 		mdmclient_macos_msu_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'Build.*macOS' | grep -Ev 'Deferred' | awk -F ',' '{print $2 "," $1 "," $3}' | uniq | sort -t ':' -k4 -V -r))
 		local mdmclient_non_system_array
-		mdmclient_non_system_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|DeferredUntil' | awk -F ',' '{print $1 "," $2}' | uniq))
+		mdmclient_non_system_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|Gatekeeper|DeferredUntil' | awk -F ',' '{print $1 "," $2}' | uniq))
 		
 		# Create arrays for macOS and non-system updates reporting as deferred.
 		local mdmclient_macos_installers_deferred_array
@@ -6174,13 +6183,13 @@ workflow_check_software_status() {
 		local mdmclient_macos_msu_deferred_array
 		mdmclient_macos_msu_deferred_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'Build.*Deferred.*macOS' | awk -F ',' '{print $2 "," $3 "," $1 "," $4}'| uniq | sort -t ':' -k7 -V -r))
 		local mdmclient_non_system_deferred_array
-		mdmclient_non_system_deferred_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT' | grep -E 'Deferred' | awk -F ',' '{print $1 "," $2 "," $3}' | uniq))
+		mdmclient_non_system_deferred_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|Gatekeeper' | grep -E 'Deferred' | awk -F ',' '{print $1 "," $2 "," $3}' | uniq))
 		
-		# Cretae an array for security updates that can not be installed programatically.
+		# Create an array for security updates that can not be installed programmatically.
 		local mdmclient_security_array
-		mdmclient_security_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'XProtect|MRT' | awk -F ',' '{print $1 "," $2}' | uniq))
+		mdmclient_security_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'XProtect|MRT|Gatekeeper' | awk -F ',' '{print $1 "," $2}' | uniq))
 		
-		# Evaulate the numer of available updates and make sure there is at least one update available.
+		# Evaluate the numer of available updates and make sure there is at least one update available.
 		if [[ ${#mdmclient_macos_installers_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_installers_deferred_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_deferred_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_deferred_array[@]} -eq 0 ]] && [[ ${#mdmclient_security_array[@]} -eq 0 ]]; then
 			log_super "Error: Parsing mdmclient available updates listing did not find any available or deferred updates."
 			workflow_check_software_status_error="TRUE"
@@ -6194,7 +6203,7 @@ workflow_check_software_status() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_deferred_array is:\n${mdmclient_non_system_deferred_array[*]}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_security_array is:\n${mdmclient_security_array[*]}"
 	
-	# If (no errors) there are deferred items then evaulate and report to super.log. Further if ${deferral_restrictions} are not present then erroneously deferred items are moved back to the appropriate available items array.
+	# If (no errors) there are deferred items then evaluate and report to super.log. Further if ${deferral_restrictions} are not present then erroneously deferred items are moved back to the appropriate available items array.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; }; then
 		# Iterate trough the deferred arrays for logging and erroneous deferrals.
 		[[ "${deferral_restrictions}" == "TRUE" ]] && log_super "Deferred: The following updates are deferred due to software update restrictions configuration profile:"
@@ -6240,7 +6249,7 @@ workflow_check_software_status() {
 		fi
 	fi
 	
-	# If (no errors) no installable updates then report any macOS security updates (that can't be installed programatically) and then exit this function.
+	# If (no errors) no installable updates then report any macOS security updates (that can't be installed programmatically) and then exit this function.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_installers_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
 		{ [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; } && log_super "Status: No currently available macOS software updates due to software update deferral restrictions configuration profile."
 		if [[ ${#mdmclient_security_array[@]} -gt 0 ]]; then
@@ -6255,7 +6264,7 @@ workflow_check_software_status() {
 		return 0
 	fi
 	
-	# If (no errors) split ${mdmclient_macos_msu_array[]} into seperate major upgrade and minor update arrays.
+	# If (no errors) split ${mdmclient_macos_msu_array[]} into separate major upgrade and minor update arrays.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
 		local mdmclient_macos_msu_array
 		mdmclient_macos_msu_major_upgrade_array=()
@@ -6382,7 +6391,7 @@ workflow_check_software_status() {
 		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${macos_installers_list}" == "FALSE" ]] || [[ -z "${macos_installers_list}" ]]; then
 			get_macos_installers_list
 			
-			# Error handaling if mist-list is misbehaving.
+			# Error handling if mist-list is misbehaving.
 			if [[ "${get_macos_installers_list_error}" == "TRUE" ]] || [[ "${get_macos_installers_list_timeout}" == "TRUE" ]]; then
 				log_super "Warning: Re-starting check for macOS installers..."
 				get_macos_installers_list
@@ -6401,7 +6410,7 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) there is a ${mdmclient_macos_installer_target} then evaluate the ${macos_installers_list} to select the appropriate ${macos_installer_target}.
-	# If a ${macos_installer_target} is selected then this funtion will also set ${macos_installer_title}, ${macos_installer_version}, ${macos_installer_build}, ${macos_installer_size}, and then exit this function.
+	# If a ${macos_installer_target} is selected then this function will also set ${macos_installer_title}, ${macos_installer_version}, ${macos_installer_build}, ${macos_installer_size}, and then exit this function.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" != "FALSE" ]] && [[ "${macos_installers_list}" != "FALSE" ]]; then
 		# Clean up the ${macos_installers_list} and create an array for searching.
 		local macos_installers_sanitized_list
@@ -6442,7 +6451,7 @@ workflow_check_software_status() {
 		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${msu_list}" == "FALSE" ]] || [[ -z "${msu_list}" ]]; then
 			get_msu_list
 			
-			# Error handaling if softwareupdate is misbehaving.
+			# Error handling if softwareupdate is misbehaving.
 			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
 				log_super "Warning: Re-starting softwareupdate available updates listing..."
 				kick_softwareupdated
@@ -6479,7 +6488,7 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) there is a ${mdmclient_macos_msu_major_upgrade_target} then evaluate the ${macos_msu_array[]} to select the appropriate macOS major upgrade for the ${macos_msu_major_upgrade_target}.
-	# If a ${macos_msu_major_upgrade_target} is selected then this funtion will also set ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, ${macos_msu_size } and then exit this function.
+	# If a ${macos_msu_major_upgrade_target} is selected then this function will also set ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, ${macos_msu_size } and then exit this function.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ ${#macos_msu_array[@]} -gt 0 ]]; then
 		# Pick the appropriate macOS major upgrade from the ${macos_msu_array} based on the ${mdmclient_macos_msu_major_upgrade_target}.
 		for macos_msu_item in "${macos_msu_array[@]}"; do
@@ -6510,7 +6519,7 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) there is a ${mdmclient_macos_msu_minor_update_target} then evaluate the ${macos_msu_array[]} to select the appropriate macOS minor update for the ${macos_msu_minor_update_target}.
-	# If a ${macos_msu_minor_update_target} is selected then this funtion will also set ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, ${macos_msu_size } and then exit this function.
+	# If a ${macos_msu_minor_update_target} is selected then this function will also set ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, ${macos_msu_size } and then exit this function.
 		if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" != "FALSE" ]] && [[ ${#macos_msu_array[@]} -gt 0 ]]; then
 		# Pick the appropriate macOS minor update from the ${macos_msu_array} based on the ${mdmclient_macos_msu_minor_update_target}.
 		for macos_msu_item in "${macos_msu_array[@]}"; do
@@ -6541,7 +6550,7 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) the only updates are non-system updates then evaluate the ${non_system_msu_array[]} and set ${non_system_msu_targets}.
-	# If there are ${non_system_msu_targets} then this funtion will also set ${non_system_msu_labels_array[]} and ${non_system_msu_titles_array[]}.
+	# If there are ${non_system_msu_targets} then this function will also set ${non_system_msu_labels_array[]} and ${non_system_msu_titles_array[]}.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_non_system_array[@]} -gt 0 ]] && [[ ${#non_system_msu_array[@]} -gt 0 ]]; then
 		# Make sure the number of non-system updates collected by mdmclient and msu match.
 		if [[ ${#non_system_msu_array[@]} -eq ${#mdmclient_non_system_array[@]} ]];then 
@@ -6613,8 +6622,11 @@ check_macos_downloads() {
 		macos_msu_label_downloaded=$(defaults read "${SUPER_LOCAL_PLIST}" MacOSMSULabelDownloaded 2>/dev/null)
 		local macos_msu_last_startup_downloaded
 		macos_msu_last_startup_downloaded=$(defaults read "${SUPER_LOCAL_PLIST}" MacOSMSULastStartupDownloaded 2>/dev/null)
+		[[ $(defaults read "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null) -eq 1 ]] && workflow_download_macos_auth_required="TRUE"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label_downloaded is: ${macos_msu_label_downloaded}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_last_startup_downloaded is: ${macos_msu_last_startup_downloaded}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
+		
 		# Only validate if we know the list of previous downloads and last startup time.
 		if [[ -n "${macos_msu_label_downloaded}" ]] && [[ -n "${macos_msu_last_startup_downloaded}" ]]; then
 			local macos_msu_downloaded_error
@@ -6754,14 +6766,23 @@ delete_unneeded_macos_installers() {
 
 # Download macOS update or upgrade via softwareupdate command, and also save responses to ${SUPER_LOG}, ${MSU_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
 download_macos_msu() {
-	log_super "softwareupdate: Starting ${macos_msu_title} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
-	log_status "Running: softwareupdate: Starting ${macos_msu_title} download workflow."
-	log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA SOFTWAREUPDATE START ****"
+	if [[ "${macos_version_major}" -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+		log_super "softwareupdate: Starting ${macos_msu_title} authenticated download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+		log_status "Running: softwareupdate: Starting ${macos_msu_title} authenticated download workflow."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA AUTHENTICATED SOFTWAREUPDATE START ****"
+	else
+		log_super "softwareupdate: Starting ${macos_msu_title} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+		log_status "Running: softwareupdate: Starting ${macos_msu_title} download workflow."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA SOFTWAREUPDATE START ****"
+	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 	
 	# The softwareupdate download process is backgrounded and is watched via a while loop later on. Also note the difference between macOS versions.
 	local download_macos_msu_pid
-	if [[ "${macos_version_major}" -ge 13 ]]; then # macOS 13+
+	if [[ "${macos_version_major}" -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then # macOS 14+ on Apple Silicon systems that require authenticated downloads.
+		echo "${auth_local_password}" | launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license --user "${auth_local_account}" --stdinpass >>"${MSU_WORKFLOW_LOG}" 2>&1 &
+		download_macos_msu_pid="$!"
+	elif [[ "${macos_version_major}" -ge 13 ]]; then # macOS 13+
 		if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
 			echo ' ' | launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" softwareupdate --download "${macos_msu_label}" --agree-to-license --user "${current_user_account_name}" --stdinpass >>"${MSU_WORKFLOW_LOG}" 2>&1 &
 			download_macos_msu_pid="$!"
@@ -7077,6 +7098,7 @@ download_macos_installer() {
 }
 
 # This function contains logic to determine the correct download behavior based on system condition and specified options.
+# This function only runs if there is an active user.
 workflow_download_macos() {
 	workflow_download_macos_error="FALSE"
 	workflow_download_macos_check_user="FALSE"
@@ -7098,22 +7120,39 @@ workflow_download_macos() {
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_error is: ${workflow_download_macos_error}"
 	
-	# If (no errors) and ${test_mode_option} then it's not necessary to continue this function.
+	# If (no errors) and ${test_mode_option} then simulate dialogs and notifications and then exit this function.
 	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${test_mode_option}" == "TRUE" ]]; then
+		if [[ "${macos_version_major}" -ge 14 ]] && [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${workflow_macos_auth}" == "USER" ]] && [[ "${workflow_download_macos_auth_required}" != "TRUE" ]]; then
+			local current_user_password_policies
+			local current_user_system_password_policies
+			[[ $(dscl . read "/Users/${current_user_account_name}" accountPolicyData 2>/dev/null | grep -c '<key>policies</key>') -gt 0 ]] && current_user_password_policies="TRUE"
+			[[ $(system_profiler SPConfigurationProfileDataType | grep -c 'passwordpolicy') -gt 0 ]] && current_user_system_password_policies="TRUE"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_password_policies is: ${current_user_password_policies}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_system_password_policies is: ${current_user_system_password_policies}"
+			if [[ "${current_user_password_policies}" == "TRUE" ]] || [[ "${current_user_system_password_policies}" == "TRUE" ]]; then
+				workflow_download_macos_auth_required="TRUE"
+				defaults write "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired -bool true
+			fi
+		fi
+		if [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+			log_super "Test Mode: Simluating authenticated download requirement because user password policies were found. Under normal curcumstances this dialog would only appear if an earlier download attempt failed because it required authentication."
+			dialog_user_auth_type="DOWNLOAD"
+			dialog_user_auth
+			unset dialog_user_auth_type
+		fi
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
-			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_download
+			notification_install_now_download
 			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for install now download notification..."
 			sleep "${test_mode_timeout_seconds}"
-		else
-			log_super "Test Mode: Ignoring macOS download workflow."
 		fi
+		log_super "Test Mode: Ignoring actual macOS download workflow."
 		return 0
 	fi
 	
 	# If (no errors) a macOS update/upgrade is available and option to allow upgrade is enabled.
 	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${macos_installer_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via installer.
 		if [[ "${macos_installer_download_required}" == "TRUE" ]]; then
-			{ [[ "${workflow_install_now_active}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_download
+			[[ "${workflow_install_now_active}" == "TRUE" ]] && notification_install_now_download
 			download_macos_installer
 			[[ "${download_macos_installer_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
 			[[ "${download_macos_installer_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
@@ -7122,8 +7161,35 @@ workflow_download_macos() {
 		fi
 	fi
 	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && { [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; }; then # Target is a macOS update/upgrade via MSU.
-		if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-			{ [[ "${workflow_install_now_active}" == "TRUE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_install_now_download
+		if [[ "${macos_msu_download_required}" == "TRUE" ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+			if [[ "${workflow_macos_auth}" == "LOCAL" ]]; then
+				get_saved_authentication
+				if [[ "${auth_error_saved}" == "TRUE" ]]; then
+					if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
+						log_super "Warning: Saved authentication error, failing over to user authenticated workflow."
+						workflow_macos_auth="FAILOVER"
+						if [[ "${dialog_user_auth_valid}" != "TRUE" ]]; then
+							dialog_user_auth_type="DOWNLOAD"
+							dialog_user_auth
+							unset dialog_user_auth_type
+							[[ "${dialog_user_auth_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+						fi
+					else
+						log_super "Error: Can not use saved authentication and the --auth-credential-failover-to-user option is not enabled."
+						workflow_download_macos_error="TRUE"
+					fi
+				fi
+			else # Need to show user authentication dialog.
+				if [[ "${dialog_user_auth_valid}" != "TRUE" ]]; then
+					dialog_user_auth_type="DOWNLOAD"
+					dialog_user_auth
+					unset dialog_user_auth_type
+					[[ "${dialog_user_auth_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+				fi
+			fi
+			[[ "${workflow_download_macos_error}" == "FALSE" ]] && download_macos_msu
+		elif [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+			[[ "${workflow_install_now_active}" == "TRUE" ]] && notification_install_now_download
 			download_macos_msu
 			[[ "${download_maocs_msu_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
 			[[ "${download_maocs_msu_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
@@ -7136,11 +7202,17 @@ workflow_download_macos() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_check_user is: ${workflow_download_macos_check_user}"
 	
 	# Handle workflow failure options.
-	if [[ "${workflow_download_macos_error}" == "TRUE" ]]; then
+	if [[ "${workflow_download_macos_error}" == "TRUE" ]] && [[ "${download_macos_msu_start_error}" == "AUTH" ]] && [[ "${workflow_download_macos_auth_required}" != "TRUE" ]]; then
+		defaults write "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired -bool true
+		log_super "Error: Download macOS update/upgrade workflow failed due to initial authentication error, restarting via LaunchDaemon to try again with authentication..."
+		log_status "Pending: Download macOS update/upgrade workflow failed due to initial authentication error, restarting via LaunchDaemon to try again with authentication..."
+		restart_super_sleep_seconds=5
+		restart_super
+	elif [[ "${workflow_download_macos_error}" == "TRUE" ]]; then
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then # Install now workflow mode.
 			log_super "Error: Download macOS update/upgrade workflow failed, install now workflow can not continue."
 			log_status "Inactive Error: Download macOS update/upgrade workflow failed, install now workflow can not continue."
-			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
+			notification_install_now_failed
 			exit_error
 		else # Default super workflow.
 			deferral_timer_minutes="${deferral_timer_error_minutes}"
@@ -7275,6 +7347,7 @@ install_macos_msu() {
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 		fi
 		# Reset various items after test macOS update is complete.
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
 		reset_schedule_zero_date_automatic
 		reset_deadline_counters
 		return 0
@@ -7480,6 +7553,7 @@ install_macos_mdm() {
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 		fi
 		# Reset various items after test macOS update is complete.
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
 		reset_schedule_zero_date_automatic
 		reset_deadline_counters
 		return 0
@@ -7919,6 +7993,7 @@ install_macos_app() {
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 		fi
 		# Reset various items after test macOS update is complete.
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
 		reset_schedule_zero_date_automatic
 		reset_deadline_counters
 		return 0
@@ -8671,11 +8746,14 @@ run_jamf_policy_triggers() {
 
 # Set language strings for dialogs and notifications.
 set_display_strings_language() {
-	#### Langauge for the restart button in dialogs. Note that for deadline dialogs this is the default button.
+	#### Langauge for the restart button in dialogs.
 	display_string_restart_now_button="Restart Now"
 	
-	#### Langauge for the install button in Jamf Pro Policy dialogs. Note that for deadline dialogs this is the default button.
+	#### Langauge for the install button in dialogs.
 	display_string_install_now_button="Install Now"
+	
+	#### Langauge for the download button in dialogs.
+	display_string_download_now_button="Download Now"
 	
 	#### Language for the defer button in dialogs when the deferral time is sometime today.
 	display_string_defer_today_button="Defer"
@@ -8757,7 +8835,7 @@ set_display_strings_language() {
 	# This is used for both non-deadline and deadline workflows.
 	display_string_jamf_pro_policy_title="Running Jamf Pro Policy ${jamf_policy_trigger}"
 	display_string_jamf_pro_policy_default_body="During this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the process."
-	display_string_jamf_pro_policy_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the process."
+	display_string_jamf_pro_policy_deadline_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the process."
 	display_string_jamf_pro_policy_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the process."
 	display_string_jamf_pro_policy_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the process."
 	
@@ -8765,7 +8843,7 @@ set_display_strings_language() {
 	# This is used for both non-deadline and deadline workflows.
 	display_string_prepare_title="${display_string_workflow_title} System Restart"
 	display_string_prepare_default_body="A required software update will automatically restart this computer in about ${display_string_prepare_time_estimate} minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
-	display_string_prepare_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nA required software update will automatically restart this computer in about ${display_string_prepare_time_estimate} minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
+	display_string_prepare_deadline_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nA required software update will automatically restart this computer in about ${display_string_prepare_time_estimate} minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
 	display_string_prepare_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nA required software update will automatically restart this computer in about ${display_string_prepare_time_estimate} minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
 	display_string_prepare_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nA required software update will automatically restart this computer in about ${display_string_prepare_time_estimate} minutes.\n\nDuring this time you can continue to use the computer or lock the screen, but please do not restart or sleep the computer as it will prolong the update process."
 	
@@ -8774,7 +8852,7 @@ set_display_strings_language() {
 	# This is used for both non-deadline and deadline workflows.
 	display_string_restart_title="${display_string_workflow_title} System Restart"
 	display_string_restart_default_body="This computer will automatically restart very soon.\n\nSave any open documents now."
-	display_string_restart_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now."
+	display_string_restart_deadline_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now."
 	display_string_restart_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now."
 	display_string_restart_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nThis computer will automatically restart very soon.\n\nSave any open documents now."
 	
@@ -8792,7 +8870,7 @@ set_display_strings_language() {
 	display_string_insufficient_storage_title="Insufficient Storage For ${display_string_workflow_title}"
 	display_string_insufficient_storage_timeout="* Please remove unecessary items in"
 	display_string_insufficient_storage_default_body="A required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
-	display_string_insufficient_storage_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
+	display_string_insufficient_storage_deadline_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
 	display_string_insufficient_storage_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
 	display_string_insufficient_storage_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nA required macOS update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.\n\nPlease use the storage settings (shown behind this notification) to remove unnecessary items."
 	
@@ -8801,7 +8879,7 @@ set_display_strings_language() {
 	display_string_power_required_title="${display_string_workflow_title} Requires Power Source"
 	display_string_power_required_timeout="* Please connect power supply in"
 	display_string_power_required_default_body="You must connect this computer to a power supply in order to install the required macOS update."
-	display_string_power_required_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
+	display_string_power_required_deadline_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
 	display_string_power_required_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
 	display_string_power_required_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nYou must connect this computer to a power supply in order to install the required macOS update."
 	
@@ -8844,19 +8922,17 @@ set_display_strings_language() {
 	#### Language for dialog_user_auth(), an interactive dialog to collect user credentials for macOS update/upgrade workflow
 	display_string_user_auth_title="${display_string_workflow_title} Requires Authentication"
 	display_string_user_auth_timeout="* Please enter password in"
-	display_string_user_auth_default_body="You must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
-	display_string_user_auth_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
+	display_string_user_auth_default_body="You must enter the password for user \"${current_user_real_name}\" to install ${display_string_workflow_title}.\n"
+	display_string_user_auth_download_body="You must enter the password for user \"${current_user_real_name}\" to download and prepare ${display_string_workflow_title}.\n"
+	display_string_user_auth_schedule_body="You must enter the password for user \"${current_user_real_name}\" to schedule the installation of ${display_string_workflow_title}.\n"
 	display_string_user_auth_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
-	display_string_user_auth_deadline_days_soft_body="You have deferred the maximum number of ${deadline_days_soft} days.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
-	display_string_user_auth_deadline_days_hard_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
 	display_string_user_auth_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
 	display_string_user_auth_password_title="Enter Password Here:"
 	display_string_user_auth_password_placeholder="Password Required"
-	display_string_user_auth_retry_default_body="You must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
-	display_string_user_auth_retry_schedule_body="A scheduled installation date of ${display_string_scheduled_install} has passed.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
+	display_string_user_auth_retry_default_body="You must enter the password for user \"${current_user_real_name}\" to install ${display_string_workflow_title}.\n"
+	display_string_user_auth_retry_download_body="You must enter the password for user \"${current_user_real_name}\" to download and prepare ${display_string_workflow_title}.\n"
+	display_string_user_auth_retry_schedule_body="You must enter the password for user \"${current_user_real_name}\" to schedule the installation of ${display_string_workflow_title}.\n"
 	display_string_user_auth_retry_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
-	display_string_user_auth_retry_deadline_days_soft_body="You have deferred the maximum number of ${deadline_days_soft} days.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
-	display_string_user_auth_retry_deadline_days_hard_body="You have deferred the maximum number of ${deadline_days_hard} days.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
 	display_string_user_auth_retry_deadline_date_body="The deferment deadline of ${display_string_deadline} has passed.\n\nYou must enter the password for user \"${current_user_real_name}\" to install the ${display_string_workflow_title}.\n"
 	display_string_user_auth_retry_password_title="Authentication Failed - Try Password Again:"
 	display_string_user_auth_retry_password_placeholder="Password Required"
@@ -9230,7 +9306,7 @@ notification_jamf_pro_policy() {
 	# Variations for the main body text of the preparing update notification.
 	if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
 		log_super "IBM Notifier: Running Jamf Pro Policy secheduled installation notification."
-		ibm_notifier_array+=(-subtitle "${display_string_jamf_pro_policy_schedule_body}")
+		ibm_notifier_array+=(-subtitle "${display_string_jamf_pro_policy_deadline_schedule_body}")
 	elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 		log_super "IBM Notifier: Running Jamf Pro Policy deadline date notification."
 		ibm_notifier_array+=(-subtitle "${display_string_jamf_pro_policy_deadline_date_body}")
@@ -9263,7 +9339,7 @@ notification_prepare() {
 	# Variations for the main body text of the preparing update notification.
 	if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
 		log_super "IBM Notifier: Preparing update/upgrade secheduled installation notification showing a ${display_string_prepare_time_estimate} minute estimate."
-		ibm_notifier_array+=(-subtitle "${display_string_prepare_schedule_body}")
+		ibm_notifier_array+=(-subtitle "${display_string_prepare_deadline_schedule_body}")
 	elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 		log_super "IBM Notifier: Preparing update/upgrade deadline date notification showing a ${display_string_prepare_time_estimate} minute estimate."
 		ibm_notifier_array+=(-subtitle "${display_string_prepare_deadline_date_body}")
@@ -9296,7 +9372,7 @@ notification_restart() {
 	# Variations for the main body text of the restart notification.
 	if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
 		log_super "IBM Notifier: Restart secheduled installation notification."
-		ibm_notifier_array+=(-subtitle "${display_string_restart_schedule_body}")
+		ibm_notifier_array+=(-subtitle "${display_string_restart_deadline_schedule_body}")
 	elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 		log_super "IBM Notifier: Restart deadline date notification."
 		ibm_notifier_array+=(-subtitle "${display_string_restart_deadline_date_body}")
@@ -9368,7 +9444,7 @@ dialog_insufficient_storage() {
 	if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage secheduled installation dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage secheduled installation dialog with no timeout."
-		ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_schedule_body}")
+		ibm_notifier_array+=(-subtitle "${display_string_insufficient_storage_deadline_schedule_body}")
 	elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Insufficient storage deadline date dialog with no timeout."
@@ -9460,7 +9536,7 @@ dialog_power_required() {
 	if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required secheduled installation dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required secheduled installation dialog with no timeout."
-		ibm_notifier_array+=(-subtitle "${display_string_power_required_schedule_body}")
+		ibm_notifier_array+=(-subtitle "${display_string_power_required_deadline_schedule_body}")
 	elif [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: Power required deadline date dialog with no timeout."
@@ -9604,7 +9680,7 @@ dialog_user_choice() {
 		;;
 	3)
 		log_super "Status: User chose to schedule the installation."
-		dialog_user_schedule # This function includes all workflows to faciliate user schedule selection.
+		dialog_user_schedule # This function includes all workflows to facilitate user schedule selection.
 		;;
 	4 | 255)
 		if [[ -n "${deferral_timer_menu_minutes}" ]]; then
@@ -9623,6 +9699,20 @@ dialog_user_choice() {
 
 # Display an interactive dialog allowing the user to schedule an installation.
 dialog_user_schedule() {
+	# First check if the user's password needs to be saved.
+	if [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && [[ "${workflow_target}" != "Non-system Software Updates" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers Without Restarting" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers With Restart" ]] && [[ "${workflow_target}" != "Restart Without Updates" ]]; then
+		dialog_user_auth_type="SCHEDULE"
+		[[ "${dialog_user_auth_valid}" != "TRUE" ]] && dialog_user_auth
+		unset dialog_user_auth_type
+		if [[ "${dialog_user_auth_error}" == "TRUE" ]]; then
+			deferral_timer_minutes="${deferral_timer_error_minutes}"
+			log_super "Error: User authentication for scheduled restart failed, trying again in ${deferral_timer_minutes} minutes."
+			log_status "Pending: User authentication for scheduled restart failed, trying again in ${deferral_timer_minutes} minutes."
+			set_auto_launch_deferral
+		fi
+	fi
+	
+	# Start preparing for use schedule dialog.
 	set_display_strings_language
 	log_status "Running: Dialog user scheduled installation."
 	unset dialog_timeout_seconds
@@ -9697,22 +9787,6 @@ dialog_user_schedule() {
 		fi
 		defaults write "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall -string "${workflow_scheduled_install}"
 		workflow_scheduled_install_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
-		if [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${workflow_macos_auth}" != "FALSE" ]]; then # Check authentication.
-			if [[ "${workflow_macos_auth}" == "LOCAL" ]] || [[ "${workflow_macos_auth}" == "JAMF" ]]; then
-				get_saved_authentication
-				if [[ "${auth_error_saved}" == "TRUE" ]]; then
-					if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-						log_super "Warning: Saved authentication error, failing over to user authenticated workflow."
-						workflow_macos_auth="FAILOVER"
-						[[ "${dialog_user_auth_valid}" != "TRUE" ]] && dialog_user_auth
-					else
-						log_super "Warning: Can not use saved authentication and the --auth-credential-failover-to-user option is not enabled."
-					fi
-				fi
-			else # Need to show user authentication dialog.
-				[[ "${dialog_user_auth_valid}" != "TRUE" ]] && dialog_user_auth
-			fi
-		fi
 		local display_string_scheduled_install_only_date
 		display_string_scheduled_install_only_date=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")
 		local display_string_scheduled_install_only_time
@@ -9730,7 +9804,7 @@ dialog_user_schedule() {
 		;;
 	2)
 		log_super "Status: User chose to cancel schedule selection."
-		dialog_user_choice # This function includes all workflows to faciliate user choices.
+		dialog_user_choice # This function includes all workflows to facilitate user choices.
 		;;
 	4 | 255)
 		log_super "Status: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
@@ -9743,7 +9817,6 @@ dialog_user_schedule() {
 # Display an interactive dialog that reminds the user of a pending scheduled installation and optionally allows for rescheduling.
 dialog_schedule_reminder() {
 	set_display_strings_language
-	log_status "Running: Dialog scheduled installation reminder."
 	
 	# Set the schedule reminder title and button display strings.
 	local display_string_schedule_reminder_title
@@ -9909,27 +9982,31 @@ dialog_user_auth() {
 	unset dialog_timeout_seconds
 	[[ -n "${dialog_timeout_user_auth_seconds}" ]] && dialog_timeout_seconds="${dialog_timeout_user_auth_seconds}"
 	{ [[ -z "${dialog_timeout_user_auth_seconds}" ]] && [[ -n "${dialog_timeout_default_seconds}" ]]; } && dialog_timeout_seconds="${dialog_timeout_default_seconds}"
+	local dialog_user_auth_button
+	if [[ "${dialog_user_auth_type}" == "DOWNLOAD" ]]; then
+		dialog_user_auth_button="${display_string_download_now_button}"
+	elif [[ "${dialog_user_auth_type}" == "SCHEDULE" ]]; then
+		dialog_user_auth_button="${display_string_schedule_restart_button}"
+	else # Default restart workflows.
+		dialog_user_auth_button="${display_string_restart_now_button}"
+	fi
 	
 	# The initial ${ibm_notifier_array} settings for the initial run of the user authentication dialog.
-	ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_now_button}")
+	ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${dialog_user_auth_button}")
 	
 	# Variations for the main body text of the initial run of the user authentication dialog.
-	if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
+	if [[ "${dialog_user_auth_type}" == "DOWNLOAD" ]]; then
+		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication download update/upgrade dialog with a ${dialog_timeout_seconds} second timeout."
+		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication download update/upgrade dialog with no timeout."
+		ibm_notifier_array+=(-subtitle "${display_string_user_auth_download_body}")
+	elif [[ "${dialog_user_auth_type}" == "SCHEDULE" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication secheduled installation dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication secheduled installation dialog with no timeout."
 		ibm_notifier_array+=(-subtitle "${display_string_user_auth_schedule_body}")
-	elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
+	elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline date dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline date dialog with no timeout."
 		ibm_notifier_array+=(-subtitle "${display_string_user_auth_deadline_date_body}")
-	elif [[ "${deadline_days_status}" == "SOFT" ]]; then
-		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline soft days dialog with a ${dialog_timeout_seconds} second timeout."
-		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline soft days dialog with no timeout."
-		ibm_notifier_array+=(-subtitle "${display_string_user_auth_deadline_days_soft_body}")
-	elif [[ "${deadline_days_status}" == "HARD" ]]; then
-		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline hard days dialog with a ${dialog_timeout_seconds} second timeout."
-		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline hard days dialog with no timeout."
-		ibm_notifier_array+=(-subtitle "${display_string_user_auth_deadline_days_hard_body}")
 	elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline count dialog with a ${dialog_timeout_seconds} second timeout."
 		[[ -z "${dialog_timeout_seconds}" ]] && log_super "IBM Notifier: User authentication deadline count dialog with no timeout."
@@ -9957,15 +10034,13 @@ dialog_user_auth() {
 	while true; do
 		if [[ "${dialog_user_auth_attempt}" -eq 1 ]]; then
 			# Re-create ${ibm_notifier_array} settings for the user authentication dialog when the user authentication fails.
-			ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_restart_now_button}")
-			if [[ "${workflow_scheduled_install_now}" == "TRUE" ]]; then
+			ibm_notifier_array=(-type popup -bar_title "${display_string_user_auth_title}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${dialog_user_auth_button}")
+			if [[ "${dialog_user_auth_type}" == "DOWNLOAD" ]]; then
+				ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_download_body}")
+			elif [[ "${dialog_user_auth_type}" == "SCHEDULE" ]]; then
 				ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_schedule_body}")
-			elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]]; then
+			elif [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "HARD" ]]; then
 				ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_date_body}")
-			elif [[ "${deadline_days_status}" == "SOFT" ]]; then
-				ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_days_soft_body}")
-			elif [[ "${deadline_days_status}" == "HARD" ]]; then
-				ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_days_hard_body}")
 			elif [[ "${deadline_count_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then
 				ibm_notifier_array+=(-subtitle "${display_string_user_auth_retry_deadline_count_body}")
 			else # No deadlines, this is the default user authentication dialog.
@@ -10069,6 +10144,10 @@ main() {
 		defaults write "${SUPER_LOCAL_PLIST}" MacLastStartup -string "${mac_last_startup}"
 		workflow_time_epoch=$(date +%s)
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowTarget 2>/dev/null
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
+		reset_schedule_zero_date_automatic
+		reset_deadline_counters
 		# Handle the ${workflow_reset_super_after_completion_active} workflow option.
 		if [[ "${workflow_reset_super_after_completion_active}" == "TRUE" ]]; then
 			defaults delete "${SUPER_LOCAL_PLIST}" WorkflowResetSuperAfterCompletion 2>/dev/null
@@ -10086,7 +10165,7 @@ main() {
 		fi
 	fi
 	
-	# If requested then reset varous counters.
+	# If requested then reset various counters.
 	{ [[ "${scheduled_install_delete_all_option}" == "TRUE" ]] || [[ "${deadline_days_restart_all_option}" == "TRUE" ]]; } && reset_schedule_zero_date_automatic
 	[[ "${deadline_count_restart_all_option}" == "TRUE" ]] && reset_deadline_counters
 	
@@ -10261,6 +10340,7 @@ main() {
 		defaults write "${SUPER_LOCAL_PLIST}" WorkflowTarget -string "${workflow_target}"
 	else # No software updates/upgrade needed so reset any leftovers.
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowTarget 2>/dev/null
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
 		reset_schedule_zero_date_automatic
 		reset_deadline_counters
 	fi
@@ -10375,7 +10455,7 @@ main() {
 					log_status "Pending: Automatic user focus deferral, trying again in ${deferral_timer_minutes} minutes."
 					set_auto_launch_deferral
 				else # Logically, this is the only time the choice dialog is shown.
-					dialog_user_choice # This function includes all workflows to faciliate user choices.
+					dialog_user_choice # This function includes all workflows to facilitate user choices.
 				fi
 			fi
 		fi
@@ -10383,9 +10463,12 @@ main() {
 	
 	# At this point super is about to exit, so wrap up for different workflow exit modes.
 	if [[ $(/usr/libexec/PlistBuddy -c "Print :WorkflowRestartValidate" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null) == "true" ]]; then # An update/upgrade is about to restart the computer.
-		log_super "Exit: Full super workflow complete! System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
-		log_status "Pending: Full super workflow complete! System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
-	else # The super workflow did not complete a macOS update/upgrade workflow.
+		log_super "Exit: System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
+		log_status "Pending: System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
+	else # The super workflow completed but not for a macOS update/upgrade workflow.
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
+		reset_schedule_zero_date_automatic
+		reset_deadline_counters
 		# Wrap-up for the ${workflow_install_now_active} if there were no updates/upgrades.
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
 			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_up_to_date

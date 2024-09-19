@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.0.0-beta3]
+## [5.0.0-beta4]
 
-2023-09-09
+2023-09-19
 
 ## [5.x] Highlights
 
@@ -22,18 +22,29 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Super-Friends/super-migration-options-v5.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Super-Friends/super-migration-managed-preferences-v5.tsv).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Super-Friends/) now supports `super` versions 3.0, 4.x, and 5.x.
-- Updated [example MDM configuration profiles for `super` v5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta3/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema for `super` v5.0.0-beta3](https://github.com/Macjutsu/super/blob/5.0.0-beta3/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0-beta3.json).  (Huge thanks to @tonyyo11 for taking this on!)
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta4/Super-Friends/super-migration-options-v5.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta4/Super-Friends/super-migration-managed-preferences-v5.tsv).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.0.0-beta4/Super-Friends/) now supports `super` versions 3.0, 4.x, and 5.x.
+- Updated [example MDM configuration profiles for `super` v5.x](https://github.com/Macjutsu/super/tree/5.0.0-beta4/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.0.0](https://github.com/Macjutsu/super/blob/5.0.0-beta4/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
 
-### Known Issues (5.0.0-beta3)
+### Known Issues (5.0.0-beta4)
 
-- A new behavior in `softwareupdate` on computers with macOS 14.5 or later can cause background downloads to fail if any local user password policies are enabled.
+- For workflows authenticated via Jamf Pro API, a new behavior in `softwareupdate` on computers with macOS 14.4 or later can cause the automated download of macOS update/upgrade to fail. In the mean time, local authentication is always the most reliable.
 - Still experiencing reliability issues when calling the [Jamf Pro API via the new managed software updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html). In the mean time, the classic Jamf Pro API remains stable and local authentication is always the most reliable.
 
-### Specific Changes (5.0.0-beta3)
+### Specific Changes (5.0.0-beta4)
+- New macOS update/upgrade download workflow detects authentication errors and automatically adjusts to require authentication for macOS update/upgrade workflows.
+- Updated user authentication dialog variations to support authenticated downloads and scheduled installations.
+- Improved error checking for incompatible workflow settings when using scheduled installation options.
+- Resolved an issue that caused inaccurate software update status reporting.
+- Resolved several issues preventing proper scheduled installation dialog flows.
+- Resolved issues where items were not properly resetting after a completed workflow.
+- Resolved an issue preventing creation of the `super` service account. (Thanks to @techtrekkie for finding this one!)
+- Countless typo fixes and improvements to both regular and verbose log output.
+- `super` [5.0.0-beta4 SHA-256: 94abd4765009a2aa79bcfb6396a00361102cba37f61c46421ef5504a6092445e](https://github.com/Macjutsu/super/blob/5.0.0-beta4/super.checksum.txt)
+
+### Specific Changes (5.0.0-beta4)
 
 - New `--schedule-workflow-active` option allows you to define multiple weekday time frames that specify when the `super` workflow is allowed to be active (aka "maintenance windows"). Each schedule workflow active time frame must be specified using the following format `DAY:hh:mm-hh:mm` where weekdays are defined as `MON|TUE|WED|THU|FRI|SAT|SUN` and times are in 24-hour format. Multiple ranges are separated by a comma with no spaces. For example, if you want the `super` workflow to only run on the afternoons during the middle of the work week then you would specify `--schedule-workflow-active=TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00`.
 - Significant rearchitecting to all deferral, scheduled installation, and deadline behaviors in order to coordinate with new `--schedule-workflow-active` option. In most cases, `super` automatically adjusts workflow timings to fit within the scheduled active time frames. These automatic adjustments always show as warnings in the super.log.
@@ -62,7 +73,7 @@
 - Resolved an issue on Apple Silicon systems where `--scheduled-install-*` options were being allowed even if there was no saved authentication.
 - Resolved an issue where non-standard installations of Java was causing the deferral menu to fail making a selection.
 - Countless typo fixes and improvements to both regular and verbose log output.
-- `super` [5.0.0-beta3 SHA-256: 119c3e891b2d116be21c32c6abb567f17aca4c5e00b4bd81a4aceca371cb931a](https://github.com/Macjutsu/super/blob/5.0.0-beta3/super.checksum.txt)
+- `super` [5.0.0-beta4 SHA-256: 119c3e891b2d116be21c32c6abb567f17aca4c5e00b4bd81a4aceca371cb931a](https://github.com/Macjutsu/super/blob/5.0.0-beta4/super.checksum.txt)
 
 ### Specific Changes (5.0.0-beta2)
 
@@ -248,13 +259,13 @@
 - Fixed a few typos and improved variable logging.
 - `super` 4.0.0-beta4 SHA-256: 574fb4822211e1efc136629310ffec89b14a4a5d7dc1477e4dd1e61ce4e3050c
 
-### Specific Changes (4.0.0-beta3)
+### Specific Changes (4.0.0-beta4)
 
 - New automatic installation of [`mist-cli` version 2.0](https://github.com/ninxsoft/mist-cli) if required to facilitate macOS installer workflows. (Huge shout out to @ninxsoft)
 - If the `--auth-delete-all` option is used with other authentication options the `--auth-delete-all` option takes priority and no longer allows for other credential options.
 - Further refinements to the saved user authentication workflow.
 - Resolved an issue where previously saved authentication credentials were being unintentionally deleted.
-- `super` 4.0.0-beta3 SHA-256: fca929a284893e6019f337acc2993a8b254490981920a8afcb56c69b40b3d399
+- `super` 4.0.0-beta4 SHA-256: fca929a284893e6019f337acc2993a8b254490981920a8afcb56c69b40b3d399
 
 ### Specific Changes (4.0.0-beta2)
 
