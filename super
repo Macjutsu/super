@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.0.0-beta4"
+SUPER_VERSION="5.0.0-beta5"
 readonly SUPER_VERSION
-SUPER_DATE="2024/09/11"
+SUPER_DATE="2024/09/22"
 readonly SUPER_DATE
 
 # MARK: *** Documentation ***
@@ -394,6 +394,10 @@ set_defaults() {
 	# The default number of minutes to defer once the super workflow is complete (aka. automatically relaunch the super workflow).
 	DEFERRAL_TIMER_WORKFLOW_RELAUNCH_DEFAULT_MINUTES=360
 	readonly DEFERRAL_TIMER_WORKFLOW_RELAUNCH_DEFAULT_MINUTES
+	
+	# The default number of minutes to defer the super restart validation workflow if there is a workflow error.
+	DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES=5
+	readonly DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES
 	
 	# Default icon size for dialogs and notifications.
 	DISPLAY_ICON_DEFAULT_SIZE=96
@@ -3336,12 +3340,6 @@ manage_workflow_options() {
 		log_super "Auth Error: The --scheduled-install-date and --scheduled-install-days options require valid saved authentication."
 		workflow_auth_error="TRUE"
 	fi
-	
-	# Provide logging for workflow conditions related to the ${scheduled_install_user_choice_option}.
-	if [[ "${scheduled_install_user_choice_option}" == "TRUE" ]] && { [[ "${workflow_auth_error}" == "TRUE" ]] || [[ "${workflow_macos_auth}" == "USER" ]]; } && { ! [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]]; }; then
-		log_super "Warning: The --scheduled-install-user-choice option requires valid saved authenticion. This option will not be show in the user choice dialog."
-		scheduled_install_user_choice_option="FALSE"
-	fi
 }
 
 # For Apple Silicon computers this function validates previously saved update/upgrade credentials given the various --auth_* options. Any error will set ${auth_error_saved}.
@@ -4390,30 +4388,75 @@ check_system() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: check_error is: ${check_error}"
 }
 
-# Check for software update settings to report non-ideal configurations, this also sets ${msu_automatic_update_checks} and ${msu_automatic_security_updates} appropriately.
+# Check for software update settings to report non-ideal configurations, this also sets ${msu_automatic_check} and ${msu_automatic_security_updates} appropriately.
 check_msu_settings() {
-	msu_automatic_update_checks="FALSE"
-	msu_automatic_security_updates="FALSE"
-	msu_automatic_macos_download="FALSE"
-	msu_automatic_macos_installation="FALSE"
-	{ [[ $(defaults read "${MSU_LOCAL_PLIST}" AutomaticCheckEnabled 2>/dev/null) -eq 1 ]] || [[ $(defaults read "${MSU_MANAGED_PLIST}" AutomaticCheckEnabled 2>/dev/null) -eq 1 ]]; } && msu_automatic_update_checks="TRUE"
-	{ [[ $(defaults read "${MSU_LOCAL_PLIST}" AutomaticallyInstallMacOSUpdates 2>/dev/null) -eq 1 ]] || [[ $(defaults read "${MSU_MANAGED_PLIST}" AutomaticallyInstallMacOSUpdates 2>/dev/null) -eq 1 ]]; } && msu_automatic_macos_installation="TRUE"
-	if [[ "${msu_automatic_update_checks}" == "TRUE" ]]; then
-		{ { [[ $(defaults read "${MSU_LOCAL_PLIST}" ConfigDataInstall 2>/dev/null) -eq 1 ]] || [[ $(defaults read "${MSU_MANAGED_PLIST}" ConfigDataInstall 2>/dev/null) -eq 1 ]]; } && { [[ $(defaults read "${MSU_LOCAL_PLIST}" CriticalUpdateInstall 2>/dev/null) -eq 1 ]] || [[ $(defaults read "${MSU_MANAGED_PLIST}" CriticalUpdateInstall 2>/dev/null) -eq 1 ]]; }; } && msu_automatic_security_updates="TRUE"
-		[[ "${msu_automatic_security_updates}" == "FALSE" ]] && log_super "Warning: Automatic installation of macOS security updates is disabled, this is a significant security risk."
-		{ [[ $(defaults read "${MSU_LOCAL_PLIST}" AutomaticDownload 2>/dev/null) -eq 1 ]] || [[ $(defaults read "${MSU_MANAGED_PLIST}" AutomaticDownload 2>/dev/null) -eq 1 ]]; } && msu_automatic_macos_download="TRUE"
-		if [[ "${msu_automatic_macos_download}" == "TRUE" ]]; then
-			{ [[ $(defaults read "${MSU_LOCAL_PLIST}" AutomaticallyInstallMacOSUpdates 2>/dev/null) -eq 1 ]] || [[ $(defaults read "${MSU_MANAGED_PLIST}" AutomaticallyInstallMacOSUpdates 2>/dev/null) -eq 1 ]]; } && msu_automatic_macos_installation="TRUE"
-			[[ "${msu_automatic_macos_installation}" == "FALSE" ]] && log_super "Warning: Automatic download of macOS updates is currently enabled, this can result in updates being downloaded outside of any super workflows."
-			[[ "${msu_automatic_macos_installation}" == "TRUE" ]] && log_super "Warning: Automatic download and installation of macOS updates is currently enabled, this can result in updates being installed outside of any super workflows."
+	msu_automatic_check="TRUE"
+	msu_automatic_download="TRUE"
+	msu_automatic_macos_installation="TRUE"
+	msu_automatic_security_updates="TRUE"
+	
+	# Start with automatic check.
+	local msu_automatic_check_managed
+	msu_automatic_check_managed=$(defaults read "${MSU_MANAGED_PLIST}" AutomaticCheckEnabled 2>/dev/null)
+	local msu_automatic_check_local
+	msu_automatic_check_local=$(defaults read "${MSU_LOCAL_PLIST}" AutomaticCheckEnabled 2>/dev/null)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_check_managed is: ${msu_automatic_check_managed}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_check_local is: ${msu_automatic_check_local}"
+	[[ -n $msu_automatic_check_managed ]] && [[ $msu_automatic_check_managed -eq 0 ]] && msu_automatic_download="FALSE"
+	[[ -z $msu_automatic_check_managed ]] && [[ -n $msu_automatic_check_local ]] && [[ $msu_automatic_check_local -eq 0 ]] && msu_automatic_download="FALSE"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_check is: ${msu_automatic_check}"
+	if [[ "${msu_automatic_check}" == "TRUE" ]]; then
+		# Automatic download check.
+		local msu_automatic_download_managed
+		msu_automatic_download_managed=$(defaults read "${MSU_MANAGED_PLIST}" AutomaticDownload 2>/dev/null)
+		local msu_automatic_download_local
+		msu_automatic_download_local=$(defaults read "${MSU_LOCAL_PLIST}" AutomaticDownload 2>/dev/null)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_download_managed is: ${msu_automatic_download_managed}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_download_local is: ${msu_automatic_download_local}"
+		[[ -n $msu_automatic_download_managed ]] && [[ $msu_automatic_download_managed -eq 0 ]] && msu_automatic_download="FALSE"
+		[[ -z $msu_automatic_download_managed ]] && [[ -n $msu_automatic_download_local ]] && [[ $msu_automatic_download_local -eq 0 ]] && msu_automatic_download="FALSE"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_download is: ${msu_automatic_download}"
+		
+		# Automatic macOS installation check.
+		local msu_automatic_macos_installation_managed
+		msu_automatic_macos_installation_managed=$(defaults read "${MSU_MANAGED_PLIST}" AutomaticallyInstallMacOSUpdates 2>/dev/null)
+		local msu_automatic_macos_installation_local
+		msu_automatic_macos_installation_local=$(defaults read "${MSU_LOCAL_PLIST}" AutomaticallyInstallMacOSUpdates 2>/dev/null)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_macos_installation_managed is: ${msu_automatic_macos_installation_managed}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_macos_installation_local is: ${msu_automatic_macos_installation_local}"
+		[[ -n $msu_automatic_macos_installation_managed ]] && [[ $msu_automatic_macos_installation_managed -eq 0 ]] && msu_automatic_macos_installation="FALSE"
+		[[ -z $msu_automatic_macos_installation_managed ]] && [[ -n $msu_automatic_macos_installation_local ]] && [[ $msu_automatic_macos_installation_local -eq 0 ]] && msu_automatic_macos_installation="FALSE"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_macos_installation is: ${msu_automatic_macos_installation}"
+		
+		# Automatic security update check.
+		local msu_automatic_config_data_managed
+		msu_automatic_config_data_managed=$(defaults read "${MSU_MANAGED_PLIST}" ConfigDataInstall 2>/dev/null)
+		local msu_automatic_config_data_local
+		msu_automatic_config_data_local=$(defaults read "${MSU_LOCAL_PLIST}" ConfigDataInstall 2>/dev/null)
+		local msu_automatic_critical_update_managed
+		msu_automatic_critical_update_managed=$(defaults read "${MSU_MANAGED_PLIST}" CriticalUpdateInstall 2>/dev/null)
+		local msu_automatic_critical_update_local
+		msu_automatic_critical_update_local=$(defaults read "${MSU_LOCAL_PLIST}" CriticalUpdateInstall 2>/dev/null)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_config_data_managed is: ${msu_automatic_config_data_managed}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_config_data_local is: ${msu_automatic_config_data_local}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_critical_update_managed is: ${msu_automatic_critical_update_managed}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_critical_update_local is: ${msu_automatic_critical_update_local}"
+		{ { [[ -n $msu_automatic_config_data_managed ]] && [[ $msu_automatic_config_data_managed -eq 0 ]]; } || { [[ -n $msu_automatic_critical_update_managed ]] && [[ $msu_automatic_critical_update_managed -eq 0 ]]; }; } && msu_automatic_security_updates="FALSE"
+		{ { [[ -z $msu_automatic_config_data_managed ]] && [[ -n $msu_automatic_config_data_local ]] && [[ $msu_automatic_config_data_local -eq 0 ]]; } || { [[ -z $msu_automatic_critical_update_managed ]] && [[ -n $msu_automatic_critical_update_local ]] && [[ $msu_automatic_critical_update_local -eq 0 ]]; }; } && msu_automatic_security_updates="FALSE"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_security_updates is: ${msu_automatic_security_updates}"
+		
+		# Log any warnings.
+		if [[ "${msu_automatic_download}" == "TRUE" ]]; then
+			[[ "${msu_automatic_macos_installation}" == "FALSE" ]] && log_super "Warning: Automatic download of macOS updates is currently enabled, this can result in updates being downloaded outside of super workflows."
+			[[ "${msu_automatic_macos_installation}" == "TRUE" ]] && log_super "Warning: Automatic download and installation of macOS updates is currently enabled, this can result in updates being installed outside of super workflows."
 		fi
-	else # msu_automatic_security_updates="FALSE"
-		log_super "Warning: Automatic macOS software updated checking is currently disabled, this is not ideal for the super workflow and prevents macOS security updates from being installed which is a significant security risk."
+		[[ "${msu_automatic_security_updates}" == "FALSE" ]] && log_super "Warning: Automatic installation of macOS security updates is disabled, this is a significant security risk."
+	else # msu_automatic_check="FALSE"
+		log_super "Warning: Automatic Apple software updated checking is currently disabled, this is not ideal for the super workflow and prevents macOS security updates from being installed which is a significant security risk."
+		msu_automatic_download="FALSE"
+		msu_automatic_macos_installation="FALSE"
+		msu_automatic_security_updates="FALSE"
 	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_update_checks is: ${msu_automatic_update_checks}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_security_updates is: ${msu_automatic_security_updates}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_macos_download is: ${msu_automatic_macos_download}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_macos_installation is: ${msu_automatic_macos_installation}"
 }
 
 # Validate that the account ${auth_local_account} and ${auth_local_password} are valid credentials to a volume owner. If not set ${auth_error_local}.
@@ -5223,19 +5266,19 @@ check_scheduled_install() {
 			if [[ -n "${workflow_scheduled_install_adjusted}" ]]; then
 				workflow_scheduled_install="${workflow_scheduled_install_adjusted}"
 				if [[ -n "${scheduled_install_days}" ]] && [[ $scheduled_install_days -eq 0 ]]; then
-					log_super "Status: Setting new scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of the soonest workflow active time frame after zero day."
+					log_super "Status: Setting new scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of the soonest workflow active time frame after zero day."
 				else
-					[[ "${schedule_workflow_active_matches_now}" == "TRUE" ]] && log_super "Status: Setting new scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of the current schedule workflow active time frame."
-					[[ "${schedule_workflow_active_matches_now}" == "FALSE" ]] && log_super "Status: Setting new scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of the latest workflow active time frame on the original scheduled installation date."
+					[[ "${schedule_workflow_active_matches_now}" == "TRUE" ]] && log_super "Status: Setting new scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of the current schedule workflow active time frame."
+					[[ "${schedule_workflow_active_matches_now}" == "FALSE" ]] && log_super "Status: Setting new scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of the latest workflow active time frame on the original scheduled installation date."
 				fi
 			else
-				[[ -n "${scheduled_install_days}" ]] && log_super "Warning: The current scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} (${scheduled_install_days} days after zero day) is overriding the schedule workflow active option because no coordinating time frame could be resolved."
-				[[ -n "${scheduled_install_date}" ]] && log_super "Warning: The current scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} is overriding the schedule workflow active option because no coordinating time frame could be resolved."
+				[[ -n "${scheduled_install_days}" ]] && log_super "Warning: The current scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} (${scheduled_install_days} days after zero day) is overriding the schedule workflow active option because no coordinating time frame could be resolved."
+				[[ -n "${scheduled_install_date}" ]] && log_super "Warning: The current scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} is overriding the schedule workflow active option because no coordinating time frame could be resolved."
 			fi
 		elif [[ -n "${schedule_workflow_active_option}" ]]; then
 			log_super "Warning: The manually scheduled installation date option that also includes a specific time of ${workflow_scheduled_install} is overriding the schedule workflow active option."
 		else # Default super workflow.
-			[[ -n "${scheduled_install_days}" ]] && log_super "Status: Setting new scheduled installation of ${workflow_scheduled_install} which is ${scheduled_install_days} days after zero date."
+			[[ -n "${scheduled_install_days}" ]] && log_super "Status: Setting new scheduled installation for ${workflow_scheduled_install} which is ${scheduled_install_days} days after zero date."
 			[[ -n "${scheduled_install_date}" ]] && log_super "Status: Using manually scheduled installation date and time of ${workflow_scheduled_install}."
 		fi
 		defaults write "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall -string "${workflow_scheduled_install}"
@@ -5320,16 +5363,16 @@ set_scheduled_install_deferral() {
 			elif [[ $scheduled_install_reminder_item -lt $deferral_timer_scheduled_install_minutes ]]; then
 				deferral_timer_minutes=$((deferral_timer_scheduled_install_minutes - scheduled_install_reminder_item))
 				[[ $deferral_timer_minutes -lt 2 ]] && deferral_timer_scheduled_install_minutes=2
-				log_super "Status: Scheduled installation at ${workflow_scheduled_install}, with a warning notification ${scheduled_install_reminder_item} minutes prior, deferring for ${deferral_timer_minutes} minutes from now."
-				log_status "Pending: Scheduled installation at ${workflow_scheduled_install}, with a warning notification ${scheduled_install_reminder_item} minutes prior, deferring for ${deferral_timer_minutes} minutes from now."
+				log_super "Status: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, with a warning notification ${scheduled_install_reminder_item} minutes prior, deferring for ${deferral_timer_minutes} minutes from now."
+				log_status "Pending: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, with a warning notification ${scheduled_install_reminder_item} minutes prior, deferring for ${deferral_timer_minutes} minutes from now."
 			break
 			fi
 		done
 		IFS="${previous_ifs}"
 	else # Default scheduled installation deferral.
 		deferral_timer_minutes="${deferral_timer_scheduled_install_minutes}"
-		log_super "Status: Scheduled installation at ${workflow_scheduled_install}, deferring for ${deferral_timer_minutes} minutes from now."
-		log_status "Pending: Scheduled installation at ${workflow_scheduled_install}, deferring for ${deferral_timer_minutes} minutes from now."
+		log_super "Status: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, deferring for ${deferral_timer_minutes} minutes from now."
+		log_status "Pending: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, deferring for ${deferral_timer_minutes} minutes from now."
 	fi
 }
 
@@ -5895,7 +5938,6 @@ check_deferral_restrictions() {
 
 # Check for macOS beta program enrollment and set ${macos_beta_program} accordingly.
 check_macos_beta_program() {
-	# [[ "${workflow_macos_auth}" == "JAMF" ]] && [[ -n "${install_macos_major_upgrades_target}" ]]
 	macos_beta_program="FALSE"
 	if [[ "${macos_version_number}" -ge 1304 ]]; then
 		local mdmclient_response
@@ -6116,7 +6158,9 @@ workflow_check_software_status() {
 	mdmclient_macos_msu_minor_update_target="FALSE"
 	macos_installer_target="FALSE"
 	macos_msu_major_upgrade_target="FALSE"
+	macos_major_upgrade_latest="FALSE"
 	macos_msu_minor_update_target="FALSE"
+	macos_minor_update_latest="FALSE"
 	non_system_msu_targets="FALSE"
 	local workflow_check_software_status_error
 	workflow_check_software_status_error="FALSE"
@@ -6286,6 +6330,7 @@ workflow_check_software_status() {
 		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ -z "${install_macos_major_upgrades_target}" ]]; then
 			[[ ${#mdmclient_macos_installers_array[@]} -gt 0 ]] && mdmclient_macos_installer_target="${mdmclient_macos_installers_array[0]}"
 			[[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -gt 0 ]] && mdmclient_macos_msu_major_upgrade_target="${mdmclient_macos_msu_major_upgrade_array[0]}"
+			[[ "${deferral_restrictions}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
 		fi
 		
 		# If there is a ${install_macos_major_upgrades_target} then evaluate versions in ${mdmclient_macos_installers_array[]} for a possible target.
@@ -6354,6 +6399,7 @@ workflow_check_software_status() {
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_target is: ${mdmclient_macos_installer_target}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_target is: ${mdmclient_macos_msu_major_upgrade_target}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_major_upgrade_latest is: ${macos_major_upgrade_latest}"
 	
 	# If (no errors) check for previously targeted macOS major upgrade betas plus Jamf API beta limitation.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ -n "${install_macos_major_upgrades_target}" ]] && [[ "${macos_beta_program}" == "TRUE" ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
@@ -6368,7 +6414,7 @@ workflow_check_software_status() {
 			if [[ "${auth_error_jamf}" == "FALSE" ]]; then
 				if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then
 					log_super "Error: Unable to target older macOS beta major upgrade: ${macos_older_beta_target}"
-					log_super "Error: The Jamf Pro software updates feature (Beta) does not support targeting older macOS beta major upgrades. To target older macOS beta major upgrades you must disable the new software updates feature (Beta) in Jamf Pro or use a local authentication option."
+					log_super "Error: The Jamf Pro new Managed Software Updates API does not support targeting older macOS beta major upgrades. To target older macOS beta major upgrades you must disable the new Managed Software Updates feature in Jamf Pro or use a local authentication option."
 					workflow_check_software_status_error="TRUE"
 				fi
 			fi
@@ -6382,8 +6428,12 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) no macOS major upgrade is targeted and a macOS minor update is available then select the latest for the ${mdmclient_macos_msu_minor_update_target}.
-	{ [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -gt 0 ]]; } && mdmclient_macos_msu_minor_update_target="${mdmclient_macos_msu_minor_update_array[0]}"
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -gt 0 ]]; then
+		mdmclient_macos_msu_minor_update_target="${mdmclient_macos_msu_minor_update_array[0]}"
+		[[ "${deferral_restrictions}" == "FALSE" ]] && macos_minor_update_latest="TRUE"
+	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_target is: ${mdmclient_macos_msu_minor_update_target}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
 	
 	# If (no errors) there is a macOS installer targeted then collect/verify the ${macos_installers_list}.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" != "FALSE" ]]; then
@@ -6578,9 +6628,15 @@ workflow_check_software_status() {
 			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
 			exit_error
 		else # Default super workflow.
-			deferral_timer_minutes="${deferral_timer_error_minutes}"
-			log_super "Error: Checking for macOS software status workflow failed, trying again in ${deferral_timer_minutes} minutes."
-			log_status "Pending: Checking for macOS software status workflow failed, trying again in ${deferral_timer_minutes} minutes."
+			if [[ "${workflow_restart_validate_active}" == "TRUE" ]]; then
+				deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
+				log_super "Error: Checking for macOS software status workflow failed, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: Checking for macOS software status workflow failed, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
+			else # Default super workflow.
+				deferral_timer_minutes="${deferral_timer_error_minutes}"
+				log_super "Error: Checking for macOS software status workflow failed, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: Checking for macOS software status workflow failed, trying again in ${deferral_timer_minutes} minutes."
+			fi
 			set_auto_launch_deferral
 		fi
 	fi
@@ -6766,6 +6822,18 @@ delete_unneeded_macos_installers() {
 
 # Download macOS update or upgrade via softwareupdate command, and also save responses to ${SUPER_LOG}, ${MSU_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
 download_macos_msu() {
+	# If ${test_mode_option} then it's not necessary to continue this function.
+	if [[ "${test_mode_option}" == "TRUE" ]]; then
+		log_super "Test Mode: Skipping the download macOS update/upgrade via MSU workflow."
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for install now download notification..."
+			sleep "${test_mode_timeout_seconds}"
+		fi
+		download_maocs_msu_error="FALSE"
+		return 0
+	fi
+	
+	# Start with log and status updates.
 	if [[ "${macos_version_major}" -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
 		log_super "softwareupdate: Starting ${macos_msu_title} authenticated download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
 		log_status "Running: softwareupdate: Starting ${macos_msu_title} authenticated download workflow."
@@ -6940,6 +7008,8 @@ download_macos_msu() {
 		elif [[ "${download_macos_msu_start_error}" == "AUTH" ]]; then
 			log_msu "Error: Download of macOS update/upgrade via softwareupdate failed to authenticate."
 			log_super "Error: Download of macOS update/upgrade via softwareupdate failed to authenticate."
+			[[ "${mac_cpu_architecture}" == "arm64" ]] && workflow_download_macos_auth_required="TRUE"
+			[[ "${mac_cpu_architecture}" == "arm64" ]] && defaults write "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired -bool true
 		elif [[ "${download_macos_msu_start_error}" == "FAILED" ]]; then
 			log_msu "Error: Download of macOS update/upgrade via softwareupdate failed to start."
 			log_super "Error: Download of macOS update/upgrade via softwareupdate failed to start."
@@ -6962,16 +7032,32 @@ download_macos_msu() {
 			fi
 		fi
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE FAILED ****"
+		download_maocs_msu_error="TRUE"
+		macos_msu_download_required="TRUE"
+		defaults delete "${SUPER_LOCAL_PLIST}" MacOSMSULabelDownloaded 2>/dev/null
+		defaults delete "${SUPER_LOCAL_PLIST}" MacOSMSULastStartupDownloaded 2>/dev/null
 		kill -9 "${download_macos_msu_pid}" >/dev/null 2>&1
 		kick_softwareupdated
-		download_maocs_msu_error="TRUE"
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_maocs_msu_error is: ${download_maocs_msu_error}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
 }
 
 # Download macOS installer via ${MIST_CLI_BINARY}, and also save responses to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
 download_macos_installer() {
+	# If ${test_mode_option} then it's not necessary to continue this function.
+	if [[ "${test_mode_option}" == "TRUE" ]]; then
+		log_super "Test Mode: Skipping the download macOS update/upgrade via installer workflow."
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for install now download notification..."
+			sleep "${test_mode_timeout_seconds}"
+		fi
+		download_macos_installer_error="FALSE"
+		return 0
+	fi
+	
+	# Start with log and status updates.
 	log_super "mist_cli: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} download installer workflow, check ${INSTALLER_WORKFLOW_LOG} for more detail."
 	log_status "Running: mist_cli: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} download installer workflow."
 	log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} INSTALLER APP START ****"
@@ -7102,71 +7188,114 @@ download_macos_installer() {
 workflow_download_macos() {
 	workflow_download_macos_error="FALSE"
 	workflow_download_macos_check_user="FALSE"
+	download_macos_installer_error="FALSE"
+	download_maocs_msu_error="FALSE"
+	push_macos_mdm_download_error="FALSE"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required is: ${macos_installer_download_required}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
 	
-	# Check to make sure system has enough available storage space.
-	check_storage_available
-	if [[ "${check_storage_available_error}" == "FALSE" ]]; then
-		if [[ "${storage_ready}" == "FALSE" ]]; then
-			if [[ "${current_user_account_name}" == "FALSE" ]]; then
-				log_super "Error: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs that is required for download. And no active user is logged in to attempt remediation."
-				workflow_download_macos_error="TRUE"
-			else # A normal user is currently logged in.
-				dialog_insufficient_storage
-				[[ "${dialog_insufficient_storage_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+	# If downloads are required then check available storage.
+	if [[ "${macos_installer_download_required}" == "TRUE" ]] || [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+		check_storage_available
+		if [[ "${check_storage_available_error}" == "FALSE" ]]; then
+			if [[ "${storage_ready}" == "FALSE" ]]; then
+				if [[ "${current_user_account_name}" == "FALSE" ]]; then
+					log_super "Error: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs that is required for download. And no active user is logged in to attempt remediation."
+					workflow_download_macos_error="TRUE"
+				else # A normal user is currently logged in.
+					dialog_insufficient_storage
+					[[ "${dialog_insufficient_storage_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+				fi
 			fi
+		else # "${check_storage_available_error}" == "TRUE"
+			workflow_download_macos_error="TRUE"
 		fi
-	else # "${check_storage_available_error}" == "TRUE"
-		workflow_download_macos_error="TRUE"
+	else # Downloads not required so log that download is not needed.
+		[[ "${macos_installer_target}" != "FALSE" ]] && log_super "Status: Previously downloaded ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is available at: /Applications/Install ${macos_installer_title}.app"
+		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS major upgrade is prepared: ${macos_msu_label_downloaded}"
+		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS minor update is prepared: ${macos_msu_label_downloaded}"	
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_error is: ${workflow_download_macos_error}"
 	
-	# If (no errors) and ${test_mode_option} then simulate dialogs and notifications and then exit this function.
-	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${test_mode_option}" == "TRUE" ]]; then
-		if [[ "${macos_version_major}" -ge 14 ]] && [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${workflow_macos_auth}" == "USER" ]] && [[ "${workflow_download_macos_auth_required}" != "TRUE" ]]; then
-			local current_user_password_policies
-			local current_user_system_password_policies
-			[[ $(dscl . read "/Users/${current_user_account_name}" accountPolicyData 2>/dev/null | grep -c '<key>policies</key>') -gt 0 ]] && current_user_password_policies="TRUE"
-			[[ $(system_profiler SPConfigurationProfileDataType | grep -c 'passwordpolicy') -gt 0 ]] && current_user_system_password_policies="TRUE"
-			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_password_policies is: ${current_user_password_policies}"
-			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_system_password_policies is: ${current_user_system_password_policies}"
-			if [[ "${current_user_password_policies}" == "TRUE" ]] || [[ "${current_user_system_password_policies}" == "TRUE" ]]; then
-				workflow_download_macos_auth_required="TRUE"
-				defaults write "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired -bool true
-			fi
-		fi
-		if [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+	# If (no errors) and ${test_mode_option} then simulate dialogs and notifications for potential user authenticated download dialog.
+	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${test_mode_option}" == "TRUE" ]] && [[ "${macos_version_major}" -ge 14 ]] && [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${workflow_macos_auth}" == "USER" ]]; then
+		local current_user_password_policies
+		local current_user_system_password_policies
+		[[ $(dscl . read "/Users/${current_user_account_name}" accountPolicyData 2>/dev/null | grep -c '<key>policies</key>') -gt 0 ]] && current_user_password_policies="TRUE"
+		[[ $(system_profiler SPConfigurationProfileDataType | grep -c 'passwordpolicy') -gt 0 ]] && current_user_system_password_policies="TRUE"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_password_policies is: ${current_user_password_policies}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_system_password_policies is: ${current_user_system_password_policies}"
+		if [[ "${current_user_password_policies}" == "TRUE" ]] || [[ "${current_user_system_password_policies}" == "TRUE" ]]; then
+			workflow_download_macos_auth_required="TRUE"
+			defaults write "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired -bool true
 			log_super "Test Mode: Simluating authenticated download requirement because user password policies were found. Under normal curcumstances this dialog would only appear if an earlier download attempt failed because it required authentication."
-			dialog_user_auth_type="DOWNLOAD"
-			dialog_user_auth
-			unset dialog_user_auth_type
 		fi
-		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
-			notification_install_now_download
-			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for install now download notification..."
-			sleep "${test_mode_timeout_seconds}"
-		fi
-		log_super "Test Mode: Ignoring actual macOS download workflow."
-		return 0
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_install_now_active is: ${workflow_install_now_active}"
+	
+	# If (no errors) and macOS installer download is needed.
+	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${macos_installer_download_required}" == "TRUE" ]]; then
+		[[ "${workflow_install_now_active}" == "TRUE" ]] && notification_install_now_download
+		download_macos_installer
+		[[ "${download_macos_installer_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+		[[ "${download_macos_installer_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
 	fi
 	
-	# If (no errors) a macOS update/upgrade is available and option to allow upgrade is enabled.
-	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${macos_installer_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via installer.
-		if [[ "${macos_installer_download_required}" == "TRUE" ]]; then
-			[[ "${workflow_install_now_active}" == "TRUE" ]] && notification_install_now_download
-			download_macos_installer
-			[[ "${download_macos_installer_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
-			[[ "${download_macos_installer_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
+	# If (no errors) and macOS update/upgrade via MSU download is needed, attempt an unauthenticated download.
+	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${macos_msu_download_required}" == "TRUE" ]] && [[ "${workflow_download_macos_auth_required}" != "TRUE" ]]; then
+		[[ "${workflow_install_now_active}" == "TRUE" ]] && notification_install_now_download
+		download_macos_msu
+		if [[ "${download_maocs_msu_error}" == "TRUE" ]]; then
+			if [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+				log_super "Warning: Initial attempt of unauthenticated download of macOS update/upgrade via MSU failed, failing over to authenticated download workflow."
+			else
+				workflow_download_macos_error="TRUE"
+			fi
 		else
-			log_super "Status: Previously downloaded ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is available at: /Applications/Install ${macos_installer_title}.app"
+			workflow_download_macos_check_user="TRUE"
 		fi
 	fi
-	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && { [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; }; then # Target is a macOS update/upgrade via MSU.
-		if [[ "${macos_msu_download_required}" == "TRUE" ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
-			if [[ "${workflow_macos_auth}" == "LOCAL" ]]; then
+	
+	# If (no errors) and macOS update/upgrade via MSU authenticated download is needed.
+	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${macos_msu_download_required}" == "TRUE" ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_macos_auth is: ${workflow_macos_auth}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_mdm_failover_to_user_status is: ${auth_mdm_failover_to_user_status}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_credential_failover_to_user_option is: ${auth_credential_failover_to_user_option}"
+		
+		# If an MDM workflow is expected, first check for MDM service, bootstrap token, and possibly failover to user authentication workflow.
+		if [[ "${workflow_macos_auth}" == "JAMF" ]]; then
+			check_mdm_service
+			if [[ "${auth_error_mdm}" == "TRUE" ]]; then
+				if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]] || [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'ERROR') -gt 0 ]] || { [[ "${workflow_install_now_active}" == "TRUE" ]] && [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'INSTALLNOW') -gt 0 ]]; }; then
+					log_super "Warning: MDM service is not available, failing over to local (and possibly user authenticated) download workflow."
+					workflow_macos_auth="FAILOVER"
+				else
+					log_super "Error: Can not use MDM workflow because the MDM service is not available."
+					workflow_download_macos_error="TRUE"
+				fi
+			else # MDM service is available.
+				check_bootstrap_token_escrow
+				if [[ "${auth_error_bootstrap_token}" == "TRUE" ]]; then
+					if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]] || [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'ERROR') -gt 0 ]] || { [[ "${workflow_install_now_active}" == "TRUE" ]] && [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'INSTALLNOW') -gt 0 ]]; }; then
+						log_super "Warning: Missing or invalid bootstrap token escrow, failing over to local (and possibly user authenticated) download workflow."
+						workflow_macos_auth="FAILOVER"
+					else
+						log_super "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed."
+						workflow_download_macos_error="TRUE"
+					fi
+				fi
+			fi
+		fi
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_macos_auth is: ${workflow_macos_auth}"
+		
+		# If (no errors) then get authentication.
+		if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${workflow_macos_auth}" != "FALSE" ]]; then
+			if [[ "${workflow_macos_auth}" == "LOCAL" ]] || [[ "${workflow_macos_auth}" == "JAMF" ]]; then
 				get_saved_authentication
 				if [[ "${auth_error_saved}" == "TRUE" ]]; then
 					if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-						log_super "Warning: Saved authentication error, failing over to user authenticated workflow."
+						log_super "Warning: Saved authentication error, failing over to user authenticated download workflow."
 						workflow_macos_auth="FAILOVER"
 						if [[ "${dialog_user_auth_valid}" != "TRUE" ]]; then
 							dialog_user_auth_type="DOWNLOAD"
@@ -7175,11 +7304,11 @@ workflow_download_macos() {
 							[[ "${dialog_user_auth_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
 						fi
 					else
-						log_super "Error: Can not use saved authentication and the --auth-credential-failover-to-user option is not enabled."
+						log_super "Error: Unable to use saved authentication for download and the --auth-credential-failover-to-user option is not enabled."
 						workflow_download_macos_error="TRUE"
 					fi
 				fi
-			else # Need to show user authentication dialog.
+			else # [[ "${workflow_macos_auth}" == "USER" ]] || [[ "${workflow_macos_auth}" == "FAILOVER" ]]
 				if [[ "${dialog_user_auth_valid}" != "TRUE" ]]; then
 					dialog_user_auth_type="DOWNLOAD"
 					dialog_user_auth
@@ -7187,28 +7316,29 @@ workflow_download_macos() {
 					[[ "${dialog_user_auth_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
 				fi
 			fi
-			[[ "${workflow_download_macos_error}" == "FALSE" ]] && download_macos_msu
-		elif [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+		fi
+			
+		# If no errors, then start the appropriate authenticated download workflow.
+		if [[ "${workflow_download_macos_error}" == "FALSE" ]]; then
 			[[ "${workflow_install_now_active}" == "TRUE" ]] && notification_install_now_download
-			download_macos_msu
-			[[ "${download_maocs_msu_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
-			[[ "${download_maocs_msu_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
-		else
-			[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS major upgrade is prepared: ${macos_msu_label_downloaded}"
-			[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS minor update is prepared: ${macos_msu_label_downloaded}"
+			if [[ "${workflow_macos_auth}" == "LOCAL" ]] || [[ "${workflow_macos_auth}" == "USER" ]] || [[ "${workflow_macos_auth}" == "FAILOVER" ]]; then
+				download_macos_msu
+				[[ "${download_maocs_msu_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+				[[ "${download_maocs_msu_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
+			else # [[ "${workflow_macos_auth}" == "JAMF" ]]
+				push_macos_mdm_workflow="DOWNLOAD"
+				push_macos_mdm
+				unset push_macos_mdm_workflow
+				[[ "${push_macos_mdm_download_error}" == "TRUE" ]] && workflow_download_macos_error="TRUE"
+				[[ "${push_macos_mdm_download_error}" == "FALSE" ]] && workflow_download_macos_check_user="TRUE"
+			fi
 		fi
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_error is: ${workflow_download_macos_error}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_check_user is: ${workflow_download_macos_check_user}"
 	
-	# Handle workflow failure options.
-	if [[ "${workflow_download_macos_error}" == "TRUE" ]] && [[ "${download_macos_msu_start_error}" == "AUTH" ]] && [[ "${workflow_download_macos_auth_required}" != "TRUE" ]]; then
-		defaults write "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired -bool true
-		log_super "Error: Download macOS update/upgrade workflow failed due to initial authentication error, restarting via LaunchDaemon to try again with authentication..."
-		log_status "Pending: Download macOS update/upgrade workflow failed due to initial authentication error, restarting via LaunchDaemon to try again with authentication..."
-		restart_super_sleep_seconds=5
-		restart_super
-	elif [[ "${workflow_download_macos_error}" == "TRUE" ]]; then
+	# Handle download workflow failures.
+	if [[ "${workflow_download_macos_error}" == "TRUE" ]]; then
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then # Install now workflow mode.
 			log_super "Error: Download macOS update/upgrade workflow failed, install now workflow can not continue."
 			log_status "Inactive Error: Download macOS update/upgrade workflow failed, install now workflow can not continue."
@@ -7538,446 +7668,6 @@ install_macos_msu() {
 	fi
 }
 
-# Install macOS update/upgrade via MDM push command, and also save responses to ${SUPER_LOG}, ${MDM_COMMAND_LOG}, ${MDM_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
-install_macos_mdm() {
-	# If ${test_mode_option} then it's not necessary to continue this function.
-	if [[ "${test_mode_option}" == "TRUE" ]]; then
-		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
-		log_super "Test Mode: Skipping the macOS update/upgrade via MDM workflow."
-		if [[ "${current_user_account_name}" != "FALSE" ]]; then
-			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the MDM preparation notification..."
-			sleep "${test_mode_timeout_seconds}"
-			notification_restart
-			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the restart notification..."
-			sleep "${test_mode_timeout_seconds}"
-			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
-		fi
-		# Reset various items after test macOS update is complete.
-		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
-		reset_deadline_counters
-		return 0
-	fi
-	
-	# Start with log and status updates.
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_mdm_failover_to_user_status is: ${auth_mdm_failover_to_user_status}"
-	local install_macos_mdm_workflow_type
-	local install_macos_mdm_version
-	if [[ "${macos_installer_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via installer.
-		install_macos_mdm_workflow_type="INSTALLER"
-		install_macos_mdm_version="${macos_installer_version}"
-		if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
-			log_super "MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow with user authenticated failover."
-			log_status "Running: MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow with user authenticated failover."
-		else
-			log_super "MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow."
-			log_status "Running: MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow."
-		fi
-		log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} VIA MDM START ****"
-		log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} VIA MDM START ****"
-	fi
-	if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then # Target is a macOS update/upgrade via MSU.
-		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && install_macos_mdm_workflow_type="UPGRADE"
-		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && install_macos_mdm_workflow_type="UPDATE"
-		install_macos_mdm_version="${macos_msu_version}"
-		if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
-				log_super "MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow with user authenticated failover."
-				log_status "Running: MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow with user authenticated failover."
-			else
-				log_super "MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow."
-				log_status "Running: MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow."
-			fi
-			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD AND UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
-			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD AND UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
-		else
-			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
-				log_super "MDM: Starting macOS ${macos_msu_version} update/upgrade workflow with user authenticated failover."
-				log_status "Running: MDM: Starting macOS ${macos_msu_version} update/upgrade workflow with user authenticated failover."
-			else
-				log_super "MDM: Starting macOS ${macos_msu_version} update/upgrade workflow."
-				log_status "Running: MDM: Starting macOS ${macos_msu_version} update/upgrade workflow."
-			fi
-			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
-			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
-		fi
-	fi
-	log_super "MDM: check ${MDM_COMMAND_LOG} and ${MDM_WORKFLOW_LOG} for more detail."
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_workflow_type is: ${install_macos_mdm_workflow_type}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_version is: ${install_macos_mdm_version}"
-	
-	# Validate Jamf Pro API token and update workflow.
-	check_jamf_api_access_token
-	check_jamf_api_update_workflow
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_error_jamf is: ${auth_error_jamf}"
-	
-	# Only continue workflow if Jamf Pro API configuration is valid.
-	if [[ "${auth_error_jamf}" == "FALSE" ]]; then
-		# Start log streaming for MDM push commands and send to ${MDM_COMMAND_LOG}.
-		local log_stream_mdm_command_pid
-		log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "${MDM_COMMAND_LOG}" &
-		log_stream_mdm_command_pid="$!"
-		if [[ "${verbose_mode_option}" == "TRUE" ]]; then
-			log_super "Verbose Mode: Starting debug log for MDM client command progress at: ${MDM_COMMAND_DEBUG_LOG}"
-			local log_stream_mdm_command_debug_pid
-			log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient"' >>"${MDM_COMMAND_DEBUG_LOG}" &
-			log_stream_mdm_command_debug_pid="$!"
-		fi
-		
-		# Start log streaming for MDM update/upgrade progress and send to ${MDM_WORKFLOW_LOG}.
-		local log_stream_mdm_workflow_pid
-		log stream --style compact --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "Reported progress"' >>"${MDM_WORKFLOW_LOG}" &
-		log_stream_mdm_workflow_pid="$!"
-		if [[ "${verbose_mode_option}" == "TRUE" ]]; then
-			log_super "Verbose Mode: Starting debug log for MDM update/upgrade workflow progress at: ${MDM_WORKFLOW_DEBUG_LOG}"
-			local log_stream_mdm_workflow_debug_pid
-			log stream --style compact --predicate 'process == "softwareupdated"' >>"${MDM_WORKFLOW_DEBUG_LOG}" &
-			log_stream_mdm_workflow_debug_pid="$!"
-		fi
-		
-		# Send the Jamf Pro API command to update/upgrade and restart via MDM.
-		local install_macos_mdm_api_error
-		install_macos_mdm_api_error="FALSE"
-		local jamf_api_update_url
-		local jamf_api_update_json
-		if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then # Jamf Pro API new managed update workflow.
-			jamf_api_update_url="${jamf_api_url}api/v1/managed-software-updates/plans"
-			if [[ "${macos_beta_program}" == "FALSE" ]]; then
-				jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "SPECIFIC_VERSION", "specificVersion": "'${install_macos_mdm_version}'" } }'
-			else # [[ "${macos_beta_program}" == "TRUE" ]]
-				if [[ "${install_macos_mdm_workflow_type}" == "INSTALLER" ]] || [[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]]; then # macOS major upgrade.
-					jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MAJOR" } }'
-				else # macOS minor update.
-					jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MINOR" } }'
-				fi
-			fi
-		else # Jamf Pro API legacy managed update workflow.
-			jamf_api_update_url="${jamf_api_url}api/v1/macos-managed-software-updates/send-updates"
-			if [[ "${install_macos_mdm_workflow_type}" == "INSTALLER" ]] || [[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]]; then # macOS major upgrade.
-				jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${install_macos_mdm_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
-			else # macOS minor update.
-				jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${install_macos_mdm_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
-			fi
-		fi
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: jamf_api_update_workflow is: ${jamf_api_update_workflow}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: jamf_api_update_url is: ${jamf_api_update_url}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: jamf_api_update_json is: ${jamf_api_update_json}"
-		local curl_response
-		curl_response=$(curl --silent --output /dev/null --write-out "%{http_code}" --location --request POST "${jamf_api_update_url}" --header "Authorization: Bearer ${jamf_access_token}" --header 'accept: application/json' --header 'content-type: application/json' --data "${jamf_api_update_json}")
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: curl_response is:\n${curl_response}"
-
-		# If the Jamf Pro API managed update was not successful then it's not necessary to continue this function.
-		if [[ $(echo "${curl_response}" | grep -c '200') -gt 0 ]] || [[ $(echo "${curl_response}" | grep -c '201') -gt 0 ]]; then
-			log_super "MDM: Successful macOS update/upgrade command request."
-			send_jamf_api_blank_push
-		else
-			install_macos_mdm_api_error="TRUE"
-		fi
-	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_api_error is: ${install_macos_mdm_api_error}"
-	
-	# Only continue workflow if Jamf Pro API managed update command was successful.
-	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" == "FALSE" ]]; then
-		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS}.
-		local install_macos_mdm_start_error
-		install_macos_mdm_start_error="TRUE"
-		while read -t "${TIMEOUT_MDM_COMMAND_SECONDS}" -r log_line; do
-			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-			if [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
-				log_super "MDM: Workflow error detected."
-				log_mdm_command "**** TIMESTAMP ****"
-				break
-			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)') -gt 0 ]]; then
-				log_super "MDM: Received push command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
-				log_mdm_command "**** TIMESTAMP ****"
-				install_macos_mdm_start_error="FALSE"
-				pkill -P $$ tail
-				break
-			fi
-		done < <(tail -n1 -F "${MDM_COMMAND_LOG}")
-	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_start_error is: ${install_macos_mdm_start_error}"
-	
-	# Only continue workflow if the initial managed update commands were received.
-	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" == "FALSE" ]] && [[ "${install_macos_mdm_start_error}" == "FALSE" ]]; then
-		local install_macos_mdm_start_timeout
-		install_macos_mdm_start_timeout="TRUE"
-		local timer_end
-		timer_end=300
-		while [[ "${timer_end}" -ge 0 ]]; do
-			log_echo_replace_line "Waiting for Jamf Pro's mandatory 5 minute delay: -$(date -u -r ${timer_end} +%M:%S)"
-			timer_end=$((timer_end - 1))
-			sleep 1
-		done
-		log_echo_replace_line "Waiting for Jamf Pro's mandatory 5 minute delay: 00:00\n)"
-		log_super "MDM: Jamf Pro's mandatory 5 minute delay should be complete, sending Blank Push..."
-		send_jamf_api_blank_push
-		if [[ "${current_user_account_name}" != "FALSE" ]]; then
-			if [[ "${install_macos_mdm_workflow_type}" == "INSTALLER" ]]; then
-				display_string_prepare_time_estimate="20-25"
-				notification_prepare
-			else
-				notification_restart
-			fi
-		fi
-		
-		# Watch ${MDM_COMMAND_LOG} while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS}.
-		while read -t "${TIMEOUT_MDM_COMMAND_SECONDS}" -r log_line; do
-			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-			if [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
-				if [[ $(echo "${log_line}" | grep -c 'DeclarativeManagement') -gt 0 ]] && [[ "${macos_version_major}" -lt 14 ]]; then
-					log_super "MDM: DDM error detected but it should be ignored by older versions of macOS."
-				else
-					log_super "MDM: Command error detected."
-					log_mdm_command "**** TIMESTAMP ****"
-					install_macos_mdm_start_error="TRUE"
-					break
-				fi
-			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Idle\]') -gt 0 ]]; then
-				log_super "MDM: Received blank push."
-				log_mdm_command "**** TIMESTAMP ****"
-			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates)') -gt 0 ]]; then
-				log_super "MDM: Received push command \"AvailableOSUpdates\"."
-				log_mdm_command "**** TIMESTAMP ****"
-			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)') -gt 0 ]]; then
-				kill -9 "${log_stream_mdm_command_pid}" >/dev/null 2>&1
-				[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_command_debug_pid}" >/dev/null 2>&1
-				log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA MDM COMMAND COMPLETED ****"
-				log_super "MDM: Received push command \"ScheduleOSUpdate\", local update/upgrade workflow should start soon..."
-				install_macos_mdm_start_timeout="FALSE"
-				break
-			fi
-		done < <(tail -n1 -F "${MDM_COMMAND_LOG}")
-	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_start_error is: ${install_macos_mdm_start_error}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_start_timeout is: ${install_macos_mdm_start_timeout}"
-	
-	# Only continue workflow if the the final (required) 'ScheduleOSUpdate' MDM command was received.
-	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" == "FALSE" ]] && [[ "${install_macos_mdm_start_error}" == "FALSE" ]] && [[ "${install_macos_mdm_start_timeout}" == "FALSE" ]]; then
-		local install_macos_mdm_timeout_error
-		install_macos_mdm_timeout_error="TRUE"
-		local install_macos_mdm_timeout_seconds
-		install_macos_mdm_timeout_seconds="${TIMEOUT_MDM_COMMAND_SECONDS}"
-		local install_macos_mdm_phase
-		install_macos_mdm_phase="START"
-		local install_macos_mdm_complete_percent
-		install_macos_mdm_complete_percent=0
-		local install_macos_mdm_complete_percent_previous
-		install_macos_mdm_complete_percent_previous=0
-		local install_macos_mdm_complete_percent_display
-		
-		# Watch ${MDM_WORKFLOW_LOG} while waiting for the update/upgrade workflow to complete.
-		# Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS} then may change to ${TIMEOUT_MDM_WORKFLOW_SECONDS}.
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_workflow_type is: ${install_macos_mdm_workflow_type}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
-		if [[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] || [[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]]; then
-			while read -t "${install_macos_mdm_timeout_seconds}" -r log_line; do
-				# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-				if [[ $(echo "${log_line}" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
-					if [[ "${install_macos_mdm_phase}" != "PREFLIGHT" ]] && [[ "${install_macos_mdm_phase}" != "DOWNLOADING" ]] && [[ "${install_macos_mdm_phase}" != "PREPARING" ]]; then
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade preflight..."
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} update preflight..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_timeout_seconds="${TIMEOUT_MDM_WORKFLOW_SECONDS}"
-						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
-						install_macos_mdm_phase="PREFLIGHT"
-					fi
-				elif [[ $(echo "${log_line}" | grep -c 'phase:DOWNLOADING_UPDATE') -gt 0 ]]; then
-					if [[ "${install_macos_mdm_phase}" != "DOWNLOADING" ]]; then
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade is downloading..."
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} update is downloading..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_timeout_seconds="${TIMEOUT_MDM_WORKFLOW_SECONDS}"
-						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
-						install_macos_mdm_phase="DOWNLOADING"
-					fi
-					install_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17;}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
-					install_macos_mdm_complete_percent=${install_macos_mdm_complete_percent#0}
-					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_complete_percent is: ${install_macos_mdm_complete_percent}"
-					if [[ $install_macos_mdm_complete_percent -ge 60 ]]; then
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_echo_replace_line "${macos_msu_label} upgrade download progress: 100%\n"
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_echo_replace_line "${macos_msu_label} update download progress: 100%\n"
-					elif [[ $install_macos_mdm_complete_percent -gt $install_macos_mdm_complete_percent_previous ]]; then
-						install_macos_mdm_complete_percent_display=$( (echo "$install_macos_mdm_complete_percent * 1.69" | bc) | cut -d '.' -f1)
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_echo_replace_line "${macos_msu_label} upgrade download progress: ${install_macos_mdm_complete_percent_display}%"
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_echo_replace_line "${macos_msu_label} update download progress: ${install_macos_mdm_complete_percent_display}%"
-						install_macos_mdm_complete_percent_previous=$install_macos_mdm_complete_percent
-					fi
-				elif [[ $(echo "${log_line}" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
-					if [[ "${install_macos_mdm_phase}" != "PREPARING" ]]; then
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade download complete, now preparing..."
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} update download complete, now preparing..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_timeout_seconds=${TIMEOUT_MDM_WORKFLOW_SECONDS}
-						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
-						install_macos_mdm_phase="PREPARING"
-					fi
-					install_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17;}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
-					install_macos_mdm_complete_percent=${install_macos_mdm_complete_percent#0}
-					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_complete_percent is: ${install_macos_mdm_complete_percent}"
-					if [[ $install_macos_mdm_complete_percent -ge 98 ]]; then
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_echo_replace_line "${macos_msu_label} upgrade preparing progress: 100%\n"
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade is downloaded and prepared, system restart is soon..."
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_echo_replace_line "${macos_msu_label} update preparing progress: 100%\n"
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} update is downloaded and prepared, system restart is soon..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-					elif [[ $install_macos_mdm_complete_percent -gt $install_macos_mdm_complete_percent_previous ]]; then
-						install_macos_mdm_complete_percent_display=$(((install_macos_mdm_complete_percent - 60) * 2))
-						[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_echo_replace_line "${macos_msu_label} upgrade preparing progress: ${install_macos_mdm_complete_percent_display}%"
-						[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_echo_replace_line "${macos_msu_label} update preparing progress: ${install_macos_mdm_complete_percent_display}%"
-						install_macos_mdm_complete_percent_previous=$install_macos_mdm_complete_percent
-					fi
-				elif [[ $(echo "${log_line}" | grep -c 'phase:PREPARED_COMMITTING_STASH') -gt 0 ]]; then
-					log_mdm_workflow "**** TIMESTAMP ****"
-					install_macos_mdm_timeout_error="FALSE"
-					install_macos_mdm_phase="DONE"
-					break
-				fi
-			done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
-		else # ${install_macos_mdm_workflow_type} == "INSTALLER"
-			# This while loop is broken into sections to allow for the notification_prepare function to update. Putting this function inside the while loop breaks the tail.
-			while read -t "${install_macos_mdm_timeout_seconds}" -r log_line; do
-				# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-				if [[ $(echo "${log_line}" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
-					log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer preflight..."
-					log_mdm_workflow "**** TIMESTAMP ****"
-					install_macos_mdm_timeout_seconds="${TIMEOUT_MDM_WORKFLOW_SECONDS}"
-					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_timeout_seconds is: ${install_macos_mdm_timeout_seconds}"
-					install_macos_mdm_timeout_error="FALSE"
-					install_macos_mdm_phase="PREFLIGHT"
-					break
-				fi
-			done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
-			if [[ "${install_macos_mdm_timeout_error}" == "FALSE" ]]; then
-				install_macos_mdm_timeout_error="TRUE"
-				while read -t "${install_macos_mdm_timeout_seconds}" -r log_line; do
-					# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-					if [[ $(echo "${log_line}" | grep -c 'phase:DOWNLOADING_SFR') -gt 0 ]]; then
-						log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} downloading additional items..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_phase="DOWNLOADING"
-					elif [[ $(echo "${log_line}" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
-						log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer preparing..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_timeout_error="FALSE"
-						install_macos_mdm_phase="PREPARING"
-						break
-					fi
-				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
-			fi
-			if [[ "${install_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
-				display_string_prepare_time_estimate="10-15"
-				notification_prepare
-			fi
-			if [[ "${install_macos_mdm_timeout_error}" == "FALSE" ]]; then
-				install_macos_mdm_timeout_error="TRUE"
-				while read -t "${install_macos_mdm_timeout_seconds}" -r log_line; do
-					# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-					if [[ $(echo "${log_line}" | grep -c 'phase:PREPARED') -gt 0 ]]; then
-						log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared, system restart is soon..."
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_timeout_error="FALSE"
-						install_macos_mdm_phase="DONE"
-						break
-					fi
-				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
-			fi
-			{ [[ "${install_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_restart
-			if [[ "${install_macos_mdm_timeout_error}" == "FALSE" ]]; then
-				install_macos_mdm_timeout_error="TRUE"
-				while read -t "${install_macos_mdm_timeout_seconds}" -r log_line; do
-					# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-					if [[ $(echo "${log_line}" | grep -c 'phase:ACCEPTED') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'phase:APPLYING') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'phase:APPLYING') -gt 0 ]]; then
-						log_mdm_workflow "**** TIMESTAMP ****"
-						install_macos_mdm_timeout_error="FALSE"
-						install_macos_mdm_phase="DONE"
-						break
-					fi
-				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
-			fi
-		fi
-	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_timeout_error is: ${install_macos_mdm_timeout_error}"
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_mdm_phase is: ${install_macos_mdm_phase}"
-
-	# If the macOS update/upgrade completed, then prepare for restart.
-	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${install_macos_mdm_api_error}" == "FALSE" ]] && [[ "${install_macos_mdm_start_error}" == "FALSE" ]] && [[ "${install_macos_mdm_start_timeout}" == "FALSE" ]] && [[ "${install_macos_mdm_timeout_error}" == "FALSE" ]]; then
-		/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
-		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
-		kill -9 "${log_stream_mdm_workflow_pid}" >/dev/null 2>&1
-		[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_workflow_debug_pid}" >/dev/null 2>&1
-		log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
-		[[ "${install_macos_mdm_workflow_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade is prepared and ready for restart!"
-		[[ "${install_macos_mdm_workflow_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} update is prepared and ready for restart!"
-		[[ "${install_macos_mdm_workflow_type}" == "INSTALLER" ]] && log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared and ready for restart!"
-		if [[ "${install_macos_mdm_workflow_type}" == "INSTALLER" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
-			log_super "MDM: Forcing logout for current user: ${current_user_account_name}."
-			launchctl bootout "user/${current_user_id}" &
-			disown %
-		fi
-	else # Some part of the MDM workflow failed.
-		kill -9 "${log_stream_mdm_command_pid}" >/dev/null 2>&1
-		[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_command_debug_pid}" >/dev/null 2>&1
-		log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_workflow_debug_pid}" >/dev/null 2>&1
-		kill -9 "${log_stream_mdm_workflow_pid}" >/dev/null 2>&1
-		log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
-		if [[ "${auth_error_jamf}" == "TRUE" ]]; then
-			log_mdm_command "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
-			log_mdm_workflow "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
-			log_super "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
-		elif [[ "${install_macos_mdm_api_error}" == "TRUE" ]]; then
-			log_mdm_command "Error: Failed to send MDM install update/upgrade macOS request. Verify that this account has appropriate privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-account-privileges"
-			log_mdm_workflow "Error: Failed to send MDM install update/upgrade macOS request. Verify that this account has appropriate privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-account-privileges"
-			log_super "Error: Failed to send MDM install update/upgrade macOS request. Verify that this account has appropriate privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-account-privileges"
-		elif [[ "${install_macos_mdm_start_error}" == "TRUE" ]]; then
-			log_mdm_command "Error: Push workflow for macOS update/upgrade via MDM failed."
-			log_mdm_workflow "Error: Push workflow for macOS update/upgrade via MDM failed."
-			log_super "Error: Push workflow for macOS update/upgrade via MDM failed."
-		elif [[ "${install_macos_mdm_start_timeout}" == "TRUE" ]]; then
-			log_mdm_command "Error: Push workflow for macOS update/upgrade via MDM failed to complete, as indicated by no progress after waiting for ${TIMEOUT_MDM_COMMAND_SECONDS} seconds."
-			log_mdm_workflow "Error: Push workflow for macOS update/upgrade via MDM failed to complete, as indicated by no progress after waiting for ${TIMEOUT_MDM_COMMAND_SECONDS} seconds."
-			log_super "Error: Push workflow for macOS update/upgrade via MDM failed to complete, as indicated by no progress after waiting for ${TIMEOUT_MDM_COMMAND_SECONDS} seconds."
-		else # "${install_macos_mdm_timeout_error}" == "TRUE"
-			log_mdm_workflow "Error: Installation of macOS update/upgrade via MDM failed to complete, as indicated by no progress after waiting for ${install_macos_mdm_timeout_seconds} seconds."
-			log_super "Error: Installation of macOS update/upgrade via MDM failed to complete, as indicated by no progress after waiting for ${install_macos_mdm_timeout_seconds} seconds."
-		fi
-		
-		# Handle workflow failure options.
-		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then # Install now workflow mode.
-			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then # User authentication MDM failover option enabled.
-				log_super "Error: Installation of macOS update/upgrade via MDM failed, failing over to user authenticated workflow."
-				[[ "${install_macos_major_upgrades}" == "TRUE" ]] && workflow_macos_auth="FAILOVER"
-				workflow_macos_auth="FAILOVER"
-				unset install_jamf_policy_triggers_option
-				workflow_install_active_user
-				return 0
-			else # No user authentication MDM failover option.
-				log_super "Error: Installation of  macOS update/upgrade via MDM failed, install now workflow can not continue."
-				log_status "Inactive Error: Installation of macOS update/upgrade via MDM failed, install now workflow can not continue."
-				[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
-				exit_error
-			fi
-		else # Default super workflow.
-			if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
-				log_super "Error: Installation of update/upgrade via MDM failed, failing over to user authenticated workflow."
-				[[ "${install_macos_major_upgrades}" == "TRUE" ]] && workflow_macos_auth="FAILOVER"
-				workflow_macos_auth="FAILOVER"
-				unset install_jamf_policy_triggers_option
-				workflow_install_active_user
-				return 0
-			else # No current user, or no user authentication MDM failover option.
-				deferral_timer_minutes="${deferral_timer_error_minutes}"
-				log_super "Error: Installation of macOS update/upgrade via MDM failed, trying again in ${deferral_timer_minutes} minutes."
-				log_status "Pending: Installation of macOS update/upgrade via MDM failed, trying again in ${deferral_timer_minutes} minutes."
-				[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
-				set_auto_launch_deferral
-			fi
-		fi
-	fi
-}
-
 # Install macOS major upgrade via macOS installer application, and also save responses to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
 install_macos_app() {
 	# If ${test_mode_option} then it's not necessary to continue this function.
@@ -8101,6 +7791,522 @@ install_macos_app() {
 			log_status "Pending: Installation of macOS major upgrade via installer application failed, trying again in ${deferral_timer_minutes} minutes."
 			[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
 			set_auto_launch_deferral
+		fi
+	fi
+}
+
+# Download and/or install macOS update/upgrade via MDM push command, and also save responses to ${SUPER_LOG}, ${MDM_COMMAND_LOG}, ${MDM_WORKFLOW_LOG}, and ${SUPER_LOCAL_PLIST}.
+push_macos_mdm() {
+	# If ${test_mode_option} then it's not necessary to continue this function.
+	if [[ "${test_mode_option}" == "TRUE" ]] && [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
+		log_super "Test Mode: Skipping the download macOS update/upgrade via MDM workflow."
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for install now download notification..."
+			sleep "${test_mode_timeout_seconds}"
+		fi
+		push_macos_mdm_download_error="FALSE"
+		return 0
+	elif [[ "${test_mode_option}" == "TRUE" ]]; then # [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]
+		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+		log_super "Test Mode: Skipping the install macOS update/upgrade via MDM workflow."
+		if [[ "${current_user_account_name}" != "FALSE" ]]; then
+			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the MDM preparation notification..."
+			sleep "${test_mode_timeout_seconds}"
+			notification_restart
+			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the restart notification..."
+			sleep "${test_mode_timeout_seconds}"
+			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
+		fi
+		# Reset various items after test macOS update is complete.
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
+		reset_schedule_zero_date_automatic
+		reset_deadline_counters
+		return 0
+	fi
+	
+	# Start with log and status updates.
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_workflow is: ${push_macos_mdm_workflow}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_mdm_failover_to_user_status is: ${auth_mdm_failover_to_user_status}"
+	local push_macos_mdm_target_type
+	local push_macos_mdm_target_version
+	if [[ "${macos_installer_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via installer.
+		push_macos_mdm_target_type="INSTALLER"
+		push_macos_mdm_target_version="${macos_installer_version}"
+		if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
+			log_super "MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow with user authenticated failover."
+			log_status "Running: MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow with user authenticated failover."
+		else
+			log_super "MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow."
+			log_status "Running: MDM: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow."
+		fi
+		log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} VIA MDM START ****"
+		log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} VIA MDM START ****"
+	fi
+	if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then # Target is a macOS update/upgrade via MSU.
+		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && push_macos_mdm_target_type="UPGRADE"
+		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && push_macos_mdm_target_type="UPDATE"
+		push_macos_mdm_target_version="${macos_msu_version}"
+		if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
+			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
+				log_super "MDM: Starting macOS ${macos_msu_version} download workflow with user authenticated failover."
+				log_status "Running: MDM: Starting macOS ${macos_msu_version} download workflow with user authenticated failover."
+			else
+				log_super "MDM: Starting macOS ${macos_msu_version} download workflow."
+				log_status "Running: MDM: Starting macOS ${macos_msu_version} download workflow."
+			fi
+			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS ${macos_msu_version} VIA MDM START ****"
+			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS ${macos_msu_version} VIA MDM START ****"
+		elif [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
+				log_super "MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow with user authenticated failover."
+				log_status "Running: MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow with user authenticated failover."
+			else
+				log_super "MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow."
+				log_status "Running: MDM: Starting macOS ${macos_msu_version} download and update/upgrade workflow."
+			fi
+			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD AND UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
+			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD AND UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
+		else # Install workflow.
+			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
+				log_super "MDM: Starting macOS ${macos_msu_version} update/upgrade workflow with user authenticated failover."
+				log_status "Running: MDM: Starting macOS ${macos_msu_version} update/upgrade workflow with user authenticated failover."
+			else
+				log_super "MDM: Starting macOS ${macos_msu_version} update/upgrade workflow."
+				log_status "Running: MDM: Starting macOS ${macos_msu_version} update/upgrade workflow."
+			fi
+			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
+			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS ${macos_msu_version} VIA MDM START ****"
+		fi
+	fi
+	log_super "MDM: check ${MDM_COMMAND_LOG} and ${MDM_WORKFLOW_LOG} for more detail."
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_target_type is: ${push_macos_mdm_target_type}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_target_version is: ${push_macos_mdm_target_version}"
+	
+	# Validate Jamf Pro API token and update workflow.
+	check_jamf_api_access_token
+	check_jamf_api_update_workflow
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_error_jamf is: ${auth_error_jamf}"
+	
+	# Only continue workflow if Jamf Pro API configuration is valid.
+	if [[ "${auth_error_jamf}" == "FALSE" ]]; then
+		# Start log streaming for MDM push commands and send to ${MDM_COMMAND_LOG}.
+		local log_stream_mdm_command_pid
+		log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "${MDM_COMMAND_LOG}" &
+		log_stream_mdm_command_pid="$!"
+		if [[ "${verbose_mode_option}" == "TRUE" ]]; then
+			log_super "Verbose Mode: Starting debug log for MDM client command progress at: ${MDM_COMMAND_DEBUG_LOG}"
+			local log_stream_mdm_command_debug_pid
+			log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient"' >>"${MDM_COMMAND_DEBUG_LOG}" &
+			log_stream_mdm_command_debug_pid="$!"
+		fi
+		
+		# Start log streaming for MDM update/upgrade progress and send to ${MDM_WORKFLOW_LOG}.
+		local log_stream_mdm_workflow_pid
+		log stream --style compact --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "Reported progress"' >>"${MDM_WORKFLOW_LOG}" &
+		log_stream_mdm_workflow_pid="$!"
+		if [[ "${verbose_mode_option}" == "TRUE" ]]; then
+			log_super "Verbose Mode: Starting debug log for MDM update/upgrade workflow progress at: ${MDM_WORKFLOW_DEBUG_LOG}"
+			local log_stream_mdm_workflow_debug_pid
+			log stream --style compact --predicate 'process == "softwareupdated"' >>"${MDM_WORKFLOW_DEBUG_LOG}" &
+			log_stream_mdm_workflow_debug_pid="$!"
+		fi
+		
+		# Send the Jamf Pro API command to update/upgrade and restart via MDM.
+		local push_macos_mdm_api_error
+		push_macos_mdm_api_error="FALSE"
+		local jamf_api_update_url
+		local jamf_api_update_json
+		if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then # Jamf Pro API new managed update workflow.
+			jamf_api_update_url="${jamf_api_url}api/v1/managed-software-updates/plans"
+			if { [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] || [[ "${push_macos_mdm_target_type}" == "UPGRADE" ]]; } && { [[ "${macos_beta_program}" == "TRUE" ]] || [[ "${macos_major_upgrade_latest}" == "TRUE" ]]; }; then
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_ONLY", "versionType": "LATEST_MAJOR" } }'
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MAJOR" } }'
+			elif [[ "${macos_beta_program}" == "TRUE" ]] || [[ "${macos_minor_update_latest}" == "TRUE" ]]; then
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_ONLY", "versionType": "LATEST_MINOR" } }'
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "LATEST_MINOR" } }'
+			else # Non-latest macOS version targets must be called by their specific version number.
+				log_super "Warning: Workflow target is not the latest macOS minor update or major upgrade. The Jamf Pro new Managed Software Updates API is unreliable when requesting specific older macOS versions."
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_ONLY", "versionType": "SPECIFIC_VERSION", "specificVersion": "'${push_macos_mdm_target_version}'" } }'
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && jamf_api_update_json='{ "devices": [ { "objectType": "COMPUTER",  "deviceId": "'${jamf_computer_id}'" } ], "config": { "updateAction": "DOWNLOAD_INSTALL_RESTART", "versionType": "SPECIFIC_VERSION", "specificVersion": "'${push_macos_mdm_target_version}'" } }'
+			fi
+		else # Jamf Pro API legacy managed update workflow.
+			log_super "Warning: Workflow is using the Jamf Pro legacy macOS Managed Software Updates API. Although this API remains stable, it is now deprecated."
+			jamf_api_update_url="${jamf_api_url}api/v1/macos-managed-software-updates/send-updates"
+			if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] || [[ "${push_macos_mdm_target_type}" == "UPGRADE" ]]; then # macOS major upgrade.
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${push_macos_mdm_target_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_ONLY" }'
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${push_macos_mdm_target_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL" }'
+			else # macOS minor update.
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${push_macos_mdm_target_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_ONLY" }'
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && jamf_api_update_json='{ "deviceIds": ["'${jamf_computer_id}'"], "version": "'${push_macos_mdm_target_version}'", "skipVersionVerification": true, "updateAction": "DOWNLOAD_AND_INSTALL", "forceRestart": true }'
+			fi
+		fi
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: jamf_api_update_workflow is: ${jamf_api_update_workflow}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: jamf_api_update_url is: ${jamf_api_update_url}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: jamf_api_update_json is: ${jamf_api_update_json}"
+		local curl_response
+		curl_response=$(curl --silent --output /dev/null --write-out "%{http_code}" --location --request POST "${jamf_api_update_url}" --header "Authorization: Bearer ${jamf_access_token}" --header 'accept: application/json' --header 'content-type: application/json' --data "${jamf_api_update_json}")
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: curl_response is:\n${curl_response}"
+
+		# If the Jamf Pro API managed update was not successful then it's not necessary to continue this function.
+		if [[ $(echo "${curl_response}" | grep -c '200') -gt 0 ]] || [[ $(echo "${curl_response}" | grep -c '201') -gt 0 ]]; then
+			[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && log_super "MDM: Successful download macOS update/upgrade command request."
+			[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && log_super "MDM: Successful install macOS update/upgrade command request."
+			send_jamf_api_blank_push
+		else
+			push_macos_mdm_api_error="TRUE"
+		fi
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_api_error is: ${push_macos_mdm_api_error}"
+	
+	# Only continue workflow if Jamf Pro API managed update command was successful.
+	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${push_macos_mdm_api_error}" == "FALSE" ]]; then
+		# Some helpfull logging while waiting for Jamf Pro's mandatory 5 minute delay. Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS}.
+		local push_macos_mdm_start_error
+		push_macos_mdm_start_error="TRUE"
+		while read -t "${TIMEOUT_MDM_COMMAND_SECONDS}" -r log_line; do
+			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+			if [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
+				log_super "MDM: Workflow error detected."
+				log_mdm_command "**** TIMESTAMP ****"
+				break
+			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdateScan)') -gt 0 ]]; then
+				log_super "MDM: Received push command \"ScheduleOSUpdateScan\", checking back after Jamf Pro's mandatory 5 minute delay..."
+				log_mdm_command "**** TIMESTAMP ****"
+				push_macos_mdm_start_error="FALSE"
+				pkill -P $$ tail
+				break
+			fi
+		done < <(tail -n1 -F "${MDM_COMMAND_LOG}")
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_start_error is: ${push_macos_mdm_start_error}"
+	
+	# Only continue workflow if the initial managed update commands were received.
+	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${push_macos_mdm_api_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_error}" == "FALSE" ]]; then
+		local push_macos_mdm_start_timeout
+		push_macos_mdm_start_timeout="TRUE"
+		local timer_end
+		timer_end=300
+		while [[ "${timer_end}" -ge 0 ]]; do
+			log_echo_replace_line "Waiting for Jamf Pro's mandatory 5 minute delay: -$(date -u -r ${timer_end} +%M:%S)"
+			timer_end=$((timer_end - 1))
+			sleep 1
+		done
+		log_echo_replace_line "Waiting for Jamf Pro's mandatory 5 minute delay: 00:00\n)"
+		log_super "MDM: Jamf Pro's mandatory 5 minute delay should be complete, sending Blank Push..."
+		send_jamf_api_blank_push
+		if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]; then
+			if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]]; then
+				display_string_prepare_time_estimate="20-25"
+				notification_prepare
+			else
+				notification_restart
+			fi
+		fi
+		
+		# Watch ${MDM_COMMAND_LOG} while waiting for the MDM workflow to complete. Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS}.
+		while read -t "${TIMEOUT_MDM_COMMAND_SECONDS}" -r log_line; do
+			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+			if [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Error') -gt 0 ]]; then
+				if [[ $(echo "${log_line}" | grep -c 'DeclarativeManagement') -gt 0 ]] && [[ "${macos_version_major}" -lt 14 ]]; then
+					log_super "MDM: DDM error detected but it should be ignored by older versions of macOS."
+				else
+					log_super "MDM: Command error detected."
+					log_mdm_command "**** TIMESTAMP ****"
+					push_macos_mdm_start_error="TRUE"
+					break
+				fi
+			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Idle\]') -gt 0 ]]; then
+				log_super "MDM: Received blank push."
+				log_mdm_command "**** TIMESTAMP ****"
+			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Acknowledged(AvailableOSUpdates)') -gt 0 ]]; then
+				log_super "MDM: Received push command \"AvailableOSUpdates\"."
+				log_mdm_command "**** TIMESTAMP ****"
+			elif [[ $(echo "${log_line}" | grep -c 'Received HTTP response (200) \[Acknowledged(ScheduleOSUpdate)') -gt 0 ]]; then
+				kill -9 "${log_stream_mdm_command_pid}" >/dev/null 2>&1
+				[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_command_debug_pid}" >/dev/null 2>&1
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA MDM COMMAND COMPLETED ****"
+				[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && log_super "MDM: Received push command \"ScheduleOSUpdate\", local download should start soon..."
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS VIA MDM COMMAND COMPLETED ****"
+				[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && log_super "MDM: Received push command \"ScheduleOSUpdate\", local update/upgrade should start soon..."
+				push_macos_mdm_start_timeout="FALSE"
+				break
+			fi
+		done < <(tail -n1 -F "${MDM_COMMAND_LOG}")
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_start_error is: ${push_macos_mdm_start_error}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_start_timeout is: ${push_macos_mdm_start_timeout}"
+	
+	# Only continue workflow if the the final (required) 'ScheduleOSUpdate' MDM command was received.
+	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${push_macos_mdm_api_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_timeout}" == "FALSE" ]]; then
+		local push_macos_mdm_timeout_error
+		push_macos_mdm_timeout_error="TRUE"
+		local push_macos_mdm_timeout_seconds
+		push_macos_mdm_timeout_seconds="${TIMEOUT_MDM_COMMAND_SECONDS}"
+		local push_macos_mdm_phase
+		push_macos_mdm_phase="START"
+		local push_macos_mdm_complete_percent
+		push_macos_mdm_complete_percent=0
+		local push_macos_mdm_complete_percent_previous
+		push_macos_mdm_complete_percent_previous=0
+		local push_macos_mdm_complete_percent_display
+		
+		# Watch ${MDM_WORKFLOW_LOG} while waiting for the update/upgrade workflow to complete.
+		# Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS} then may change to ${TIMEOUT_MDM_WORKFLOW_SECONDS}.
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_target_type is: ${push_macos_mdm_target_type}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_timeout_seconds is: ${push_macos_mdm_timeout_seconds}"
+		if [[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] || [[ "${push_macos_mdm_target_type}" == "UPDATE" ]]; then
+			while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
+				# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+				if [[ $(echo "${log_line}" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
+					if [[ "${push_macos_mdm_phase}" != "PREFLIGHT" ]] && [[ "${push_macos_mdm_phase}" != "DOWNLOADING" ]] && [[ "${push_macos_mdm_phase}" != "PREPARING" ]]; then
+						log_super "MDM: ${macos_msu_label} preflight..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_timeout_seconds="${TIMEOUT_MDM_WORKFLOW_SECONDS}"
+						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_timeout_seconds is: ${push_macos_mdm_timeout_seconds}"
+						push_macos_mdm_phase="PREFLIGHT"
+					fi
+				elif [[ $(echo "${log_line}" | grep -c 'phase:DOWNLOADING_UPDATE') -gt 0 ]]; then
+					if [[ "${push_macos_mdm_phase}" != "DOWNLOADING" ]]; then
+						log_super "MDM: ${macos_msu_label} is downloading..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_timeout_seconds="${TIMEOUT_MDM_WORKFLOW_SECONDS}"
+						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_timeout_seconds is: ${push_macos_mdm_timeout_seconds}"
+						push_macos_mdm_phase="DOWNLOADING"
+					fi
+					push_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17;}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
+					push_macos_mdm_complete_percent=${push_macos_mdm_complete_percent#0}
+					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_complete_percent is: ${push_macos_mdm_complete_percent}"
+					if [[ $push_macos_mdm_complete_percent -ge 60 ]]; then
+						log_echo_replace_line "${macos_msu_label} download progress: 100%\n"
+					elif [[ $push_macos_mdm_complete_percent -gt $push_macos_mdm_complete_percent_previous ]]; then
+						push_macos_mdm_complete_percent_display=$( (echo "$push_macos_mdm_complete_percent * 1.69" | bc) | cut -d '.' -f1)
+						log_echo_replace_line "${macos_msu_label} download progress: ${push_macos_mdm_complete_percent_display}%"
+						push_macos_mdm_complete_percent_previous=$push_macos_mdm_complete_percent
+					fi
+				elif [[ $(echo "${log_line}" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+					if [[ "${push_macos_mdm_phase}" != "PREPARING" ]]; then
+						log_super "MDM: ${macos_msu_label} download complete, now preparing..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_timeout_seconds=${TIMEOUT_MDM_WORKFLOW_SECONDS}
+						[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_timeout_seconds is: ${push_macos_mdm_timeout_seconds}"
+						push_macos_mdm_phase="PREPARING"
+					fi
+					push_macos_mdm_complete_percent=$(echo "${log_line}" | awk '{print $17;}' | sed -e 's/portionComplete:0.//' | cut -c 1-2)
+					push_macos_mdm_complete_percent=${push_macos_mdm_complete_percent#0}
+					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_complete_percent is: ${push_macos_mdm_complete_percent}"
+					if [[ $push_macos_mdm_complete_percent -ge 98 ]]; then
+						log_echo_replace_line "${macos_msu_label} preparing progress: 100%\n"
+						[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && log_super "MDM: ${macos_msu_label} is downloaded and prepared."
+						[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && log_super "MDM: ${macos_msu_label} is downloaded and prepared, system restart is soon..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+					elif [[ $push_macos_mdm_complete_percent -gt $push_macos_mdm_complete_percent_previous ]]; then
+						push_macos_mdm_complete_percent_display=$(((push_macos_mdm_complete_percent - 60) * 2))
+						log_echo_replace_line "${macos_msu_label} preparing progress: ${push_macos_mdm_complete_percent_display}%"
+						push_macos_mdm_complete_percent_previous=$push_macos_mdm_complete_percent
+					fi
+				elif [[ $(echo "${log_line}" | grep -c 'phase:PREPARED_COMMITTING_STASH') -gt 0 ]]; then
+					log_mdm_workflow "**** TIMESTAMP ****"
+					push_macos_mdm_timeout_error="FALSE"
+					push_macos_mdm_phase="DONE"
+					break
+				fi
+			done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
+		else # ${push_macos_mdm_target_type} == "INSTALLER"
+			# This while loop is broken into sections to allow for the notification_prepare function to update. Putting this function inside the while loop breaks the tail.
+			while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
+				# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+				if [[ $(echo "${log_line}" | grep -c 'phase:PREFLIGHT') -gt 0 ]]; then
+					log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer preflight..."
+					log_mdm_workflow "**** TIMESTAMP ****"
+					push_macos_mdm_timeout_seconds="${TIMEOUT_MDM_WORKFLOW_SECONDS}"
+					[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_timeout_seconds is: ${push_macos_mdm_timeout_seconds}"
+					push_macos_mdm_timeout_error="FALSE"
+					push_macos_mdm_phase="PREFLIGHT"
+					break
+				fi
+			done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
+			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
+				push_macos_mdm_timeout_error="TRUE"
+				while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
+					# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+					if [[ $(echo "${log_line}" | grep -c 'phase:DOWNLOADING_SFR') -gt 0 ]]; then
+						log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} downloading additional items..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_phase="DOWNLOADING"
+					elif [[ $(echo "${log_line}" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+						log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer preparing..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_timeout_error="FALSE"
+						push_macos_mdm_phase="PREPARING"
+						break
+					fi
+				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
+			fi
+			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
+				display_string_prepare_time_estimate="10-15"
+				notification_prepare
+			fi
+			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
+				push_macos_mdm_timeout_error="TRUE"
+				while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
+					# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+					if [[ $(echo "${log_line}" | grep -c 'phase:PREPARED') -gt 0 ]]; then
+						log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared, system restart is soon..."
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_timeout_error="FALSE"
+						push_macos_mdm_phase="DONE"
+						break
+					fi
+				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
+			fi
+			{ [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_restart
+			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
+				push_macos_mdm_timeout_error="TRUE"
+				while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
+					# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+					if [[ $(echo "${log_line}" | grep -c 'phase:ACCEPTED') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'phase:APPLYING') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'phase:APPLYING') -gt 0 ]]; then
+						log_mdm_workflow "**** TIMESTAMP ****"
+						push_macos_mdm_timeout_error="FALSE"
+						push_macos_mdm_phase="DONE"
+						break
+					fi
+				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
+			fi
+		fi
+	fi
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_timeout_error is: ${push_macos_mdm_timeout_error}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_phase is: ${push_macos_mdm_phase}"
+	
+	# If the macOS update/upgrade completed, then prepare for restart.
+	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${push_macos_mdm_api_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_timeout}" == "FALSE" ]] && [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
+		kill -9 "${log_stream_mdm_workflow_pid}" >/dev/null 2>&1
+		[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_workflow_debug_pid}" >/dev/null 2>&1
+		if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
+			local push_macos_mdm_download_validation_error
+			push_macos_mdm_download_validation_error="TRUE"
+			local update_asset_attributes
+			update_asset_attributes=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2>/dev/null)
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: update_asset_attributes is:\n${update_asset_attributes}"
+			local macos_mdm_version_prepared
+			macos_mdm_version_prepared=$(echo "${update_asset_attributes}" | grep -w 'OSVersion' | awk -F '"' '{print $2;}')
+			if [[ "${macos_version_major}" -ge 13 ]]; then
+				local macos_mdm_prepared_version_extra
+				macos_mdm_prepared_version_extra=$(echo "${update_asset_attributes}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2;}')
+				[[ -n "${macos_mdm_prepared_version_extra}" ]] && macos_mdm_version_prepared="${macos_mdm_version_prepared} ${macos_mdm_prepared_version_extra}"
+				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_mdm_prepared_version_extra is: ${macos_mdm_prepared_version_extra}"
+			fi
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_mdm_version_prepared is: ${macos_mdm_version_prepared}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_version is: ${macos_msu_version}"
+			if [[ "${macos_mdm_version_prepared}" == "${macos_msu_version}" ]]; then
+				push_macos_mdm_download_validation_error="FALSE"
+				log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
+				[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade is downloaded and prepared."
+				[[ "${push_macos_mdm_target_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} upgrade is downloaded and prepared."
+				push_macos_mdm_download_error="FALSE"
+				macos_msu_download_required="FALSE"
+				defaults write "${SUPER_LOCAL_PLIST}" MacOSMSULabelDownloaded -string "${macos_msu_label}"
+				defaults write "${SUPER_LOCAL_PLIST}" MacOSMSULastStartupDownloaded -string "${mac_last_startup}"
+			fi
+		else # Install workflow at this point is a success.
+			/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
+			[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade is prepared and ready for restart!"
+			[[ "${push_macos_mdm_target_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} update is prepared and ready for restart!"
+			[[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && log_super "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared and ready for restart!"
+			if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
+				log_super "MDM: Forcing logout for current user: ${current_user_account_name}."
+				launchctl bootout "user/${current_user_id}" &
+				disown %
+			fi
+		fi
+	fi
+	
+	# Handle MDM workflow failures.
+	if [[ "${auth_error_jamf}" == "TRUE" ]] || [[ "${push_macos_mdm_api_error}" == "TRUE" ]] || [[ "${push_macos_mdm_start_error}" == "TRUE" ]] || [[ "${push_macos_mdm_start_timeout}" == "TRUE" ]] || [[ "${push_macos_mdm_timeout_error}" == "TRUE" ]] || [[ "${push_macos_mdm_download_validation_error}" == "TRUE" ]]; then
+		kill -9 "${log_stream_mdm_command_pid}" >/dev/null 2>&1
+		[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_command_debug_pid}" >/dev/null 2>&1
+		kill -9 "${log_stream_mdm_workflow_pid}" >/dev/null 2>&1
+		[[ "${verbose_mode_option}" == "TRUE" ]] && kill -9 "${log_stream_mdm_workflow_debug_pid}" >/dev/null 2>&1
+		if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
+			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
+			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
+			push_macos_mdm_download_error="TRUE"
+			macos_msu_download_required="TRUE"
+			defaults delete "${SUPER_LOCAL_PLIST}" MacOSMSULabelDownloaded 2>/dev/null
+			defaults delete "${SUPER_LOCAL_PLIST}" MacOSMSULastStartupDownloaded 2>/dev/null
+		else # [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]
+			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
+			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
+		fi
+		if [[ "${auth_error_jamf}" == "TRUE" ]]; then
+			log_mdm_command "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
+			log_mdm_workflow "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
+			log_super "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
+		elif [[ "${push_macos_mdm_api_error}" == "TRUE" ]]; then
+			log_mdm_command "Error: Failed to send MDM download/install macOS request. Verify that this account has appropriate privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-account-privileges"
+			log_mdm_workflow "Error: Failed to send MDM download/install macOS request. Verify that this account has appropriate privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-account-privileges"
+			log_super "Error: Failed to send MDM download/install macOS request. Verify that this account has appropriate privileges: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#jamf-pro-api-account-privileges"
+		elif [[ "${push_macos_mdm_start_error}" == "TRUE" ]]; then
+			log_mdm_command "Error: Push workflow for download/install macOS via MDM failed."
+			log_mdm_workflow "Error: Push workflow for download/install macOS via MDM failed."
+			log_super "Error: Push workflow for download/install macOS via MDM failed."
+		elif [[ "${push_macos_mdm_start_timeout}" == "TRUE" ]]; then
+			log_mdm_command "Error: Push workflow for download/install macOS via MDM failed to complete, as indicated by no progress after waiting for ${TIMEOUT_MDM_COMMAND_SECONDS} seconds."
+			log_mdm_workflow "Error: Push workflow for download/install macOS via MDM failed to complete, as indicated by no progress after waiting for ${TIMEOUT_MDM_COMMAND_SECONDS} seconds."
+			log_super "Error: Push workflow for download/install macOS via MDM failed to complete, as indicated by no progress after waiting for ${TIMEOUT_MDM_COMMAND_SECONDS} seconds."
+		elif [[ "${push_macos_mdm_timeout_error}" == "TRUE" ]]; then
+			log_mdm_workflow "Error: Download/install of macOS via MDM failed to complete, as indicated by no progress after waiting for ${push_macos_mdm_timeout_seconds} seconds."
+			log_super "Error: Download/install of macOS via MDM failed to complete, as indicated by no progress after waiting for ${push_macos_mdm_timeout_seconds} seconds."
+		else # ${push_macos_mdm_download_validation_error}
+			if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
+				log_msu "Error: Downloaded macOS major upgrade version of ${macos_mdm_version_prepared} doesn't match expected version ${macos_msu_version}."
+				log_super "Error: Downloaded macOS major upgrade version of ${macos_mdm_version_prepared} doesn't match expected version ${macos_msu_version}."
+			else # "${macos_msu_minor_update_target}" != "FALSE"
+				log_msu "Error: Downloaded macOS minor update version of ${macos_mdm_version_prepared} doesn't match expected version ${macos_msu_version}."
+				log_super "Error: Downloaded macOS mintor update version of ${macos_mdm_version_prepared} doesn't match expected version ${macos_msu_version}."
+			fi
+		fi
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: push_macos_mdm_download_error is: ${push_macos_mdm_download_error}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
+		
+		# Handle workflow failure options.
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then # Install now workflow mode.
+			if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then # User authentication MDM failover option enabled.
+				log_super "Warning: Download/install of macOS via MDM failed, failing over to user authenticated workflow."
+				workflow_macos_auth="FAILOVER"
+				if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
+					workflow_download_macos
+				else # [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]
+					unset install_jamf_policy_triggers_option
+					workflow_install_active_user
+				fi
+				return 0
+			else # No user authentication MDM failover option.
+				log_super "Error: Download/install of macOS via MDM failed, install now workflow can not continue."
+				log_status "Inactive Error: Download/install of macOS via MDM failed, install now workflow can not continue."
+				[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
+				exit_error
+			fi
+		else # Default super workflow.
+			if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]]; then
+				log_super "Warning: Download/install of macOS via MDM failed, failing over to user authenticated workflow."
+				workflow_macos_auth="FAILOVER"
+				if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
+					workflow_download_macos
+				else # [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]
+					unset install_jamf_policy_triggers_option
+					workflow_install_active_user
+				fi
+				return 0
+			else # No current user, or no user authentication MDM failover option.
+				deferral_timer_minutes="${deferral_timer_error_minutes}"
+				log_super "Error: Download/install of macOS via MDM failed, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: Download/install of macOS via MDM failed, trying again in ${deferral_timer_minutes} minutes."
+				{ [[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_failed
+				set_auto_launch_deferral
+			fi
 		fi
 	fi
 }
@@ -8237,7 +8443,9 @@ workflow_install_no_user() {
 				fi
 			elif [[ "${workflow_macos_auth}" == "JAMF" ]]; then
 				[[ -n "${install_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
-				install_macos_mdm
+				push_macos_mdm_workflow="INSTALL"
+				push_macos_mdm
+				unset push_macos_mdm_workflow
 			else # Apple Silicon with no saved update/upgrade credentials can not enforce macOS upgrade/update.
 				log_super "Error: No saved Apple silicon credentials and no active logged in user."
 				workflow_install_macos_no_user_error="TRUE"
@@ -8314,12 +8522,12 @@ workflow_install_active_user() {
 			workflow_install_macos_active_user_error="TRUE"
 		fi
 		
-		# If (no errors) the MDM workflow is expected, first check for MDM service, bootstrap token, and possibly failover to user authentication workflow.
+		# If (no errors) an MDM workflow is expected, first check for MDM service, bootstrap token, and possibly failover to user authentication workflow.
 		if [[ "${workflow_install_macos_active_user_error}" == "FALSE" ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
 			check_mdm_service
 			if [[ "${auth_error_mdm}" == "TRUE" ]]; then
 				if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]] || [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'ERROR') -gt 0 ]] || { [[ "${workflow_install_now_active}" == "TRUE" ]] && [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'INSTALLNOW') -gt 0 ]]; }; then
-					log_super "Warning: MDM service is not available, failing over to user authenticated workflow."
+					log_super "Warning: MDM service is not available, failing over to user authenticated install workflow."
 					workflow_macos_auth="FAILOVER"
 				else
 					log_super "Error: Can not use MDM workflow because the MDM service is not available."
@@ -8329,7 +8537,7 @@ workflow_install_active_user() {
 				check_bootstrap_token_escrow
 				if [[ "${auth_error_bootstrap_token}" == "TRUE" ]]; then
 					if [[ "${auth_mdm_failover_to_user_status}" == "TRUE" ]] || [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'ERROR') -gt 0 ]] || { [[ "${workflow_install_now_active}" == "TRUE" ]] && [[ $(echo "${auth_mdm_failover_to_user_option}" | grep -c 'INSTALLNOW') -gt 0 ]]; }; then
-						log_super "Warning: Missing or invalid bootstrap token escrow, failing over to user authenticated workflow."
+						log_super "Warning: Missing or invalid bootstrap token escrow, failing over to user authenticated install workflow."
 						workflow_macos_auth="FAILOVER"
 					else
 						log_super "Error: Can not use MDM workflow because this computer's bootstrap token is not escrowed."
@@ -8345,16 +8553,16 @@ workflow_install_active_user() {
 				get_saved_authentication
 				if [[ "${auth_error_saved}" == "TRUE" ]]; then
 					if [[ "${auth_credential_failover_to_user_option}" == "TRUE" ]] || [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
-						log_super "Warning: Saved authentication error, failing over to user authenticated workflow."
+						log_super "Warning: Saved authentication error, failing over to user authenticated installation workflow."
 						workflow_macos_auth="FAILOVER"
 						[[ "${dialog_user_auth_valid}" != "TRUE" ]] && dialog_user_auth
 						[[ "${dialog_user_auth_error}" == "TRUE" ]] && workflow_install_macos_active_user_error="TRUE"
 					else
-						log_super "Error: Can not use saved authentication and the --auth-credential-failover-to-user option is not enabled."
+						log_super "Error: Unable to use saved authentication for installation and the --auth-credential-failover-to-user option is not enabled."
 						workflow_install_macos_active_user_error="TRUE"
 					fi
 				fi
-			else # Need to show user authentication dialog.
+			else # [[ "${workflow_macos_auth}" == "USER" ]] || [[ "${workflow_macos_auth}" == "FAILOVER" ]]
 				[[ "${dialog_user_auth_valid}" != "TRUE" ]] && dialog_user_auth
 				[[ "${dialog_user_auth_error}" == "TRUE" ]] && workflow_install_macos_active_user_error="TRUE"
 			fi
@@ -8380,7 +8588,9 @@ workflow_install_active_user() {
 				fi
 				notification_prepare
 				[[ -n "${install_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
-				install_macos_mdm
+				push_macos_mdm_workflow="INSTALL"
+				push_macos_mdm
+				unset push_macos_mdm_workflow
 			fi
 		fi
 	elif [[ "${workflow_target}" == "Non-system Software Updates" ]]; then
@@ -8452,6 +8662,11 @@ workflow_restart_validate() {
 	if [[ "${macos_installer_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "FALSE" ]]; then
 		log_super "Status: All available and enabled macOS software updates/upgrades completed!"
 		check_software_status_required="FALSE"
+	elif [[ "${macos_installer_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "TRUE" ]]; then
+		deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
+		log_super "Error: Some non-system macOS software updates remain available for installation, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: Some non-system macOS software updates remain available for installation, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
+		set_auto_launch_deferral
 	else
 		log_super "Warning: Some macOS software updates/upgrades did not complete after last restart, continuing workflow."
 	fi
@@ -8476,9 +8691,9 @@ workflow_restart_validate() {
 				"${JAMF_PRO_BINARY}" policy >/dev/null 2>&1
 			fi
 		else # There was an earlier Jamf Pro validation error.
-			deferral_timer_minutes="${deferral_timer_error_minutes}"
-			log_super "Error: Unable to submit inventory or perform check-in via Jamf Pro, trying again in ${deferral_timer_minutes} minutes."
-			log_status "Pending: Unable to submit inventory or perform check-in via Jamf Pro, trying again in ${deferral_timer_minutes} minutes."
+			deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
+			log_super "Error: Unable to submit inventory or perform check-in via Jamf Pro, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
+			log_status "Pending: Unable to submit inventory or perform check-in via Jamf Pro, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
 			set_auto_launch_deferral
 		fi
 	fi
@@ -9638,6 +9853,12 @@ dialog_user_choice() {
 	[[ -n "${deferral_timer_menu_minutes}" ]] && set_deferral_menu
 	[[ -z "${display_string_deferral_menu}" ]] && set_deferral_button
 	
+	# Provide logging for workflow conditions related to the ${scheduled_install_user_choice_option}.
+	if [[ "${scheduled_install_user_choice_option}" == "TRUE" ]] && { [[ "${workflow_target}" != "Non-system Software Updates" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers Without Restarting" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers With Restart" ]] && [[ "${workflow_target}" != "Restart Without Updates" ]]; } && { [[ "${workflow_auth_error}" == "TRUE" ]] || [[ "${workflow_macos_auth}" == "USER" ]]; } && { ! [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]]; }; then
+		log_super "Warning: The --scheduled-install-user-choice option requires valid saved authenticion. This option will not be show in the user choice dialog."
+		scheduled_install_user_choice_option="FALSE"
+	fi
+	
 	# Set the user choice buttons including handling of ${scheduled_install_user_choice_option}.
 	if [[ "${scheduled_install_user_choice_option}" == "TRUE" ]]; then
 		ibm_notifier_array+=(-main_button_label "${display_string_defer_button}" -secondary_button_label "${dialog_user_choice_now_button}" -tertiary_button_label "${dialog_user_choice_schedule_button}" -tertiary_button_cta_type exitlink -tertiary_button_cta_payload "")
@@ -9737,7 +9958,7 @@ dialog_user_schedule() {
 	
 	# Body text variations based on deadline options, also set ${display_accessory_datepicker_payload}.
 	local display_accessory_datepicker_start_epoch
-	display_accessory_datepicker_start_epoch=$((workflow_time_epoch + (deferral_timer_minutes * 60) + 1))
+	display_accessory_datepicker_start_epoch=$(($(date +%s) + (deferral_timer_minutes * 60) + 1))
 	local display_accessory_datepicker_start_date
 	display_accessory_datepicker_start_date=$(date -j -f %s "${display_accessory_datepicker_start_epoch}" +"%Y/%m/%d %H:%M:%S" | xargs)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_accessory_datepicker_start_date is: ${display_accessory_datepicker_start_date}"
@@ -9774,15 +9995,29 @@ dialog_user_schedule() {
 	# The ${dialog_return} contains the IBM Notifier.app return code. If the user selected a scheduled restart then prepare and call the set_scheduled_install_deferral() function or if the dialog timed out then set ${deferral_timer_minutes}.
 	case "${dialog_return}" in
 	0)
-		workflow_scheduled_install=$(echo "${dialog_response}" | sed -e 's/ /:/' -e 's/:[0-9][0-9]$//')
-		log_super "Status: User chose to schedule installation for: ${workflow_scheduled_install}"
+		local dialog_user_schedule_selection
+		dialog_user_schedule_selection=$(echo "${dialog_response}" | sed -e 's/ /:/' -e 's/:[0-9][0-9]$//')
+		local dialog_user_schedule_selection_epoch
+		dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${dialog_user_schedule_selection}:00" +%s)
+		local dialog_user_schedule_minimum_selection_epoch
+		dialog_user_schedule_minimum_selection_epoch=$(($(date +%s) + 121))
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection is: ${dialog_user_schedule_selection}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_epoch is: ${dialog_user_schedule_selection_epoch}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_minimum_selection_epoch is: ${dialog_user_schedule_minimum_selection_epoch}"
+		if [[ $dialog_user_schedule_selection_epoch -lt $dialog_user_schedule_minimum_selection_epoch ]];then
+			workflow_scheduled_install="$(date -r ${dialog_user_schedule_minimum_selection_epoch} +%Y-%m-%d:%H:%M)"
+			log_super "Warning: Adjusting user selected scheduled installation because it's in the past or less than two minutes from now."
+		else
+			workflow_scheduled_install="${dialog_user_schedule_selection}"
+		fi
+		log_super "Status: User chose to schedule installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}."
 		if [[ -n "${schedule_workflow_active_option}" ]]; then
 			set_schedule_workflow_active_adjustments
 			if [[ -n "${workflow_scheduled_install_adjusted}" ]]; then
 				workflow_scheduled_install="${workflow_scheduled_install_adjusted}"
-				[[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]] && log_super "Status: Setting new user selected scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of a workflow active time frame that closest matches the user's choice."
+				[[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]] && log_super "Status: Setting new user selected scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of a workflow active time frame that closest matches the user's choice."
 			else
-				log_super "Warning: The current user selected scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} is overriding the schedule workflow active option because no coordinating time frame could be resolved."
+				log_super "Warning: The current user selected scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} is overriding the schedule workflow active option because no coordinating time frame could be resolved."
 			fi
 		fi
 		defaults write "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall -string "${workflow_scheduled_install}"
@@ -9987,7 +10222,7 @@ dialog_user_auth() {
 		dialog_user_auth_button="${display_string_download_now_button}"
 	elif [[ "${dialog_user_auth_type}" == "SCHEDULE" ]]; then
 		dialog_user_auth_button="${display_string_schedule_restart_button}"
-	else # Default restart workflows.
+	else # Installation workflow.
 		dialog_user_auth_button="${display_string_restart_now_button}"
 	fi
 	
@@ -10262,25 +10497,33 @@ main() {
 			display_accessory_content="${display_accessory_default}"
 		fi
 	elif [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
-		workflow_target="${macos_msu_title} ${macos_msu_version}-${macos_msu_build}"
-		workflow_target_log_string="${workflow_target} MINOR UPDATE VIA SOFTWAREUPDATE"
-		if [[ -n "${display_accessory_macos_minor_update}" ]]; then
-			display_accessory_content="${display_accessory_macos_minor_update}"
-		elif [[ -n "${display_accessory_default}" ]]; then
-			display_accessory_content="${display_accessory_default}"
+		if [[ $(echo "${macos_msu_minor_update_target}" | grep -c '(') -gt 0 ]] && [[ "${install_rapid_security_responses_option}" != "TRUE" ]]; then
+			log_super "Warning: The default workflow ignores macOS Rapid Security Response (RSR) updates. Use the --install-rapid-security-responses option to always install macOS RSR updates as soon as they are available."
+		else
+			workflow_target="${macos_msu_title} ${macos_msu_version}-${macos_msu_build}"
+			workflow_target_log_string="${workflow_target} MINOR UPDATE VIA SOFTWAREUPDATE"
+			if [[ -n "${display_accessory_macos_minor_update}" ]]; then
+				display_accessory_content="${display_accessory_macos_minor_update}"
+			elif [[ -n "${display_accessory_default}" ]]; then
+				display_accessory_content="${display_accessory_default}"
+			fi
 		fi
 	elif [[ "${non_system_msu_targets}" == "TRUE" ]]; then
-		workflow_target="Non-system Software Updates"
-		workflow_target_log_string="NON-SYSTEM SOFTWARE UPDATES WITHOUT RESTARTING"
-		workflow_macos_auth="FALSE"
-		if [[ "${workflow_only_download_active}" == "TRUE" ]]; then
-			log_super "Warning: The --install-non-system-updates-without-restarting option is currently overriding the --only-download option."
-			workflow_only_download_active="FALSE"
-		fi
-		if [[ -n "${display_accessory_non_system_updates}" ]]; then
-			display_accessory_content="${display_accessory_non_system_updates}"
-		elif [[ -n "${display_accessory_default}" ]]; then
-			display_accessory_content="${display_accessory_default}"
+		if [[ "${install_non_system_updates_without_restarting_option}" != "TRUE" ]]; then
+			log_super "Warning: The default workflow ignores non-system software updates if there is no macOS update/upgrade available. Use the --install-non-system-updates-without-restarting option to always install non-system updates as soon as they are available."
+		else
+			workflow_target="Non-system Software Updates"
+			workflow_target_log_string="NON-SYSTEM SOFTWARE UPDATES WITHOUT RESTARTING"
+			workflow_macos_auth="FALSE"
+			if [[ "${workflow_only_download_active}" == "TRUE" ]]; then
+				log_super "Warning: The --install-non-system-updates-without-restarting option is currently overriding the --only-download option."
+				workflow_only_download_active="FALSE"
+			fi
+			if [[ -n "${display_accessory_non_system_updates}" ]]; then
+				display_accessory_content="${display_accessory_non_system_updates}"
+			elif [[ -n "${display_accessory_default}" ]]; then
+				display_accessory_content="${display_accessory_default}"
+			fi
 		fi
 	elif [[ "${install_jamf_policy_triggers_without_restarting_option}" == "TRUE" ]]; then
 		workflow_target="Jamf Pro Policy Triggers Without Restarting"
