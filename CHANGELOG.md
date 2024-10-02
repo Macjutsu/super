@@ -37,19 +37,19 @@
 ### Specific Changes (5.0.0-rc1)
 - New [IBM Notifier 3.2.1](https://github.com/IBM/mac-ibm-notifications/releases) is automatically installed. (Thanks to @SMartorelli for his dedication to the project!)
 - Initial draft of [the `super` v5.x beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki)!
-- Recreated [all example screenshots](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/) for `super` v5.x (also removed all previous screenshots).
+- Recreated [example screenshots](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/) for `super` v5.x (also removed all previous screenshots).
 - Updated [README page](https://github.com/Macjutsu/super/tree/5.0.0-rc1) for `super` v5.x.
 - If any deadline days option is specified, the calculated deadline date is now also saved to the local `super` preference file for reference. Thus allowing for additional `super` status collection via third party tools such as...
-- New [Jamf Pro Extension Attribute script to return the current `super` workflow target](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Workflow-Target-Jamf-Pro-EA.sh).
-- New [Jamf Pro Extension Attribute script to return the current `super` workflow zero date](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Workflow-Zero-Date-Jamf-Pro-EA.sh).
-- New [Jamf Pro Extension Attribute script to return the current `super` workflow scheduled install date and time](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Workflow-Scheduled-Install-Jamf-Pro-EA.sh).
-- New [Jamf Pro Extension Attribute script to return the current `super` workflow deadline days focus date](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Deadline-Days-Focus-Date-Jamf-Pro-EA.sh).
-- New [Jamf Pro Extension Attribute script to return the current `super` workflow deadline days soft date](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Deadline-Days-Soft-Date-Jamf-Pro-EA.sh).
-- New [Jamf Pro Extension Attribute script to return the current `super` workflow deadline days hard date](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Deadline-Days-Hard-Date-Jamf-Pro-EA.sh).
+- New [Jamf Pro Extension Attribute script to return the current `super` workflow target](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
+- New [Jamf Pro Extension Attribute script to return the current `super` workflow zero date](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
+- New [Jamf Pro Extension Attribute script to return the current `super` workflow scheduled install date and time](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
+- New [Jamf Pro Extension Attribute script to return the current `super` workflow deadline days focus date](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
+- New [Jamf Pro Extension Attribute script to return the current `super` workflow deadline days soft date](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
+- New [Jamf Pro Extension Attribute script to return the current `super` workflow deadline days hard date](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
 - Resolved an issue where resetting workflow items was running too often.
 - Added logging to indicate that specifying "DIALOG" for the `--display-hide-progress-bar` and `--display-notifications-centered` options will be ignored.
 - Updated documentation no longer includes "DIALOG" for the `--display-hide-progress-bar` and `--display-notifications-centered` options.
-- Updated [Jamf Pro Extension Attribute script to return the current `super` workflow next auto launch date and time](https://github.com/Macjutsu/super/blob5.0.0-rc1/Super-Friends/super-Next-Auto-Launch-Jamf-Pro-EA.sh).
+- Updated [Jamf Pro Extension Attribute script to return the current `super` workflow next auto launch date and time](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends).
 - `super` [5.0.0-rc1 SHA-256: 84532f9b0c67f65253206cbea28efd65a4f2fa6a9984db54a6d31b7c359cf691](https://github.com/Macjutsu/super/blob/5.0.0-rc1/super.checksum.txt)
 
 ### Specific Changes (5.0.0-beta5)
