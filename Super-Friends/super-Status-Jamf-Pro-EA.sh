@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script returns the super status to Jamf inventory as reported by super 3.0 or later.
+# This script returns the super status to Jamf inventory as reported by super version 3.0 or later.
 # Make sure to set the Extension Attribute Data Type to "String".
 # https://github.com/Macjutsu/super
 # by Kevin M. White

@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.0.0-beta5"
+SUPER_VERSION="5.0.0-rc1"
 readonly SUPER_VERSION
-SUPER_DATE="2024/09/22"
+SUPER_DATE="2024/10/02"
 readonly SUPER_DATE
 
 # MARK: *** Documentation ***
@@ -88,8 +88,8 @@ show_usage() {
   [--display-unmovable=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
   [--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
   [--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
-  [--display-hide-progress-bar=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
-  [--display-notifications-centered=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
+  [--display-hide-progress-bar=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
+  [--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
   
   Display Interface Options:
   [--display-icon-size=pixels]  [--display-icon-file=/local/path or URL]
@@ -177,9 +177,9 @@ show_usage() {
   <key>DisplaySilently</key>
   <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplayHideProgressBar</key>
-  <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
+  <string>ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplayNotificationsCentered</key>
-  <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
+  <string>ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplayIconSize</key> <string>pixels</string>
   <key>DisplayIconFile</key> <string>path</string>
   <key>DisplayIconLightFile</key> <string>path</string>
@@ -341,11 +341,11 @@ set_defaults() {
 	# IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the jamf binary.
 	
 	# URL to the IBM Notifier.app download:
-	IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.1.0-b-110/IBM.Notifier.zip"
+	IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.2.1-b-127/IBM.Notifier.zip"
 	readonly IBM_NOTIFIER_DOWNLOAD_URL
 	
 	# Target version for IBM Notifier.app:
-	IBM_NOTIFIER_TARGET_VERSION="3.1.0"
+	IBM_NOTIFIER_TARGET_VERSION="3.2.1"
 	readonly IBM_NOTIFIER_TARGET_VERSION
 	
 	# Path to the local IBM Notifier.app:
@@ -2362,6 +2362,7 @@ manage_parameter_options() {
 				log_super "Parameter Error: Unrecognized --display-hide-progress-bar type of ${option_type}. You can only specify the following types separated by commas (no spaces): ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"
 				option_error="TRUE"
 			fi
+			[[ "${option_type}" == "DIALOG" ]] && log_super "Parameter Warning: The --display-hide-progress-bar type of DIALOG is ignored because interactive dialogs don't have progress bars'."
 		done
 		IFS="${previous_ifs}"
 		[[ "${option_error}" != "TRUE" ]] && defaults write "${SUPER_LOCAL_PLIST}" DisplayHideProgressBar -string "${display_hide_progress_bar_option}"
@@ -2381,9 +2382,10 @@ manage_parameter_options() {
 		read -r -a display_notifications_centered_array <<<"${display_notifications_centered_option}"
 		for option_type in "${display_notifications_centered_array[@]}"; do
 			if ! [[ "${option_type}" =~ ${REGEX_WORKFLOW_OPTIONS} ]]; then
-				log_super "Parameter Error: Unrecognized --display-notifications-centered type of ${option_type}. You can only specify the following types separated by commas (no spaces): ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"
+				log_super "Parameter Error: Unrecognized --display-notifications-centered type of ${option_type}. You can only specify the following types separated by commas (no spaces): ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"
 				option_error="TRUE"
 			fi
+			[[ "${option_type}" == "DIALOG" ]] && log_super "Parameter Warning: The --display-notifications-centered type of DIALOG is ignored because dialogs are not notifcations."
 		done
 		IFS="${previous_ifs}"
 		[[ "${option_error}" != "TRUE" ]] && defaults write "${SUPER_LOCAL_PLIST}" DisplayNotificationsCentered -string "${display_notifications_centered_option}"
@@ -4626,17 +4628,20 @@ check_bootstrap_token_escrow() {
 
 # Delete the deadline counters in ${SUPER_LOCAL_PLIST} to reset the counters.
 reset_deadline_counters() {
-	log_super "Status: Resetting all deadline counters."
+	log_super "Status: Resetting any deadline counters."
 	defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterFocus 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterSoft 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" DeadlineCounterHard 2>/dev/null
 }
 
-# Delete any automatic zero dates in ${SUPER_LOCAL_PLIST} to reset automatic zero dates.
-reset_schedule_zero_date_automatic() {
-	log_super "Status: Resetting automatic zero date."
+# Delete any automatic zero dates and associated cached dates in ${SUPER_LOCAL_PLIST}.
+reset_schedule_zero_date() {
+	log_super "Status: Resetting any workflow dates."
 	defaults delete "${SUPER_LOCAL_PLIST}" ScheduleZeroDateAutomaticRelease 2>/dev/null
 	defaults delete "${SUPER_LOCAL_PLIST}" ScheduleZeroDateAutomaticStart 2>/dev/null
+	defaults delete "${SUPER_LOCAL_PLIST}" DeadlineDaysFocusDate 2>/dev/null
+	defaults delete "${SUPER_LOCAL_PLIST}" DeadlineDaysSoftDate 2>/dev/null
+	defaults delete "${SUPER_LOCAL_PLIST}" DeadlineDaysHardDate 2>/dev/null
 }
 
 # Evaluate ${schedule_workflow_active_option} and set ${workflow_time_weekday}, ${schedule_workflow_active_array}, and ${schedule_workflow_active_deferral} accordingly.
@@ -5385,6 +5390,7 @@ check_deadlines_days_date() {
 	if [[ -n "${deadline_days_focus}" ]]; then
 		local deadline_days_focus_date
 		deadline_days_focus_date=$(date -r $((schedule_zero_date_epoch + (deadline_days_focus * 86400))) +%Y-%m-%d)
+		defaults write "${SUPER_LOCAL_PLIST}" DeadlineDaysFocusDate -string "${deadline_days_focus_date}"
 		local deadline_days_focus_epoch
 		deadline_days_focus_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${deadline_days_focus_date}:00:00:00" +%s)
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_days_focus_epoch: ${deadline_days_focus_epoch}"
@@ -5408,6 +5414,7 @@ check_deadlines_days_date() {
 	if [[ -n "${deadline_days_soft}" ]]; then
 		local deadline_days_soft_date
 		deadline_days_soft_date=$(date -r $((schedule_zero_date_epoch + (deadline_days_soft * 86400))) +%Y-%m-%d)
+		defaults write "${SUPER_LOCAL_PLIST}" DeadlineDaysSoftDate -string "${deadline_days_soft_date}"
 		local deadline_days_soft_epoch
 		deadline_days_soft_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${deadline_days_soft_date}:00:00:00" +%s)
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_days_soft_epoch: ${deadline_days_soft_epoch}"
@@ -5431,6 +5438,7 @@ check_deadlines_days_date() {
 	if [[ -n "${deadline_days_hard}" ]]; then
 		local deadline_days_hard_date
 		deadline_days_hard_date=$(date -r $((schedule_zero_date_epoch + (deadline_days_hard * 86400))) +%Y-%m-%d)
+		defaults write "${SUPER_LOCAL_PLIST}" DeadlineDaysHardDate -string "${deadline_days_hard_date}"
 		local deadline_days_hard_epoch
 		deadline_days_hard_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${deadline_days_hard_date}:00:00:00" +%s)
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_days_hard_epoch: ${deadline_days_hard_epoch}"
@@ -7478,7 +7486,7 @@ install_macos_msu() {
 		fi
 		# Reset various items after test macOS update is complete.
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
+		reset_schedule_zero_date
 		reset_deadline_counters
 		return 0
 	fi
@@ -7684,7 +7692,7 @@ install_macos_app() {
 		fi
 		# Reset various items after test macOS update is complete.
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
+		reset_schedule_zero_date
 		reset_deadline_counters
 		return 0
 	fi
@@ -7819,7 +7827,7 @@ push_macos_mdm() {
 		fi
 		# Reset various items after test macOS update is complete.
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
+		reset_schedule_zero_date
 		reset_deadline_counters
 		return 0
 	fi
@@ -10381,7 +10389,7 @@ main() {
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowTarget 2>/dev/null
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
+		reset_schedule_zero_date
 		reset_deadline_counters
 		# Handle the ${workflow_reset_super_after_completion_active} workflow option.
 		if [[ "${workflow_reset_super_after_completion_active}" == "TRUE" ]]; then
@@ -10401,7 +10409,7 @@ main() {
 	fi
 	
 	# If requested then reset various counters.
-	{ [[ "${scheduled_install_delete_all_option}" == "TRUE" ]] || [[ "${deadline_days_restart_all_option}" == "TRUE" ]]; } && reset_schedule_zero_date_automatic
+	{ [[ "${scheduled_install_delete_all_option}" == "TRUE" ]] || [[ "${deadline_days_restart_all_option}" == "TRUE" ]]; } && reset_schedule_zero_date
 	[[ "${deadline_count_restart_all_option}" == "TRUE" ]] && reset_deadline_counters
 	
 	# Check for software update/upgrades workflow.
@@ -10584,7 +10592,7 @@ main() {
 	else # No software updates/upgrade needed so reset any leftovers.
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowTarget 2>/dev/null
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
+		reset_schedule_zero_date
 		reset_deadline_counters
 	fi
 	
@@ -10709,9 +10717,11 @@ main() {
 		log_super "Exit: System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
 		log_status "Pending: System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
 	else # The super workflow completed but not for a macOS update/upgrade workflow.
-		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
-		reset_schedule_zero_date_automatic
-		reset_deadline_counters
+		if [[ "${workflow_target}" != "FALSE" ]]; then
+			defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
+			reset_schedule_zero_date
+			reset_deadline_counters
+		fi
 		# Wrap-up for the ${workflow_install_now_active} if there were no updates/upgrades.
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
 			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_up_to_date
