@@ -1,8 +1,0 @@
-Wed May 03 15:37:28 ASVM-13-0 super[2620]: **** S.U.P.E.R.M.A.N. 3.0b11 UPDATE MACOS 13.3.1 (a) MDM START ****
-Filtering the log data using "process == "softwareupdated" AND composedMessage CONTAINS "Reported progress""
-Timestamp               Ty Process[PID:TID]
-2023-05-03 15:43:05.009 Df softwareupdated[5145:5fa6] [com.apple.SoftwareUpdateMacController:SU] [SUMacControllerProgressManager] Reported progress (start): phase:ACCEPTED stalled:NO portionComplete:0.001000 estimatedTimeRemaining:-1.000000
-2023-05-03 15:43:05.010 Df softwareupdated[5145:5fa6] [com.apple.SoftwareUpdateMacController:SU] [SUMacControllerProgressManager] Reported progress (start): phase:PREPARED_COMMITTING_STASH stalled:NO portionComplete:0.010000 estimatedTimeRemaining:-1.000000
-2023-05-03 15:43:05.016 Df softwareupdated[5145:5fa6] [com.apple.SoftwareUpdateMacController:SU] [SUMacControllerProgressManager] Reported progress (inter): phase:PREPARED_COMMITTING_STASH stalled:NO portionComplete:0.504500 estimatedTimeRemaining:-1.000000
-Wed May 03 15:43:05 ASVM-13-0 super[2620]: **** TIMESTAMP ****
-Wed May 03 15:43:05 ASVM-13-0 super[2620]: **** S.U.P.E.R.M.A.N. 3.0b11 UPDATE/UPGRADE MACOS MDM COMPLETED ****
