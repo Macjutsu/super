@@ -11,7 +11,7 @@
     <key>PayloadIdentifier</key>
     <string>D819E6B3-72BA-4202-874D-FE7C6783C984</string>
     <key>PayloadDisplayName</key>
-    <string>S.U.P.E.R.M.A.N. All Settings Example</string>
+    <string>super | All Settings Example</string>
     <key>PayloadDescription</key>
     <string>This is an example of all possible super managed preferences. DO NOT DEPLOY. THIS EXAMPLE CONTAINS CONFLICTING SETTINGS THAT WILL CAUSE ERRORS IF DEPLOYED.</string>
     <key>PayloadVersion</key>
@@ -53,9 +53,9 @@
                   <key>AuthJamfComputerID</key>
                   <string>$JSSID</string>
                   <key>AuthJamfCustomURL</key>
-                  <string>https://jamf-api.domain.com</string>
+                  <string>https://jamf-api.example.domain.com</string>
                   <key>AuthMDMFailoverToUser</key>
-                  <string>NOSERVICE,BOOTSTRAP</string>
+                  <string>ERROR</string>
                   <key>DeadlineCountFocus</key>
                   <string>5</string>
                   <key>DeadlineCountHard</key>
@@ -90,45 +90,77 @@
                   <string>600</string>
                   <key>DialogTimeoutPowerRequired</key>
                   <string>600</string>
-                  <key>DialogTimeoutRestartOrDefer</key>
-                  <string>600</string>
                   <key>DialogTimeoutSoftDeadline</key>
                   <string>600</string>
                   <key>DialogTimeoutUserAuth</key>
                   <string>600</string>
+                  <key>DialogTimeoutUserChoice</key>
+                  <string>600</string>
+                  <key>DialogTimeoutUserSchedule</key>
+                  <string>600</string>
                   <key>DisplayAccessoryDefaultFile</key>
                   <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+                  <key>DisplayAccessoryJamfPolicyTriggersFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryMacOSMajorUpgradeFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryMacOSMinorUpdateFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryNonSystemUpdatesFile</key>
+                  <string>path or URL</string>
+                  <key>DisplayAccessoryRestartWithoutUpdatesFile</key>
+                  <string>path or URL</string>
                   <key>DisplayAccessoryType</key>
                   <string>HTML</string>
-                  <key>DisplayAccessoryUpdateFile</key>
-                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-                  <key>DisplayAccessoryUpgradeFile</key>
-                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-                  <key>DisplayAccessoryUserAuthFile</key>
-                  <string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
                   <key>DisplayHelpButtonString</key>
                   <string>https://support.apple.com/en-us/HT201541</string>
                   <key>DisplayHideBackground</key>
-                  <string>HARD,POWER</string>
+                  <string>DEADLINE,INSTALLNOW</string>
+                  <key>DisplayHideProgressBar</key>
+                  <string>DEADLINE,INSTALLNOW</string>
+                  <key>DisplayIconDarkFile</key>
+                  <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconFile</key>
+                  <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
+                  <key>DisplayIconLightFile</key>
                   <string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
                   <key>DisplayIconSize</key>
                   <string>128</string>
                   <key>DisplayNotificationsCentered</key>
-                  <string>HARD,INSTALLNOW</string>
+                  <string>DEADLINE,INSTALLNOW</string>
                   <key>DisplaySilently</key>
                   <string>INSTALLNOW</string>
                   <key>DisplayUnmovable</key>
                   <string>ALWAYS</string>
                   <key>DisplayWarningButtonString</key>
                   <string>https://support.apple.com/en-us/HT201222</string>
+                  <key>InstallJamfPolicyTriggers</key>
+                  <string>trigger1,trigger2,trigger3</string>
+                  <key>InstallJamfPolicyTriggersWithoutRestarting</key>
+                  <true/>
                   <key>InstallMacOSMajorUpgrades</key>
                   <true/>
                   <key>InstallMacOSMajorVersionTarget</key>
-                  <string>13</string>
+                  <string>14</string>
                   <key>InstallNonSystemUpdatesWithoutRestarting</key>
                   <true/>
                   <key>InstallRapidSecurityResponses</key>
+                  <true/>
+                  <key>ScheduleWorkflowActive</key>
+                  <string>TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00</string>
+                  <key>ScheduleZeroDateManual</key>
+                  <string>2023-09-21:00:00</string>
+                  <key>ScheduleZeroDateRelease</key>
+                  <true/>
+                  <key>ScheduleZeroDateSOFACustomURL</key>
+                  <string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
+                  <key>ScheduledInstallDate</key>
+                  <string>2023-09-21:00:00</string>
+                  <key>ScheduledInstallDays</key>
+                  <string>3</string>
+                  <key>ScheduledInstallReminder</key>
+                  <string>15,60,240,1440</string>
+                  <key>ScheduledInstallUserChoice</key>
                   <true/>
                   <key>TestBatteryLevel</key>
                   <string>75</string>
@@ -143,17 +175,15 @@
                   <key>VerboseMode</key>
                   <true/>
                   <key>WorkflowDisableRelaunch</key>
-                  <false/>
+                  <true/>
                   <key>WorkflowDisableUpdateCheck</key>
-                  <false/>
-                  <key>WorkflowJamfPolicyTriggers</key>
-                  <string>trigger1,trigger2,trigger3</string>
+                  <true/>
+                  <key>WorkflowInstallNow</key>
+                  <true/>
                   <key>WorkflowOnlyDownload</key>
-                  <false/>
+                  <true/>
                   <key>WorkflowRestartWithoutUpdates</key>
-                  <false/>
-                  <key>WorkflowZeroDateManual</key>
-                  <string>2023-09-19:14:45</string>
+                  <true/>
                 </dict>
               </dict>
             </array>

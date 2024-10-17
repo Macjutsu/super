@@ -7,23 +7,25 @@
 	<key>InstallMacOSMajorUpgrades</key>
 	<true/>
 	<key>InstallMacOSMajorVersionTarget</key>
-	<string>13</string>
+	<string>14</string>
 	<key>InstallRapidSecurityResponses</key>
 	<true/>
 	<key>InstallNonSystemUpdatesWithoutRestarting</key>
 	<true/>
-	<key>WorkflowOnlyDownload</key>
-	<false/>
-	<key>WorkflowZeroDateManual</key>
-	<string>2023-09-19:14:45</string>
-	<key>WorkflowDisableUpdateCheck</key>
-	<false/>
-	<key>WorkflowDisableRelaunch</key>
-	<false/>
-	<key>WorkflowJamfPolicyTriggers</key>
+	<key>InstallJamfPolicyTriggers</key>
 	<string>trigger1,trigger2,trigger3</string>
+	<key>InstallJamfPolicyTriggersWithoutRestarting</key>
+	<true/>
+	<key>WorkflowInstallNow</key>
+	<true/>
+	<key>WorkflowOnlyDownload</key>
+	<true/>
 	<key>WorkflowRestartWithoutUpdates</key>
-	<false/>
+	<true/>
+	<key>WorkflowDisableUpdateCheck</key>
+	<true/>
+	<key>WorkflowDisableRelaunch</key>
+	<true/>
 	<key>DeferralTimerDefault</key>
 	<string>60</string>
 	<key>DeferralTimerMenu</key>
@@ -34,6 +36,22 @@
 	<string>60</string>
 	<key>DeferralTimerWorkflowRelaunch</key>
 	<string>360</string>
+	<key>ScheduleWorkflowActive</key>
+	<string>TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00</string>
+	<key>ScheduleZeroDateRelease</key>
+	<true/>
+	<key>ScheduleZeroDateSOFACustomURL</key>
+	<string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
+	<key>ScheduleZeroDateManual</key>
+	<string>2023-09-21:00:00</string>
+	<key>ScheduledInstallDays</key>
+	<string>3</string>
+	<key>ScheduledInstallDate</key>
+	<string>2023-09-21:00:00</string>
+	<key>ScheduledInstallUserChoice</key>
+	<true/>
+	<key>ScheduledInstallReminder</key>
+	<string>15,60,240,1440</string>
 	<key>DeadlineCountFocus</key>
 	<string>5</string>
 	<key>DeadlineCountSoft</key>
@@ -54,11 +72,13 @@
 	<string>2023-09-27:00:00</string>
 	<key>DialogTimeoutDefault</key>
 	<string>600</string>
-	<key>DialogTimeoutRestartOrDefer</key>
+	<key>DialogTimeoutUserAuth</key>
+	<string>600</string>
+	<key>DialogTimeoutUserChoice</key>
+	<string>600</string>
+	<key>DialogTimeoutUserSchedule</key>
 	<string>600</string>
 	<key>DialogTimeoutSoftDeadline</key>
-	<string>600</string>
-	<key>DialogTimeoutUserAuth</key>
 	<string>600</string>
 	<key>DialogTimeoutInsufficientStorage</key>
 	<string>600</string>
@@ -67,24 +87,34 @@
 	<key>DisplayUnmovable</key>
 	<string>ALWAYS</string>
 	<key>DisplayHideBackground</key>
-	<string>HARD,POWER</string>
+	<string>DEADLINE,INSTALLNOW</string>
 	<key>DisplaySilently</key>
 	<string>INSTALLNOW</string>
+	<key>DisplayHideProgressBar</key>
+	<string>DEADLINE,INSTALLNOW</string>
 	<key>DisplayNotificationsCentered</key>
-	<string>HARD,INSTALLNOW</string>
-	<key>DisplayIconFile</key>
-	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
+	<string>DEADLINE,INSTALLNOW</string>
 	<key>DisplayIconSize</key>
 	<string>128</string>
+	<key>DisplayIconFile</key>
+	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
+	<key>DisplayIconLightFile</key>
+	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
+	<key>DisplayIconDarkFile</key>
+	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
 	<key>DisplayAccessoryType</key>
 	<string>HTML</string>
 	<key>DisplayAccessoryDefaultFile</key>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryUpdateFile</key>
+	<key>DisplayAccessoryMacOSMinorUpdateFile</key> <string>path or URL</string>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryUpgradeFile</key>
+	<key>DisplayAccessoryMacOSMajorUpgradeFile</key> <string>path or URL</string>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryUserAuthFile</key>
+	<key>DisplayAccessoryNonSystemUpdatesFile</key> <string>path or URL</string>
+	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+	<key>DisplayAccessoryJamfPolicyTriggersFile</key> <string>path or URL</string>
+	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+	<key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
 	<key>DisplayHelpButtonString</key>
 	<string>https://support.apple.com/en-us/HT201541</string>
@@ -93,11 +123,11 @@
 	<key>AuthAskUserToSavePassword</key>
 	<true/>
 	<key>AuthJamfCustomURL</key>
-	<string>https://jamf-api.domain.com</string>
+	<string>https://jamf-api.example.domain.com</string>
 	<key>AuthCredentialFailoverToUser</key>
 	<true/>
 	<key>AuthMDMFailoverToUser</key>
-	<string>NOSERVICE,BOOTSTRAP</string>
+	<string>ERROR</string>
 	<key>TestMode</key>
 	<true/>
 	<key>TestModeTimeout</key>

@@ -2,15 +2,25 @@
 
 ### Software Update Policy Enforcement (with) Recursive Messaging And Notification
 
-S.U.P.E.R.M.A.N. optimizes the macOS software upgrade and upgrade experience.
+S.U.P.E.R.M.A.N. optimizes the macOS update experience.
 
 by Kevin M. White
 
-### Please use [the newest version of `super`](https://github.com/Macjutsu/super/releases) for the best experience when using or upgrading to macOS 15 Sequoia. Older versions of `super` are not tested against macOS 15 Sequioa update/upgrade workflows.
+### Please use [the newest version of `super`](https://github.com/Macjutsu/super/releases) for the best experience when using or upgrading to macOS 15 Sequoia. Older versions of `super` are not tested against macOS 15 Sequoia.
 
 ## Introduction
 
-S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides administrators with a comprehensive workflow to encourage and enforce macOS software updates or upgrades for both Intel and Apple silicon Mac computers. Deployed using a single script and optional configuration profile, `super` creates a background agent (aka LaunchDaemon) that ensures software updates are applied with the least user interference possible. Further, `super` can also enforce software updates with options for customizable deferrals and deadlines. In other words, `super` makes the macOS update or upgrade experience better for both users and administrators.
+S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides administrators with a comprehensive solution to encourage and enforce [macOS minor updates, macOS major upgrades,](https://support.apple.com/guide/deployment/about-software-updates-depc4c80847a) [Jamf Pro Policies,](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Policies.html) or enforced system restarts. Deployed using a single script and optional configuration profiles, `super` creates a background agent (aka LaunchDaemon) that ensures updates are applied with the least user interference possible. Further, `super` offers a broad range of options for customizable dialogs, notifications, schedules, deferrals, and deadlines. In other words, `super` makes the macOS update experience better for both users and administrators.
+
+## Screenshots
+
+__A `super` macOS update dialog with multiple options__
+
+![The `super` macOS update dialog](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/Example-macOS-Update-Dialog.png)
+
+__A `super` macOS update restart notification__
+
+![The `super` macOS update restart notification](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/Example-macOS-Restart-Notification.png)
 
 ## Learn More
 
