@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.0.0-rc1"
+SUPER_VERSION="5.0.0"
 readonly SUPER_VERSION
-SUPER_DATE="2024/10/02"
+SUPER_DATE="2024/10/17"
 readonly SUPER_DATE
 
 # MARK: *** Documentation ***
@@ -383,8 +383,8 @@ set_defaults() {
 	# IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the managed software update settings property list file.
 	
 	# Path to the managed preference file that would contain any software update deferral restrictions:
-	APLICATION_ACCESS_MANAGED_PLIST="/Library/Managed Preferences/com.apple.applicationaccess" # No trailing ".plist"
-	readonly APLICATION_ACCESS_MANAGED_PLIST
+	APPLICATION_ACCESS_MANAGED_PLIST="/Library/Managed Preferences/com.apple.applicationaccess" # No trailing ".plist"
+	readonly APPLICATION_ACCESS_MANAGED_PLIST
 	# IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the software update deferral restrictions property list file.
 	
 	# The default number of minutes to defer the super workflow (except for the relaunch workflow deferral timer).
@@ -398,6 +398,10 @@ set_defaults() {
 	# The default number of minutes to defer the super restart validation workflow if there is a workflow error.
 	DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES=5
 	readonly DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES
+	
+	# The the minimum number of minutes in the future a user can select a scheduled install.
+	DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES=2
+	readonly DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES
 	
 	# Default icon size for dialogs and notifications.
 	DISPLAY_ICON_DEFAULT_SIZE=96
@@ -5766,7 +5770,6 @@ check_deadlines_count() {
 # This function checks the validity of software updates/upgrade caches.
 check_software_update_status_cached() {
 	check_software_status_required="FALSE"
-	deferral_restrictions="FALSE"
 	macos_beta_program="FALSE"
 	mdmclient_available="FALSE"
 	mdmclient_list="FALSE"
@@ -5787,18 +5790,15 @@ check_software_update_status_cached() {
 	fi
 	
 	# Check macOS deferral restrictions cache.
-	local deferral_restrictions_checksum_cache
-	deferral_restrictions_checksum_cache=$(defaults read "${SUPER_LOCAL_PLIST}" DeferralRestrictionsChecksum 2>/dev/null)
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions_checksum_cache is: ${deferral_restrictions_checksum_cache}"
-	if { [[ "${deferral_restrictions_checksum_cache}" == "0" ]] && [[ ! -f "${APLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; } || [[ "${deferral_restrictions_checksum_cache}" == "$(md5 -q "${APLICATION_ACCESS_MANAGED_PLIST}.plist" 2>/dev/null)" ]]; then
-		local deferral_restrictions_cache
-		deferral_restrictions_cache=$(defaults read "${SUPER_LOCAL_PLIST}" DeferralRestrictionsCache 2>/dev/null)
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions_cache is: ${deferral_restrictions_cache}"
-		if [[ -n "${deferral_restrictions_cache}" ]]; then
-			if [[ "${deferral_restrictions_cache}" == "1" ]]; then
-				log_super "Status: This system is currently configured with software update deferral restrictions."
-				deferral_restrictions="TRUE"
-			fi
+	local restrictions_deferral_checksum_cache
+	restrictions_deferral_checksum_cache=$(defaults read "${SUPER_LOCAL_PLIST}" DeferralRestrictionsChecksum 2>/dev/null)
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: restrictions_deferral_checksum_cache is: ${restrictions_deferral_checksum_cache}"
+	if { [[ "${restrictions_deferral_checksum_cache}" == "0" ]] && [[ ! -f "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; } || [[ "${restrictions_deferral_checksum_cache}" == "$(md5 -q "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" 2>/dev/null)" ]]; then
+		local restrictions_deferral_cache
+		restrictions_deferral_cache=$(defaults read "${SUPER_LOCAL_PLIST}" DeferralRestrictionsCache 2>/dev/null)
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: restrictions_deferral_cache is: ${restrictions_deferral_cache}"
+		if [[ -n "${restrictions_deferral_cache}" ]]; then
+			check_restrictions_deferral
 		else
 			log_super "Status: No deferral restrictions cache, full software status check required."
 			check_software_status_required="TRUE"
@@ -5809,7 +5809,6 @@ check_software_update_status_cached() {
 		check_software_status_required="TRUE"
 		return 0
 	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions is: ${deferral_restrictions}"
 	
 	# Check macOS beta program status cache.
 	local macos_beta_program_cache
@@ -5887,7 +5886,9 @@ check_software_update_status_cached() {
 # This function clears any cached update/upgrade information except for the SOFA cache (because SOFA has it's own cache mechanism).
 reset_software_update_status() {
 	# Non-local get_*_list() parameters.
-	deferral_restrictions="FALSE"
+	restrictions_deferral_macOS_minor_updates="FALSE"
+	restrictions_deferral_macOS_major_upgrades="FALSE"
+	restrictions_deferral_non_system_updates="FALSE"
 	macos_beta_program="FALSE"
 	mdmclient_available="FALSE"
 	mdmclient_list="FALSE"
@@ -5924,24 +5925,43 @@ reset_software_update_status() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Local preference file after reset_software_update_status: ${SUPER_LOCAL_PLIST}:\n$(defaults read "${SUPER_LOCAL_PLIST}" 2>/dev/null)"
 }
 
-# Check for software update deferral restrictions and set ${deferral_restrictions} accordingly.
-check_deferral_restrictions() {
-	deferral_restrictions="FALSE"
-	if [[ -f "${APLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; then
-		defaults write "${SUPER_LOCAL_PLIST}" DeferralRestrictionsChecksum -string "$(md5 -q "${APLICATION_ACCESS_MANAGED_PLIST}.plist" 2>/dev/null)"
-		local deferral_restrictions_response
-		deferral_restrictions_response=$(defaults read "${APLICATION_ACCESS_MANAGED_PLIST}" 2>&1)
+# Check for restrictions configuration profile deferrals and set ${restrictions_deferral_macOS_minor_updates}, ${restrictions_deferral_macOS_major_upgrades}, and ${restrictions_deferral_non_system_updates} accordingly.
+check_restrictions_deferral() {
+	restrictions_deferral_macOS_major_upgrades="FALSE"
+	restrictions_deferral_macOS_minor_updates="FALSE"
+	restrictions_deferral_non_system_updates="FALSE"
+	if [[ -f "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; then
+		defaults write "${SUPER_LOCAL_PLIST}" DeferralRestrictionsChecksum -string "$(md5 -q "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" 2>/dev/null)"
+		local restrictions_deferral_response
+		restrictions_deferral_response=$(defaults read "${APPLICATION_ACCESS_MANAGED_PLIST}" 2>&1 | grep -E 'enforcedSoftware|forceDelayed' | tr -d ';')
 	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions_response is:\n${deferral_restrictions_response}"
-	if [[ $(echo "${deferral_restrictions_response}" | grep -c -E 'enforcedSoftware|forceDelayed') -gt 0 ]]; then
-		log_super "Status: This system is currently configured with software update deferral restrictions."
-		deferral_restrictions="TRUE"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: restrictions_deferral_response is:\n${restrictions_deferral_response}"
+	if [[ -n "${restrictions_deferral_response}" ]]; then
 		defaults write "${SUPER_LOCAL_PLIST}" DeferralRestrictionsCache -bool true
+		if [[ $(echo "${restrictions_deferral_response}" | awk '/forceDelayedMajorSoftwareUpdates/ {print $3}') -gt 0 ]]; then
+			restrictions_deferral_macOS_major_upgrades=30
+			[[ $(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateMajorOSDeferredInstallDelay/ {print $3}') -gt 0 ]] && restrictions_deferral_macOS_major_upgrades=$(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateMajorOSDeferredInstallDelay/ {print $3}')
+			log_super "Status: Restrictions configuration profile is deferring macOS major upgrades for ${restrictions_deferral_macOS_major_upgrades} days."
+		fi
+		if [[ $(echo "${restrictions_deferral_response}" | awk '/forceDelayedSoftwareUpdates/ {print $3}') -gt 0 ]]; then
+			restrictions_deferral_macOS_minor_updates=30
+			[[ $(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateDelay/ {print $3}') -gt 0 ]] && restrictions_deferral_macOS_minor_updates=$(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateDelay/ {print $3}')
+			[[ $(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateMinorOSDeferredInstallDelay/ {print $3}') -gt 0 ]] && restrictions_deferral_macOS_minor_updates=$(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateMinorOSDeferredInstallDelay/ {print $3}')
+			log_super "Status: Restrictions configuration profile is deferring macOS minor updates for ${restrictions_deferral_macOS_minor_updates} days."
+		fi
+		if [[ $(echo "${restrictions_deferral_response}" | awk '/forceDelayedAppSoftwareUpdates/ {print $3}') -gt 0 ]]; then
+			restrictions_deferral_non_system_updates=30
+			[[ $(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateDelay/ {print $3}') -gt 0 ]] && restrictions_deferral_non_system_updates=$(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateDelay/ {print $3}')
+			[[ $(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateNonOSDeferredInstallDelay/ {print $3}') -gt 0 ]] && restrictions_deferral_non_system_updates=$(echo "${restrictions_deferral_response}" | awk '/enforcedSoftwareUpdateNonOSDeferredInstallDelay/ {print $3}')
+			log_super "Status: Restrictions configuration profile is deferring non-system updates for ${restrictions_deferral_non_system_updates} days."
+		fi
 	else
 		defaults write "${SUPER_LOCAL_PLIST}" DeferralRestrictionsChecksum -int 0
 		defaults write "${SUPER_LOCAL_PLIST}" DeferralRestrictionsCache -bool false
 	fi
-	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions is: ${deferral_restrictions}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: restrictions_deferral_macOS_major_upgrades is: ${restrictions_deferral_macOS_major_upgrades}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: restrictions_deferral_macOS_minor_updates is: ${restrictions_deferral_macOS_minor_updates}"
+	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: restrictions_deferral_non_system_updates is: ${restrictions_deferral_non_system_updates}"
 }
 
 # Check for macOS beta program enrollment and set ${macos_beta_program} accordingly.
@@ -6180,7 +6200,7 @@ workflow_check_software_status() {
 	# When a full software status check is required start with reseting caches and then check for beta program and mdmclient listing.
 	if [[ "${check_software_status_required}" == "TRUE" ]]; then
 		reset_software_update_status
-		check_deferral_restrictions
+		check_restrictions_deferral
 		check_macos_beta_program
 	fi
 	
@@ -6255,55 +6275,96 @@ workflow_check_software_status() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_deferred_array is:\n${mdmclient_non_system_deferred_array[*]}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_security_array is:\n${mdmclient_security_array[*]}"
 	
-	# If (no errors) there are deferred items then evaluate and report to super.log. Further if ${deferral_restrictions} are not present then erroneously deferred items are moved back to the appropriate available items array.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; }; then
+	# If (no errors) split ${mdmclient_macos_msu_array[]} and into separate major upgrade and minor update arrays.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
+		local mdmclient_macos_msu_major_upgrade_array
+		mdmclient_macos_msu_major_upgrade_array=()
+		local mdmclient_macos_msu_minor_update_array
+		mdmclient_macos_msu_minor_update_array=()
+		for mdmclient_macos_msu_item in "${mdmclient_macos_msu_array[@]}"; do
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is:\n${mdmclient_macos_msu_item}"
+			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -gt "${macos_version_major}" ]] && mdmclient_macos_msu_major_upgrade_array+=("${mdmclient_macos_msu_item}")
+			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -eq "${macos_version_major}" ]] && mdmclient_macos_msu_minor_update_array+=("${mdmclient_macos_msu_item}")
+		done
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_array is:\n${mdmclient_macos_msu_major_upgrade_array[*]}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_array is:\n${mdmclient_macos_msu_minor_update_array[*]}"
+	fi
+	
+	# If (no errors) split ${mdmclient_macos_msu_deferred_array[]} and into separate major upgrade and minor update arrays.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]]; then
+		local mdmclient_macos_msu_major_upgrade_deferred_array
+		mdmclient_macos_msu_major_upgrade_deferred_array=()
+		local mdmclient_macos_msu_minor_update_deferred_array
+		mdmclient_macos_msu_minor_update_deferred_array=()
+		for mdmclient_macos_msu_item in "${mdmclient_macos_msu_deferred_array[@]}"; do
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is:\n${mdmclient_macos_msu_item}"
+			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g') -gt "${macos_version_major}" ]] && mdmclient_macos_msu_major_upgrade_deferred_array+=("${mdmclient_macos_msu_item}")
+			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g') -eq "${macos_version_major}" ]] && mdmclient_macos_msu_minor_update_deferred_array+=("${mdmclient_macos_msu_item}")
+		done
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_deferred_array is:\n${mdmclient_macos_msu_major_upgrade_deferred_array[*]}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_deferred_array is:\n${mdmclient_macos_msu_minor_update_deferred_array[*]}"
+	fi
+	
+	# If (no errors) there are deferred items then evaluate and report to super.log. Further, if restrictions deferrals are not present then erroneously deferred items are moved back to the appropriate available items array.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_minor_update_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; }; then
 		# Iterate trough the deferred arrays for logging and erroneous deferrals.
-		[[ "${deferral_restrictions}" == "TRUE" ]] && log_super "Deferred: The following updates are deferred due to software update restrictions configuration profile:"
-		[[ "${deferral_restrictions}" == "FALSE" ]] && log_super "Deferral Warning: The following updates are reporting as deferred but there is no software update restrictions configuration profile present so these updates will still be considered for installation:"
+		{ [[ "${restrictions_deferral_macOS_major_upgrades}" != "FALSE" ]] || [[ "${restrictions_deferral_macOS_minor_updates}" != "FALSE" ]] || [[ "${restrictions_deferral_non_system_updates}" != "FALSE" ]]; } && log_super "Status: Some updates are deferred due to a restrictions deferral configuration profile."
+		{ [[ "${restrictions_deferral_macOS_major_upgrades}" == "FALSE" ]] || [[ "${restrictions_deferral_macOS_minor_updates}" == "FALSE" ]] || [[ "${restrictions_deferral_non_system_updates}" == "FALSE" ]]; } && log_super "Warning: Some updates are inaccurately reporting as deferred even though restrictions deferral configuration is not enabled. As such, these updates will still be considered for installation."
 		if [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]]; then
 			for array_index in "${!mdmclient_macos_installers_deferred_array[@]}"; do
-				[[ "${deferral_restrictions}" == "TRUE" ]] && log_super "Deferred: macOS major upgrade installer $((array_index + 1)) of ${#mdmclient_macos_installers_deferred_array[@]} is: ${mdmclient_macos_installers_deferred_array[array_index]}"
-				if [[ "${deferral_restrictions}" == "FALSE" ]]; then
-					log_super "Deferral Warning: macOS major upgrade installer $((array_index + 1)) of ${#mdmclient_macos_installers_deferred_array[@]} is: ${mdmclient_macos_installers_deferred_array[array_index]}"
+				[[ "${restrictions_deferral_macOS_major_upgrades}" != "FALSE" ]] && log_super "Restrictions Deferral: macOS major upgrade installer $((array_index + 1)) of ${#mdmclient_macos_installers_deferred_array[@]} is: ${mdmclient_macos_installers_deferred_array[array_index]}"
+				if [[ "${restrictions_deferral_macOS_major_upgrades}" == "FALSE" ]]; then
+					log_super "Warning: Inaccurate deferral found for macOS major upgrade installer $((array_index + 1)) of ${#mdmclient_macos_installers_deferred_array[@]} is: ${mdmclient_macos_installers_deferred_array[array_index]}"
 					# shellcheck disable=SC2001
 					mdmclient_macos_installers_array+=($(echo "${mdmclient_macos_installers_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
 				fi
 			done
-			if [[ "${deferral_restrictions}" == "FALSE" ]]; then
-				mdmclient_macos_installers_array=($(sort -t ':' -k4 -V -r  <<<"${mdmclient_macos_installers_array[*]}"))
-				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installers_array is:\n${mdmclient_macos_installers_array[*]}"
-			fi
+			[[ "${restrictions_deferral_macOS_major_upgrades}" == "FALSE" ]] && mdmclient_macos_installers_array=($(sort -t ':' -k4 -V -r  <<<"${mdmclient_macos_installers_array[*]}"))
 		fi
-		if [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]]; then
-			for array_index in "${!mdmclient_macos_msu_deferred_array[@]}"; do
-				[[ "${deferral_restrictions}" == "TRUE" ]] && log_super "Deferred: macOS upgrade/update $((array_index + 1)) of ${#mdmclient_macos_msu_deferred_array[@]} is: ${mdmclient_macos_msu_deferred_array[array_index]}"
-				if [[ "${deferral_restrictions}" == "FALSE" ]]; then
-					log_super "Deferral Warning: macOS upgrade/update $((array_index + 1)) of ${#mdmclient_macos_msu_deferred_array[@]} is: ${mdmclient_macos_msu_deferred_array[array_index]}"
+		
+		if [[ ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} -gt 0 ]]; then
+			for array_index in "${!mdmclient_macos_msu_major_upgrade_deferred_array[@]}"; do
+				[[ "${restrictions_deferral_macOS_major_upgrades}" != "FALSE" ]] && log_super "Restrictions Deferral: macOS major upgrade $((array_index + 1)) of ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} is: ${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}"
+				if [[ "${restrictions_deferral_macOS_major_upgrades}" == "FALSE" ]]; then
+					log_super "Warning: Inaccurate deferral found for macOS major upgrade $((array_index + 1)) of ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} is: ${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}"
 					# shellcheck disable=SC2001
-					mdmclient_macos_msu_array+=($(echo "${mdmclient_macos_msu_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
+					mdmclient_macos_msu_major_upgrade_array+=($(echo "${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
 				fi
 			done
-			if [[ "${deferral_restrictions}" == "FALSE" ]]; then
-				mdmclient_macos_msu_array=($(sort -t ':' -k3 -V -r  <<<"${mdmclient_macos_msu_array[*]}"))
-				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_array is:\n${mdmclient_macos_msu_array[*]}"
-			fi
+			[[ "${restrictions_deferral_macOS_major_upgrades}" == "FALSE" ]] && mdmclient_macos_msu_major_upgrade_array=($(sort -t ':' -k3 -V -r  <<<"${mdmclient_macos_msu_major_upgrade_array[*]}"))
 		fi
+		
+		if [[ ${#mdmclient_macos_msu_minor_update_deferred_array[@]} -gt 0 ]]; then
+			for array_index in "${!mdmclient_macos_msu_minor_update_deferred_array[@]}"; do
+				[[ "${restrictions_deferral_macOS_minor_updates}" != "FALSE" ]] && log_super "Restrictions Deferral: macOS minor update $((array_index + 1)) of ${#mdmclient_macos_msu_minor_update_deferred_array[@]} is: ${mdmclient_macos_msu_minor_update_deferred_array[array_index]}"
+				if [[ "${restrictions_deferral_macOS_minor_updates}" == "FALSE" ]]; then
+					log_super "Warning: Inaccurate deferral found for macOS minor update $((array_index + 1)) of ${#mdmclient_macos_msu_minor_update_deferred_array[@]} is: ${mdmclient_macos_msu_minor_update_deferred_array[array_index]}"
+					# shellcheck disable=SC2001
+					mdmclient_macos_msu_minor_update_array+=($(echo "${mdmclient_macos_msu_minor_update_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
+				fi
+			done
+			[[ "${restrictions_deferral_macOS_minor_updates}" == "FALSE" ]] && mdmclient_macos_msu_minor_update_array=($(sort -t ':' -k3 -V -r  <<<"${mdmclient_macos_msu_minor_update_array[*]}"))
+		fi
+		
 		if [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; then
 			for array_index in "${!mdmclient_non_system_deferred_array[@]}"; do
-				[[ "${deferral_restrictions}" == "TRUE" ]] && log_super "Deferred: Non-system update $((array_index + 1)) of ${#mdmclient_non_system_deferred_array[@]} is: ${mdmclient_non_system_deferred_array[array_index]}"
-				if [[ "${deferral_restrictions}" == "FALSE" ]]; then
-					log_super "Deferral Warning: Non-system update $((array_index + 1)) of ${#mdmclient_non_system_deferred_array[@]} is: ${mdmclient_non_system_deferred_array[array_index]}"
+				[[ "${restrictions_deferral_non_system_updates}" != "FALSE" ]] && log_super "Restrictions Deferral: Non-system update $((array_index + 1)) of ${#mdmclient_non_system_deferred_array[@]} is: ${mdmclient_non_system_deferred_array[array_index]}"
+				if [[ "${restrictions_deferral_non_system_updates}" == "FALSE" ]]; then
+					log_super "Warning: Inaccurate deferral found for Non-system update $((array_index + 1)) of ${#mdmclient_non_system_deferred_array[@]} is: ${mdmclient_non_system_deferred_array[array_index]}"
 					# shellcheck disable=SC2001
 					mdmclient_non_system_array+=($(echo "${mdmclient_non_system_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
 				fi
 			done
-			{ [[ "${deferral_restrictions}" == "FALSE" ]] && [[ "${verbose_mode_option}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_array is:\n${mdmclient_non_system_array[*]}"
 		fi
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installers_array is:\n${mdmclient_macos_installers_array[*]}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_array is:\n${mdmclient_macos_msu_major_upgrade_array[*]}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_array is:\n${mdmclient_macos_msu_minor_update_array[*]}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_array is:\n${mdmclient_non_system_array[*]}"
 	fi
 	
 	# If (no errors) no installable updates then report any macOS security updates (that can't be installed programmatically) and then exit this function.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_installers_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
-		{ [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; } && log_super "Status: No currently available macOS software updates due to software update deferral restrictions configuration profile."
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_installers_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
+		{ [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_minor_update_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; } && log_super "Status: No currently available macOS software updates due to software update deferral restrictions configuration profile."
 		if [[ ${#mdmclient_security_array[@]} -gt 0 ]]; then
 			[[ "${msu_automatic_security_updates}" == "TRUE" ]] && log_super "Status: The following security updates are currently available and they should be installed soon via automatic macOS software udpate:"
 			[[ "${msu_automatic_security_updates}" == "FALSE" ]] && log_super "Warning: The following security updates are available but due to macOS software update settings are not allowed for installation:"
@@ -6316,29 +6377,16 @@ workflow_check_software_status() {
 		return 0
 	fi
 	
-	# If (no errors) split ${mdmclient_macos_msu_array[]} into separate major upgrade and minor update arrays.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
-		local mdmclient_macos_msu_array
-		mdmclient_macos_msu_major_upgrade_array=()
-		local mdmclient_macos_msu_minor_update_array
-		mdmclient_macos_msu_minor_update_array=()
-		for mdmclient_macos_msu_item in "${mdmclient_macos_msu_array[@]}"; do
-			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is: ${mdmclient_macos_msu_item}"
-			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -gt "${macos_version_major}" ]] && mdmclient_macos_msu_major_upgrade_array+=("${mdmclient_macos_msu_item}")
-			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -eq "${macos_version_major}" ]] && mdmclient_macos_msu_minor_update_array+=("${mdmclient_macos_msu_item}")
-		done
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_array is:\n${mdmclient_macos_msu_major_upgrade_array[*]}"
-		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_array is:\n${mdmclient_macos_msu_minor_update_array[*]}"
-	fi
-	
 	# If (no errors) macOS major upgrades are available then determine if any of them are allowed.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_macos_installers_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -gt 0 ]]; }; then
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_upgrades is: ${install_macos_major_upgrades}"
+		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_upgrades_target is: ${install_macos_major_upgrades_target}"
 		
 		# If there is no ${install_macos_major_upgrades_target}, then the newest macOS major upgrade versions should be the targets.
 		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ -z "${install_macos_major_upgrades_target}" ]]; then
 			[[ ${#mdmclient_macos_installers_array[@]} -gt 0 ]] && mdmclient_macos_installer_target="${mdmclient_macos_installers_array[0]}"
 			[[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -gt 0 ]] && mdmclient_macos_msu_major_upgrade_target="${mdmclient_macos_msu_major_upgrade_array[0]}"
-			[[ "${deferral_restrictions}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
+			[[ "${restrictions_deferral_macOS_major_upgrades}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
 		fi
 		
 		# If there is a ${install_macos_major_upgrades_target} then evaluate versions in ${mdmclient_macos_installers_array[]} for a possible target.
@@ -6346,7 +6394,7 @@ workflow_check_software_status() {
 			local mdmclient_macos_installers_disallowed_array
 			mdmclient_macos_installers_disallowed_array=()
 			for mdmclient_macos_installer_item in "${mdmclient_macos_installers_array[@]}"; do
-				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_item is: ${mdmclient_macos_installer_item}"
+				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_item is:\n${mdmclient_macos_installer_item}"
 				if [[ $(echo "${mdmclient_macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_major_upgrades_target} ]]; then
 					mdmclient_macos_installer_target="${mdmclient_macos_installer_item}"
 					break
@@ -6360,7 +6408,7 @@ workflow_check_software_status() {
 			local mdmclient_macos_msu_major_upgrades_disallowed_array
 			mdmclient_macos_msu_major_upgrades_disallowed_array=()
 			for mdmclient_macos_msu_item in "${mdmclient_macos_msu_major_upgrade_array[@]}"; do
-				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is: ${mdmclient_macos_msu_item}"
+				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is:\n${mdmclient_macos_msu_item}"
 				if [[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_major_upgrades_target} ]]; then
 					mdmclient_macos_msu_major_upgrade_target="${mdmclient_macos_msu_item}"
 					break
@@ -6438,7 +6486,7 @@ workflow_check_software_status() {
 	# If (no errors) no macOS major upgrade is targeted and a macOS minor update is available then select the latest for the ${mdmclient_macos_msu_minor_update_target}.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -gt 0 ]]; then
 		mdmclient_macos_msu_minor_update_target="${mdmclient_macos_msu_minor_update_array[0]}"
-		[[ "${deferral_restrictions}" == "FALSE" ]] && macos_minor_update_latest="TRUE"
+		[[ "${restrictions_deferral_macOS_minor_updates}" == "FALSE" ]] && macos_minor_update_latest="TRUE"
 	fi
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_target is: ${mdmclient_macos_msu_minor_update_target}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
@@ -6480,7 +6528,7 @@ workflow_check_software_status() {
 		
 		# Pick the appropriate macOS installer from the ${macos_installers_array} based on the ${mdmclient_macos_installer_target}.
 		for macos_installer_item in "${macos_installers_array[@]}"; do
-			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is: ${macos_installer_item}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is:\n${macos_installer_item}"
 			if [[ "$(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')" == "$(echo "${mdmclient_macos_installer_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')" ]]; then
 				macos_installer_target="${macos_installer_item}"
 				break
@@ -6489,7 +6537,7 @@ workflow_check_software_status() {
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_target is: ${macos_installer_target}"
 		
 		# If there is a ${macos_installer_target} then set the remaining individual parameters.
-		if [[ -n "${macos_installer_target}" ]]; then
+		if [[ "${macos_installer_target}" != "FALSE" ]]; then
 			macos_installer_title=$(echo "${macos_installer_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g')
 			macos_installer_version=$(echo "${macos_installer_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')
 			macos_installer_build=$(echo "${macos_installer_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g')
@@ -6550,7 +6598,7 @@ workflow_check_software_status() {
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ ${#macos_msu_array[@]} -gt 0 ]]; then
 		# Pick the appropriate macOS major upgrade from the ${macos_msu_array} based on the ${mdmclient_macos_msu_major_upgrade_target}.
 		for macos_msu_item in "${macos_msu_array[@]}"; do
-			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_item is: ${macos_msu_item}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_item is:\n${macos_msu_item}"
 			if [[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')" == "$(echo "${mdmclient_macos_msu_major_upgrade_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g')" ]]; then
 				macos_msu_major_upgrade_target="${macos_msu_item}"
 				break
@@ -6559,7 +6607,7 @@ workflow_check_software_status() {
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade_target is: ${macos_msu_major_upgrade_target}"
 		
 		# If there is a ${macos_msu_major_upgrade_target} then set the remaining individual parameters.
-		if [[ -n "${macos_msu_major_upgrade_target}" ]]; then
+		if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
 			macos_msu_label=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g')
 			[[ $(echo "${macos_msu_major_upgrade_target}" | grep -c 'Beta') -eq 0 ]] && macos_msu_title=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*//g')
 			[[ $(echo "${macos_msu_major_upgrade_target}" | grep -c 'Beta') -gt 0 ]] && macos_msu_title=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
@@ -6581,7 +6629,7 @@ workflow_check_software_status() {
 		if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" != "FALSE" ]] && [[ ${#macos_msu_array[@]} -gt 0 ]]; then
 		# Pick the appropriate macOS minor update from the ${macos_msu_array} based on the ${mdmclient_macos_msu_minor_update_target}.
 		for macos_msu_item in "${macos_msu_array[@]}"; do
-			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_item is: ${macos_msu_item}"
+			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_item is:\n${macos_msu_item}"
 			if [[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')" == "$(echo "${mdmclient_macos_msu_minor_update_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g')" ]]; then
 				macos_msu_minor_update_target="${macos_msu_item}"
 				break
@@ -6590,7 +6638,7 @@ workflow_check_software_status() {
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update_target is: ${macos_msu_minor_update_target}"
 		
 		# If there is a ${macos_msu_minor_update_target} then set the remaining individual parameters.
-		if [[ -n "${macos_msu_minor_update_target}" ]]; then
+		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
 			macos_msu_label=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g')
 			[[ $(echo "${macos_msu_minor_update_target}" | grep -c 'Beta') -eq 0 ]] &&  macos_msu_title=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*//g')
 			[[ $(echo "${macos_msu_minor_update_target}" | grep -c 'Beta') -gt 0 ]] &&  macos_msu_title=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
@@ -7477,7 +7525,7 @@ install_macos_msu() {
 	[[ "${current_user_account_name}" != "FALSE" ]] && notification_restart
 	# If ${test_mode_option} then it's not necessary to continue this function.
 	if [[ "${test_mode_option}" == "TRUE" ]]; then
-		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 		log_super "Test Mode: Skipping the macOS update/upgrade via softwareupdate workflow."
 		if [[ "${current_user_account_name}" != "FALSE" ]]; then
 			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the restart notification..."
@@ -7680,7 +7728,7 @@ install_macos_msu() {
 install_macos_app() {
 	# If ${test_mode_option} then it's not necessary to continue this function.
 	if [[ "${test_mode_option}" == "TRUE" ]]; then
-		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 		log_super "Test Mode: Skipping the macOS major upgrade via insaller workflow."
 		if [[ "${current_user_account_name}" != "FALSE" ]]; then
 			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the macOS major upgrade via insaller preparation notification..."
@@ -7815,7 +7863,7 @@ push_macos_mdm() {
 		push_macos_mdm_download_error="FALSE"
 		return 0
 	elif [[ "${test_mode_option}" == "TRUE" ]]; then # [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]
-		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 		log_super "Test Mode: Skipping the install macOS update/upgrade via MDM workflow."
 		if [[ "${current_user_account_name}" != "FALSE" ]]; then
 			log_super "Test Mode: Pausing ${test_mode_timeout_seconds} seconds for the MDM preparation notification..."
@@ -8346,7 +8394,7 @@ workflow_install_non_system_msu() {
 	fi
 	
 	# Log status of non-system update completion.
-	[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+	[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 	unset notification_non_system_updates_active
 	if [[ "${install_non_system_msu_error}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "FALSE" ]]; then
 		log_super "Status: Completed installation of all non-system macOS software updates!"
@@ -8464,15 +8512,15 @@ workflow_install_no_user() {
 	else # Workflows when there are no macOS updates/upgrades.
 		if [[ "${workflow_restart_without_updates_option}" == "TRUE" ]]; then # If requested, restart without updates.
 			[[ -n "${install_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
-			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
-			/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+			defaults write "${SUPER_LOCAL_PLIST}" WorkflowRestartValidate -bool true
+			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 			log_super "Status: Restarting computer in one minute..."
 			shutdown -o -r +1 >/dev/null 2>&1 &
 			disown -a
 		else # Option to restart without updates is not enabled.
 			if [[ "${install_jamf_policy_triggers_without_restarting_option}" == "TRUE" ]] && [[ -n "${install_jamf_policy_triggers_option}" ]]; then
 				run_jamf_policy_triggers
-				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 			else
 				log_super "Warning: When no macOS update/upgrade is available you must also specify the --workflow-restart-without-updates option to restart automatically."
 			fi
@@ -8607,9 +8655,9 @@ workflow_install_active_user() {
 		if [[ "${workflow_restart_without_updates_option}" == "TRUE" ]]; then # If requested, restart without updates.
 			[[ -n "${install_jamf_policy_triggers_option}" ]] && run_jamf_policy_triggers
 			notification_restart
-			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
 			if [[ "${test_mode_option}" != "TRUE" ]]; then
-				/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+				defaults write "${SUPER_LOCAL_PLIST}" WorkflowRestartValidate -bool true
+				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 				log_super "Status: Restarting computer in one minute..."
 				shutdown -o -r +1 >/dev/null 2>&1 &
 				disown -a
@@ -8621,7 +8669,7 @@ workflow_install_active_user() {
 		else # Option to restart without updates is not enabled.
 			if [[ "${install_jamf_policy_triggers_without_restarting_option}" == "TRUE" ]] && [[ -n "${install_jamf_policy_triggers_option}" ]]; then
 				run_jamf_policy_triggers
-				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 			else
 				log_super "Warning: When no macOS update/upgrade is available you must also specify the --workflow-restart-without-updates option to restart automatically."
 			fi
@@ -9966,7 +10014,7 @@ dialog_user_schedule() {
 	
 	# Body text variations based on deadline options, also set ${display_accessory_datepicker_payload}.
 	local display_accessory_datepicker_start_epoch
-	display_accessory_datepicker_start_epoch=$(($(date +%s) + (deferral_timer_minutes * 60) + 1))
+	display_accessory_datepicker_start_epoch=$(($(date +%s) + (DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES * 60) + 1))
 	local display_accessory_datepicker_start_date
 	display_accessory_datepicker_start_date=$(date -j -f %s "${display_accessory_datepicker_start_epoch}" +"%Y/%m/%d %H:%M:%S" | xargs)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_accessory_datepicker_start_date is: ${display_accessory_datepicker_start_date}"
@@ -10004,20 +10052,28 @@ dialog_user_schedule() {
 	case "${dialog_return}" in
 	0)
 		local dialog_user_schedule_selection
-		dialog_user_schedule_selection=$(echo "${dialog_response}" | sed -e 's/ /:/' -e 's/:[0-9][0-9]$//')
 		local dialog_user_schedule_selection_epoch
-		dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${dialog_user_schedule_selection}:00" +%s)
+		if [[ $(echo "${dialog_response}" | grep -Ec 'am|pm') -gt 0 ]]; then
+			dialog_user_schedule_selection=$(echo "${dialog_response}" | tr '[:space:]' ':' | sed -e 's/[0-9][0-9]:am:$/00:am/' -e 's/[0-9][0-9]:pm:$/00:pm/')
+			dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%I:%M:%S:%p "${dialog_user_schedule_selection}" +%s)
+		else # Default 24h time.
+			dialog_user_schedule_selection=$(echo "${dialog_response}" | tr '[:space:]' ':' | sed -e 's/[0-9][0-9]:$/00/')
+			dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${dialog_user_schedule_selection}" +%s)
+		fi
 		local dialog_user_schedule_minimum_selection_epoch
 		dialog_user_schedule_minimum_selection_epoch=$(($(date +%s) + 121))
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection is: ${dialog_user_schedule_selection}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_epoch is: ${dialog_user_schedule_selection_epoch}"
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_minimum_selection_epoch is: ${dialog_user_schedule_minimum_selection_epoch}"
 		if [[ $dialog_user_schedule_selection_epoch -lt $dialog_user_schedule_minimum_selection_epoch ]];then
-			workflow_scheduled_install="$(date -r ${dialog_user_schedule_minimum_selection_epoch} +%Y-%m-%d:%H:%M)"
 			log_super "Warning: Adjusting user selected scheduled installation because it's in the past or less than two minutes from now."
-		else
-			workflow_scheduled_install="${dialog_user_schedule_selection}"
+			workflow_scheduled_install=$(date -r "${dialog_user_schedule_minimum_selection_epoch}" +%Y-%m-%d:%H:%M)
 		fi
+		if [[ -n "${deadline_epoch}" ]] && [[ $dialog_user_schedule_selection_epoch -gt $display_accessory_datepicker_end_epoch ]];then
+			log_super "Warning: Adjusting user selected scheduled installation because it's past the current workflow deadline."
+			workflow_scheduled_install=$(date -r "${display_accessory_datepicker_end_epoch}" +%Y-%m-%d:%H:%M)
+		fi
+		[[ -z "${workflow_scheduled_install}" ]] && workflow_scheduled_install=$(date -r "${dialog_user_schedule_selection_epoch}" +%Y-%m-%d:%H:%M)
 		log_super "Status: User chose to schedule installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}."
 		if [[ -n "${schedule_workflow_active_option}" ]]; then
 			set_schedule_workflow_active_adjustments
@@ -10109,7 +10165,7 @@ dialog_schedule_reminder() {
 			log_super "Status: User chose to install now."
 			;;
 		2)
-			/usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+			defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 			log_super "Status: User chose to reschedule, removing previously scheduled installation and restarting super..."
 			restart_super_sleep_seconds=1
 			restart_super
@@ -10144,7 +10200,7 @@ dialog_schedule_reminder() {
 			log_super "Background Schedule Reminder Dialog: User dismissed the dialog."
 			;;
 		2)
-			/usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_LOCAL_PLIST}.plist" 2> /dev/null
+			defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 			log_super "Background Schedule Reminder Dialog: User chose to reschedule, removing previously scheduled installation and restarting super..."
 			restart_super_sleep_seconds=1
 			restart_super
@@ -10388,6 +10444,7 @@ main() {
 		workflow_time_epoch=$(date +%s)
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowTarget 2>/dev/null
+		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowScheduledInstall 2>/dev/null
 		defaults delete "${SUPER_LOCAL_PLIST}" WorkflowDownloadMacOSAuthRequired 2>/dev/null
 		reset_schedule_zero_date
 		reset_deadline_counters
@@ -10401,7 +10458,7 @@ main() {
 		fi
 		# At this point the ${workflow_auth_error} condition is a workflow-stopper, so try again later.
 		if [[ "${workflow_auth_error}" == "TRUE" ]]; then
-			deferral_timer_minutes="${deferral_timer_error_minutes}"
+			deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
 			log_super "Workflow Error: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
 			log_status "Pending: Configured authentication workflow is not currently possible, trying again in ${deferral_timer_minutes} minutes."
 			set_auto_launch_deferral

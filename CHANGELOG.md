@@ -1,20 +1,20 @@
 # CHANGELOG
 
-## [5.0.0-rc1]
+## [5.0.0]
 
-2023-10-02
+2023-10-17
 
-## [5.x] Highlights
+## Highlights (5.x)
 
 - Suport for macOS 15 Sequoia.
-- New schedule workflow active option allows administrators to set exactly when the `super` workflow is active, thus allowing for "maintenance windows".
 - New scheduled installation workflows allow administrators or the end user to specify a date and time for the installation of macOS updates/upgrades, Jamf Pro Policies, or enforced system restarts.
+- New schedule workflow active option allows administrators to set exactly when the `super` workflow is active, thus allowing for "maintenance windows".
 - [MacAdmin's SOFA](https://sofa.macadmins.io) integration allows schedule and deadline options to align with macOS release dates (as opposed to when `super` discovers a macOS release).
-- Completely rearchitected main `super` logic so all workflow options can be permanent (via managed preferences) or temporary until the requested workflow is completed.
-- Completely rearchitected software update/upgrade discovery to significantly improve reliability, performance, and improve support for native macOS software update/upgrade deferral restrictions.
+- Completely rearchitected main `super` logic so all workflow options can be permanent (via configuration profile) or temporary until the requested workflow is completed.
+- Completely rearchitected software update/upgrade discovery to significantly improve reliability, performance, and improve support for native macOS software update restrictions deferral.
 - Significantly improved behavior for alternate workflow targets (non-system updates, Jamf Pro Policies, and enforced system restarts) now support all deferral, schedule, deadline, and display options.
 - Even more user interface customization options.
-- Please visit [the `super` v5.x beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki) for full details!
+- Please visit [the `super` Wiki](https://github.com/Macjutsu/super/wiki) for full details!
 
 ### Compatibility Notes (5.x)
 
@@ -22,19 +22,30 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends/super-migration-options-v5.0.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences to version 5.x](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends/super-migration-managed-preferences-v5.0.0.tsv).
-- New [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends/) for features unique to `super` version 5.x.
-- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Super-Friends/) now supports `super` versions 3.0, 4.x, and 5.x.
-- Updated [example MDM configuration profiles for `super` version v5.0.0](https://github.com/Macjutsu/super/tree/5.0.0-rc1/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema for `super` v5.0.0](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-options-v5.0.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-managed-preferences-v5.0.0.tsv).
+- New [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) for features unique to `super` 5.x.
+- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
 
-### Known Issues (5.0.0-rc1)
+### Known Issues (5.0.0)
 
 - There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
 
+### Specific Changes (5.0.0)
+
+- Updated scheduled install user selection dialog now allows for selections as soon as two minutes from the present. This minimum time can be adjusted via the `DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES` parameter in the `set_defaults()` function.
+- Significantly improved parsing of configuration profile restrictions for Apple software update deferrals now identifies and reports each type of restriction deferral (macOS major upgrades, macOS minor updates, and non-system software updates).
+- Implemented work arounds to resolve issues with IBM Notifier's handling of non-standard combinations of system Language & Region and Date & Time settings.
+- Resolved issues that could prevent the current scheduled installation from resetting after workflow completion.
+- Resolved issues that could cause parse errors in the update discovery workflow.
+- [Main `super` Wiki updated to 5.0.0.](https://github.com/Macjutsu/super/wiki)
+- `super` [5.0.0 SHA-256: 730b9f74094f31618f2202a305f8a7d53273eab2aff571b0ff4ce65235f17e6c](https://github.com/Macjutsu/super/blob/main/super.checksum.txt)
+
 ### Specific Changes (5.0.0-rc1)
+
 - New [IBM Notifier 3.2.1](https://github.com/IBM/mac-ibm-notifications/releases) is automatically installed. (Thanks to @SMartorelli for his dedication to the project!)
 - Initial draft of [the `super` v5.x beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki)!
 - Recreated [example screenshots](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/) for `super` v5.x (also removed all previous screenshots).
@@ -53,6 +64,7 @@
 - `super` [5.0.0-rc1 SHA-256: 84532f9b0c67f65253206cbea28efd65a4f2fa6a9984db54a6d31b7c359cf691](https://github.com/Macjutsu/super/blob/5.0.0-rc1/super.checksum.txt)
 
 ### Specific Changes (5.0.0-beta5)
+
 - Significantly improved macOS update/upgrade download workflow now automatically attempts authenticated `softwareupdate` downloads if there are previously saved authentication credentials. Further, if the `--auth-credential-failover-to-user` or the `--auth-mdm-failover-to-user` options are enabled, the download workflow can fail over to user authentication.
 - Updated restart validation workflow now automatically retries every 5 minutes (as opposed to every 60 minutes) if there are errors when attempting to install non-system Apple software updates or interacting with Jamf Pro. This deferral timer can be manually modified in the script by editing the `DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES` parameter.
 - Resolved issues that caused inaccurate detection of automatic Apple software update settings status.
@@ -64,6 +76,7 @@
 - `super` [5.0.0-beta5 SHA-256: fb407f3d625a4235795ccd626120afd89692255883b98c13048c001fd1b927f9](https://github.com/Macjutsu/super/blob/5.0.0-beta5/super.checksum.txt)
 
 ### Specific Changes (5.0.0-beta4)
+
 - New macOS update/upgrade download workflow detects authentication errors and automatically adjusts to require authentication for macOS update/upgrade workflows.
 - Updated user authentication dialog variations to support authenticated downloads and scheduled installations.
 - Improved error checking for incompatible workflow settings when using scheduled installation options.
