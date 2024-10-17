@@ -16,11 +16,11 @@ S.U.P.E.R.M.A.N. (or just `super`) is an open source script that provides admini
 
 __A `super` macOS update dialog with multiple options__
 
-![The `super` macOS update dialog](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/Example-macOS-Update-Dialog.png)
+![The `super` macOS update dialog](https://github.com/Macjutsu/super/blob/main/Example-Screenshots/Example-macOS-Update-Dialog.png)
 
 __A `super` macOS update restart notification__
 
-![The `super` macOS update restart notification](https://github.com/Macjutsu/super/blob/5.0.0-rc1/Example-Screenshots/Example-macOS-Restart-Notification.png)
+![The `super` macOS update restart notification](https://github.com/Macjutsu/super/blob/main/Example-Screenshots/Example-macOS-Restart-Notification.png)
 
 ## Learn More
 
