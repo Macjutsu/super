@@ -4492,7 +4492,7 @@ check_storage_available() {
 	check_storage_available_error="FALSE"
 	storage_ready="FALSE"
 	[[ -z "${current_user_account_name}" ]] && check_current_user
-	[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
+	[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
 	[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2>/dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3;}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_available_gigabytes: ${storage_available_gigabytes}"
 	if [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
