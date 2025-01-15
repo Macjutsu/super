@@ -5357,6 +5357,7 @@ set_scheduled_install_deferral() {
 	[[ -z "${workflow_scheduled_install_epoch}" ]] && workflow_scheduled_install_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_epoch: ${workflow_scheduled_install_epoch}"
 	local deferral_timer_scheduled_install_minutes
+	workflow_time_epoch=$(date +%s)
 	deferral_timer_scheduled_install_minutes=$(((workflow_scheduled_install_epoch - workflow_time_epoch) / 60 ))
 	if [[ -n "${scheduled_install_reminder_minutes}" ]]; then
 		[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_reminder_minutes is: ${scheduled_install_reminder_minutes}"
