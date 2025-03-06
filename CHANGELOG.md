@@ -48,7 +48,7 @@
 - New Super-Friends/Jamf-Pro folder for Jamf Pro specific items.
 - Countless typo fixes and improvements to both regular and verbose log output. (Thanks to everyone who reported typos on both GitHub and #super on MacAdmins Slack)
 - Updated [example MDM configuration profiles for `super` v5.1.0-beta1](https://github.com/Macjutsu/super/tree/5.1.0-beta1/Example-MDM).
-- `super` [5.1.0-beta1 SHA-256: 7fc290bfeb72e79d8445be10000eda182c904d99974857b379f0975a4fe3f7a6](https://github.com/Macjutsu/super/blob/main/super.checksum.txt)
+- `super` [5.1.0-beta1 SHA-256: 7fc290bfeb72e79d8445be10000eda182c904d99974857b379f0975a4fe3f7a6](https://github.com/Macjutsu/super/blob/5.1.0-beta1/super.checksum.txt)
 
 ### Specific Changes (5.0.0)
 
