@@ -12,6 +12,10 @@
 	<true/>
 	<key>InstallNonSystemUpdatesWithoutRestarting</key>
 	<true/>
+	<key>InstallSafariUpdateWithoutRestarting</key>
+	<true/>
+	<key>InstallPrioritizeNonRestartUpdates</key>
+	<true/>
 	<key>InstallJamfPolicyTriggers</key>
 	<string>trigger1,trigger2,trigger3</string>
 	<key>InstallJamfPolicyTriggersWithoutRestarting</key>
@@ -111,6 +115,8 @@
 	<key>DisplayAccessoryMacOSMajorUpgradeFile</key> <string>path or URL</string>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
 	<key>DisplayAccessoryNonSystemUpdatesFile</key> <string>path or URL</string>
+	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
+	<key>DisplayAccessorySafariUpdateFile</key> <string>path or URL</string>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
 	<key>DisplayAccessoryJamfPolicyTriggersFile</key> <string>path or URL</string>
 	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>

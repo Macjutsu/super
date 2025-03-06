@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.0.0]
+## [5.1.0-beta1]
 
-2024-10-17
+2025-03-06
 
 ## Highlights (5.x)
 
@@ -29,10 +29,26 @@
 - Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/main/Example-MDM).
 - Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
 
-### Known Issues (5.0.0)
+### Known Issues (5.1.0-beta1)
 
 - There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-beta1)
+
+- New `--install-safari-update-without-restarting` option targets Safari updates for installation without restarting the system. This is a counter-option to the existing `--install-non-system-updates-without-restarting` option that targets all non-system updates for installation without restarting the system. This option is also unique in that if Safari is not active then the workflow installs the Safari update automatically with no user interaction.
+- New `--display-accessory-safari-update-file` option to specify a custom display accessory when the workflow target is a Safari update and Safari is actively in use.
+- New `--install-prioritize-non-restart-updates` option works with either the `--install-safari-update-without-restarting` or the `--install-non-system-updates-without-restarting` option to prioritize non-system updates before any other potential workflows. In other words, even if a macOS update or upgrade is possible, this option forces the super workflow to target non-system updates for installation first. After the appropriate non-system items are installed, then the next time (based on the relaunch deferral timer) the super workflow runs, it reverts to the default targeting behavior (likely a pending macOS update/upgrade).
+- New `/Library/Management/super/logs/super-audit.log` is a significantly condensed version of the default `super.log` that only contains the most important status changes. Entries in the `super-audit.log` are limited to items considered necessary for most change management policies. This includes; installation events, changes to workflow targets, changes to zero date, changes to deadlines, successful workflow completions, or any other event that would dramatically alter the super workflow behavior.
+- New [IBM Notifier 3.2.2](https://github.com/IBM/mac-ibm-notifications/releases) is automatically installed. (Thanks to @SMartorelli for his dedication to the project!)
+- All `curl` usage now includes a `super` user-agent header that is defined via the `SUPER_USER_AGENT` parameter. (Thanks to the Jamf Marketplace team for this suggestion!)
+- Various `curl` cleanup to improve syntax uniformity and readability.
+- Improved handling of inaccurate `mdmclient` deferral dates.
+- Clean-up of outdated files/folders in `super` repository.
+- New Super-Friends/Jamf-Pro folder for Jamf Pro specific items.
+- Countless typo fixes and improvements to both regular and verbose log output. (Thanks to everyone who reported typos on both GitHub and #super on MacAdmins Slack)
+- Updated [example MDM configuration profiles for `super` v5.1.0-beta1](https://github.com/Macjutsu/super/tree/5.1.0-beta1/Example-MDM).
+- `super` [5.1.0-beta1 SHA-256: 7fc290bfeb72e79d8445be10000eda182c904d99974857b379f0975a4fe3f7a6](https://github.com/Macjutsu/super/blob/main/super.checksum.txt)
 
 ### Specific Changes (5.0.0)
 

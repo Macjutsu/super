@@ -110,6 +110,8 @@
                   <string>path or URL</string>
                   <key>DisplayAccessoryRestartWithoutUpdatesFile</key>
                   <string>path or URL</string>
+                  <key>DisplayAccessorySafariUpdateFile</key>
+                  <string>path or URL</string>
                   <key>DisplayAccessoryType</key>
                   <string>HTML</string>
                   <key>DisplayHelpButtonString</key>
@@ -144,7 +146,11 @@
                   <string>14</string>
                   <key>InstallNonSystemUpdatesWithoutRestarting</key>
                   <true/>
+                  <key>InstallPrioritizeNonRestartUpdates</key>
+                  <true/>
                   <key>InstallRapidSecurityResponses</key>
+                  <true/>
+                  <key>InstallSafariUpdateWithoutRestarting</key>
                   <true/>
                   <key>ScheduleWorkflowActive</key>
                   <string>TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00</string>
