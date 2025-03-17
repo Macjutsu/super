@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.1.0-beta1]
+## [5.1.0-beta2]
 
-2025-03-06
+2025-03-17
 
 ## Highlights (5.x)
 
@@ -22,17 +22,29 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-options-v5.0.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-managed-preferences-v5.0.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
 - New [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) for features unique to `super` 5.x.
-- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/main/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.0.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
+- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-beta2/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-beta2/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
 
-### Known Issues (5.1.0-beta1)
+### Known Issues (5.x)
 
 - There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-beta2)
+
+- New `--version` option returns the `super` version number to standard out. Using this option does not require root permissions and does not start or interrupt the `super` workflow.
+- New `--config-status` option returns the status of a variety of items including the contents of the `super` folder and `super` settings files. While this option does require root permissions, it does not start or interrupt the `super` workflow.
+- New [Jamf Pro Extension Attribute script to return the last few lines of the super-audit.log](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Jamf-Pro/super-Audit-Log-Jamf-Pro-EA.sh).
+- New workflow behavior if the system has recently started (as defined by within `$RECENT_STARTUP_AUTO_DEFERRAL_SECONDS`), then an automatic error deferral will restart the workflow for later. This is to prevent unintended forced restarts in cases where the workflow was started before the user had a chance to log in.
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.1.0](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
+- As always, typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.0-beta2 SHA-256: 0d4a1bfa40bd8234a9f7759fbdc69ccf4033814c9cae0a0245c7b869e4f3f20a](https://github.com/Macjutsu/super/blob/5.1.0-beta2/super.checksum.txt)
 
 ### Specific Changes (5.1.0-beta1)
 
@@ -341,7 +353,7 @@
 - Updated [Jamf Pro config profile external application custom schema for `super` 4.0.0-beta2](https://github.com/Macjutsu/super/blob/4.0.0-beta2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v4.0.0-beta2.JSON). (Thanks to @robjschroeder for updating this!)
 - `super` 4.0.0-beta2 SHA-256: 40824d6425757022af8c78a9942e81c4a9c442f83c808950429efcf71afcfb2e
 
-### Specific Changes (4.0.0-beta1)
+### Specific Changes (4.0.0-beta2)
 
 - New `--usage` and `--help` options behavior now no longer requires `sudo`, or installs `super` items, or writes anything to the super.log, or interferes with any running `super` workflow. However, `super` still installs automatically (if needed) when using any other options.
 - New default behavior if no updates/upgrades are available (or allowed), `super` now automatically checks for new updates/upgrades on a reoccurring basis. Thus, the `--recheck-defer` option has been replaced by this default behavior.
@@ -404,7 +416,7 @@
 - Resolved an issue where MacBook computers with M2 chips were not being properly identified as portables.
 - Resolved an issue where the patch version number (11.7.10 <- this last number) of macOS minor updates were not being properly identified.
 - Countless improvements to both regular and verbose log output.
-- `super` 4.0.0-beta1 SHA-256: f179ef824b128510f8867388d6d0252044cd2b4b36036181293a7601873c9ee3
+- `super` 4.0.0-beta2 SHA-256: f179ef824b128510f8867388d6d0252044cd2b4b36036181293a7601873c9ee3
 
 ## [3.0]
 

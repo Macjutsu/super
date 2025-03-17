@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-beta1"
+SUPER_VERSION="5.1.0-beta2"
 readonly SUPER_VERSION
-SUPER_DATE="2025/03/06"
+SUPER_DATE="2025/03/17"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -17,7 +17,7 @@ readonly SUPER_USER_AGENT
 # MARK: *** Documentation ***
 ################################################################################
 
-# Show usage documentation.
+# Output the usage documentation to standard out.
 show_usage() {
 	echo "
   S.U.P.E.R.M.A.N.
@@ -30,6 +30,9 @@ show_usage() {
   
   Usage:
   sudo ./super
+  
+  Documentation Options:
+  [--usage]  [--help]  [--version]
   
   macOS Installation Options:
   [--install-macos-major-upgrades]  [--install-macos-major-upgrades-off]
@@ -133,9 +136,9 @@ show_usage() {
   [--test-storage-update=gigabytes]  [--test-storage-upgrade=gigabytes]
   [--test-battery-level=percentage]
   
-  Troubleshooting and Documentation Options:
-  [--open-logs]  [--reset-super]  [--verbose-mode]  [--verbose-mode-off]
-  [--usage]  [--help]
+  Troubleshooting Options:
+  [--config-status]  [--open-logs]  [--reset-super]
+  [--verbose-mode]  [--verbose-mode-off]
   
   ** Managed preferences override local options via domain: com.macjutsu.super
   
@@ -241,15 +244,63 @@ show_usage() {
 
 # If there is a real current user then open the S.U.P.E.R.M.A.N. Wiki, otherwise run the show_usage() function.
 show_help() {
+	log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - SHOW HELP ****"
 	check_current_user
 	if [[ "${current_user_account_name}" != "FALSE" ]]; then
 		log_echo "Status: Opening S.U.P.E.R.M.A.N. Wiki for user account: ${current_user_account_name}."
 		sudo -u "${current_user_account_name}" open "https://github.com/Macjutsu/super/wiki" &
-		log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT HELP ****"
+		log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT SHOW HELP ****"
 	else # No current GUI user.
 		log_echo "Warning: Unable to open S.U.P.E.R.M.A.N. Wiki because there is no GUI user."
 		show_usage
 	fi
+	exit 0
+}
+
+# Output only the ${SUPER_VERSION} to standard out.
+show_version() {
+	echo "${SUPER_VERSION}"
+	exit 0
+}
+
+# Output various configuration status to standard out.
+show_config_status() {
+	if [[ $(id -u) -ne 0 ]]; then
+		log_echo "Exit: super must run with root privileges."
+		exit 1
+	fi
+	
+	log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - CONFIGURATION STATUS ****"
+	if [[ -n "${SUPER_FOLDER}" ]]; then
+		echo -e "\n**** Config Status: Contents of the super working folder located at ${SUPER_FOLDER}:"
+		ls -lah "${SUPER_FOLDER}" | tail -n +4
+	else
+		echo -e "\n**** Config Error: No super working folder in the expected location at ${SUPER_FOLDER}!"
+	fi
+	
+	if [[ -n "${SUPER_LOG_FOLDER}" ]]; then
+		echo -e "\n**** Config Status: Contents of the super log folder located at ${SUPER_LOG_FOLDER}:"
+		ls -lah "${SUPER_LOG_FOLDER}" | tail -n +4
+	else
+		echo -e "\nConfig Error: No super working log folder in the expected location at ${SUPER_LOG_FOLDER}!"
+	fi
+	
+	if [[ -n "${SUPER_MANAGED_PLIST}" ]]; then
+		echo -e "\n**** Config Status: Contents of the super managed settings file located at ${SUPER_MANAGED_PLIST}.plist:"
+		defaults read "${SUPER_MANAGED_PLIST}" | tail -n +2 | sed -e 's/    //g' -e 's/;//g' -e '$d'
+	else
+		echo -e "\n**** Config Status: No managed super settings file in the expected location at ${SUPER_MANAGED_PLIST}.plist."
+	fi
+	
+	if [[ -n "${SUPER_LOCAL_PLIST}" ]]; then
+		echo -e "\n**** Config Status: Contents of the super local settings file located at ${SUPER_LOCAL_PLIST}.plist:"
+		defaults read "${SUPER_LOCAL_PLIST}" | tail -n +2 | sed -e 's/    //g' -e 's/;//g' -e '$d'
+	else
+		echo -e "\n**** Config Error: No managed super settings file in the expected location at ${SUPER_LOCAL_PLIST}.plist!"
+	fi
+	
+	echo ""
+	log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT CONFIGURATION STATUS ****"
 	exit 0
 }
 
@@ -473,6 +524,10 @@ set_defaults() {
 	POWER_REQUIRED_RECHECK_SECONDS=1
 	readonly POWER_REQUIRED_RECHECK_SECONDS
 	
+	# The minimum number of seconds after a recent system startup where it's safe to start a super workflow. If the system has started up too soon, the the workflow is automatically deferred.
+	RECENT_STARTUP_AUTO_DEFERRAL_SECONDS=300
+	readonly RECENT_STARTUP_AUTO_DEFERRAL_SECONDS
+	
 	# The number of seconds to timeout various workflow startup processes if no progress is reported.
 	TIMEOUT_START_SECONDS=120
 	readonly TIMEOUT_START_SECONDS
@@ -553,6 +608,9 @@ get_options() {
 			;;
 		-h | -H | --help)
 			show_help
+			;;
+		--version)
+			show_version
 			;;
 		--install-macos-major-upgrades)
 			install_macos_major_upgrades="TRUE"
@@ -871,6 +929,9 @@ get_options() {
 			;;
 		--test-battery-level=*)
 			test_battery_level_option="${1##*=}"
+			;;
+		--config-status)
+			show_config_status
 			;;
 		-l | -L | --open-logs)
 			open_logs_option="TRUE"
@@ -3643,7 +3704,7 @@ workflow_installation() {
 # by Kevin M. White
 
 # This script is ran by launchd every 60 seconds per the /Library/LaunchDaemons/com.macjutsu.super.plist.
-# This script checks a variety of settings to ensure that the super workflow only restarts when necissary.
+# This script checks a variety of settings to ensure that the super workflow only restarts when necessary.
 # Version ${SUPER_VERSION}
 # ${SUPER_DATE}
 
@@ -4470,7 +4531,6 @@ check_system() {
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_version_number is: ${macos_version_number}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mac_model_name is: ${mac_model_name}"
 	[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mac_is_portable is: ${mac_is_portable}"
-	local kernel_boot_epoch
 	kernel_boot_epoch=$(sysctl -n kern.boottime | awk -F 'sec = |, usec' '{print $2}') # Expected outputs: seconds since epoch
 	if [[ "${kernel_boot_epoch}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
 		mac_last_startup=$(date -r "${kernel_boot_epoch}" +%Y-%m-%d:%H:%M:%S) # Expected output: 2023-08-25:00:16:00
@@ -6634,7 +6694,7 @@ workflow_check_software_status() {
 			macos_installer_size=$(echo "${macos_installer_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk '{print $1"/1000000000 +1"}' | bc)
 			log_super "Target: macOS major upgrade installer ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} which is a ${macos_installer_size}GB download."
 			
-			# No longer necissary to continue this function if the target will be the macOS installer.
+			# No longer necessary to continue this function if the target will be the macOS installer.
 			if [[ "${install_prioritize_non_restart_updates_option}" == "FALSE" ]] || { [[ "${install_prioritize_non_restart_updates_option}" == "TRUE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; }; then
 				IFS="${previous_ifs}"
 				return 0
@@ -6711,7 +6771,7 @@ workflow_check_software_status() {
 			log_super "Target: \"Over-the-air\" macOS major upgrade ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 			
-			# No longer necissary to continue this function if the target will be the macOS major upgrade.
+			# No longer necessary to continue this function if the target will be the macOS major upgrade.
 			if [[ "${install_prioritize_non_restart_updates_option}" == "FALSE" ]] || { [[ "${install_prioritize_non_restart_updates_option}" == "TRUE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; }; then
 				IFS="${previous_ifs}"
 				return 0
@@ -6746,7 +6806,7 @@ workflow_check_software_status() {
 			log_super "Target: macOS minor update ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
 			[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 			
-			# No longer necissary to continue this function if the target will be the macOS minor update.
+			# No longer necessary to continue this function if the target will be the macOS minor update.
 			if [[ "${install_prioritize_non_restart_updates_option}" == "FALSE" ]] || { [[ "${install_prioritize_non_restart_updates_option}" == "TRUE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; }; then
 				IFS="${previous_ifs}"
 				return 0
@@ -11030,6 +11090,15 @@ main() {
 				[[ "${verbose_mode_option}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
 			fi
 		else # Default super workflow, can run with or without logged in user.
+			# Double-check for local user, and if recently started up then wait until later.
+			[[ "${current_user_account_name}" == "FALSE" ]] && check_current_user
+			if [[ "${current_user_account_name}" == "FALSE" ]] && [[ $((workflow_time_epoch - kernel_boot_epoch)) -lt $RECENT_STARTUP_AUTO_DEFERRAL_SECONDS ]]; then
+				deferral_timer_minutes="${deferral_timer_error_minutes}"
+				log_super "Error: The system started up less than $RECENT_STARTUP_AUTO_DEFERRAL_SECONDS seconds ago so it's unsafe to assume current active user status, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: The system started up less than $RECENT_STARTUP_AUTO_DEFERRAL_SECONDS seconds ago so it's unsafe to assume current active user status, trying again in ${deferral_timer_minutes} minutes."
+				set_auto_launch_deferral
+			fi
+			# At this point pick a workflow based on if the user is active.
 			if [[ "${current_user_account_name}" == "FALSE" ]]; then # A normal user is not logged in, start installations immediately.
 				workflow_install_no_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 			else # A normal user is currently logged in so complete any macOS downloads first.
