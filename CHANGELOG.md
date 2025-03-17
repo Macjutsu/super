@@ -38,7 +38,7 @@
 
 - New `--version` option returns the `super` version number to standard out. Using this option does not require root permissions and does not start or interrupt the `super` workflow.
 - New `--config-status` option returns the status of a variety of items including the contents of the `super` folder and `super` settings files. While this option does require root permissions, it does not start or interrupt the `super` workflow.
-- New [Jamf Pro Extension Attribute script to return the last few lines of the super-audit.log](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Jamf-Pro/super-Audit-Log-Jamf-Pro-EA.sh).
+- New [Jamf Pro Extension Attribute script to return the last few lines of the super-audit.log](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/Jamf-Pro/super-Audit-Log-Jamf-Pro-EA.sh).
 - New workflow behavior if the system has recently started (as defined by within `$RECENT_STARTUP_AUTO_DEFERRAL_SECONDS`), then an automatic error deferral will restart the workflow for later. This is to prevent unintended forced restarts in cases where the workflow was started before the user had a chance to log in.
 - Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/super-migration-options-v5.1.0.tsv).
 - Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
