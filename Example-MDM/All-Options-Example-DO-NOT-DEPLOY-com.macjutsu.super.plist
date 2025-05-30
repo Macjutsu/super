@@ -24,6 +24,8 @@
 	<true/>
 	<key>WorkflowOnlyDownload</key>
 	<true/>
+	<key>WorkflowRequireActiveUser</key>
+	<true/>
 	<key>WorkflowRestartWithoutUpdates</key>
 	<true/>
 	<key>WorkflowDisableUpdateCheck</key>

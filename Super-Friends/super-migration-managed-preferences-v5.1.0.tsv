@@ -10,6 +10,7 @@ super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	<key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	N/A	N/A
 <key>WorkflowInstallNow</key> <true/> | <false/>	<key>WorkflowInstallNow</key> <true/> | <false/>	REMOVED	<key>InstallNow</key> <true/> | <false/>
 <key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>OnlyDownload</key> <true/> | <false/>
+<key>WorkflowRequireActiveUser</key> <true/> | <false/>	N/A	N/A	N/A
 <key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>RestartWithoutUpdates</key> <true/> | <false/>
 <key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>SkipUpdates</key> <true/> | <false/>
 <key>WorkflowDisableRelaunch</key> <true/> | <false/>	<key>WorkflowDisableRelaunch</key> <true/> | <false/>	<key>WorkflowDisableRelaunch</key> <true/> | <false/>	N/A
@@ -61,15 +62,15 @@ super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>	<key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>	N/A	N/A
 <key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>HelpButton</key> <string>plain text or URL</string>
 <key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>WarningButton</key> <string>plain text or URL</string>
-<key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	N/A
-<key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	N/A
-<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	N/A
-"<key>AuthMDMFailoverToUser</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>"	"<key>AuthMDMFailoverToUser</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>"	"<key>AuthMDMFailoverToUser</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>"	"<key>UserAuthMDMFailover</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>"
 <key>TestMode</key> <true/> | <false/>	<key>TestMode</key> <true/> | <false/>	<key>TestMode</key> <true/> | <false/>	<key>TestMode</key> <true/> | <false/>
 <key>TestModeTimeout</key> <string>seconds</string>	<key>TestModeTimeout</key> <string>seconds</string>	<key>TestModeTimeout</key> <string>seconds</string>	<key>TestModeTimeout</key> <string>seconds</string>
 <key>TestStorageUpdate</key> <string>gigabytes</string>	<key>TestStorageUpdate</key> <string>gigabytes</string>	<key>TestStorageUpdate</key> <string>gigabytes</string>	<key>FreeSpaceUpdate</key> <string>gigabytes</string>
 <key>TestStorageUpgrade</key> <string>gigabytes</string>	<key>TestStorageUpgrade</key> <string>gigabytes</string>	<key>TestStorageUpgrade</key> <string>gigabytes</string>	<key>FreeSpaceUpgrade</key> <string>gigabytes</string>
 <key>TestBatteryLevel</key> <string>percentage</string>	<key>TestBatteryLevel</key> <string>percentage</string>	<key>TestBatteryLevel</key> <string>percentage</string>	<key>BatteryLevel</key> <string>percentage</string>
+<key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	N/A
+<key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	N/A
+<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	<key>AuthCredentialFailoverToUser</key> <true/> | <false/>	N/A
+"<key>AuthMDMFailoverToUser</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>"	"<key>AuthMDMFailoverToUser</key> <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>"	"<key>AuthMDMFailoverToUser</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>"	"<key>UserAuthMDMFailover</key> <string>ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP</string>"
 <key>VerboseMode</key> <true/> | <false/>	<key>VerboseMode</key> <true/> | <false/>	<key>VerboseMode</key> <true/> | <false/>	<key>VerboseMode</key> <true/> | <false/>
 REMOVED	REMOVED	<key>DisplayAccessoryUserAuthFile</key> <string>path or URL</string>	<key>DisplayAccessoryUserAuth</key> <string>path or URL</string>
 REMOVED	REMOVED	REMOVED	<key>DisplayRedraw</key> <string>seconds</string>
