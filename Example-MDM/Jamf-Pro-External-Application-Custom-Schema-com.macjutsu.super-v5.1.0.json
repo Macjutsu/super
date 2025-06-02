@@ -1,6 +1,6 @@
 {
     "title": "Super Version 5.1.0 (com.macjutsu.super)",
-    "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true, please remember to set to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
+    "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true. Please remember to set it to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
     "__preferencedomain": "com.macjutsu.super",
     "options": {
         "remove_empty_properties": true
@@ -589,6 +589,12 @@
         "WorkflowDisableRelaunch": {
             "title": "Disable Super Auto-Relaunch",
             "description": "Prevents super from checking for new updates/upgrades on a reoccurring basis.",
+            "type": "boolean",
+            "default": "false"
+        },
+        "WorkflowRequireActiveUser": {
+            "title": "Require Active Logged In User",
+            "description": "Super will only continue if there is a logged in user. With this option enabled, if there is no active user when the super workflow runs, then an automatic error deferral will restart the workflow for later.",
             "type": "boolean",
             "default": "false"
         },
