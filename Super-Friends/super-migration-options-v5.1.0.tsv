@@ -29,7 +29,7 @@ YES	--workflow-disable-update-check-off	--workflow-disable-update-check-off	--wo
 YES	--workflow-disable-relaunch	--workflow-disable-relaunch	--workflow-disable-relaunch	N/A
 YES	--workflow-disable-relaunch-off	--workflow-disable-relaunch-off	--workflow-disable-relaunch-off	N/A
 YES	--workflow-reset-super-after-completion	--workflow-reset-super-after-completion	N/A	N/A
-YES	—workflow-reset-super-after-completion-off	N/A	N/A	N/A
+YES	--workflow-reset-super-after-completion-off	N/A	N/A	N/A
 YES	--deferral-timer-default=minutes	--deferral-timer-default=minutes	--deferral-timer-default=minutes	--default-defer=seconds
 YES	"--deferral-timer-menu=minutes,minutes,etc..."	"--deferral-timer-menu=minutes,minutes,etc..."	"--deferral-timer-menu=minutes,minutes,etc..."	"--menu-defer=seconds,seconds,etc..."
 YES	--deferral-timer-focus=minutes	--deferral-timer-focus=minutes	--deferral-timer-focus=minutes	--focus-defer=seconds
@@ -37,6 +37,8 @@ YES	--deferral-timer-error=minutes	--deferral-timer-error=minutes	--deferral-tim
 YES	--deferral-timer-workflow-relaunch=minutes	--deferral-timer-workflow-relaunch=minutes	--deferral-timer-workflow-relaunch=minutes	--recheck-defer=seconds
 YES	--deferral-timer-reset-all	--deferral-timer-reset-all	--deferral-timer-reset-all	--delete-deferrals
 YES	"--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc..."	"--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc..."	N/A	N/A
+YES	--schedule-deferred-start-file=/local/path	N/A	N/A	N/A
+YES	--schedule-deferred-start-days=number	N/A	N/A	N/A
 YES	--schedule-zero-date-release	--schedule-zero-date-release	N/A	N/A
 YES	--schedule-zero-date-release-off	--schedule-zero-date-release-off	N/A	N/A
 YES	--schedule-zero-date-sofa-custom-url=URL	--schedule-zero-date-sofa-custom-url=URL	N/A	N/A

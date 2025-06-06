@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-beta3"
+SUPER_VERSION="5.1.0-beta4"
 readonly SUPER_VERSION
-SUPER_DATE="2025/05/30"
+SUPER_DATE="2025/06/06"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -70,6 +70,8 @@ show_usage() {
   
   Scheduling Options:
   [--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...]
+  [--schedule-deferred-start-file=/local/path]
+  [--schedule-deferred-start-days=number]
   [--schedule-zero-date-release]  [--schedule-zero-date-release-off]
   [--schedule-zero-date-sofa-custom-url=URL]
   [--schedule-zero-date-manual=YYYY-MM-DD:hh:mm]
@@ -174,6 +176,8 @@ show_usage() {
   <key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>
   <key>ScheduleWorkflowActive</key>
   <string>DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...</string>
+  <key>ScheduleDeferredStartFile</key> <string>path</string>
+  <key>ScheduleDeferredStartDays</key> <string>number</string>
   <key>ScheduleZeroDateRelease</key> <true/> | <false/>
   <key>ScheduleZeroDateSOFACustomURL</key> <string>URL</string>
   <key>ScheduleZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>
@@ -287,8 +291,8 @@ show_config_status() {
 	elif [[ "${super_launch_daemon_active}" == "TRUE" ]]; then
 		local next_auto_launch
 		next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null)
-		[[ "${next_auto_launch}" != "FALSE" ]] && echo "Config Status: LaunchDaemon system/${SUPER_LAUNCH_DAEMON_LABEL} is ENABLED and the super workflow is SCHEDULED to run again at ${next_auto_launch}."
-		[[ "${next_auto_launch}" == "FALSE" ]] && echo "Config Status: LaunchDaemon system/${SUPER_LAUNCH_DAEMON_LABEL} is ENABLED but the super workflow is NOT SCHEDULED to run again."
+		[[ "${next_auto_launch}" != "FALSE" ]] && echo "Config Status: LaunchDaemon system/${SUPER_LAUNCH_DAEMON_LABEL} is ENABLED and the super workflow is scheduled to automatically relaunch at ${next_auto_launch}."
+		[[ "${next_auto_launch}" == "FALSE" ]] && echo "Config Status: LaunchDaemon system/${SUPER_LAUNCH_DAEMON_LABEL} is ENABLED but the super workflow is NOT scheduled to automatically relaunch."
 	else
 		echo "Config Status: LaunchDaemon system/${SUPER_LAUNCH_DAEMON_LABEL} is NOT ENABLED."
 	fi
@@ -517,6 +521,11 @@ set_defaults() {
 	readonly MIST_CLI_BINARY
 	# IMPORTANT DETAIL: super does not move the mist-cli binary to another custom location.
 	# Changing this folder path to anything besides "/usr/local/bin/mist" requires that you must also deploy the mist-cli binary to the custom location prior to using super.
+	
+	# Path to the local Apple Setup (Assistant) Done file.
+	APPLE_SETUP_DONE_FILE="/var/db/.AppleSetupDone"
+	readonly APPLE_SETUP_DONE_FILE
+	# IMPORTANT DETAIL: Changing this path provides no benefit as this is the default (and only) location for this file.
 	
 	# Path to the local preference file that would contain any software update settings:
 	MSU_LOCAL_PLIST="/Library/Preferences/com.apple.SoftwareUpdate" # No trailing ".plist"
@@ -793,6 +802,12 @@ get_options() {
 			;;
 		--schedule-workflow-active=*)
 			schedule_workflow_active_option="${1##*=}"
+			;;
+		--schedule-deferred-start-file=*)
+			schedule_deferred_start_file_option="${1##*=}"
+			;;
+		--schedule-deferred-start-days=*)
+			schedule_deferred_start_days_option="${1##*=}"
 			;;
 		--schedule-zero-date-release)
 			schedule_zero_date_release_option="TRUE"
@@ -1161,6 +1176,7 @@ manage_preference_resets() {
 	
 		# Delete and/or reset locally saved items.
 		defaults delete "${SUPER_MAIN_PLIST}" >/dev/null 2>&1
+		set_pref_main "SuperVersion" "${SUPER_VERSION}"
 		defaults read "${SUPER_MAIN_PLIST}" >/dev/null 2>&1
 		rm -f "${SUPER_FOLDER}/.WorkflowInstallNow" 2>/dev/null # This is cleaning up a legacy item.
 		rm -f "${SUPER_FOLDER}/.WorkflowRestartValidate" 2>/dev/null # This is cleaning up a legacy item.
@@ -1170,7 +1186,6 @@ manage_preference_resets() {
 		check_software_status_required="TRUE" # This will trigger the reset_software_update_status() function.
 		rm -f "${SOFA_MACOS_JSON_ETAG_CACHE}" 2>/dev/null
 		rm -f "${SOFA_MACOS_JSON_CACHE}" 2>/dev/null
-		set_pref_main "SuperVersion" "${SUPER_VERSION}"
 		[[ "${verbose_mode}" == "TRUE" ]] && set_pref_main "VerboseMode" "TRUE"
 	
 		# Restore any saved preferences from backup.
@@ -1234,6 +1249,7 @@ manage_preference_resets() {
 	# Handle any alternate workflow configuration delete requests.
 	alternate_default_plist=$(get_pref "AlternateDefaultPlist")
 	alternate_temporary_plist=$(get_pref "AlternateTemporaryPlist")
+	config_delete_reset_workflow="FALSE"
 	if [[ "${config_delete_all_option}" == "TRUE" ]]; then
 		log_super_audit "Status: Deleting all workflow configurations in ${SUPER_CONFIGS_FOLDER}."
 		for delete_alt_plist in "${SUPER_CONFIGS_FOLDER:?}"/*; do
@@ -1243,10 +1259,12 @@ manage_preference_resets() {
 		if [[ -n "${alternate_default_plist}" ]]; then
 			log_super_audit "Status: Workflow is no longer using deleted alternate default configuration at ${alternate_default_plist}.plist."
 			delete_pref_main "AlternateDefaultPlist"
+			config_delete_reset_workflow="TRUE"
 		fi
 		if [[ -n "${alternate_temporary_plist}" ]]; then
 			log_super_audit "Status: Workflow is no longer using deleted alternate temporary configuration at ${alternate_temporary_plist}.plist."
 			delete_pref_main "AlternateTemporaryPlist"
+			config_delete_reset_workflow="TRUE"
 		fi
 	elif [[ -n "${config_delete_option}" ]]; then # Only deleting an individual altnernate plist.
 		if [[ -f "${SUPER_CONFIGS_FOLDER}/com.macjutsu.super.${config_delete_option}.plist" ]]; then
@@ -1258,14 +1276,17 @@ manage_preference_resets() {
 		if [[ "${alternate_default_plist}" == "${SUPER_CONFIGS_FOLDER}/com.macjutsu.super.${config_delete_option}" ]]; then
 			log_super_audit "Status: Workflow is no longer using deleted alternate default configuration at ${alternate_default_plist}.plist."
 			delete_pref_main "AlternateDefaultPlist"
+			config_delete_reset_workflow="TRUE"
 		fi
 		if [[ "${alternate_temporary_plist}" == "${SUPER_CONFIGS_FOLDER}/com.macjutsu.super.${config_delete_option}" ]]; then
 			log_super_audit "Status: Workflow is no longer using deleted alternate temporary configuration at ${alternate_temporary_plist}.plist."
 			delete_pref_main "AlternateTemporaryPlist"
+			config_delete_reset_workflow="TRUE"
 		fi
 	fi
 	unset alternate_default_plist
 	unset alternate_temporary_plist
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: config_delete_reset_workflow is: ${config_delete_reset_workflow}"
 }
 
 # Validate non-authentication parameters and if necissary modifications to local preferences. Any errors set ${parameter_error}.
@@ -1605,6 +1626,38 @@ manage_parameter_options() {
 	fi
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${schedule_workflow_active}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active is: ${schedule_workflow_active}"
 	
+	# Validate ${schedule_deferred_start_file_option} input and if valid set the ${schedule_deferred_start_file} parameter.
+	schedule_deferred_start_file=$(get_pref_managed "ScheduleDeferredStartFile")
+	if [[ -z "${schedule_deferred_start_file}" ]] && [[ "${schedule_deferred_start_file_option}" == "X" ]]; then
+		delete_pref "ScheduleDeferredStartFile"
+	elif [[ -z "${schedule_deferred_start_file}" ]] && [[ -n "${schedule_deferred_start_file_option}" ]]; then
+		schedule_deferred_start_file="${schedule_deferred_start_file_option}"
+		set_pref "ScheduleDeferredStartFile" "${schedule_deferred_start_file}"
+	fi
+	[[ -z "${schedule_deferred_start_file}" ]] && schedule_deferred_start_file=$(get_pref "ScheduleDeferredStartFile")
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${schedule_deferred_start_file}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_deferred_start_file is: ${schedule_deferred_start_file}"
+	
+	# Validate ${schedule_deferred_start_days_option} input and if valid set the ${schedule_deferred_start_days} parameter.
+	schedule_deferred_start_days=$(get_pref_managed "ScheduleDeferredStartDays")
+	if [[ -z "${schedule_deferred_start_days}" ]] && [[ "${schedule_deferred_start_days_option}" == "X" ]]; then
+		delete_pref "ScheduleDeferredStartDays"
+	elif [[ -z "${schedule_deferred_start_days}" ]] && [[ -n "${schedule_deferred_start_days_option}" ]]; then
+		schedule_deferred_start_days="${schedule_deferred_start_days_option}"
+		set_pref "ScheduleDeferredStartDays" "${schedule_deferred_start_days}"
+	fi
+	[[ -z "${schedule_deferred_start_days}" ]] && schedule_deferred_start_days=$(get_pref "ScheduleDeferredStartDays")
+	if [[ -n "${schedule_deferred_start_days}" ]] && [[ "${schedule_deferred_start_days}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		if [[ "${schedule_deferred_start_days}" -lt 1 ]]; then
+			log_super "Parameter Warning: Specified --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} must be greater than zero days to have any affect."
+			unset schedule_deferred_start_days
+		elif [[ "${schedule_deferred_start_days}" -gt 90 ]]; then
+			log_super "Parameter Warning: Specified --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} days is too high, rounding down to 90 days."
+			schedule_deferred_start_days=90
+		fi
+	fi
+	{ [[ -n "${schedule_deferred_start_days}" ]] && [[ ! "${schedule_deferred_start_days}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --schedule-deferred-start-days=number value must only be a number." && parameter_error="TRUE"
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${schedule_deferred_start_days}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_deferred_start_days is: ${schedule_deferred_start_days}"
+	
 	# Manage ${schedule_zero_date_release} parameter.
 	schedule_zero_date_release=$(get_pref_managed "ScheduleZeroDateRelease")
 	{ [[ -z "${schedule_zero_date_release}" ]] && [[ -n "${schedule_zero_date_release_option}" ]]; } && schedule_zero_date_release="${schedule_zero_date_release_option}" && set_pref "ScheduleZeroDateRelease" "${schedule_zero_date_release_option}"
@@ -1664,7 +1717,8 @@ manage_parameter_options() {
 			parameter_error="TRUE"
 		fi
 	fi
-	{ [[ -n "${schedule_zero_date_manual}" ]] && [[ "${schedule_zero_date_release}" == "TRUE" ]]; } && log_super "Parameter Warning: When both the --schedule-zero-date-manual and the --schedule-zero-date-release options are enabled the --schedule-zero-date-manual option takes priority." && schedule_zero_date_release="FALSE"
+	{ [[ -n "${schedule_zero_date_manual}" ]] && [[ "${schedule_zero_date_release}" == "TRUE" ]]; } && log_super "Parameter Warning: When both the --schedule-zero-date-manual and the --schedule-zero-date-release options are enabled the --schedule-zero-date-manual option takes priority." && unset schedule_zero_date_release
+	{ [[ -n "${schedule_zero_date_manual}" ]] && [[ -n "${schedule_deferred_start_days}" ]]; } && log_super "Parameter Warning: When both the --schedule-zero-date-manual and the --schedule-deferred-start-days options are enabled the --schedule-zero-date-manual option takes priority." && unset schedule_deferred_start_days
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${schedule_zero_date_manual}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_manual is: ${schedule_zero_date_manual}"
 	
 	# Validate ${scheduled_install_days_option} input and if valid set the ${scheduled_install_days} parameter.
@@ -1837,10 +1891,14 @@ manage_parameter_options() {
 	{ [[ -n "${deadline_days_hard}" ]] && [[ ! "${deadline_days_hard}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --deadline-days-hard=number value must only be a number." && parameter_error="TRUE"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${deadline_days_hard}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_days_hard is: ${deadline_days_hard}"
 	
-	# Validate ${deadline_days_focus}, ${deadline_days_soft}, and ${deadline_days_hard} in relation to each other.
+	# Validate ${deadline_days_focus}, ${deadline_days_soft}, ${deadline_days_hard}, and ${schedule_deferred_start_days} parameters in relation to each other.
 	{ [[ -n "${deadline_days_hard}" ]] && [[ -n "${deadline_days_soft}" ]] && [[ "${deadline_days_hard}" -le "${deadline_days_soft}" ]]; } && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --deadline-days-soft=number value of ${deadline_days_soft} day(s)." && parameter_error="TRUE"
 	{ [[ -n "${deadline_days_hard}" ]] && [[ -n "${deadline_days_focus}" ]] && [[ "${deadline_days_hard}" -le "${deadline_days_focus}" ]]; } && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --deadline-days-focus=number value of ${deadline_days_focus} day(s)." && parameter_error="TRUE"
 	{ [[ -n "${deadline_days_soft}" ]] && [[ -n "${deadline_days_focus}" ]] && [[ "${deadline_days_soft}" -le "${deadline_days_focus}" ]]; } && log_super "Parameter Error: The --deadline-days-soft=number value of ${deadline_days_soft} day(s) must be more than the --deadline-days-focus=number value of ${deadline_days_focus} day(s)." && parameter_error="TRUE"
+	{ [[ -n "${deadline_days_focus}" ]] && [[ -n "${schedule_deferred_start_days}" ]] && [[ "${deadline_days_focus}" -le "${schedule_deferred_start_days}" ]]; } && log_super "Parameter Error: The --deadline-days-focus=number value of ${deadline_days_focus} day(s) must be more than the --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} day(s)." && parameter_error="TRUE"
+	{ [[ -n "${deadline_days_soft}" ]] && [[ -n "${schedule_deferred_start_days}" ]] && [[ "${deadline_days_soft}" -le "${schedule_deferred_start_days}" ]]; } && log_super "Parameter Error: The --deadline-days-soft=number value of ${deadline_days_soft} day(s) must be more than the --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} day(s)." && parameter_error="TRUE"
+	{ [[ -n "${deadline_days_hard}" ]] && [[ -n "${schedule_deferred_start_days}" ]] && [[ "${deadline_days_hard}" -le "${schedule_deferred_start_days}" ]]; } && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} day(s)." && parameter_error="TRUE"
+	
 	
 	# Validate ${deadline_date_focus_option} input and if valid set the ${deadline_date_focus} and ${deadline_date_focus_epoch} parameters.
 	deadline_date_focus=$(get_pref_managed "DeadlineDateFocus")
@@ -3674,8 +3732,13 @@ workflow_startup() {
 	# Create new ${SUPER_PID_FILE} for this instance of super.
 	echo $$ >"${SUPER_PID_FILE}"
 	
-	# If super crashes or the system restarts unexpectedly before super exits, then automatically launch again.
-	/usr/libexec/PlistBuddy -c "Delete :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+	# If using an alternate configuration mode then save a ${super_status_backup} otherwise delete the NextAutoLaunch preference in case the workflow crashes or the system restarts unexpectedly before super exits. A "missing" NextAutoLaunch preference will cause super to automatically restart via the LaunchDaemon.
+	if [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]] || [[ -n "${config_delete_option}" ]] || [[ "${config_delete_all_option}" == "TRUE" ]]; then
+		local super_status_backup
+		super_status_backup=$(get_pref "SuperStatus")
+	else
+		/usr/libexec/PlistBuddy -c "Delete :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+	fi
 	
 	# Check for super installation.
 	local super_current_folder
@@ -3687,8 +3750,6 @@ workflow_startup() {
 	
 	# After installation is verified, the startup workflow can begin.
 	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - SUPER STARTUP ****"
-	local super_status_backup
-	{ [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]] || [[ -n "${config_delete_option}" ]] || [[ "${config_delete_all_option}" == "TRUE" ]]; } && super_status_backup=$(get_pref "SuperStatus")
 	log_status "Running: Startup workflow."
 	
 	# Manage the ${verbose_mode} parameter and if enabled start additional logging.
@@ -3753,21 +3814,6 @@ workflow_startup() {
 		exit_error
 	fi
 	
-	# If user is only making alternate configuration changes then the entire workflow should exit.
-	if [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]] || [[ -n "${config_delete_option}" ]] || [[ "${config_delete_all_option}" == "TRUE" ]]; then
-		local next_auto_launch
-		next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null)
-		if [[ $(launchctl print "system/${SUPER_LAUNCH_DAEMON_LABEL}" 2>&1 | grep -c "system/${SUPER_LAUNCH_DAEMON_LABEL}") -gt 0 ]] && [[ "${next_auto_launch}" != "FALSE" ]]; then
-			log_super "Exit: Configuration mode complete. The super workflow is scheduled to run again at ${next_auto_launch}."
-			[[ -n "${super_status_backup}" ]] && set_pref_main "SuperStatus" "${super_status_backup}"
-			[[ -z "${super_status_backup}" ]] && log_status "Inactive: Configuration mode complete. The super workflow is scheduled to run again at ${next_auto_launch}."
-		else
-			log_super "Exit: Configuration mode complete. The super workflow is not scheduled to run again. You must run super again to start a workflow."
-			log_status "Inactive: Configuration mode complete. The super workflow is not scheduled to run again. You must run super again to start a workflow."
-		fi
-		exit_clean
-	fi
-	
 	# Initial preparation for various workflow modes. This enforces a hierarchy of workflows as follows: Restart Validate > Install Now > Scheduled Installation > Only Download > Default Workflow.
 	[[ "${test_mode}" == "TRUE" ]] && log_super "Status: Test mode active with ${test_mode_timeout_seconds} second timeout."
 	if [[ $(get_pref "WorkflowRestartValidate") == "TRUE" ]]; then
@@ -3819,6 +3865,59 @@ workflow_startup() {
 	manage_workflow_options
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file after startup validation: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2>/dev/null)"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${super_alternate_plist}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Alternate preference file after startup validation: ${super_alternate_plist}:\n$(defaults read "${super_alternate_plist}" 2>/dev/null)"
+	
+	# If the macOS Setup Assistant is incomplete, or the ${schedule_deferred_start_file} is not found, or the admin is only making alternate configuration changes then the workflow should automatically defer or exit.
+	if [[ ! -f "${APPLE_SETUP_DONE_FILE}" ]] || { [[ -n "${schedule_deferred_start_file}" ]] && [[ ! -f "${schedule_deferred_start_file}" ]]; } || [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]] || [[ -n "${config_delete_option}" ]] || [[ "${config_delete_all_option}" == "TRUE" ]]; then
+		[[ "${config_delete_reset_workflow}" == "TRUE" ]] && reset_workflow
+		local next_auto_launch
+		if [[ "${workflow_disable_relaunch}" == "TRUE" ]]; then
+			/usr/libexec/PlistBuddy -c "Delete :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+			/usr/libexec/PlistBuddy -c "Add :NextAutoLaunch string FALSE" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+			next_auto_launch="FALSE"
+		else
+			next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null)
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: next_auto_launch: ${next_auto_launch}"
+		if [[ $(launchctl print "system/${SUPER_LAUNCH_DAEMON_LABEL}" 2>&1 | grep -c "system/${SUPER_LAUNCH_DAEMON_LABEL}") -gt 0 ]] && [[ "${next_auto_launch}" != "FALSE" ]]; then
+			if [[ ! -f "${APPLE_SETUP_DONE_FILE}" ]] || { [[ -n "${schedule_deferred_start_file}" ]] && [[ ! -f "${schedule_deferred_start_file}" ]]; } || [[ "${config_delete_reset_workflow}" == "TRUE" ]]; then
+				if [[ ! -f "${APPLE_SETUP_DONE_FILE}" ]]; then
+					log_super "Exit: macOS Setup Assistant is not done. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+					log_status "Pending: macOS Setup Assistant is not done. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+				elif [[ ! -f "${schedule_deferred_start_file}" ]]; then
+					log_super "Status: The following schedule deferred start file was not found on the system ${schedule_deferred_start_file}."
+					log_super "Exit: Schedule deferred start file not found. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+					log_status "Pending: Schedule deferred start file not found. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+				else
+					log_super "Exit: Configuration mode complete. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+					log_status "Pending: Configuration mode complete. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+				fi
+				set_auto_launch_deferral
+			else
+				if [[ -n "${next_auto_launch}" ]]; then
+					log_super "Exit: Configuration mode complete. The super workflow is scheduled to automatically relaunch at ${next_auto_launch}."
+					[[ -n "${super_status_backup}" ]] && set_pref_main "SuperStatus" "${super_status_backup}"
+					[[ -z "${super_status_backup}" ]] && log_status "Pending: Configuration mode complete. The super workflow is scheduled to automatically relaunch at ${next_auto_launch}."
+				else
+					log_super "Exit: Configuration mode complete. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+					log_status "Pending: Configuration mode complete. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
+					set_auto_launch_deferral
+				fi
+			fi
+		else
+			if [[ ! -f "${APPLE_SETUP_DONE_FILE}" ]]; then
+				log_super "Exit: macOS Setup Assistant is not done. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
+				log_status "Inactive: macOS Setup Assistant is not done. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
+			elif [[ ! -f "${schedule_deferred_start_file}" ]]; then
+				log_super "Status: The following schedule deferred start file was not found on the system ${schedule_deferred_start_file}."
+				log_super "Exit: Schedule deferred start file not found. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
+				log_status "Inactive: Schedule deferred start file not found. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
+			else
+				log_super "Exit: Configuration mode complete. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
+				log_status "Inactive: Configuration mode complete. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
+			fi
+		fi
+		exit_clean
+	fi
 	
 	# If super is running via Jamf, then restart via LaunchDaemon to release the jamf parent process.
 	if [[ "${parent_process_is_jamf}" == "TRUE" ]]; then
@@ -4423,6 +4522,18 @@ reset_schedule_zero_date() {
 	delete_pref_main "DeadlineDaysHardDate"
 }
 
+# Delete all workflow items, counters, and zero dates in ${SUPER_MAIN_PLIST} to reset the workflow target.
+reset_workflow() {
+	log_super "Status: Resetting workflow target."
+	set_pref_main "WorkflowTarget" "FALSE"
+	delete_pref_main "WorkflowScheduledInstall"
+	delete_pref_main "WorkflowDownloadMacOSAuthRequired"
+	reset_schedule_zero_date
+	reset_deadline_counters
+}
+
+
+
 # Evaluate ${schedule_workflow_active} and set ${workflow_time_weekday}, ${schedule_workflow_active_array}, and ${schedule_workflow_active_deferral} accordingly.
 # If the workflow schedule is currently active then set ${schedule_workflow_active_current_end_epoch} and ${schedule_workflow_active_current_end}, but if the workflow schedule is currently inactive then set ${schedule_workflow_active_next_start_epoch} and ${schedule_workflow_active_next_start}.
 check_schedule_workflow_active() {
@@ -4850,6 +4961,7 @@ get_sofa_macos_json() {
 # Evaluate ${schedule_zero_date_manual} and ${schedule_zero_date_release} to set ${schedule_zero_date}, ${schedule_zero_date_epoch}, and ${display_string_schedule_zero_date} accordingly.
 check_schedule_zero_date() {
 	schedule_zero_date="FALSE"
+	schedule_deferred_start_days_active="FALSE"
 	local schedule_zero_date_automatic_release_previous
 	schedule_zero_date_automatic_release_previous=$(get_pref "ScheduleZeroDateAutomaticRelease")
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_automatic_release_previous: ${schedule_zero_date_automatic_release_previous}"
@@ -4957,7 +5069,7 @@ check_schedule_zero_date() {
 	
 	# If there is no ${schedule_zero_date} at this point then set one based on workflow start date/time of now.
 	if [[ "${schedule_zero_date}" == "FALSE" ]]; then
-		schedule_zero_date=$(date +%Y-%m-%d:%H:%M)
+		schedule_zero_date=$(date -r "${workflow_time_epoch}" +%Y-%m-%d:%H:%M)
 		log_super_audit "Status: Setting new automatic zero date based on the ${workflow_target} workflow start date of ${schedule_zero_date}."
 		set_pref_main "ScheduleZeroDateAutomaticStart" "${schedule_zero_date}"
 		delete_pref_main "ScheduleZeroDateAutomaticRelease"
@@ -4969,7 +5081,7 @@ check_schedule_zero_date() {
 		fi
 	fi
 	
-	# Set remaining zero date parameters.
+	# Set the ${schedule_zero_date_epoch} and ${display_string_schedule_zero_date} parameters.
 	schedule_zero_date_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${schedule_zero_date}:00" +%s)
 	local display_string_schedule_zero_date_only_date
 	display_string_schedule_zero_date_only_date=$(date -r "${schedule_zero_date_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")
@@ -4984,6 +5096,29 @@ check_schedule_zero_date() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_schedule_zero_date_only_date: ${display_string_schedule_zero_date_only_date}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_schedule_zero_date_only_time: ${display_string_schedule_zero_date_only_time}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_schedule_zero_date: ${display_string_schedule_zero_date}"
+	
+	# If required, handle the ${schedule_deferred_start_days} option and ${schedule_deferred_start_days_active} accordingly.
+	if [[ -n "${schedule_deferred_start_days}" ]]; then
+		schedule_zero_date_deferred_start_date=$(date -r $((schedule_zero_date_epoch + (schedule_deferred_start_days * 86400))) +%Y-%m-%d:%H:%M)
+		schedule_zero_date_deferred_start_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${schedule_zero_date_deferred_start_date}:00" +%s)
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_deferred_start_epoch: ${schedule_zero_date_deferred_start_epoch}"
+		if [[ $schedule_zero_date_deferred_start_epoch -lt $workflow_time_epoch ]]; then
+			log_super "Status: Schedule deferred start of ${schedule_zero_date_deferred_start_date} (${schedule_deferred_start_days} day(s) after zero date of ${schedule_zero_date}) has passed."
+		else
+			local schedule_zero_date_deferred_start_difference
+			schedule_zero_date_deferred_start_difference=$((schedule_zero_date_deferred_start_epoch - workflow_time_epoch))
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_deferred_start_difference is: ${schedule_zero_date_deferred_start_difference}"
+			if [[ $schedule_zero_date_deferred_start_difference -le 180 ]]; then
+				log_super "Status: Schedule deferred start of ${schedule_zero_date_deferred_start_date} (${schedule_deferred_start_days} day(s) after zero date of ${schedule_zero_date}) is only ${schedule_zero_date_deferred_start_difference} seconds away, waiting for deferred start to pass..."
+				sleep $((schedule_zero_date_deferred_start_difference + 1))
+				log_super "Status: Schedule deferred start of ${schedule_zero_date_deferred_start_date} (${schedule_deferred_start_days} day(s) after zero date of ${schedule_zero_date}) has passed."
+			else
+				log_super "Status: Schedule deferred start of ${schedule_zero_date_deferred_start_date} (${schedule_deferred_start_days} day(s) after zero date of ${schedule_zero_date}) has not passed."
+				schedule_deferred_start_days_active="TRUE"
+			fi
+		fi
+	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_deferred_start_days_active: ${schedule_deferred_start_days_active}"
 }
 
 # Evaluate any previously set ${workflow_scheduled_install_active}, ${scheduled_install_days}, and ${scheduled_install_date} options.
@@ -5543,7 +5678,7 @@ check_software_update_status_cached() {
 	[[ -n "${msu_last_sccessful_date}" ]] && msu_last_sccessful_epoch=$(date -j -u -f "%Y-%m-%d %H:%M:%S %z" "${msu_last_sccessful_date}" +%s)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_last_sccessful_date is: ${msu_last_sccessful_date}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_last_sccessful_epoch is: ${msu_last_sccessful_epoch}"
-	if [[ "${msu_last_sccessful_epoch}" -lt $(($(date +%s) - 21600)) ]]; then
+	if [[ "${msu_last_sccessful_epoch}" -lt $((workflow_time_epoch - 21600)) ]]; then
 		log_super "Status: Last macOS software update check was more than 6 hours ago, full software status check required."
 		check_software_status_required="TRUE"
 		return 0
@@ -7396,10 +7531,7 @@ install_macos_msu() {
 			sleep "${test_mode_timeout_seconds}"
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 		fi
-		# Reset various items after test macOS update is complete.
-		delete_pref_main "WorkflowDownloadMacOSAuthRequired"
-		reset_schedule_zero_date
-		reset_deadline_counters
+		reset_workflow
 		return 0
 	fi
 	
@@ -7602,10 +7734,7 @@ install_macos_app() {
 			sleep "${test_mode_timeout_seconds}"
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 		fi
-		# Reset various items after test macOS update is complete.
-		delete_pref_main "WorkflowDownloadMacOSAuthRequired"
-		reset_schedule_zero_date
-		reset_deadline_counters
+		reset_workflow
 		return 0
 	fi
 	
@@ -7737,10 +7866,7 @@ push_macos_mdm() {
 			sleep "${test_mode_timeout_seconds}"
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 		fi
-		# Reset various items after test macOS update is complete.
-		delete_pref_main "WorkflowDownloadMacOSAuthRequired"
-		reset_schedule_zero_date
-		reset_deadline_counters
+		reset_workflow
 		return 0
 	fi
 	
@@ -9960,7 +10086,7 @@ dialog_user_schedule() {
 	
 	# Body text variations based on deadline options, also set ${display_accessory_datepicker_payload}.
 	local display_accessory_datepicker_start_epoch
-	display_accessory_datepicker_start_epoch=$(($(date +%s) + (DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES * 60) + 1))
+	display_accessory_datepicker_start_epoch=$((workflow_time_epoch + (DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES * 60) + 1))
 	local display_accessory_datepicker_start_date
 	display_accessory_datepicker_start_date=$(date -j -f %s "${display_accessory_datepicker_start_epoch}" +"%Y/%m/%d %H:%M:%S" | xargs)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_accessory_datepicker_start_date is: ${display_accessory_datepicker_start_date}"
@@ -10007,7 +10133,7 @@ dialog_user_schedule() {
 			dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${dialog_user_schedule_selection}" +%s)
 		fi
 		local dialog_user_schedule_minimum_selection_epoch
-		dialog_user_schedule_minimum_selection_epoch=$(($(date +%s) + 121))
+		dialog_user_schedule_minimum_selection_epoch=$((workflow_time_epoch + 121))
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection is: ${dialog_user_schedule_selection}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_epoch is: ${dialog_user_schedule_selection_epoch}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_minimum_selection_epoch is: ${dialog_user_schedule_minimum_selection_epoch}"
@@ -10389,11 +10515,7 @@ main() {
 		set_pref_main "MacLastStartup" "${mac_last_startup}"
 		workflow_time_epoch=$(date +%s)
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
-		delete_pref_main "WorkflowTarget"
-		delete_pref_main "WorkflowScheduledInstall"
-		delete_pref_main "WorkflowDownloadMacOSAuthRequired"
-		reset_schedule_zero_date
-		reset_deadline_counters
+		reset_workflow
 		# Handle the ${workflow_reset_super_after_completion_active} or ${alternate_temporary_plist} workflow options.
 		if [[ "${workflow_reset_super_after_completion_active}" == "TRUE" ]] || [[ -n "${alternate_temporary_plist}" ]]; then
 			if [[ "${workflow_reset_super_after_completion_active}" == "TRUE" ]]; then
@@ -10615,7 +10737,7 @@ main() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_install_now_suppress_notifications is: ${workflow_install_now_suppress_notifications}"
 	fi
 	
-	# Check for zero date, scheduled installations, and log workflow.
+	# Check for zero date, scheduled installation, and log workflow.
 	if [[ "${workflow_target}" != "FALSE" ]]; then
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
 			log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL NOW ${workflow_target_log_string} ****"
@@ -10632,10 +10754,22 @@ main() {
 		fi
 		set_pref_main "WorkflowTarget" "${workflow_target}"
 	else # No software updates/upgrade needed so reset any leftovers.
-		delete_pref_main "WorkflowTarget"
-		delete_pref_main "WorkflowDownloadMacOSAuthRequired"
-		reset_schedule_zero_date
-		reset_deadline_counters
+		[[ "${workflow_target_previous}" != "FALSE" ]] && reset_workflow
+	fi
+	
+	# If needed, handle ${schedule_deferred_start_days_active} before the any installation or restart workflow starts.
+	if [[ "${workflow_target}" != "FALSE" ]] && [[ "${schedule_deferred_start_days_active}" == "TRUE" ]]; then
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+			log_super "Warning: The --workflow-install-now option is currently overriding the schedule deferred start."
+		elif [[ "${workflow_scheduled_install_active}" == "TRUE" ]]; then
+			[[ "${workflow_scheduled_install_now}" == "TRUE" ]] && log_super "Warning: A scheduled installation is currently overriding the schedule deferred start."
+			[[ "${workflow_scheduled_install_now}" != "TRUE" ]] && log_super "Warning: A scheduled installation reminder is currently overriding the schedule deferred start."
+		else # Schedule deferred start should force a deferral.
+			deferral_timer_minutes=$(((schedule_zero_date_deferred_start_epoch - workflow_time_epoch) / 60 ))
+			log_super "Status: Automatic deferred start until ${schedule_zero_date_deferred_start_date}, deferring for ${deferral_timer_minutes} minutes."
+			log_status "Pending: Automatic deferred start until ${schedule_zero_date_deferred_start_date}, deferring for ${deferral_timer_minutes} minutes."
+			set_auto_launch_deferral
+		fi
 	fi
 	
 	# If set, handle the ${schedule_workflow_active} before the any installation or restart workflow starts.
@@ -10777,11 +10911,7 @@ main() {
 		log_super "Exit: System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
 		log_status "Pending: System restart is imminent and the super restart validation workflow is scheduled to automatically relaunch at next startup."
 	else # The super workflow completed but not for a macOS update/upgrade workflow.
-		if [[ "${workflow_target}" != "FALSE" ]]; then
-			delete_pref_main "WorkflowDownloadMacOSAuthRequired"
-			reset_schedule_zero_date
-			reset_deadline_counters
-		fi
+		[[ "${workflow_target}" != "FALSE" ]] && reset_workflow
 		# Wrap-up for the ${workflow_install_now_active} if there were no updates/upgrades.
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
 			{ [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${workflow_install_now_suppress_notifications}" != "TRUE" ]]; } && notification_install_now_up_to_date

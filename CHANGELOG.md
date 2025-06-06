@@ -1,12 +1,13 @@
 # CHANGELOG
 
-## [5.1.0-beta3]
+## [5.1.0-beta4]
 
-2025-05-30
+2025-06-06
 
 ## Highlights (5.1.x)
 
 - Completely rearchitected `super` preferences mechanism allows for alternate configuration workflows. In other words, you can now create multiple different `super` workflow configurations and active them on an as-needed basis.
+- New scheduling options for automatic deferrals when provisioning new systems and when you want to delay the start of a workflow after zero day.
 - New workflow options for installing non-system software updates.
 - Significant quality of life improvements for gathering information about the super workflow configuration including a new `super-audit.log`. 
 
@@ -28,17 +29,32 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta3/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta3/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
 - New [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) for features unique to `super` 5.x.
-- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-beta3/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-beta3/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-beta3/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-beta4/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-beta4/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
 
 ### Known Issues (5.x)
 
 - There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-beta4)
+
+- New macOS Setup Assistant "done file" detection automatically defers the workflow if `super` is installed during new system provisioning. In other words, it's now safe to install `super` during macOS onboarding (including [ADE workflows](https://support.apple.com/guide/security/automated-device-enrollment-secc2cd563ef/web)), as it will automatically defer based on the `--deferral-timer-default=minutes` option or the default of 60 minutes.
+- New `--schedule-deferred-start-file=/local/path` option automatically defers the workflow if the specified file is not found. This allows for `super` to be safely installed during extended macOS onboarding workflows (like Jamf Setup Manager, Setup-Your-Mac, SplashBuddy, etc.), as it will automatically defer based on the `--deferral-timer-default=minutes` option or the default of 60 minutes.
+- New `--schedule-deferred-start-days=number` option automatically defers the workflow until the specified number of days has passed since the zero date. Simliar to the native macOS update/upgrade deferral mechanism, this option prevents `super` from interrupting the user (or if there is no user, from automatically installing) until after the deferred start number of days has passed.
+- Resolved an issue that could prevent authentication options from being saved when using the `--config-edit-main` or `--config-edit=ConfigurationName` options.
+- Resolved an issue that prevented a previously set automatic workflow launch when using the `--config-edit-main` or `--config-edit=ConfigurationName` options.
+- Resolved an issue that prevented the `--config-delete=ConfigurationName` and `--config-delete-all` options from properly removing all relevant workflow settings.
+- Improvements to the workflow complete reset mechanism should prevent issues caused by previously scheduled installations not properly reseting.
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated [example MDM configuration profiles for `super` v5.1.0](https://github.com/Macjutsu/super/tree/5.1.0-beta4/Example-MDM).
+- As always, typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.0-beta4 SHA-256: a05ecc6ec1dea5568532196a70c98b178e944312ef45724f87afcbde1823f737](https://github.com/Macjutsu/super/blob/5.1.0-beta4/super.checksum.txt)
 
 ### Specific Changes (5.1.0-beta3)
 

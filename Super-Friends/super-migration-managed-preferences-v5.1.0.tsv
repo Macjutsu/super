@@ -20,6 +20,8 @@ super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>DeferralTimerWorkflowRelaunch</key> <string>minutes</string>	<key>RecheckDefer</key> <string>seconds</string>
 <key>DeferralTimerError</key> <string>minutes</string>	<key>DeferralTimerError</key> <string>minutes</string>	<key>DeferralTimerError</key> <string>minutes</string>	<key>ErrorDefer</key> <string>seconds</string>
 "<key>ScheduleWorkflowActive</key> <string>DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc…</string>"	"<key>ScheduleWorkflowActive</key> <string>DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc…</string>"	N/A	N/A
+<key>ScheduleDeferredStartFile</key> <string>path</string>	N/A	N/A	N/A
+<key>ScheduleDeferredStartDays</key> <string>number</string>	N/A	N/A	N/A
 <key>ScheduleZeroDateRelease</key> <true/> | <false/>	<key>ScheduleZeroDateRelease</key> <true/> | <false/>	N/A	N/A
 <key>ScheduleZeroDateSOFACustomURL</key> <string>URL</string>	<key>ScheduleZeroDateSOFACustomURL</key> <string>URL</string>	N/A	N/A
 <key>ScheduleZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>	<key>ScheduleZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>	<key>WorkflowZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>	<key>ZeroDay</key> <string>YYYY-MM-DD:hh:mm</string>

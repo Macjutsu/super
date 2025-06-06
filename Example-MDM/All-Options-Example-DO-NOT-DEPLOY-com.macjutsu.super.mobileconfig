@@ -152,6 +152,10 @@
                   <true/>
                   <key>InstallSafariUpdateWithoutRestarting</key>
                   <true/>
+                  <key>ScheduleDeferredStartDays</key>
+                  <string>7</string>
+                  <key>ScheduleDeferredStartFile</key>
+                  <string>/var/db/.MySetupDone</string>
                   <key>ScheduleWorkflowActive</key>
                   <string>TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00</string>
                   <key>ScheduleZeroDateManual</key>
