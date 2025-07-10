@@ -1,12 +1,13 @@
 # CHANGELOG
 
-## [5.1.0-beta4]
+## [5.1.0-beta5]
 
-2025-06-06
+2025-07-10
 
 ## Highlights (5.1.x)
 
 - Completely rearchitected `super` preferences mechanism allows for alternate configuration workflows. In other words, you can now create multiple different `super` workflow configurations and active them on an as-needed basis.
+- Significantly improved macOS update workflow is fully compatible on systems with all built-in automatic software update options enabled.
 - New scheduling options for automatic deferrals when provisioning new systems and when you want to delay the start of a workflow after zero day.
 - New workflow options for installing non-system software updates.
 - Significant quality of life improvements for gathering information about the super workflow configuration including a new `super-audit.log`. 
@@ -29,17 +30,30 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
 - New [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) for features unique to `super` 5.x.
-- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-beta4/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-beta4/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-beta4/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-beta5/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-beta5/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
 
 ### Known Issues (5.x)
 
+- The `super` workflow has not been tested on systems with declarative software update settings. You should continue to use traditional configuration profiles to enforce software update settings.
 - There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-beta5)
+
+- New `--config-clone=SourceConfigurationName` option duplicates an existing alternate configuration preference file. This option must be used with the `--config-edit=ConfigurationName` option to specify (a new or existing) destination for the copy of the cloned configuration. Any additional options specified in the same run are also applied to the destination configuration.
+- New configuration preference file attribute `ConfigEditTimestamp` is the date and time of the previous edits made to that configuration file from a previous `super` run.
+- Significantly improved download workflow assumes that macOS minor updates should be downloaded by the built-in automatic software update option. Workflows targeting macOS minor updates automatically defer if the update has not yet downloaded and the system is configured to automatically download macOS updates.
+- Improved `--config-status` option now shows if a macOS update or upgrade has been cached (downloaded and prepared) by the softwareupdate service.
+- Resolved an issue when using a `--config-edit*` option that would improperly exit the `super` workflow.
+- Resolved an issue when using a `--config-edit*` option that would improperly disable the `super` workflow from automatically re-launching.
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Super-Friends/super-migration-options-v5.1.0.tsv).
+- As always, typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.0-beta5 SHA-256: 1ef92bbcb757037d6cc5c904bb91aad80df1b10ef364201160ff5bebbcd0ed8d](https://github.com/Macjutsu/super/blob/5.1.0-beta5/super.checksum.txt)
 
 ### Specific Changes (5.1.0-beta4)
 

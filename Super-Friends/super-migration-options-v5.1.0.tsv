@@ -98,6 +98,7 @@ YES	--test-storage-upgrade=gigabytes	--test-storage-upgrade=gigabytes	--test-sto
 YES	--test-battery-level=percentage	--test-battery-level=percentage	--test-battery-level=percentage	--battery-level=percentage
 N/A	--config-edit-main	N/A	N/A	N/A
 N/A	--config-edit=ConfigurationName	N/A	N/A	N/A
+N/A	--config-clone=SourceConfigurationName	N/A	N/A	N/A
 N/A	--config-delete=ConfigurationName	N/A	N/A	N/A
 N/A	--config-delete-all	N/A	N/A	N/A
 N/A	--config-start-default=ConfigurationName	N/A	N/A	N/A

@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-beta4"
+SUPER_VERSION="5.1.0-beta5"
 readonly SUPER_VERSION
-SUPER_DATE="2025/06/06"
+SUPER_DATE="2025/07/10"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -130,6 +130,7 @@ show_usage() {
   
   Alternate Configuration Options:
   [--config-edit-main]  [--config-edit=ConfigurationName]
+  [--config-clone=SourceConfigurationName]
   [--config-delete=ConfigurationName]  [--config-delete-all]
   [--config-start-default=ConfigurationName]
   [--config-start-temp=ConfigurationName]
@@ -281,6 +282,9 @@ show_version() {
 show_config_status() {
 	log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - CONFIGURATION STATUS ****"
 	check_system
+	check_macos_msu_download
+	[[ "${macos_msu_downloaded_version}" == "FALSE" ]] && echo "Config Status: Mac softwareupdate system cache is empty (no downloaded macOS update/upgrade)."
+	[[ "${macos_msu_downloaded_version}" != "FALSE" ]] && echo "Config Status: Mac softwareupdate system cache is macOS ${macos_msu_downloaded_version}-${macos_msu_downloaded_build}."
 	local super_previous_pid
 	super_previous_pid=$(pgrep -F "${SUPER_PID_FILE}" 2>/dev/null)
 	local super_launch_daemon_active
@@ -688,6 +692,7 @@ get_options() {
 	
 	# This is a standard while/case loop to collect all the input parameters.
 	while [[ -n "$1" ]]; do
+		config_update="TRUE"
 		case "$1" in
 		-u | -U | --usage)
 			show_usage
@@ -985,6 +990,9 @@ get_options() {
 			;;
 		--config-edit=*)
 			config_edit_option="${1##*=}"
+			;;
+		--config-clone=*)
+			config_clone_option="${1##*=}"
 			;;
 		--config-delete=*)
 			config_delete_option="${1##*=}"
@@ -1302,21 +1310,43 @@ manage_parameter_options() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file before startup validation: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2>/dev/null)"
 	
 	# First handle incompatible combintations of alternate config options.
-	{ [[ -n "${config_edit_main_option}" ]] && [[ -n "${config_edit_option}" ]]; } && log_super "Parameter Error: You can not use both the --config-edit-main and the --config-edit=ConfigurationName options a the same time. Instead, use multiple seperate runs of super for each configuration you want to edit." && parameter_error="TRUE"
-	{ { [[ -n "${config_edit_main_option}" ]] || [[ -n "${config_edit_option}" ]]; } && { [[ -n "${config_start_default_option}" ]] && [[ -n "${config_start_temp_option}" ]]; }; } && log_super "Parameter Error: You can not use both a --config-edit* option and a --config-start* option a the same time. Instead, first run super to edit configurations and then run super again to start configurations." && parameter_error="TRUE"
+	{ [[ "${config_edit_main_option}" == "TRUE" ]] && [[ -n "${config_edit_option}" ]]; } && log_super "Parameter Error: You can not use both the --config-edit-main and the --config-edit=ConfigurationName options a the same time. Instead, use multiple seperate runs of super for each configuration you want to edit." && parameter_error="TRUE"
+	{ [[ -n "${config_clone_option}" ]] && [[ -z "${config_edit_option}" ]]; } && log_super "Parameter Error: To use the --config-clone=SourceConfigurationName option you must also use the --config-edit=ConfigurationName option in order to specify a desination for the cloned configuration." && parameter_error="TRUE"
+	{ { [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]]; } && { [[ -n "${config_start_default_option}" ]] && [[ -n "${config_start_temp_option}" ]]; }; } && log_super "Parameter Error: You can not use both a --config-edit* option and a --config-start* option a the same time. Instead, first run super to edit configurations and then run super again to start configurations." && parameter_error="TRUE"
 	{ { [[ -n "${config_delete_option}" ]] || [[ -n "${config_delete_all_option}" ]]; } && { [[ -n "${config_start_default_option}" ]] && [[ -n "${config_start_temp_option}" ]]; }; } && log_super "Parameter Error: You can not use both a --config-delete* option and a --config-start* option a the same time. Instead, first run super to delete configurations and then run super again to start configurations." && parameter_error="TRUE"
 	[[ "${parameter_error}" == "TRUE" ]] && return 0
 	
-	# Evaluate ${config_edit_main_option} and ${config_edit_option} to optionally set ${super_alternate_plist}.
-	[[ -n "${config_edit_main_option}" ]] && log_super_audit "Status: Saving workflow configuration to main preferences at ${SUPER_MAIN_PLIST}.plist."
-	if [[ -n "${config_edit_option}" ]]; then
+	# Evaluate ${config_edit_option} and ${config_clone_option}, if appropriate then set ${super_alternate_plist}. This also logs changes to configuration files and sets a new ConfigEditTimestamp.
+	if [[ -n "${config_clone_option}" ]]; then
+		local alternate_clone_plist
+		alternate_clone_plist="${SUPER_CONFIGS_FOLDER}/com.macjutsu.super.${config_clone_option}"
+		super_alternate_plist="${SUPER_CONFIGS_FOLDER}/com.macjutsu.super.${config_edit_option}"
+		if [[ -f "${alternate_clone_plist}.plist" ]]; then
+			if [[ ! -f "${super_alternate_plist}.plist" ]]; then
+				log_super_audit "Status: Cloning workflow configuration ${config_clone_option} to new alternate preferences at ${super_alternate_plist}.plist."
+			else
+				log_super_audit "Status: Cloning workflow configuration ${config_clone_option} to replace alternate preferences at ${super_alternate_plist}.plist."
+				rm -Rf "${SUPER_CONFIGS_FOLDER:?}/com.macjutsu.super.${config_edit_option}.plist" >/dev/null 2>&1
+			fi
+			cp "${alternate_clone_plist}.plist" "${super_alternate_plist}.plist" >/dev/null 2>&1
+			set_pref "ConfigEditTimestamp" "$(date +%Y-%m-%d:%H:%M:%S)"
+		else
+			log_super "Parameter Error: Unable to clone workflow configuration because the preferences could not be located at ${alternate_clone_plist}.plist."
+			parameter_error="TRUE"
+		fi
+	elif [[ -n "${config_edit_option}" ]]; then
 		super_alternate_plist="${SUPER_CONFIGS_FOLDER}/com.macjutsu.super.${config_edit_option}"
 		log_super_audit "Status: Saving workflow configuration to alternate preferences at ${super_alternate_plist}.plist."
-		touch "${super_alternate_plist}.plist"
+		set_pref "ConfigEditTimestamp" "$(date +%Y-%m-%d:%H:%M:%S)"
 	fi
+	if [[ "${config_update}" == "TRUE" ]]; then
+		log_super_audit "Status: Saving workflow configuration to main preferences at ${SUPER_MAIN_PLIST}.plist."
+		set_pref_main "ConfigEditTimestamp" "$(date +%Y-%m-%d:%H:%M:%S)"
+	fi
+	[[ "${parameter_error}" == "TRUE" ]] && return 0
 	
 	# If the workflow should start, then evaluate ${config_start_default_option} and ${config_start_temp_option} and possibly save to ${SUPER_MAIN_PLIST} and set ${super_alternate_plist}.
-	if [[ -z "${config_edit_main_option}" ]] && [[ -z "${config_edit_option}" ]] && [[ -z "${config_delete_option}" ]] && [[ -z "${config_delete_all_option}" ]]; then
+	if [[ "${config_edit_main_option}" != "TRUE" ]] && [[ -z "${config_edit_option}" ]] && [[ -z "${config_delete_option}" ]] && [[ -z "${config_delete_all_option}" ]]; then
 		if [[ "${config_start_default_option}" == "X" ]]; then
 			unset_alternate_plist=$(get_pref "AlternateDefaultPlist")
 			if [[ -n "${unset_alternate_plist}" ]]; then
@@ -3427,7 +3457,7 @@ EOSS
 	fi
 	
 	log_super "Installation: Creating super LaunchDaemon: /Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist."
-	/bin/cat <<EOLDL >"/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist"
+	/bin/cat <<EOLD >"/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -3448,7 +3478,7 @@ EOSS
 	<integer>60</integer>
 </dict>
 </plist>
-EOLDL
+EOLD
 	
 	log_super "Installation: Setting permissions for installed super items."
 	chown -R root:wheel "${SUPER_FOLDER}"
@@ -3802,7 +3832,6 @@ workflow_startup() {
 	
 	# Configuration management and helper validations, if any of these fail then it's unsafe for the workflow to continue.
 	if [[ "${check_system_error}" == "FALSE" ]]; then
-		check_msu_settings
 		check_jamf_management_framework
 		manage_preference_resets
 		manage_parameter_options
@@ -3883,7 +3912,7 @@ workflow_startup() {
 				if [[ ! -f "${APPLE_SETUP_DONE_FILE}" ]]; then
 					log_super "Exit: macOS Setup Assistant is not done. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
 					log_status "Pending: macOS Setup Assistant is not done. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
-				elif [[ ! -f "${schedule_deferred_start_file}" ]]; then
+				elif [[ -n "${schedule_deferred_start_file}" ]] && [[ ! -f "${schedule_deferred_start_file}" ]]; then
 					log_super "Status: The following schedule deferred start file was not found on the system ${schedule_deferred_start_file}."
 					log_super "Exit: Schedule deferred start file not found. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
 					log_status "Pending: Schedule deferred start file not found. The super workflow is scheduled to automatically relaunch in ${deferral_timer_minutes} minutes."
@@ -3907,7 +3936,7 @@ workflow_startup() {
 			if [[ ! -f "${APPLE_SETUP_DONE_FILE}" ]]; then
 				log_super "Exit: macOS Setup Assistant is not done. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
 				log_status "Inactive: macOS Setup Assistant is not done. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
-			elif [[ ! -f "${schedule_deferred_start_file}" ]]; then
+			elif [[ -n "${schedule_deferred_start_file}" ]] && [[ ! -f "${schedule_deferred_start_file}" ]]; then
 				log_super "Status: The following schedule deferred start file was not found on the system ${schedule_deferred_start_file}."
 				log_super "Exit: Schedule deferred start file not found. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
 				log_status "Inactive: Schedule deferred start file not found. The super workflow is not scheduled to automatically relaunch. You must run super again to start a workflow."
@@ -4003,18 +4032,8 @@ set_auto_launch_deferral() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_timer_minutes is: ${deferral_timer_minutes}"
 	local deferral_timer_epoch
 	deferral_timer_epoch=$(($(date +%s) + (deferral_timer_minutes * 60)))
-	local deferral_timer_year
-	deferral_timer_year=$(date -j -f %s "${deferral_timer_epoch}" +%Y | xargs)
-	local deferral_timer_month
-	deferral_timer_month=$(date -j -f %s "${deferral_timer_epoch}" +%m | xargs)
-	local deferral_timer_day
-	deferral_timer_day=$(date -j -f %s "${deferral_timer_epoch}" +%d | xargs)
-	local deferral_timer_hour
-	deferral_timer_hour=$(date -j -f %s "${deferral_timer_epoch}" +%H | xargs)
-	local deferral_timer_minute
-	deferral_timer_minute=$(date -j -f %s "${deferral_timer_epoch}" +%M | xargs)
 	local next_auto_launch
-	next_auto_launch="${deferral_timer_year}-${deferral_timer_month}-${deferral_timer_day}:${deferral_timer_hour}:${deferral_timer_minute}:00"
+	next_auto_launch="$(date -j -f %s "${deferral_timer_epoch}" +%Y-%m-%d:%H:%M:00 | xargs)"
 	/usr/libexec/PlistBuddy -c "Add :NextAutoLaunch string ${next_auto_launch}" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 	launchctl bootstrap system "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" >/dev/null 2>&1
 	log_super "Exit: super is scheduled to automatically relaunch at: ${next_auto_launch}"
@@ -4255,7 +4274,7 @@ check_system() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mac_is_portable is: ${mac_is_portable}"
 	kernel_boot_epoch=$(sysctl -n kern.boottime | awk -F 'sec = |, usec' '{print $2}') # Expected outputs: seconds since epoch
 	if [[ "${kernel_boot_epoch}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
-		mac_last_startup=$(date -r "${kernel_boot_epoch}" +%Y-%m-%d:%H:%M:%S) # Expected output: 2023-08-25:00:16:00
+		mac_last_startup=$(date -r "${kernel_boot_epoch}" +%Y-%m-%d:%H:%M:%S) # Expected output: 2023-08-25:13:25:45
 	else
 		log_super "Error: Unrecognized kernel boot epoch time: ${kernel_boot_epoch}"
 		check_system_error="TRUE"
@@ -4329,7 +4348,6 @@ check_msu_settings() {
 		
 		# Log any warnings.
 		[[ "${msu_automatic_security_updates}" == "FALSE" ]] && log_super "Warning: Automatic installation of macOS security updates is disabled, this is a significant security risk."
-		[[ "${msu_automatic_download}" == "FALSE" ]] && log_super "Warning: Automatic download of macOS updates is disabled, this is not reccomended for most super workflows."
 		[[ "${msu_automatic_macos_installation}" == "TRUE" ]] && log_super "Warning: Automatic download and installation of macOS updates is currently enabled, this can result in updates being installed outside of super workflows."
 	else # msu_automatic_check="FALSE"
 		log_super "Warning: Automatic Apple software updated checking is currently disabled, this is not ideal for the super workflow and prevents macOS security updates from being installed which is a significant security risk."
@@ -5811,7 +5829,6 @@ reset_software_update_status() {
 	delete_pref_main "MDMClientAvailableCache"
 	delete_pref_main "MacOSInstallerDownloaded"
 	delete_pref_main "MacOSMSULabelDownloaded"
-	delete_pref_main "MacOSMSULastStartupDownloaded"
 	rm -f "${MDMCLIENT_LIST_LOG}" 2>/dev/null
 	delete_pref_main "MacOSInstallersListChecksum"
 	rm -f "${MACOS_INSTALLERS_LIST_LOG}" 2>/dev/null
@@ -6099,6 +6116,7 @@ workflow_check_software_status() {
 		check_deferral_restrictions
 		check_macos_beta_program
 	fi
+	check_msu_settings
 	
 	# If (no errors) a full software status check is required then start with mdmclient listing.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${check_software_status_required}" == "TRUE" ]]; then
@@ -6628,7 +6646,6 @@ check_macos_msu_download() {
 		if [[ "${macos_version_major}" -ge 13 ]]; then
 			macos_msu_downloaded_version_extra=$(echo "${update_asset_attributes}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2;}')
 			[[ -n "${macos_msu_downloaded_version_extra}" ]] && macos_msu_downloaded_version="${macos_msu_downloaded_version} ${macos_msu_downloaded_version_extra}"
-			
 		fi
 		macos_msu_downloaded_build=$(echo "${update_asset_attributes}" | grep -w 'Build' | awk '{print substr($3, 1, length($3)-1)}')
 	fi
@@ -6724,10 +6741,11 @@ delete_unneeded_macos_installers() {
 	IFS="${previous_ifs}"
 }
 
-# This function determines which macOS updates, upgrades, or installers should be downloaded and validates any previously downloaded macOS updates, upgrades, or installers and sets ${macos_installer_download_required}, ${macos_msu_download_required}, ${macos_msu_label}, and ${macos_msu_title} accordingly.
+# This function determines which macOS updates, upgrades, or installers have been downloaded and validates any previously downloaded macOS updates, upgrades, or installers and sets ${macos_installer_download_required}, ${macos_msu_download_required}, and ${macos_msu_automatic_download_deferral} accordingly.
 workflow_check_download_status() {
 	macos_installer_download_required="FALSE"
 	macos_msu_download_required="FALSE"
+	macos_msu_automatic_download_deferral="FALSE"
 	
 	# If a macOS installer is targeted then evaluate any local installers and set ${macos_installer_download_required}.
 	if [[ "${macos_installer_target}" != "FALSE" ]]; then
@@ -6752,53 +6770,38 @@ workflow_check_download_status() {
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required is: ${macos_installer_download_required}"
 	
-	# If a softwareupdate is targeted then evaluate cached macOS update/upgrade.
+	# If a softwareupdate is targeted then evaluate if there is a cached macOS update/upgrade.
 	if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
+		local macos_msu_downloaded_error
+		macos_msu_downloaded_error="FALSE"
+		check_macos_msu_download
 		macos_msu_label_downloaded=$(get_pref "MacOSMSULabelDownloaded")
-		local macos_msu_last_startup_downloaded
-		macos_msu_last_startup_downloaded=$(get_pref "MacOSMSULastStartupDownloaded")
-		[[ $(get_pref "WorkflowDownloadMacOSAuthRequired") == "TRUE" ]] && workflow_download_macos_auth_required="TRUE"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label_downloaded is: ${macos_msu_label_downloaded}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_last_startup_downloaded is: ${macos_msu_last_startup_downloaded}"
+		[[ $(get_pref "WorkflowDownloadMacOSAuthRequired") == "TRUE" ]] && workflow_download_macos_auth_required="TRUE"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
 		
-		# Only validate if we know the list of previous downloads and last startup time.
-		if [[ -n "${macos_msu_label_downloaded}" ]] && [[ -n "${macos_msu_last_startup_downloaded}" ]]; then
-			local macos_msu_downloaded_error
-			macos_msu_downloaded_error="FALSE"
-			if [[ "${macos_msu_label_downloaded}" != "${macos_msu_label}" ]]; then
-				log_super "Warning: Previously downloaded macOS update/upgrade \"${macos_msu_label_downloaded}\" does not match the expected macOS update/upgrade \"${macos_msu_label}\", download workflow needs to run again."
-				macos_msu_downloaded_error="TRUE"
-			fi
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mac_last_startup is: ${mac_last_startup}"
-			if [[ "${macos_msu_last_startup_downloaded}" != "${mac_last_startup}" ]]; then
-				log_super "Warning: The system has been restarted without applying the previously downloaded macOS update/upgrade, download workflow needs to run again."
-				macos_msu_downloaded_error="TRUE"
-			fi
-			if [[ "${macos_msu_downloaded_error}" == "FALSE" ]]; then
-				check_macos_msu_download
-				if [[ "${macos_msu_downloaded_version}" == "FALSE" ]]; then
-					log_super "Warning: Previously downloaded macOS update/upgrade is no longer valid, download workflow needs to run again."
-					macos_msu_downloaded_error="TRUE"
-				else
-					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_version is: ${macos_msu_version}"
-					if [[ "${macos_msu_downloaded_version}" != "${macos_msu_version}" ]]; then
-						macos_msu_downloaded_error="TRUE"
-						[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && log_super "Warning: Previously downloaded macOS major upgrade version ${macos_msu_downloaded_version} doesn't match expected version ${macos_msu_version}, download workflow needs to run again."
-						[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && log_super "Warning: Previously downloaded macOS minor update version ${macos_msu_downloaded_version} doesn't match expected version ${macos_msu_version}, download workflow needs to run again."
-					fi
-				fi
-			fi
-			if [[ "${macos_msu_downloaded_error}" == "TRUE" ]]; then
-				macos_msu_download_required="TRUE"
-				delete_pref_main "MacOSMSULabelDownloaded"
-				delete_pref_main "MacOSMSULastStartupDownloaded"
-			fi
-		else
-			macos_msu_download_required="TRUE"
+		# If an MSU macOS version is cached then determine if it's valid.
+		if [[ "${macos_msu_downloaded_version}" != "FALSE" ]]; then
+			{ [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]] && [[ -z "${macos_msu_label_downloaded}" ]]; } && macos_msu_label_downloaded="${macos_msu_label}" && set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
+			[[ "${macos_msu_downloaded_version}" != "${macos_msu_version}" ]] && log_super "Warning: Previously downloaded macOS update/upgrade version ${macos_msu_downloaded_version} doesn't match workflow target version ${macos_msu_version}." && macos_msu_downloaded_error="TRUE"
+		else # No msu download is prepared.
+			macos_msu_downloaded_error="TRUE"
+			[[ -n "${macos_msu_label_downloaded}" ]] && log_super "Warning: Previously downloaded macOS update/upgrade is no longer valid."
 		fi
+		if [[ "${macos_msu_downloaded_error}" == "TRUE" ]]; then
+			macos_msu_download_required="TRUE"
+			unset macos_msu_label_downloaded
+			delete_pref_main "MacOSMSULabelDownloaded"
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
+		
+		# If the target is a macOS minor update and it should have been downloaded automatically, then evaluate if the workflow should automatically defer.
+		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
+			{ [[ "${msu_automatic_download}" == "TRUE" ]] && [[ "${macos_msu_download_required}" == "TRUE" ]]; } && macos_msu_automatic_download_deferral="TRUE"
+			[[ "${msu_automatic_download}" == "FALSE" ]] && log_super "Warning: Automatic download of macOS updates is disabled, this is not recommended for macOS minor update workflows."
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_automatic_download_deferral is: ${macos_msu_automatic_download_deferral}"
 	fi
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
 }
 
 # Download macOS update or upgrade via softwareupdate command, and also save responses to ${SUPER_LOG}, ${MSU_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
@@ -6964,7 +6967,6 @@ download_macos_msu() {
 		download_maocs_msu_error="FALSE"
 		macos_msu_download_required="FALSE"
 		set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
-		set_pref_main "MacOSMSULastStartupDownloaded" "${mac_last_startup}"
 	else # Some part of the softwareupdate download workflow failed.
 		if [[ "${download_macos_msu_start_error}" == "CONNECT" ]]; then
 			log_msu "Error: Unable to reach macOS software update servers."
@@ -7005,7 +7007,6 @@ download_macos_msu() {
 		download_maocs_msu_error="TRUE"
 		macos_msu_download_required="TRUE"
 		delete_pref_main "MacOSMSULabelDownloaded"
-		delete_pref_main "MacOSMSULastStartupDownloaded"
 		kill -9 "${download_macos_msu_pid}" >/dev/null 2>&1
 		kick_softwareupdated
 	fi
@@ -7163,9 +7164,23 @@ workflow_download_macos() {
 	push_macos_mdm_download_error="FALSE"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required is: ${macos_installer_download_required}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required is: ${macos_msu_download_required}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_automatic_download_deferral is: ${macos_msu_automatic_download_deferral}"
 	
-	# If downloads are required then check available storage.
+	# If downloads are required then check for possible automatic download deferral and available storage.
 	if [[ "${macos_installer_download_required}" == "TRUE" ]] || [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+		# If a macOS automatic download should be possible then automatically defer.
+		if [[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]]; then
+			if [[ "${workflow_install_now_active}" != "TRUE" ]] && [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]] && [[ "${deadline_count_status}" == "FALSE" ]]; then
+				log_super "Warning: Automatic macOS minor update downloads are enabled and should be completed by the system, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: Automatic macOS minor update downloads are enabled and should be completed by the system, trying again in ${deferral_timer_minutes} minutes."
+				set_auto_launch_deferral
+			else
+				[[ "${workflow_install_now_active}" == "TRUE" ]] && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current install now workflow."
+				{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_count_status}" != "FALSE" ]]; } && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current deadline workflow."
+			fi
+		fi
+		
+		# Check for available storage.
 		check_storage_available
 		if [[ "${check_storage_available_error}" == "FALSE" ]]; then
 			if [[ "${storage_ready}" == "FALSE" ]]; then
@@ -7183,7 +7198,7 @@ workflow_download_macos() {
 	else # Downloads not required so log that download is not needed.
 		[[ "${macos_installer_target}" != "FALSE" ]] && log_super "Status: Previously downloaded ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is available at: /Applications/Install ${macos_installer_title}.app"
 		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS major upgrade is prepared: ${macos_msu_label_downloaded}"
-		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS minor update is prepared: ${macos_msu_label_downloaded}"	
+		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && log_super "Status: Previously downloaded macOS minor update is prepared: ${macos_msu_label_downloaded}"
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_error is: ${workflow_download_macos_error}"
 	
@@ -8252,7 +8267,6 @@ push_macos_mdm() {
 				push_macos_mdm_download_error="FALSE"
 				macos_msu_download_required="FALSE"
 				set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
-				set_pref_main "MacOSMSULastStartupDownloaded" "${mac_last_startup}"
 			fi
 		else # Install workflow at this point is a success.
 			/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
@@ -8281,7 +8295,6 @@ push_macos_mdm() {
 			push_macos_mdm_download_error="TRUE"
 			macos_msu_download_required="TRUE"
 			delete_pref_main "MacOSMSULabelDownloaded"
-			delete_pref_main "MacOSMSULastStartupDownloaded"
 		else # [[ "${push_macos_mdm_workflow}" == "INSTALL" ]]
 			log_mdm_command "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
 			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM FAILED ****"
@@ -10840,12 +10853,12 @@ main() {
 				set_auto_launch_deferral
 			fi
 		elif [[ "${workflow_only_download_active}" == "TRUE" ]]; then # Only download workflow doesn't matter if the user is logged in.
-			if [[ "${current_user_account_name}" == "FALSE" ]]; then # A normal user is not logged in, the only download workflow can not continue.
+			if [[ "${current_user_account_name}" == "FALSE" ]] && [[ "${macos_msu_automatic_download_deferral}" == "FALSE" ]]; then # A normal user is not logged in and the system can not automatically download the update, the only download workflow can not continue.
 				deferral_timer_minutes="${deferral_timer_error_minutes}"
-				log_super "Error: No current active user, due to limitations in macOS the only download workflow can not continue, trying again in ${deferral_timer_minutes} minutes."
-				log_status "Pending: No current active user, due to limitations in macOS the only download workflow can not continue, trying again in ${deferral_timer_minutes} minutes."
+				log_super "Error: No current active user and automatic macOS update downloads are disabled, due to limitations in macOS the only download workflow can not continue, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: No current active user and automatic macOS update downloads are disabled, due to limitations in macOS the only download workflow can not continue, trying again in ${deferral_timer_minutes} minutes."
 				set_auto_launch_deferral
-			else # A normal user is currently logged in.
+			else # A normal user is currently logged in or automatic macOS update downloads is possible.
 				workflow_download_macos # This function only downloads if needed and includes internal storage checks and test mode logic.
 				workflow_time_epoch=$(date +%s)
 				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
@@ -10862,24 +10875,28 @@ main() {
 			# At this point pick a workflow based on if the user is active.
 			if [[ "${current_user_account_name}" == "FALSE" ]]; then # A normal user is not logged in, start installations immediately.
 				workflow_install_no_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
-			else # A normal user is currently logged in so complete any macOS downloads first.
-				{ [[ "${workflow_target}" != "Non-system Software Updates" ]] && [[ "${workflow_target}" != "Safari Update" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers Without Restarting" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers With Restart" ]] && [[ "${workflow_target}" != "Restart Without Updates" ]]; } && workflow_download_macos # This function only downloads if needed and includes internal storage checks and test mode logic.
-				workflow_time_epoch=$(date +%s)
-				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
-				[[ "${workflow_download_macos_check_user}" == "TRUE" ]] && check_current_user # The download may have taken a while so another check to make sure the user is still logged in.
-				if [[ "${current_user_account_name}" == "FALSE" ]]; then
-					workflow_install_no_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
-					return 0
-				fi
-				# Check deadlines.
+			else # A normal user is currently logged in so check for deadlines and if necissary download macOS update/upgrade.
 				check_deadlines_days_date
-				# User Focus only needs to be checked if there are no date or day deadlines.
-				if [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]]; then
-					check_user_focus
-				else # At this point any date or days deadline would rule out any ${user_focus_active} option.
-					user_focus_active="FALSE"
-				fi
+				{ [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]]; } && check_user_focus
+				{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]]; } && user_focus_active="FALSE"
 				check_deadlines_count
+				{ [[ "${workflow_target}" != "Non-system Software Updates" ]] && [[ "${workflow_target}" != "Safari Update" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers Without Restarting" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers With Restart" ]] && [[ "${workflow_target}" != "Restart Without Updates" ]]; } && workflow_download_macos # This function only downloads if needed and includes internal storage checks and test mode logic.
+				if [[ "${workflow_download_macos_check_user}" == "TRUE" ]]; then # The download may have taken a while so another check to make sure the user is still logged in.
+					check_current_user
+					workflow_time_epoch=$(date +%s)
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
+					if [[ "${current_user_account_name}" == "FALSE" ]]; then
+						deferral_timer_minutes="${deferral_timer_error_minutes}"
+						log_super "Error: The active user logged out while the update was downloading, trying again in ${deferral_timer_minutes} minutes."
+						log_status "Pending: The active user logged out while the update was downloading, trying again in ${deferral_timer_minutes} minutes."
+						set_auto_launch_deferral
+					else
+						check_deadlines_days_date
+						{ [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]]; } && check_user_focus
+						{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]]; } && user_focus_active="FALSE"
+						check_deadlines_count
+					fi
+				fi
 				# Manage various workflow options when any deadline is active.
 				if [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_count_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "SOFT" ]]; then
 					[[ $(echo "${display_unmovable}" | grep -c 'DEADLINE') -gt 0 ]] && display_unmovable_status="TRUE"
