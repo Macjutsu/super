@@ -4387,43 +4387,70 @@ check_storage_available() {
 	[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
 	[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2>/dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3;}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_available_gigabytes: ${storage_available_gigabytes}"
-	if [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
-		log_super "Error: Unable to determine available storage."
-		check_storage_available_error="TRUE"
-	elif [[ "${macos_installer_target}" != "FALSE" ]] || [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
-		{ [[ -z "${test_storage_update_option}" ]] && [[ "${macos_msu_size}" -lt 5 ]]; } && storage_required_update_gb=$((macos_msu_size * 2))
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required: ${macos_installer_download_required}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_size: ${macos_installer_size}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required: ${macos_msu_download_required}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_size: ${macos_msu_size}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_upgrade_gb: ${storage_required_upgrade_gb}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_update_gb: ${storage_required_update_gb}"
-		if [[ "${macos_installer_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via installer.
-			if [[ "${macos_installer_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_upgrade_gb + macos_installer_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_upgrade_gb}"
+	
+	# Fallback mechanism for when NSURLVolumeAvailableCapacityForImportantUsageKey fails or returns 0
+	if [[ "${storage_available_gigabytes}" == "0" ]] || [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		if [[ "${current_user_account_name}" != "FALSE" ]]; then
+			log_super "Warning: NSURLVolumeAvailableCapacityForImportantUsageKey returned ${storage_available_gigabytes}, trying fallback methods..."
+			
+			# Try NSURLVolumeAvailableCapacityKey as first fallback
+			storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Fallback NSURLVolumeAvailableCapacityKey result: ${storage_available_gigabytes}"
+			
+			# If still 0 or empty, try df command as second fallback
+			if [[ "${storage_available_gigabytes}" == "0" ]] || [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+				storage_available_gigabytes=$(df -g / | tail -1 | awk '{print $4}')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Fallback df command result: ${storage_available_gigabytes}"
+			fi
+			
+			# If still 0 or empty, try system_profiler as final fallback
+			if [[ "${storage_available_gigabytes}" == "0" ]] || [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+				storage_available_gigabytes=$(system_profiler SPStorageDataType -json | grep -A 10 -B 5 "Available" | grep "Available" | head -1 | awk -F '"' '{print $4}' | sed 's/\.[0-9]*//')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Fallback system_profiler result: ${storage_available_gigabytes}"
 			fi
 		fi
-		if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via MSU.
-			if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_upgrade_gb + macos_msu_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_upgrade_gb}"
-			fi
+		
+		# Final check - if all methods failed, set error
+		if [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+			log_super "Error: Unable to determine available storage after trying all fallback methods."
+			check_storage_available_error="TRUE"
 		fi
-		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then # Target is a macOS minor update.
-			if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_update_gb + macos_msu_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_update_gb}"
-			fi
-		fi
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_gigabytes: ${storage_required_gigabytes}"
-		[[ "${storage_available_gigabytes}" -ge "${storage_required_gigabytes}" ]] && storage_ready="TRUE"
-	else # No macOS update/upgrade is available.
-		storage_ready="TRUE"
 	fi
+	
+		if [[ "${macos_installer_target}" != "FALSE" ]] || [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
+			{ [[ -z "${test_storage_update_option}" ]] && [[ "${macos_msu_size}" -lt 5 ]]; } && storage_required_update_gb=$((macos_msu_size * 2))
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required: ${macos_installer_download_required}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_size: ${macos_installer_size}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required: ${macos_msu_download_required}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_size: ${macos_msu_size}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_upgrade_gb: ${storage_required_upgrade_gb}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_update_gb: ${storage_required_update_gb}"
+			if [[ "${macos_installer_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via installer.
+				if [[ "${macos_installer_download_required}" == "TRUE" ]]; then
+					storage_required_gigabytes=$((storage_required_upgrade_gb + macos_installer_size))
+				else # Download calculation is not required.
+					storage_required_gigabytes="${storage_required_upgrade_gb}"
+				fi
+			fi
+			if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via MSU.
+				if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+					storage_required_gigabytes=$((storage_required_upgrade_gb + macos_msu_size))
+				else # Download calculation is not required.
+					storage_required_gigabytes="${storage_required_upgrade_gb}"
+				fi
+			fi
+			if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then # Target is a macOS minor update.
+				if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
+					storage_required_gigabytes=$((storage_required_update_gb + macos_msu_size))
+				else # Download calculation is not required.
+					storage_required_gigabytes="${storage_required_update_gb}"
+				fi
+			fi
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_gigabytes: ${storage_required_gigabytes}"
+			[[ "${storage_available_gigabytes}" -ge "${storage_required_gigabytes}" ]] && storage_ready="TRUE"
+		else # No macOS update/upgrade is available.
+			storage_ready="TRUE"
+		fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: check_storage_available_error: ${check_storage_available_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_ready: ${storage_ready}"
 }
@@ -6535,7 +6562,7 @@ workflow_check_software_status() {
 			[[ $(echo "${macos_msu_major_upgrade_target}" | grep -c 'Beta') -gt 0 ]] && macos_msu_title=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
 			macos_msu_version=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')
 			macos_msu_build=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g' -e 's/^.*-//g')
-			macos_msu_size=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000 +1"}' | bc)
+			macos_msu_size=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000000 +1"}' | bc)
 			log_super "Target: \"Over-the-air\" macOS major upgrade ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 			
@@ -6570,7 +6597,7 @@ workflow_check_software_status() {
 			[[ $(echo "${macos_msu_minor_update_target}" | grep -c 'Beta') -gt 0 ]] &&  macos_msu_title=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
 			macos_msu_version=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')
 			macos_msu_build=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g' -e 's/^.*-//g')
-			macos_msu_size=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000 +1"}' | bc)
+			macos_msu_size=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000000 +1"}' | bc)
 			log_super "Target: macOS minor update ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 			
