@@ -488,7 +488,7 @@ set_defaults() {
 	readonly TEST_MODE_DEFAULT_TIMEOUT
 	
 	# Various regular expressions used for parameter validation.
-	REGEX_MACOS_MAJOR_VERSION="^([1][1-9])$"
+	REGEX_MACOS_MAJOR_VERSION="^([1-2][1-9])$"
 	readonly REGEX_MACOS_MAJOR_VERSION
 	REGEX_ANY_WHOLE_NUMBER="^[0-9]+$"
 	readonly REGEX_ANY_WHOLE_NUMBER
