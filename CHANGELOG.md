@@ -1,13 +1,15 @@
 # CHANGELOG
 
-## [5.1.0-beta5]
+## [5.1.0-rc1]
 
-2025-07-10
+2025-10-02
 
 ## Highlights (5.1.x)
 
+- Suport for macOS 26 Tahoe.
+- New ability to target specific macOS versions (ex. 15.6.1) for both minor updates and major upgrades.
 - Completely rearchitected `super` preferences mechanism allows for alternate configuration workflows. In other words, you can now create multiple different `super` workflow configurations and active them on an as-needed basis.
-- Significantly improved macOS update workflow is fully compatible on systems with all built-in automatic software update options enabled.
+- Significantly improved macOS minor update workflow is fully compatible on systems with all built-in automatic software update options enabled.
 - New scheduling options for automatic deferrals when provisioning new systems and when you want to delay the start of a workflow after zero day.
 - New workflow options for installing non-system software updates.
 - Significant quality of life improvements for gathering information about the super workflow configuration including a new `super-audit.log`. 
@@ -30,18 +32,40 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
-- New [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends) for features unique to `super` 5.x.
-- Several updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-beta5/Super-Friends) now supports `super` versions 3.0, 4.x, and 5.x.
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-beta5/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-beta5/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-rc1/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-rc1/Super-Friends).
 
 ### Known Issues (5.x)
 
-- The `super` workflow has not been tested on systems with declarative software update settings. You should continue to use traditional configuration profiles to enforce software update settings.
+- The `super` workflow does not currently support declarative software update settings. You should continue to use traditional configuration profiles to enforce software update settings.
 - There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-rc1)
+
+- New support for macOS 26 Tahoe.
+- New `--install-macos-minor-version-target=macOSVersionNumber` option allows you to target specific macOS minor updates (for example, 15.6.1). Note that targeting specific minor updates that are not the latest version is very likely to require full macOS installer downloads.
+- Significantly updated `--install-macos-major-version-target=macOSVersionNumber` option allows you to target specific macOS major upgrades (for example, 15.6.1). Note that targeting specific major upgrades that are not the latest version is very likely to require full macOS installer downloads.
+- New `<key>ConfigTempOverride</key> <true/> | <false/>` managed preference key allows temporary alternate workflow settings (started via the `--config-start-temp=ConfigurationName` option) to override conflicting managed preferences.
+- New [mist-cli 2.2](https://github.com/ninxsoft/mist-cli/releases/tag/v2.2) (which now supports creating installers on macOS 15.6 and later) is automatically installed if required to facilitate macOS installer workflows. (Thanks to @ninxsoft for his dedication to the project!)
+- Improved macOS installer validation now checks for matching target version and build number.
+- Improved software status cache age verification now also allows for setting a specific age by adjusting the `SOFTWARE_STATUS_CACHE_AGE_MINUTES` parameter in the `set_defaults()` function.
+- Improved Jamf Pro version tracking now accounts for full version numbers (ex. 11.20.1).
+- Improved alternate workflow configuration logging.
+- Resolved an issue that prevented saving changes to alternate workflow settings if there was a conflicting managed workflow setting.
+- Resolved an issue that would cause workflow errors if duplicate non-system updates were discovered.
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated ["Software Update Automatic Settings"example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Software-Update-Automatic-Settings.mobileconfig).
+- Updated ["Software Update Notification Settings" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Software-Update-Disable-Notifications.mobileconfig).
+- Updated ["All Options" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.mobileconfig).
+- Updated ["All Options" example MDM property list](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.plist).
+
+- As always, typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.0-rc1 SHA-256: f28fab463885139970781cbe7aa83263f14b97a8246eb05a9ece0281fa6a10b9](https://github.com/Macjutsu/super/blob/5.1.0-rc1/super.checksum.txt)
 
 ### Specific Changes (5.1.0-beta5)
 

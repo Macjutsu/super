@@ -4,10 +4,12 @@
 <dict>
 	<key>AuthJamfComputerID</key>
 	<string>$JSSID</string>
+	<key>InstallMacOSMinorVersionTarget</key>
+	<string>14.7.8</string>
 	<key>InstallMacOSMajorUpgrades</key>
 	<true/>
 	<key>InstallMacOSMajorVersionTarget</key>
-	<string>14</string>
+	<string>26.1</string>
 	<key>InstallRapidSecurityResponses</key>
 	<true/>
 	<key>InstallNonSystemUpdatesWithoutRestarting</key>
@@ -132,6 +134,8 @@
 	<string>https://support.apple.com/en-us/HT201541</string>
 	<key>DisplayWarningButtonString</key>
 	<string>https://support.apple.com/en-us/HT201222</string>
+	<key>ConfigTempOverride</key>
+	<true/>
 	<key>AuthAskUserToSavePassword</key>
 	<true/>
 	<key>AuthJamfCustomURL</key>

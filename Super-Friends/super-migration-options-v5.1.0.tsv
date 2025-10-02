@@ -2,9 +2,10 @@ super 5.1.x Supports Alternate Config	super 5.1.x	super 5.0.x	super 4.0.x	super 
 N/A	--usage	--usage	--usage	--usage
 N/A	--help	--help	--help	--help
 N/A	--version	N/A	N/A	N/A
+YES	--install-macos-minor-version-target=macOSVersionNumber	N/A	N/A	N/A
 YES	--install-macos-major-upgrades	--install-macos-major-upgrades	--install-macos-major-upgrades	--allow-upgrade
 YES	--install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--allow-upgrade-off
-YES	--install-macos-major-version-target=number	--install-macos-major-version-target=number	--install-macos-major-version-target=number	--target-upgrade=version
+YES	--install-macos-major-version-target=macOSVersionNumber	--install-macos-major-version-target=IntegerNumber	--install-macos-major-version-target=IntegerNumber	--target-upgrade=IntegerNumber
 YES	--install-rapid-security-responses	--install-rapid-security-responses	--install-rapid-security-responses	--allow-rsr-updates
 YES	--install-rapid-security-responses-off	--install-rapid-security-responses-off	--install-rapid-security-responses-off	--allow-rsr-updates-off
 YES	--install-non-system-updates-without-restarting	--install-non-system-updates-without-restarting	--install-non-system-updates-without-restarting	--enforce-non-system-updates

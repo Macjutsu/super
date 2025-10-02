@@ -3,17 +3,17 @@
 <plist version="1">
   <dict>
     <key>PayloadUUID</key>
-    <string>CDB0BC64-F3EB-4B1A-AA5E-9A5D994CA592</string>
+    <string>00CBFFC5-3109-470F-8264-8A37441B1CAB</string>
     <key>PayloadType</key>
     <string>Configuration</string>
     <key>PayloadOrganization</key>
     <string>Macjutsu</string>
     <key>PayloadIdentifier</key>
-    <string>CDB0BC64-F3EB-4B1A-AA5E-9A5D994CA592</string>
+    <string>00CBFFC5-3109-470F-8264-8A37441B1CAB</string>
     <key>PayloadDisplayName</key>
-    <string>Apple Software Update Disable Notifications</string>
+    <string>Software Update Disable Notifications</string>
     <key>PayloadDescription</key>
-    <string>These settings disable the Apple software update notifications and banners.</string>
+    <string>These settings disable software update notifications.</string>
     <key>PayloadVersion</key>
     <integer>1</integer>
     <key>PayloadEnabled</key>
@@ -28,13 +28,13 @@
         <key>PayloadDisplayName</key>
         <string>Notifications Payload</string>
         <key>PayloadIdentifier</key>
-        <string>84DB38D0-8A4B-4382-B1D2-11235122FF6D</string>
+        <string>C3C94788-F238-4F63-8A86-4436FEB20BC4</string>
         <key>PayloadOrganization</key>
-        <string>Macjutsu</string>
+        <string>JAMF Software</string>
         <key>PayloadType</key>
         <string>com.apple.notificationsettings</string>
         <key>PayloadUUID</key>
-        <string>84DB38D0-8A4B-4382-B1D2-11235122FF6D</string>
+        <string>C7CF2690-1C7B-49DE-BFE5-F6FA5E729AA3</string>
         <key>PayloadVersion</key>
         <integer>1</integer>
         <key>NotificationSettings</key>
@@ -47,19 +47,27 @@
             <key>NotificationsEnabled</key>
             <false/>
           </dict>
+          <dict>
+            <key>BundleIdentifier</key>
+            <string>com.apple.softwareupdatenotification</string>
+            <key>CriticalAlertEnabled</key>
+            <false/>
+            <key>NotificationsEnabled</key>
+            <false/>
+          </dict>
         </array>
       </dict>
       <dict>
         <key>PayloadDisplayName</key>
         <string>Custom Settings</string>
         <key>PayloadIdentifier</key>
-        <string>87E2F5E4-1C8A-4D43-AA52-676364A3326E</string>
+        <string>AA993E77-BD7C-4078-9468-CCD7B4FF680D</string>
         <key>PayloadOrganization</key>
-        <string>Macjutsu</string>
+        <string>JAMF Software</string>
         <key>PayloadType</key>
         <string>com.apple.ManagedClient.preferences</string>
         <key>PayloadUUID</key>
-        <string>87E2F5E4-1C8A-4D43-AA52-676364A3326E</string>
+        <string>AA993E77-BD7C-4078-9468-CCD7B4FF680D</string>
         <key>PayloadVersion</key>
         <integer>1</integer>
         <key>PayloadContent</key>
