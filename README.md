@@ -6,7 +6,7 @@ S.U.P.E.R.M.A.N. optimizes the macOS update experience.
 
 by Kevin M. White
 
-### Please use [the newest version of `super`](https://github.com/Macjutsu/super/releases) for the best experience when using or upgrading to macOS 15 Sequoia. Older versions of `super` are not tested against macOS 15 Sequoia.
+### Please use [the newest version of `super`](https://github.com/Macjutsu/super/releases) for the best experience when using or upgrading to macOS 26 Tahoe. Older versions of `super` are not tested against macOS 26 Tahoe.
 
 ## Introduction
 
