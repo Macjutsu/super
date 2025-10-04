@@ -63,6 +63,7 @@
 - Updated ["Software Update Notification Settings" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Software-Update-Disable-Notifications.mobileconfig).
 - Updated ["All Options" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.mobileconfig).
 - Updated ["All Options" example MDM property list](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.plist).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.1.0](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).  (Huge thanks to @tonyyo11 for taking this on!)
 
 - As always, typo fixes and improvements to both regular and verbose log output.
 - `super` [5.1.0-rc1 SHA-256: f28fab463885139970781cbe7aa83263f14b97a8246eb05a9ece0281fa6a10b9](https://github.com/Macjutsu/super/blob/5.1.0-rc1/super.checksum.txt)
