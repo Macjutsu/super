@@ -139,6 +139,21 @@
                 }
             }
         },
+        "ScheduleDeferredStartFile": {
+            "title": "Schedule Deferred Start File",
+            "description": "Requires a local path to a file that automatically defers the workflow if the specified file is not found. This allows for super to be safely installed during extended macOS onboarding workflows (like Jamf Setup Manager, Setup-Your-Mac, SplashBuddy, etc.), as it will automatically defer based on the DeferralTimerDefault option or the default of 60 minutes.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "/path/to/file"
+                }
+            }
+        },
+        "ScheduleDeferredStartDays": {
+            "title": "Schedule Deferred Start Days",
+            "description": "Automatically defers the workflow until the specified number of days has passed since the zero date. Simliar to the native macOS update/upgrade deferral mechanism, this option prevents super from interrupting the user (or if there is no user, from automatically installing) until after the deferred start number of days has passed.",
+            "type": "string"
+        },
         "ScheduleZeroDateManual": {
             "title": "Manual Zero Day Workflow Date",
             "description": "Instead of having the days deadline counter, automatically select the day zero date. PutX to diable this option.",
@@ -455,6 +470,12 @@
             "type": "boolean",
             "default": "true"
         },
+        "ConfigTempOverride": {
+            "title": "Allow Temporary Configuration Overrides",
+            "description": "Allows temporary alternate workflow settings (started via the --config-start-temp=ConfigurationName option) to override conflicting managed preferences.",
+            "type": "boolean",
+            "default": "false"
+        },
         "AuthMDMFailoverToUser": {
             "title": "User Authentication MDM Failover",
             "description": "The MDM workflow can be unreliable due to its complexity, and super will automatically try again upon failure, however this settings allows super to try other options. For more information see https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials#user-authentication-mdm-failover. Put X to diable this option.",
@@ -472,17 +493,27 @@
             "default": "true"
         },
         "InstallMacOSMajorUpgrades": {
-            "title": "Allow Upgrades",
+            "title": "Enforce macOS Upgrades",
             "description": "macOS now presents some Upgrades options as updates, super detects and ignores them by default (objective update over upgrade). Enabling this setting will allow the upgrades.",
             "type": "boolean"
         },
         "InstallMacOSMajorVersionTarget": {
-            "title": "Target Upgrades",
-            "description": "This setting provides a limitation on the Allow Upgrades setting, providing some management of the maximum macOS version to upgrade to.",
+            "title": "Target Major Upgrade Version",
+            "description": "This setting option allows you to target specific macOS major upgrades (for example, 15.6.1). Note that targeting specific major upgrades that are not the latest version is very likely to require full macOS installer downloads.",
             "type": "string",
             "options": {
                 "inputAttributes": {
-                    "placeholder": "13"
+                    "placeholder": "15"
+                }
+            }
+        },
+        "InstallMacOSMinorVersionTarget": {
+            "title": "Target Minor Update Version",
+            "description": "This setting option allows you to target specific macOS minor updates (for example, 15.6.1). Note that targeting specific major upgrades that are not the latest version is very likely to require full macOS installer downloads.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "15.7.1"
                 }
             }
         },
@@ -503,7 +534,7 @@
         },
         "InstallPrioritizeNonRestartUpdates": {
             "title": "Prioritize Non-Restart Updates",
-            "description": "option works with either the Enforce Safari-only Updates (InstallSafariUpdateWithoutRestarting) or the Enforce Non-System Updates (InstallNonSystemUpdatesWithoutRestarting) option to prioritize non-system updates before any other potential workflows. In other words, even if a macOS update or upgrade is possible, this option forces the super workflow to target non-system updates for installation first. After the appropriate non-system items are installed, then the next time (based on the relaunch deferral timer) the super workflow runs, it reverts to the default targeting behavior.",
+            "description": "This option works with either the Enforce Safari-only Updates (InstallSafariUpdateWithoutRestarting) or the Enforce Non-System Updates (InstallNonSystemUpdatesWithoutRestarting) option to prioritize non-system updates before any other potential workflows. In other words, even if a macOS update or upgrade is possible, this option forces the super workflow to target non-system updates for installation first. After the appropriate non-system items are installed, then the next time (based on the relaunch deferral timer) the super workflow runs, it reverts to the default targeting behavior.",
             "type": "boolean"
         },
         "WorkflowOnlyDownload": {
