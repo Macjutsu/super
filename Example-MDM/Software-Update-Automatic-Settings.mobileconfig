@@ -11,9 +11,9 @@
     <key>PayloadIdentifier</key>
     <string>11F60840-A42D-4D5E-BCA7-44C4AEC4F7C9</string>
     <key>PayloadDisplayName</key>
-    <string>Apple Software Update Settings</string>
+    <string>Software Update Automatic Settings</string>
     <key>PayloadDescription</key>
-    <string>These settings disable the automatic download and installation of system updates but enable the automatic installation of all other software update types.</string>
+    <string>These settings disable the automatic installation of macOS updates but enable the automatic installation of all other software update types.</string>
     <key>PayloadVersion</key>
     <integer>1</integer>
     <key>PayloadEnabled</key>
@@ -50,7 +50,7 @@
         <key>AutomaticCheckEnabled</key>
         <true/>
         <key>AutomaticDownload</key>
-        <false/>
+        <true/>
         <key>ConfigDataInstall</key>
         <true/>
         <key>CriticalUpdateInstall</key>

@@ -56,6 +56,8 @@
                   <string>https://jamf-api.example.domain.com</string>
                   <key>AuthMDMFailoverToUser</key>
                   <string>ERROR</string>
+                  <key>ConfigTempOverride</key>
+                  <true/>
                   <key>DeadlineCountFocus</key>
                   <string>5</string>
                   <key>DeadlineCountHard</key>
@@ -110,6 +112,8 @@
                   <string>path or URL</string>
                   <key>DisplayAccessoryRestartWithoutUpdatesFile</key>
                   <string>path or URL</string>
+                  <key>DisplayAccessorySafariUpdateFile</key>
+                  <string>path or URL</string>
                   <key>DisplayAccessoryType</key>
                   <string>HTML</string>
                   <key>DisplayHelpButtonString</key>
@@ -141,11 +145,21 @@
                   <key>InstallMacOSMajorUpgrades</key>
                   <true/>
                   <key>InstallMacOSMajorVersionTarget</key>
-                  <string>14</string>
+                  <string>26.1</string>
+                  <key>InstallMacOSMinorVersionTarget</key>
+                  <string>14.7.8</string>
                   <key>InstallNonSystemUpdatesWithoutRestarting</key>
+                  <true/>
+                  <key>InstallPrioritizeNonRestartUpdates</key>
                   <true/>
                   <key>InstallRapidSecurityResponses</key>
                   <true/>
+                  <key>InstallSafariUpdateWithoutRestarting</key>
+                  <true/>
+                  <key>ScheduleDeferredStartDays</key>
+                  <string>7</string>
+                  <key>ScheduleDeferredStartFile</key>
+                  <string>/var/db/.MySetupDone</string>
                   <key>ScheduleWorkflowActive</key>
                   <string>TUE:13:00-17:00,WED:13:00-17:00,THU:13:00-17:00</string>
                   <key>ScheduleZeroDateManual</key>
@@ -181,6 +195,8 @@
                   <key>WorkflowInstallNow</key>
                   <true/>
                   <key>WorkflowOnlyDownload</key>
+                  <true/>
+                  <key>WorkflowRequireActiveUser</key>
                   <true/>
                   <key>WorkflowRestartWithoutUpdates</key>
                   <true/>

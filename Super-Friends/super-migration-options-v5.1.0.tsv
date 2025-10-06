@@ -1,0 +1,133 @@
+super 5.1.x Supports Alternate Config	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
+N/A	--usage	--usage	--usage	--usage
+N/A	--help	--help	--help	--help
+N/A	--version	N/A	N/A	N/A
+YES	--install-macos-minor-version-target=macOSVersionNumber	N/A	N/A	N/A
+YES	--install-macos-major-upgrades	--install-macos-major-upgrades	--install-macos-major-upgrades	--allow-upgrade
+YES	--install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--allow-upgrade-off
+YES	--install-macos-major-version-target=macOSVersionNumber	--install-macos-major-version-target=IntegerNumber	--install-macos-major-version-target=IntegerNumber	--target-upgrade=IntegerNumber
+YES	--install-rapid-security-responses	--install-rapid-security-responses	--install-rapid-security-responses	--allow-rsr-updates
+YES	--install-rapid-security-responses-off	--install-rapid-security-responses-off	--install-rapid-security-responses-off	--allow-rsr-updates-off
+YES	--install-non-system-updates-without-restarting	--install-non-system-updates-without-restarting	--install-non-system-updates-without-restarting	--enforce-non-system-updates
+YES	--install-non-system-updates-without-restarting-off	--install-non-system-updates-without-restarting-off	--install-non-system-updates-without-restarting-off	--enforce-non-system-updates-off
+YES	--install-safari-update-without-restarting	N/A	N/A	N/A
+YES	--install-safari-update-without-restarting-off	N/A	N/A	N/A
+YES	--install-prioritize-non-restart-updates	N/A	N/A	N/A
+YES	--install-prioritize-non-restart-updates-off	N/A	N/A	N/A
+YES	"--install-jamf-policy-triggers=PolicyTrigger,PolicyTrigger,etc..."	"--install-jamf-policy-triggers=PolicyTrigger,PolicyTrigger,etc..."	"--workflow-jamf-policy-triggers=PolicyTrigger,PolicyTrigger,etc..."	"--policy-triggers=PolicyTrigger,PolicyTrigger,etc..."
+YES	--install-jamf-policy-triggers-without-restarting	--install-jamf-policy-triggers-without-restarting	N/A	N/A
+YES	--install-jamf-policy-triggers-without-restarting-off	--install-jamf-policy-triggers-without-restarting-off	N/A	N/A
+YES	--workflow-install-now	--workflow-install-now	--workflow-install-now	--install-now
+YES	--workflow-install-now-off	--workflow-install-now-off	REMOVED	--install-now-off
+YES	--workflow-only-download	--workflow-only-download	--workflow-only-download	--only-download
+YES	--workflow-only-download-off	--workflow-only-download-off	--workflow-only-download-off	--only-download-off
+YES	--workflow-require-active-user	N/A	N/A	N/A
+YES	--workflow-require-active-user-off	N/A	N/A	N/A
+YES	--workflow-restart-without-updates	--workflow-restart-without-updates	--workflow-restart-without-updates	--restart-without-updates
+YES	--workflow-restart-without-updates-off	--workflow-restart-without-updates-off	--workflow-restart-without-updates-off	--restart-without-updates-off
+YES	--workflow-disable-update-check	--workflow-disable-update-check	--workflow-disable-update-check	--skip-updates
+YES	--workflow-disable-update-check-off	--workflow-disable-update-check-off	--workflow-disable-update-check-off	--skip-updates-off
+YES	--workflow-disable-relaunch	--workflow-disable-relaunch	--workflow-disable-relaunch	N/A
+YES	--workflow-disable-relaunch-off	--workflow-disable-relaunch-off	--workflow-disable-relaunch-off	N/A
+YES	--workflow-reset-super-after-completion	--workflow-reset-super-after-completion	N/A	N/A
+YES	--workflow-reset-super-after-completion-off	N/A	N/A	N/A
+YES	--deferral-timer-default=minutes	--deferral-timer-default=minutes	--deferral-timer-default=minutes	--default-defer=seconds
+YES	"--deferral-timer-menu=minutes,minutes,etc..."	"--deferral-timer-menu=minutes,minutes,etc..."	"--deferral-timer-menu=minutes,minutes,etc..."	"--menu-defer=seconds,seconds,etc..."
+YES	--deferral-timer-focus=minutes	--deferral-timer-focus=minutes	--deferral-timer-focus=minutes	--focus-defer=seconds
+YES	--deferral-timer-error=minutes	--deferral-timer-error=minutes	--deferral-timer-error=minutes	--error-defer=seconds
+YES	--deferral-timer-workflow-relaunch=minutes	--deferral-timer-workflow-relaunch=minutes	--deferral-timer-workflow-relaunch=minutes	--recheck-defer=seconds
+YES	--deferral-timer-reset-all	--deferral-timer-reset-all	--deferral-timer-reset-all	--delete-deferrals
+YES	"--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc..."	"--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc..."	N/A	N/A
+YES	--schedule-deferred-start-file=/local/path	N/A	N/A	N/A
+YES	--schedule-deferred-start-days=number	N/A	N/A	N/A
+YES	--schedule-zero-date-release	--schedule-zero-date-release	N/A	N/A
+YES	--schedule-zero-date-release-off	--schedule-zero-date-release-off	N/A	N/A
+YES	--schedule-zero-date-sofa-custom-url=URL	--schedule-zero-date-sofa-custom-url=URL	N/A	N/A
+YES	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--workflow-zero-date-manual=YYYY-MM-DD:hh:mm	--zero-day=YYYY-MM-DD:hh:mm
+YES	--scheduled-install-days=number	--scheduled-install-days=number	N/A	N/A
+YES	--scheduled-install-date=YYYY-MM-DD:hh:mm	--scheduled-install-date=YYYY-MM-DD:hh:mm	N/A	N/A
+YES	--scheduled-install-user-choice	--scheduled-install-user-choice	N/A	N/A
+YES	--scheduled-install-user-choice-off	--scheduled-install-user-choice-off	N/A	N/A
+YES	"--scheduled-install-reminder=minutes,minutes,etc..."	"--scheduled-install-reminder=minutes,minutes,etc..."	N/A	N/A
+YES	--scheduled-install-delete-all	--scheduled-install-delete-all	N/A	N/A
+YES	--deadline-count-focus=number	--deadline-count-focus=number	--deadline-count-focus=number	--focus-count=number
+YES	--deadline-count-soft=number	--deadline-count-soft=number	--deadline-count-soft=number	--soft-count=number
+YES	--deadline-count-hard=number	--deadline-count-hard=number	--deadline-count-hard=number	--hard-count=number
+YES	--deadline-count-restart-all	--deadline-count-restart-all	--deadline-count-restart-all	--restart-counts
+YES	--deadline-count-delete-all	--deadline-count-delete-all	--deadline-count-delete-all	--delete-counts
+YES	--deadline-days-focus=number	--deadline-days-focus=number	--deadline-days-focus=number	--focus-days=number
+YES	--deadline-days-soft=number	--deadline-days-soft=number	--deadline-days-soft=number	--soft-days=number
+YES	--deadline-days-hard=number	--deadline-days-hard=number	--deadline-days-hard=number	--hard-days=number
+YES	--deadline-days-restart-all	--deadline-days-restart-all	--deadline-days-restart-all	--restart-days
+YES	--deadline-days-delete-all	--deadline-days-delete-all	--deadline-days-delete-all	--delete-days
+YES	--deadline-date-focus=YYYY-MM-DD:hh:mm	--deadline-date-focus=YYYY-MM-DD:hh:mm	--deadline-date-focus=YYYY-MM-DD:hh:mm	--focus-date=YYYY-MM-DD:hh:mm
+YES	--deadline-date-soft=YYYY-MM-DD:hh:mm	--deadline-date-soft=YYYY-MM-DD:hh:mm	--deadline-date-soft=YYYY-MM-DD:hh:mm	--soft-date=YYYY-MM-DD:hh:mm
+YES	--deadline-date-hard=YYYY-MM-DD:hh:mm	--deadline-date-hard=YYYY-MM-DD:hh:mm	--deadline-date-hard=YYYY-MM-DD:hh:mm	--hard-date=YYYY-MM-DD:hh:mm
+YES	--deadline-date-delete-all	--deadline-date-delete-all	--deadline-date-delete-all	--delete-dates
+YES	--dialog-timeout-default=seconds	--dialog-timeout-default=seconds	--dialog-timeout-default=seconds	N/A
+YES	--dialog-timeout-user-auth=seconds	--dialog-timeout-user-auth=seconds	--dialog-timeout-user-auth=seconds	--user-auth-timeout=seconds
+YES	--dialog-timeout-user-choice=seconds	--dialog-timeout-user-choice=seconds	--dialog-timeout-restart-or-defer=seconds	--defer-dialog-timeout=seconds
+YES	--dialog-timeout-user-schedule=seconds	--dialog-timeout-user-schedule=seconds	N/A	N/A
+YES	--dialog-timeout-soft-deadline=seconds	--dialog-timeout-soft-deadline=seconds	--dialog-timeout-soft-deadline=seconds	--soft-dialog-timeout=seconds
+YES	--dialog-timeout-insufficient-storage=seconds	--dialog-timeout-insufficient-storage=seconds	--dialog-timeout-insufficient-storage=seconds	--free-space-timeout=seconds
+YES	--dialog-timeout-power-required=seconds	--dialog-timeout-power-required=seconds	--dialog-timeout-power-required=seconds	--battery-timeout=seconds
+YES	--dialog-timeout-delete-all	--dialog-timeout-delete-all	--dialog-timeout-delete-all	N/A
+YES	"--display-unmovable=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-unmovable=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-unmovable=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE"	N/A
+YES	"--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-hide-background=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER"	N/A
+YES	"--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-silently=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE"	--display-silently (—display-silently-off)
+YES	"--display-hide-progress-bar=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-hide-progress-bar=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	N/A	N/A
+YES	"--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--display-notifications-centered=ALWAYS,SOFT,HARD,INSTALLNOW"	N/A
+YES	--display-icon-size=pixels	--display-icon-size=pixels	--display-icon-size=pixels	--icon-size-ibm=pixels
+YES	--display-icon-file=/local/path or URL	--display-icon-file=/local/path or URL	--display-icon-file=/local/path or URL	--display-icon=/local/path or URL
+YES	--display-icon-light-file=/local/path or URL	--display-icon-light-file=/local/path or URL	N/A	N/A
+YES	--display-icon-dark-file=/local/path or URL	--display-icon-dark-file=/local/path or URL	N/A	N/A
+YES	--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO	--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO	--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO	--display-accessory-type=TEXTBOX|HTMLBOX|HTML|IMAGE|VIDEO|VIDEOAUTO
+YES	--display-accessory-default-file=/local/path or URL	--display-accessory-default-file=/local/path or URL	--display-accessory-default-file=/local/path or URL	--display-accessory-default=/local/path or URL
+YES	--display-accessory-macos-minor-update-file=/local/path or URL	--display-accessory-macos-minor-update-file=/local/path or URL	--display-accessory-update-file=/local/path or URL	--display-accessory-update=/local/path or URL
+YES	--display-accessory-macos-major-upgrade-file=/local/path or URL	--display-accessory-macos-major-upgrade-file=/local/path or URL	--display-accessory-upgrade-file=/local/path or URL	--display-accessory-upgrade=/local/path or URL
+YES	--display-accessory-non-system-updates-file=/local/path or URL	--display-accessory-non-system-updates-file=/local/path or URL	N/A	N/A
+YES	--display-accessory-safari-update-file=/local/path or URL	N/A	N/A	N/A
+YES	--display-accessory-jamf-policy-triggers-file=/local/path or URL	--display-accessory-jamf-policy-triggers-file=/local/path or URL	N/A	N/A
+YES	--display-accessory-restart-without-updates-file=/local/path or URL	--display-accessory-restart-without-updates-file=/local/path or URL	N/A	N/A
+YES	--display-help-button-string=plain text or URL	--display-help-button-string=plain text or URL	--display-help-button-string=plain text or URL	--help-button=plain text or URL
+YES	--display-warning-button-string=plain text or URL	--display-warning-button-string=plain text or URL	--display-warning-button-string=plain text or URL	--warning-button=plain text or URL
+YES	--test-mode	--test-mode	--test-mode	--test-mode
+YES	--test-mode-off	--test-mode-off	--test-mode-off	--test-mode-off
+YES	--test-mode-timeout=seconds	--test-mode-timeout=seconds	--test-mode-timeout=seconds	--test-mode-timeout=seconds
+YES	--test-storage-update=gigabytes	--test-storage-update=gigabytes	--test-storage-update=gigabytes	--free-space-update=gigabytes
+YES	--test-storage-upgrade=gigabytes	--test-storage-upgrade=gigabytes	--test-storage-upgrade=gigabytes	--free-space-upgrade=gigabytes
+YES	--test-battery-level=percentage	--test-battery-level=percentage	--test-battery-level=percentage	--battery-level=percentage
+N/A	--config-edit-main	N/A	N/A	N/A
+N/A	--config-edit=ConfigurationName	N/A	N/A	N/A
+N/A	--config-clone=SourceConfigurationName	N/A	N/A	N/A
+N/A	--config-delete=ConfigurationName	N/A	N/A	N/A
+N/A	--config-delete-all	N/A	N/A	N/A
+N/A	--config-start-default=ConfigurationName	N/A	N/A	N/A
+N/A	--config-start-temp=ConfigurationName	N/A	N/A	N/A
+N/A	--config-status	N/A	N/A	N/A
+NO	--auth-ask-user-to-save-password	--auth-ask-user-to-save-password	--auth-ask-user-to-save-password	N/A
+NO	--auth-ask-user-to-save-password-off	--auth-ask-user-to-save-password-off	--auth-ask-user-to-save-password-off	N/A
+NO	--auth-local-account=AccountName	--auth-local-account=AccountName	--auth-local-account=AccountName	--local-account=AccountName
+NO	--auth-local-password=Password	--auth-local-password=Password	--auth-local-password=Password	--local-password=Password
+NO	--auth-service-add-via-admin-account=AccountName	--auth-service-add-via-admin-account=AccountName	--auth-service-add-via-admin-account=AccountName	--admin-account=AccountName
+NO	--auth-service-add-via-admin-password=Password	--auth-service-add-via-admin-password=Password	--auth-service-add-via-admin-password=Password	--admin-password=Password
+NO	--auth-service-account=AccountName	--auth-service-account=AccountName	--auth-service-account=AccountName	--super-account=AccountName
+NO	--auth-service-password=Password	--auth-service-password=Password	--auth-service-password=Password	--super-password=Password
+NO	--auth-jamf-client=ClientID	--auth-jamf-client=ClientID	--auth-jamf-client=ClientID	N/A
+NO	--auth-jamf-secret=ClientSecret	--auth-jamf-secret=ClientSecret	--auth-jamf-secret=ClientSecret	N/A
+NO	--auth-jamf-account=AccountName	--auth-jamf-account=AccountName	--auth-jamf-account=AccountName	--jamf-account=AccountName
+NO	--auth-jamf-password=Password	--auth-jamf-password=Password	--auth-jamf-password=Password	--jamf-password=Password
+NO	--auth-jamf-custom-url=URL	--auth-jamf-custom-url=URL	--auth-jamf-custom-url=URL	N/A
+NO	--auth-delete-all	--auth-delete-all	--auth-delete-all	--delete-accounts
+NO	--auth-credential-failover-to-user	--auth-credential-failover-to-user	--auth-credential-failover-to-user	N/A
+NO	--auth-credential-failover-to-user-off	--auth-credential-failover-to-user-off	--auth-credential-failover-to-user-off	N/A
+NO	"--auth-mdm-failover-to-user=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--auth-mdm-failover-to-user=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"	"--auth-mdm-failover-to-user=ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP"	"--user-auth-mdm-failover=ALWAYS,NOSERVICE,SOFT,HARD,INSTALLNOW,BOOTSTRAP"
+N/A	--open-logs	--open-logs	--open-logs	--open-logs
+N/A	--reset-super	--reset-super	--reset-super	--reset-super
+NO	--verbose-mode	--verbose-mode	--verbose-mode	--verbose-mode
+NO	--verbose-mode-off	--verbose-mode-off	--verbose-mode-off	--verbose-mode-off
+N/A	REMOVED	REMOVED	--display-accessory-user-auth-file=/local/path or URL	--display-accessory-user-auth=/local/path or URL
+N/A	REMOVED	REMOVED	REMOVED	--display-redraw=seconds
+N/A	REMOVED	REMOVED	REMOVED	--icon-size-jamf=pixels
+N/A	REMOVED	REMOVED	REMOVED	--prefer-jamf-helper
+N/A	REMOVED	REMOVED	REMOVED	--prefer-jamf-helper-off
