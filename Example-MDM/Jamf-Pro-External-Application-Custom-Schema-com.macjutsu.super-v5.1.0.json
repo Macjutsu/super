@@ -385,7 +385,7 @@
             }
         },
     	"DisplayAccessorySafariUpdateFile": {
-            "title": "Non-System Updates Accessory File",
+            "title": "Safari Updates Accessory File",
             "description": "Local path or http(s) URL to a file that is the accessory to display when the InstallSafariUpdateWithoutRestarting payload option is also enabled and the workflow target is only non-system updates. Put X to reset this to default.",
             "type": "string",
             "options": {
