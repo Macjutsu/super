@@ -24,7 +24,7 @@
 - Completely rearchitected software update/upgrade discovery to significantly improve reliability, performance, and improve support for native macOS software update restrictions deferral.
 - Significantly improved behavior for alternate workflow targets (non-system updates, Jamf Pro Policies, and enforced system restarts) now support all deferral, schedule, deadline, and display options.
 - Even more user interface customization options.
-- Please visit [the `super` Wiki](https://github.com/Macjutsu/super/wiki) for full details!
+- Please visit [the `super` Beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki) for full details!
 
 ### Compatibility Notes (5.x)
 
