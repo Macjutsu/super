@@ -24,7 +24,7 @@ __A `super` macOS update restart notification__
 
 ## Learn More
 
-Please visit the [S.U.P.E.R.M.A.N. Wiki](https://github.com/Macjutsu/super/wiki) for detailed documentation!
+Please visit the [S.U.P.E.R.M.A.N. Beta Wiki](https://github.com/Macjutsu/super-beta-wiki/wiki) for detailed documentation!
 
 Detailed `super` version progress can be found in the [Change Log](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md).
 
