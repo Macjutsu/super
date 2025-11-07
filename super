@@ -1811,8 +1811,17 @@ manage_parameter_options() {
 		set_pref "ScheduledInstallDays" "${scheduled_install_days}"
 	fi
 	[[ -z "${scheduled_install_days}" ]] && scheduled_install_days=$(get_pref "ScheduledInstallDays")
-	{ [[ -n "${scheduled_install_days}" ]] && [[ ! "${scheduled_install_days_option}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --scheduled-install-days=number value must only be a number." && parameter_error="TRUE"
-	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${scheduled_install_days}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_days is: ${scheduled_install_days}"
+
+		if [[ -n "${scheduled_install_days}" ]]; then
+		if ! [[ "${scheduled_install_days}" =~ ^[0-9]+$ ]]; then
+			log_super "Parameter Error: The --scheduled-install-days=number value must only be a number."
+			parameter_error="TRUE"
+		fi
+	fi
+	
+	if [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${scheduled_install_days}" ]]; then
+		log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_days is: ${scheduled_install_days}"
+	fi
 	
 	# Validate ${scheduled_install_date_option} input and if valid set the ${scheduled_install_date} parameter.
 	scheduled_install_date=$(get_pref_managed "ScheduledInstallDate")
