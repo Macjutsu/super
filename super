@@ -1811,7 +1811,7 @@ manage_parameter_options() {
 		set_pref "ScheduledInstallDays" "${scheduled_install_days}"
 	fi
 	[[ -z "${scheduled_install_days}" ]] && scheduled_install_days=$(get_pref "ScheduledInstallDays")
-
+		# Flag parameter and CLI for validation checking
 		if [[ -n "${scheduled_install_days}" ]]; then
 		if ! [[ "${scheduled_install_days}" =~ ^[0-9]+$ ]]; then
 			log_super "Parameter Error: The --scheduled-install-days=number value must only be a number."
