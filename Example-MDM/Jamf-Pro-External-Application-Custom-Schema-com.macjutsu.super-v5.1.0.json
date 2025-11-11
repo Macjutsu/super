@@ -318,7 +318,7 @@
             }
         },
         "DisplayIconDarkFile": {
-            "title": "Light Display Icon",
+            "title": "Dark Display Icon",
             "description": "Local path or http(s) URL to a file that is the picture to display in notifications or dialogs when in dark mode. Failover to DisplayIconFile payload if configured. Put X to reset this to default.",
             "type": "string",
             "options": {
