@@ -1133,11 +1133,22 @@ delete_pref() {
 get_pref_managed() {
 	{ [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]] || [[ -n "${config_delete_option}" ]] || [[ "${config_delete_all_option}" == "TRUE" ]]; } && return 1
 	local preference_result
-	{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -n "${alternate_temporary_plist}" ]] && [[ "${config_temp_override}" == "TRUE" ]]; } && preference_result=$(defaults read "${super_alternate_plist}" "${1}" 2>/dev/null)
-	{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -z "${preference_result}" ]]; } && preference_result=$(defaults read "${SUPER_MANAGED_PLIST}" "${1}" 2>/dev/null)
+	local source_plist
+	if [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -n "${alternate_temporary_plist}" ]] && [[ "${config_temp_override}" == "TRUE" ]]; then
+        preference_result=$(defaults read "${super_alternate_plist}" "${1}" 2>/dev/null)
+        if [[ -n "${preference_result}" ]]; then
+            source_plist="${super_alternate_plist}"
+        fi
+    fi
+    if [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -z "${preference_result}" ]]; then
+        preference_result=$(defaults read "${SUPER_MANAGED_PLIST}" "${1}" 2>/dev/null)
+        if [[ -n "${preference_result}" ]]; then
+            source_plist="${SUPER_MANAGED_PLIST}"
+        fi
+    fi
 	if [[ -n "${preference_result}" ]]; then
 		local preference_type
-		preference_type=$(defaults read-type "${SUPER_MANAGED_PLIST}" "${1}" 2>/dev/null)
+		preference_type=$(defaults read-type "${source_plist}" "${1}" 2>/dev/null)
 		if [[ $(echo "${preference_type}" | grep -c 'boolean') -gt 0 ]]; then
 			{ [[ "${preference_result}" == "0" ]] || [[ "${preference_result}" == "FALSE" ]]; } && echo "FALSE" && return 0
 			{ [[ "${preference_result}" == "1" ]] || [[ "${preference_result}" == "TRUE" ]]; } && echo "TRUE" && return 0
