@@ -6019,11 +6019,21 @@ get_macos_installers_list() {
 	
 	# Background the mist-cli list process and send to ${MACOS_INSTALLERS_LIST_LOG}.
 	local get_macos_installers_list_pid
+	local mist_cache_server
+	mist_cache_server="$(get_mist_cache_server)"
+	local mist_cache_option
+	mist_cache_option=()
+	if [[ -n "${mist_cache_server}" ]]; then
+		log_super "mist_cli: Using caching server ${mist_cache_server}."
+		mist_cache_option=(--caching-server "${mist_cache_server}")
+	else
+		log_super "mist_cli: No caching server found, proceeding without cache."
+	fi
 	if [[ "${macos_beta_program}" == "FALSE" ]]; then
-		"${MIST_CLI_BINARY}" list installer --output-type csv --no-ansi --compatible >"${MACOS_INSTALLERS_LIST_LOG}" 2>&1 &
+		"${MIST_CLI_BINARY}" list installer --output-type csv --no-ansi --compatible "${mist_cache_option[@]}" >"${MACOS_INSTALLERS_LIST_LOG}" 2>&1 &
 		get_macos_installers_list_pid="$!"
 	else # macOS beta workflow.
-		"${MIST_CLI_BINARY}" list installer --output-type csv --no-ansi --compatible --include-betas >"${MACOS_INSTALLERS_LIST_LOG}" 2>&1 &
+		"${MIST_CLI_BINARY}" list installer --output-type csv --no-ansi --compatible --include-betas "${mist_cache_option[@]}" >"${MACOS_INSTALLERS_LIST_LOG}" 2>&1 &
 		get_macos_installers_list_pid="$!"
 	fi
 	
@@ -7042,6 +7052,39 @@ download_macos_msu() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
 }
 
+# Determine available content cache server for mist-cli.
+get_mist_cache_server() {
+	if [[ ! -x "/usr/bin/AssetCacheLocatorUtil" ]]; then
+		return 0
+	fi
+	local cache_output
+	cache_output=$(/usr/bin/AssetCacheLocatorUtil -j 2>&1)
+	cache_output="${cache_output//$'\r'/}"
+	if [[ -z "${cache_output}" ]]; then
+		return 0
+	fi
+	local cache_hostport
+	cache_hostport="${cache_output#*\"hostport\":\"}"
+	if [[ "${cache_hostport}" != "${cache_output}" ]]; then
+		cache_hostport="${cache_hostport%%\"*}"
+	else
+		cache_hostport=""
+	fi
+	if [[ -z "${cache_hostport}" ]]; then
+		local cache_line
+		while IFS= read -r cache_line; do
+			if [[ "${cache_line}" =~ ([A-Za-z0-9._-]+:[0-9]+),\ rank ]]; then
+				cache_hostport="${BASH_REMATCH[1]}"
+				break
+			fi
+		done <<< "${cache_output}"
+	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: cache_hostport is: ${cache_hostport}"
+	if [[ -n "${cache_hostport}" ]]; then
+		echo "http://${cache_hostport}"
+	fi
+}
+
 # Download macOS installer via ${MIST_CLI_BINARY}, and also save responses to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 download_macos_installer() {
 	# If ${test_mode} then it's not necessary to continue this function.
@@ -7062,11 +7105,21 @@ download_macos_installer() {
 	
 	# Background the ${MIST_CLI_BINARY} download process and send to ${INSTALLER_WORKFLOW_LOG}.
 	local download_macos_installer_mist_pid
+	local mist_cache_server
+	mist_cache_server="$(get_mist_cache_server)"
+	local mist_cache_option
+	mist_cache_option=()
+	if [[ -n "${mist_cache_server}" ]]; then
+		log_super "mist_cli: Using caching server ${mist_cache_server}."
+		mist_cache_option=(--caching-server "${mist_cache_server}")
+	else
+		log_super "mist_cli: No caching server found, proceeding without cache."
+	fi
 	if [[ "${macos_beta_program}" == "FALSE" ]]; then
-		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible "${macos_installer_build}" application --application-name "Install %NAME%.app" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
+		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible "${macos_installer_build}" application --application-name "Install %NAME%.app" "${mist_cache_option[@]}" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
 		download_macos_installer_mist_pid="$!"
 	else # macOS beta workflow.
-		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible --include-betas "${macos_installer_build}" application --application-name "Install %NAME%.app" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
+		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible --include-betas "${macos_installer_build}" application --application-name "Install %NAME%.app" "${mist_cache_option[@]}" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
 		download_macos_installer_mist_pid="$!"
 	fi
 	
