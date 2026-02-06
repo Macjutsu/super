@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.1.0-rc1]
+## [5.1.0-rc2]
 
-2025-10-02
+2026-02-06
 
 ## Highlights (5.1.x)
 
@@ -12,7 +12,7 @@
 - Significantly improved macOS minor update workflow is fully compatible on systems with all built-in automatic software update options enabled.
 - New scheduling options for automatic deferrals when provisioning new systems and when you want to delay the start of a workflow after zero day.
 - New workflow options for installing non-system software updates.
-- Significant quality of life improvements for gathering information about the super workflow configuration including a new `super-audit.log`. 
+- Significant quality of life improvements for gathering information about the super workflow configuration including a new `super-audit.log` and `super-metrics.log`. 
 
 ## Highlights (5.0.x)
 
@@ -32,17 +32,37 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-rc1/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-rc1/Super-Friends).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-rc2/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-rc2/Super-Friends).
 
 ### Known Issues (5.x)
 
-- The `super` workflow does not currently support declarative software update settings. You should continue to use traditional configuration profiles to enforce software update settings.
-- There are currently no available Rapid Security Response (RSR) updates for any version of macOS. As such, RSR update workflows have not been validated against this version of `super`.
+- The `super` workflow does not currently support Declarative Device Management (DDM) software update settings. You should continue to use traditional MDM configuration profiles to enforce software update settings.
+- There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-rc2)
+
+- Completely rearchitected software update/upgrade discovery (again) to resolve issues caused by inaccurate reporting from the `mdmclient` command. The `super` workflow no longer relies solely on the `mdmclient` command to determine software availability. As such, `super` workflows are now more likely to leverage `mist-cli` to determine macOS update/upgrade targets.
+- New `super-metrics.log` contains a history of elapsed times for total workflow completion and interactive user dialogs. In addition to total dialog open time, both the user's active (input devices are active) and inactive elapsed times are recorded while the dialog is open.
+- New support for code signed alternate configuration preference files. Signing remains optional but if an alternate configuration preference file has been code signed then it must be valid for `super` to accept it. Therefore, `super` will not accept any alternate configuration preference files that have been modified from their original signed state.
+- New `<key>ConfigCodeSignature</key> <string>Identifier</string>` managed preference key enforces the use of code signed alternate configuration preference files. If this key is present then the `super` workflow will only accept alternate configuration preference files that are code signed and match the specified identifier. Both Apple Bundle and Apple Team identifiers are supported.
+- New `--install-macos-bsi-updates` option overrides the `--install-rapid-security-responses` option. Presently this "new" option only represents a name change as the underlying mechanism for [macOS BSI updates](https://support.apple.com/en-us/102657) appears to be similar to the legacy macOS Rapid Security Responses. The `--install-rapid-security-responses` option remains but is deprecated and will be removed in a future version of `super`.
+- Renamed `--install-safari-updates-without-restarting` option replaces the `--install-safari-update-without-restarting` option. The new option name is plural to match the format of the other non-system update options.
+- New behavior for the `--install-safari-updates-without-restarting` option takes priority over the `--install-non-system-updates-without-restarting` option.
+- New "ramped status" detection now recognizes when the target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism. This status is reported to the super.log and to the `SuperStatus` key in the main settings property list.
+- New [IBM Notifier 3.2.3](https://github.com/IBM/mac-ibm-notifications/releases) is automatically installed. (Thanks to @SMartorelli for his dedication to the project!)
+- Resolved an issue that prevented non-system updates from being targeted for installation.
+- Resolved an issue that resulted in inaccurate deferral counts.
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated ["All Options" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.mobileconfig).
+- Updated ["All Options" example MDM property list](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.plist).
+- As always, typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.0-rc2 SHA-256: fdd0891117983d9864b6c6e79af1321acfbe07c8a53dfd0f19900c364d41a9f6](https://github.com/Macjutsu/super/blob/5.1.0-rc2/super.checksum.txt)
 
 ### Specific Changes (5.1.0-rc1)
 
@@ -63,7 +83,6 @@
 - Updated ["Software Update Notification Settings" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/Software-Update-Disable-Notifications.mobileconfig).
 - Updated ["All Options" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.mobileconfig).
 - Updated ["All Options" example MDM property list](https://github.com/Macjutsu/super/blob/5.1.0-rc1/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.plist).
-
 - As always, typo fixes and improvements to both regular and verbose log output.
 - `super` [5.1.0-rc1 SHA-256: f28fab463885139970781cbe7aa83263f14b97a8246eb05a9ece0281fa6a10b9](https://github.com/Macjutsu/super/blob/5.1.0-rc1/super.checksum.txt)
 

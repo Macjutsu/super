@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-rc1"
+SUPER_VERSION="5.1.0-rc2"
 readonly SUPER_VERSION
-SUPER_DATE="2025/10/02"
+SUPER_DATE="2026/02/06"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -38,13 +38,14 @@ show_usage() {
   [--install-macos-minor-version-target=macOSVersionNumber]
   [--install-macos-major-upgrades]  [--install-macos-major-upgrades-off]
   [--install-macos-major-version-target=macOSVersionNumber]
+  [--install-macos-bsi-updates]  [--install-macos-bsi-updates-off]
   [--install-rapid-security-responses]  [--install-rapid-security-responses-off]
   
   Non-system Installation Options:
   [--install-non-system-updates-without-restarting]
   [--install-non-system-updates-without-restarting-off]
-  [--install-safari-update-without-restarting]
-  [--install-safari-update-without-restarting-off]
+  [--install-safari-updates-without-restarting]
+  [--install-safari-updates-without-restarting-off]
   [--install-prioritize-non-restart-updates]
   [--install-prioritize-non-restart-updates-off]
   
@@ -56,6 +57,8 @@ show_usage() {
   Workflow Options:
   [--workflow-install-now]  [--workflow-install-now-off]
   [--workflow-only-download]  [--workflow-only-download-off]
+  [--workflow-ignore-managed-deferrals]
+  [--workflow-ignore-managed-deferrals-off]
   [--workflow-require-active-user]  [--workflow-require-active-user-off]
   [--workflow-restart-without-updates]  [--workflow-restart-without-updates-off]
   [--workflow-disable-update-check]  [--workflow-disable-update-check-off]
@@ -159,9 +162,10 @@ show_usage() {
   <key>InstallMacOSMinorVersionTarget</key> <string>macOSVersionNumber</string>
   <key>InstallMacOSMajorUpgrades</key> <true/> | <false/>
   <key>InstallMacOSMajorVersionTarget</key> <string>macOSVersionNumber</string>
+  <key>InstallMacOSBSIUpdates</key> <true/> | <false/>
   <key>InstallRapidSecurityResponses</key> <true/> | <false/>
   <key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>
-  <key>InstallSafariUpdateWithoutRestarting</key> <true/> | <false/>
+  <key>InstallSafariUpdatesWithoutRestarting</key> <true/> | <false/>
   <key>InstallPrioritizeNonRestartUpdates</key> <true/> | <false/>
   <key>InstallJamfPolicyTriggers</key>
   <string>PolicyTrigger,PolicyTrigger,etc...</string>
@@ -229,6 +233,7 @@ show_usage() {
   <key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>
   <key>DisplayHelpButtonString</key> <string>plain text or URL</string>
   <key>DisplayWarningButtonString</key> <string>plain text or URL</string>
+  <key>ConfigCodeSignature</key> <string>Identifier</string>
   <key>ConfigTempOverride</key> <true/> | <false/>
   <key>AuthAskUserToSavePassword</key> <true/> | <false/>
   <key>AuthJamfCustomURL</key> <string>URL</string>
@@ -341,6 +346,7 @@ show_config_status() {
 			{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ "${config_temp_override}" == "FALSE" ]]; } && echo -e "\n**** Config Status: The managed workflow configuration will override conflicting settings in the temporary workflow configuration. You can reverse this behavior via the <key>ConfigTempOverride</key> <true/> managed preference setting."
 			echo -e "\n**** Config Status: Contents of the ALTERNATE TEMPORARY super settings file located at ${alternate_temporary_plist}.plist:"
 			defaults read "${alternate_temporary_plist}" | tail -n +2 | sed -e 's/    //g' -e 's/;//g' -e '$d'
+			echo -e "$(get_config_code_signature "${alternate_temporary_plist}.plist")"
 			{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ "${config_temp_override}" == "TRUE" ]]; } && echo -e "\n**** Config Status: Contents of the CONFIGURATION PROFILE MANAGED super settings file located at ${SUPER_MANAGED_PLIST}.plist:"
 			{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ "${config_temp_override}" == "TRUE" ]]; } && defaults read "${SUPER_MANAGED_PLIST}" | tail -n +2 | sed -e 's/    //g' -e 's/;//g' -e '$d'
 		else
@@ -355,6 +361,7 @@ show_config_status() {
 		if [[ -f "${alternate_default_plist}.plist" ]]; then
 			echo -e "\n**** Config Status: Contents of the ALTERNATE DEFAULT super settings file located at ${alternate_default_plist}.plist:"
 			defaults read "${alternate_default_plist}" | tail -n +2 | sed -e 's/    //g' -e 's/;//g' -e '$d'
+			echo -e "$(get_config_code_signature "${alternate_default_plist}.plist")"
 		else
 			echo -e "\n**** Config Error: No ALTERNATE DEFAULT super settings file in the expected location at ${alternate_default_plist}.plist."
 		fi
@@ -374,6 +381,7 @@ show_config_status() {
 			if [[ "${super_inactive_alt_plist}" != "${alternate_temporary_plist}.plist" ]] && [[ "${super_inactive_alt_plist}" != "${alternate_default_plist}.plist" ]]; then
 				echo -e "\n**** Config Status: Contents of the INACTIVE super settings file located at ${super_inactive_alt_plist}:"
 				defaults read "${super_inactive_alt_plist}" | tail -n +2 | sed -e 's/    //g' -e 's/;//g' -e '$d'
+				echo -e "$(get_config_code_signature "${super_inactive_alt_plist}")"
 			fi
 		done
 	fi
@@ -450,6 +458,10 @@ set_defaults() {
 	SUPER_AUDIT_LOG="${SUPER_LOG_FOLDER}/super-audit.log"
 	readonly SUPER_AUDIT_LOG
 	
+	# Path to the log for the super metrics log:
+	SUPER_METRICS_LOG="${SUPER_LOG_FOLDER}/super-metrics.log"
+	readonly SUPER_METRICS_LOG
+	
 	# Path to the log for the current "mdmclient AvailableOSUpdates" command response:
 	MDMCLIENT_LIST_LOG="${SUPER_LOG_FOLDER}/mdmclient-list.log"
 	readonly MDMCLIENT_LIST_LOG
@@ -504,11 +516,11 @@ set_defaults() {
 	# IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the jamf binary.
 	
 	# URL to the IBM Notifier.app download:
-	IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.2.2-b-128/IBM.Notifier.zip"
+	IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.2.3-b-135/IBM.Notifier.zip"
 	readonly IBM_NOTIFIER_DOWNLOAD_URL
 	
 	# Target version for IBM Notifier.app:
-	IBM_NOTIFIER_TARGET_VERSION="3.2.2"
+	IBM_NOTIFIER_TARGET_VERSION="3.2.3"
 	readonly IBM_NOTIFIER_TARGET_VERSION
 	
 	# Path to the local IBM Notifier.app:
@@ -728,6 +740,12 @@ get_options() {
 		--install-macos-major-version-target=*)
 			install_macos_major_version_target_option="${1##*=}"
 			;;
+		--install-macos-bsi-updates)
+			install_macos_bsi_updates_option="TRUE"
+			;;
+		--install-macos-bsi-updates-off)
+			install_macos_bsi_updates_option="FALSE"
+			;;
 		--install-rapid-security-responses)
 			install_rapid_security_responses_option="TRUE"
 			;;
@@ -740,11 +758,11 @@ get_options() {
 		--install-non-system-updates-without-restarting-off)
 			install_non_system_updates_without_restarting_option="FALSE"
 			;;
-		--install-safari-update-without-restarting)
-			install_safari_update_without_restarting_option="TRUE"
+		--install-safari-updates-without-restarting)
+			install_safari_updates_without_restarting_option="TRUE"
 			;;
-		--install-safari-update-without-restarting-off)
-			install_safari_update_without_restarting_option="FALSE"
+		--install-safari-updates-without-restarting-off)
+			install_safari_updates_without_restarting_option="FALSE"
 			;;
 		--install-prioritize-non-restart-updates)
 			install_prioritize_non_restart_updates_option="TRUE"
@@ -1167,6 +1185,16 @@ get_pref() {
 	return 1
 }
 
+# Validate the code signing signature of the specified ${1} plist and return "UNSIGNED", "INVALID", or the output the valid code signature details.
+get_config_code_signature(){
+	local codesign_verify_response
+	codesign_verify_response=$(codesign --verify -v "${1}" 2>&1)
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: codesign_verify_response: ${codesign_verify_response}"
+	[[ $(echo "${codesign_verify_response}" | grep -c 'not signed') -gt 0 ]] && echo -e "** UNSIGNED **" && return 0
+	[[ $(echo "${codesign_verify_response}" | grep -c 'invalid') -gt 0 ]] && echo -e "** INVALID CODE SIGNATURE **\n${codesign_verify_response}"  && return 0
+	[[ $(echo "${codesign_verify_response}" | grep -c 'valid') -gt 0 ]] && echo -e "** VALID CODE SIGNATURE **\n$(codesign --display -v "${1}" 2>&1)"
+}
+
 # If needed, reset any parameters stored in ${SUPER_MAIN_PLIST}.
 manage_preference_resets() {
 	# First handle any main preference deletion requests.
@@ -1326,6 +1354,9 @@ manage_parameter_options() {
 	config_temp_override=$(get_pref_managed "ConfigTempOverride")
 	[[ -z "${config_temp_override}" ]] && config_temp_override="FALSE"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: config_temp_override: ${config_temp_override}"
+	config_code_signature=$(get_pref_managed "ConfigCodeSignature")
+	[[ -z "${config_code_signature}" ]] && config_code_signature="FALSE"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: config_code_signature is: ${config_code_signature}"
 	[[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && log_super "Status: Active managed workflow configuration located at ${SUPER_MANAGED_PLIST}.plist."
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Managed preference file: ${SUPER_MANAGED_PLIST}:\n$(defaults read "${SUPER_MANAGED_PLIST}" 2>/dev/null)"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file before startup validation: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2>/dev/null)"
@@ -1367,11 +1398,13 @@ manage_parameter_options() {
 	[[ "${parameter_error}" == "TRUE" ]] && return 0
 	
 	# If the workflow should start, then evaluate ${config_start_default_option} and ${config_start_temp_option} and possibly save to ${SUPER_MAIN_PLIST} and set ${super_alternate_plist}.
+	# If the workflow should start, then evaluate ${config_start_default_option} and ${config_start_temp_option} and possibly save to ${SUPER_MAIN_PLIST} and set ${super_alternate_plist}.
 	if [[ "${config_edit_main_option}" != "TRUE" ]] && [[ -z "${config_edit_option}" ]] && [[ -z "${config_delete_option}" ]] && [[ -z "${config_delete_all_option}" ]]; then
 		if [[ "${config_start_default_option}" == "X" ]]; then
 			unset_alternate_plist=$(get_pref "AlternateDefaultPlist")
 			if [[ -n "${unset_alternate_plist}" ]]; then
 				delete_pref_main "AlternateDefaultPlist"
+				delete_pref_main "AlternateDefaultPlistStatus"
 				log_super_audit "Status: Workflow is no longer using alternate default configuration at ${unset_alternate_plist}.plist."
 				unset unset_alternate_plist
 			fi
@@ -1391,6 +1424,7 @@ manage_parameter_options() {
 			unset_alternate_plist=$(get_pref "AlternateTemporaryPlist")
 			if [[ -n "${unset_alternate_plist}" ]]; then
 				delete_pref_main "AlternateTemporaryPlist"
+				delete_pref_main "AlternateTemporaryPlistStatus"
 				log_super_audit "Status: Workflow is no longer using alternate temporary configuration at ${unset_alternate_plist}.plist."
 				unset unset_alternate_plist
 			fi
@@ -1413,9 +1447,55 @@ manage_parameter_options() {
 		
 		# Evaluate previously saved AlternateDefaultPlist and AlternateTemporaryPlist. If valid set ${alternate_default_plist} and/or ${alternate_temporary_plist}.
 		[[ -z "${alternate_default_plist}" ]] && alternate_default_plist=$(get_pref "AlternateDefaultPlist")
-		{ [[ -n "${alternate_default_plist}" ]] && [[ ! -f "${alternate_default_plist}.plist" ]]; } && log_super "Parameter Error: Unable to locate default workflow configuration at ${alternate_default_plist}.plist." && parameter_error="TRUE"
+		if [[ -n "${alternate_default_plist}" ]]; then
+			if [[ -f "${alternate_default_plist}.plist" ]]; then
+				get_config_code_signature_response=$(get_config_code_signature "${alternate_default_plist}.plist")
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: get_config_code_signature_response is:\n${get_config_code_signature_response}"
+				if [[ $(echo "${get_config_code_signature_response}" | grep -c ' UNSIGNED') -gt 0 ]] || [[ $(echo "${get_config_code_signature_response}" | grep -c ' VALID') -gt 0 ]]; then
+					if [[ "${config_code_signature}" == "FALSE" ]] || [[ $(echo "${get_config_code_signature_response}" | grep -c "${config_code_signature}") -gt 0 ]]; then
+						set_pref_main "AlternateDefaultPlistStatus" "VALID"
+					else
+						log_super "Parameter Error: The default workflow configuration at ${alternate_default_plist}.plist does not match the code signature requirement of ${config_code_signature}."
+						set_pref_main "AlternateDefaultPlistStatus" "UNMATCHED"
+						parameter_error="TRUE"
+					fi
+				else
+					log_super "Parameter Error: The default workflow configuration at ${alternate_default_plist}.plist has an invalid code signature."
+					set_pref_main "AlternateDefaultPlistStatus" "INVALID"
+					parameter_error="TRUE"
+				fi
+				unset get_config_code_signature_response
+			else
+				log_super "Parameter Error: Unable to locate default workflow configuration at ${alternate_default_plist}.plist."
+				set_pref_main "AlternateDefaultPlistStatus" "MISSING"
+				parameter_error="TRUE"
+			fi
+		fi
 		[[ -z "${alternate_temporary_plist}" ]] && alternate_temporary_plist=$(get_pref "AlternateTemporaryPlist")
-		{ [[ -n "${alternate_temporary_plist}" ]] && [[ ! -f "${alternate_temporary_plist}.plist" ]]; } && log_super "Parameter Error: Unable to locate temporary workflow configuration at ${alternate_temporary_plist}.plist." && parameter_error="TRUE"
+		if [[ -n "${alternate_temporary_plist}" ]]; then
+			if [[ -f "${alternate_temporary_plist}.plist" ]]; then
+				get_config_code_signature_response=$(get_config_code_signature "${alternate_temporary_plist}.plist")
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: get_config_code_signature_response is:\n${get_config_code_signature_response}"
+				if [[ $(echo "${get_config_code_signature_response}" | grep -c ' UNSIGNED') -gt 0 ]] || [[ $(echo "${get_config_code_signature_response}" | grep -c ' VALID') -gt 0 ]]; then
+					if [[ "${config_code_signature}" == "FALSE" ]] || [[ $(echo "${get_config_code_signature_response}" | grep -c "${config_code_signature}") -gt 0 ]]; then
+						set_pref_main "AlternateTemporaryPlistStatus" "VALID"
+					else
+						log_super "Parameter Error: The default workflow configuration at ${alternate_default_plist}.plist does not match the code signature requirement of ${config_code_signature}."
+						set_pref_main "AlternateTemporaryPlistStatus" "UNMATCHED"
+						parameter_error="TRUE"
+					fi
+				else
+					log_super "Parameter Error: The temporary workflow configuration at ${alternate_temporary_plist}.plist has an invalid code signature."
+					set_pref_main "AlternateTemporaryPlistStatus" "INVALID"
+					parameter_error="TRUE"
+				fi
+				unset get_config_code_signature_response
+			else
+				log_super "Parameter Error: Unable to locate temporary workflow configuration at ${alternate_temporary_plist}.plist."
+				set_pref_main "AlternateTemporaryPlistStatus" "MISSING"
+				parameter_error="TRUE"
+			fi
+		fi
 		[[ "${parameter_error}" == "TRUE" ]] && return 0
 		
 		# At this point if there are valid ${alternate_default_plist} or ${alternate_temporary_plist} options, evaluate both and set ${super_alternate_plist}.
@@ -1442,7 +1522,8 @@ manage_parameter_options() {
 		set_pref "InstallMacOSMinorVersionTarget" "${install_macos_minor_version_target}"
 	fi
 	[[ -z "${install_macos_minor_version_target}" ]] && install_macos_minor_version_target=$(get_pref "InstallMacOSMinorVersionTarget")
-	{ [[ -n "${install_macos_minor_version_target}" ]] && [[ ! "${install_macos_minor_version_target}" =~ ${REGEX_MACOS_TARGET_VERSION} ]]; } && log_super "Parameter Error: The --install-macos-minor-version-target=number value must be a contemporary macOS version number (15 | 15.1 | 15.1.1)." && parameter_error="TRUE"
+	{ [[ -n "${install_macos_minor_version_target}" ]] && [[ ! "${install_macos_minor_version_target}" =~ ${REGEX_MACOS_TARGET_VERSION} ]]; } && log_super "Parameter Error: The --install-macos-minor-version-target=number value must be a contemporary macOS version number (15.0 | 15.1 | 15.1.1)." && parameter_error="TRUE"
+	{ [[ -n "${install_macos_minor_version_target}" ]] && [[ $(echo "${install_macos_minor_version_target}" | grep -c '\.') -eq 0 ]]; } && log_super "Parameter Error: The --install-macos-minor-version-target=number value must inlucde macOS major and minor version numbers (15.0 | 15.1 | 15.1.1)." && parameter_error="TRUE"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_macos_minor_version_target}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_version_target is: ${install_macos_minor_version_target}"
 	[[ -n "${install_macos_minor_version_target}" ]] && install_macos_minor_version_normalized_target=$(echo "${install_macos_minor_version_target}" | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n $install_macos_minor_version_normalized_target ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_version_normalized_target is: ${install_macos_minor_version_normalized_target}"
@@ -1488,30 +1569,38 @@ manage_parameter_options() {
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_upgrades is: ${install_macos_major_upgrades}"
 	
-	# Manage ${install_rapid_security_responses} parameter.
+	# Manage the ${install_macos_bsi_updates} and ${install_rapid_security_responses} parameters.
+	install_macos_bsi_updates=$(get_pref_managed "InstallMacOSBSIUpdates")
+	{ [[ -z "${install_macos_bsi_updates}" ]] && [[ -n "${install_macos_bsi_updates_option}" ]]; } && install_macos_bsi_updates="${install_macos_bsi_updates_option}" && set_pref "InstallMacOSBSIUpdates" "${install_macos_bsi_updates_option}"
+	[[ -z "${install_macos_bsi_updates}" ]] && install_macos_bsi_updates=$(get_pref "InstallMacOSBSIUpdates")
 	install_rapid_security_responses=$(get_pref_managed "InstallRapidSecurityResponses")
 	{ [[ -z "${install_rapid_security_responses}" ]] && [[ -n "${install_rapid_security_responses_option}" ]]; } && install_rapid_security_responses="${install_rapid_security_responses_option}" && set_pref "InstallRapidSecurityResponses" "${install_rapid_security_responses_option}"
 	[[ -z "${install_rapid_security_responses}" ]] && install_rapid_security_responses=$(get_pref "InstallRapidSecurityResponses")
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_rapid_security_responses}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_rapid_security_responses is: ${install_rapid_security_responses}"
-	
+	if [[ -n "${install_rapid_security_responses}" ]]; then
+		log_super "Parameter Warning: The --install-rapid-security-responses option is deprecated and will be removed in a future version of super. It's superseded by the --install-macos-bsi-updates option."
+		[[ -z "${install_macos_bsi_updates}" ]] && install_macos_bsi_updates="${install_rapid_security_responses}"
+		unset install_rapid_security_responses
+	fi
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_macos_bsi_updates}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_bsi_updates is: ${install_macos_bsi_updates}"
+
 	# Manage ${install_non_system_updates_without_restarting} parameter.
 	install_non_system_updates_without_restarting=$(get_pref_managed "InstallNonSystemUpdatesWithoutRestarting")
 	{ [[ -z "${install_non_system_updates_without_restarting}" ]] && [[ -n "${install_non_system_updates_without_restarting_option}" ]]; } && install_non_system_updates_without_restarting="${install_non_system_updates_without_restarting_option}" && set_pref "InstallNonSystemUpdatesWithoutRestarting" "${install_non_system_updates_without_restarting_option}"
 	[[ -z "${install_non_system_updates_without_restarting}" ]] && install_non_system_updates_without_restarting=$(get_pref "InstallNonSystemUpdatesWithoutRestarting")
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_non_system_updates_without_restarting}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_non_system_updates_without_restarting is: ${install_non_system_updates_without_restarting}"
 	
-	# Manage ${install_safari_update_without_restarting} parameter.
-	install_safari_update_without_restarting=$(get_pref_managed "InstallSafariUpdateWithoutRestarting")
-	{ [[ -z "${install_safari_update_without_restarting}" ]] && [[ -n "${install_safari_update_without_restarting_option}" ]]; } && install_safari_update_without_restarting="${install_safari_update_without_restarting_option}" && set_pref "InstallSafariUpdateWithoutRestarting" "${install_safari_update_without_restarting_option}"
-	[[ -z "${install_safari_update_without_restarting}" ]] && install_safari_update_without_restarting=$(get_pref "InstallSafariUpdateWithoutRestarting")
-	{ [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]] && [[ "${install_safari_update_without_restarting}" == "TRUE" ]]; } && log_super "Parameter Error: You can not use both the --install-non-system-updates-without-restarting and the --install-safari-update-without-restarting options simultaneously. Use the --install-non-system-updates-without-restarting to install all non-system updates including any Safari updates." && parameter_error="TRUE"
-	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_safari_update_without_restarting}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_safari_update_without_restarting is: ${install_safari_update_without_restarting}"
+	# Manage ${install_safari_updates_without_restarting} parameter.
+	install_safari_updates_without_restarting=$(get_pref_managed "InstallSafariUpdatesWithoutRestarting")
+	{ [[ -z "${install_safari_updates_without_restarting}" ]] && [[ -n "${install_safari_updates_without_restarting_option}" ]]; } && install_safari_updates_without_restarting="${install_safari_updates_without_restarting_option}" && set_pref "InstallSafariUpdatesWithoutRestarting" "${install_safari_updates_without_restarting_option}"
+	[[ -z "${install_safari_updates_without_restarting}" ]] && install_safari_updates_without_restarting=$(get_pref "InstallSafariUpdatesWithoutRestarting")
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_safari_updates_without_restarting}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_safari_updates_without_restarting is: ${install_safari_updates_without_restarting}"
 	
 	# Manage ${install_prioritize_non_restart_updates} parameter.
 	install_prioritize_non_restart_updates=$(get_pref_managed "InstallPrioritizeNonRestartUpdates")
 	{ [[ -z "${install_prioritize_non_restart_updates}" ]] && [[ -n "${install_prioritize_non_restart_updates_option}" ]]; } && install_prioritize_non_restart_updates="${install_prioritize_non_restart_updates_option}" && set_pref "InstallPrioritizeNonRestartUpdates" "${install_prioritize_non_restart_updates_option}"
 	[[ -z "${install_prioritize_non_restart_updates}" ]] && install_prioritize_non_restart_updates=$(get_pref "InstallPrioritizeNonRestartUpdates")
-	{ [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && { [[ -z "${install_non_system_updates_without_restarting}" ]] || [[ "${install_non_system_updates_without_restarting}" == "FALSE" ]]; } && { [[ -z "${install_safari_update_without_restarting}" ]] || [[ "${install_safari_update_without_restarting}" == "FALSE" ]]; }; } && log_super "Parameter Error: To use the --install-prioritize-non-restart-updates option, you must also specifiy either the --install-non-system-updates-without-restarting option or the --install-safari-update-without-restarting option." && parameter_error="TRUE"
+	{ [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && { [[ -z "${install_non_system_updates_without_restarting}" ]] || [[ "${install_non_system_updates_without_restarting}" == "FALSE" ]]; } && { [[ -z "${install_safari_updates_without_restarting}" ]] || [[ "${install_safari_updates_without_restarting}" == "FALSE" ]]; }; } && log_super "Parameter Error: To use the --install-prioritize-non-restart-updates option, you must also specifiy either the --install-non-system-updates-without-restarting option or the --install-safari-updates-without-restarting option." && parameter_error="TRUE"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${install_prioritize_non_restart_updates}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_prioritize_non_restart_updates is: ${install_prioritize_non_restart_updates}"
 	
 	# Validate ${install_jamf_policy_triggers_option} and if a valid set the ${install_jamf_policy_triggers} parameter.
@@ -3698,7 +3787,7 @@ manage_helpers() {
 	[[ "${ibm_notifier_valid}" == "FALSE" ]] && helper_error="TRUE"
 	
 	# If needed, validate mist-cli and if missing or invalid then install and check again.
-	if [[ -n "${install_macos_minor_version_target}" ]] || [[ "${install_macos_major_upgrades}" == "TRUE" ]];then
+	if [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; then
 		if [[ ! -f "${MIST_CLI_BINARY}" ]]; then
 			get_mist_cli
 			[[ -f "${MIST_CLI_BINARY}" ]] && check_mist_cli
@@ -3874,6 +3963,7 @@ workflow_startup() {
 			sudo -u "${current_user_account_name}" open "${MACOS_INSTALLERS_LIST_LOG}"
 			sudo -u "${current_user_account_name}" open "${MDMCLIENT_LIST_LOG}"
 			sudo -u "${current_user_account_name}" open "${MSU_LIST_LOG}"
+			sudo -u "${current_user_account_name}" open "${SUPER_METRICS_LOG}"
 			sudo -u "${current_user_account_name}" open "${SUPER_AUDIT_LOG}"
 			sudo -u "${current_user_account_name}" open "${SUPER_LOG}"
 		else # No current GUI user.
@@ -4057,7 +4147,7 @@ workflow_startup() {
 # This function is only used for debugging from the command line to interrupt the workflow and wait for the user to press Enter to continue. Insert the following line wherever you want an interrupt to occur:
 # [[ "${current_user_account_name}" != "FALSE" ]] && interactive_interrupt
 interactive_interrupt() {
-	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INTERACTIVE INTERRUPT - PRESS ENTER TO CONTINUE ****"
+	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INTERACTIVE INTERRUPT - PRESS ENTER TO CONTINUE OR CTRL-C TO EXIT ****"
 	read -n 1 -p -r >/dev/null 2>&1
 }
 
@@ -4116,6 +4206,11 @@ log_super() {
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}"
 }
 
+# Append input to the command line and logs located at ${SUPER_LOG} and ${SUPER_AUDIT_LOG}.
+log_super_audit() {
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}" 
+}
+
 # Send input to the command line only, so as not to save secrets to the ${SUPER_LOG}.
 log_echo() {
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: Not Logged: $*"
@@ -4126,9 +4221,31 @@ log_echo_replace_line() {
 	echo -ne "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: Not Logged: $*\r"
 }
 
-# Append input to the command line and logs located at ${SUPER_LOG} and ${SUPER_AUDIT_LOG}.
-log_super_audit() {
-	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}" 
+# Append input to the log located at ${SUPER_METRICS_LOG} including an elapsed time based on the log text ${1} and timestamp ${2}. The timestamp can be either an integer of seconds, or a variable of a timestamp, or a property list key containing a timestamp.
+log_metrics() {
+	local log_metrics_elapsed_seconds
+	local log_metrics_timestamp
+	if [[ "${2}" =~ ^[0-9]+$ ]]; then
+		log_metrics_elapsed_seconds="${2}"
+	else # ${2} is not an integer.
+		[[ ! "${2}" =~ ^[[:upper:]] ]] && log_metrics_timestamp="${2}"
+		[[ "${2}" =~ ^[[:upper:]] ]] && log_metrics_timestamp=$(get_pref "${2}")
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: log_metrics_timestamp is: ${log_metrics_timestamp}"
+		[[ -n "${log_metrics_timestamp}" ]] && log_metrics_elapsed_seconds=$(( $(date +%s) - $(date -j -f %Y-%m-%d:%H:%M:%S "${log_metrics_timestamp}" +%s) ))
+	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: log_metrics_elapsed_seconds is: ${log_metrics_elapsed_seconds}"
+	if [[ -n "${log_metrics_elapsed_seconds}" ]]; then
+		{ [[ -n "${workflow_target}" ]] && [[ "${workflow_target}" != "FALSE" ]]; } && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: ${workflow_target}: ${1} (DHMS): $(printf "%02d" $(( log_metrics_elapsed_seconds / 86400))):$(printf "%02d" $(( log_metrics_elapsed_seconds / 3600 % 24 ))):$(printf "%02d" $(( log_metrics_elapsed_seconds / 60 % 60 ))):$(printf "%02d" $(( log_metrics_elapsed_seconds %60 )))" >> "${SUPER_METRICS_LOG}"
+		{ [[ -z "${workflow_target}" ]] || [[ "${workflow_target}" == "FALSE" ]]; } && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: No Target: ${1} (DHMS): $(printf "%02d" $(( log_metrics_elapsed_seconds / 86400))):$(printf "%02d" $(( log_metrics_elapsed_seconds / 3600 % 24 ))):$(printf "%02d" $(( log_metrics_elapsed_seconds / 60 % 60 ))):$(printf "%02d" $(( log_metrics_elapsed_seconds %60 )))" >> "${SUPER_METRICS_LOG}"
+	else
+		{ [[ -n "${workflow_target}" ]] && [[ "${workflow_target}" != "FALSE" ]]; } && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: ${workflow_target}: ${1}" >> "${SUPER_METRICS_LOG}"
+		{ [[ -z "${workflow_target}" ]] || [[ "${workflow_target}" == "FALSE" ]]; } && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: No Target: ${1}" >> "${SUPER_METRICS_LOG}"
+	fi
+}
+
+# Update the SuperStatus key in the ${SUPER_MAIN_PLIST}.
+log_status() {
+	set_pref_main "SuperStatus" "$(date +"%a %b %d %T"): $*"
 }
 
 # Append input to a log located at ${MSU_WORKFLOW_LOG}.
@@ -4149,11 +4266,6 @@ log_mdm_command() {
 # Append input to a log located at ${MDM_WORKFLOW_LOG}.
 log_mdm_workflow() {
 	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" >> "${MDM_WORKFLOW_LOG}"
-}
-
-# Update the SuperStatus key in the ${SUPER_MAIN_PLIST}.
-log_status() {
-	set_pref_main "SuperStatus" "$(date +"%a %b %d %T"): $*"
 }
 
 # Archive all legacy log files to the ${SUPER_LOG_ARCHIVE_FOLDER}, and if needed, archive larger current logs.
@@ -4184,6 +4296,7 @@ archive_logs() {
 	archive_logs_needed="FALSE"
 	[[ $(ls -l "${SUPER_LOG}" 2>/dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
 	[[ $(ls -l "${SUPER_AUDIT_LOG}" 2>/dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
+	[[ $(ls -l "${SUPER_METRICS_LOG}" 2>/dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
 	[[ $(ls -l "${MSU_WORKFLOW_LOG}" 2>/dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
 	[[ $(ls -l "${INSTALLER_WORKFLOW_LOG}" 2>/dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
 	[[ $(ls -l "${MDM_COMMAND_LOG}" 2>/dev/null | awk '{print int($5/1000)}') -gt $SUPER_LOG_ARCHIVE_SIZE ]] && archive_logs_needed="TRUE"
@@ -4202,6 +4315,7 @@ archive_logs() {
 		log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - LOGS ARCHIVAL ****"
 		log_super "Status: A super log was larger than ${SUPER_LOG_ARCHIVE_SIZE} KB, previous super logs archived to ${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}.zip."
 		[[ -f "${SUPER_AUDIT_LOG}" ]] && mv "${SUPER_AUDIT_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${SUPER_AUDIT_LOG})"
+		[[ -f "${SUPER_METRICS_LOG}" ]] && mv "${SUPER_METRICS_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${SUPER_METRICS_LOG})"
 		[[ -f "${MSU_WORKFLOW_LOG}" ]] && mv "${MSU_WORKFLOW_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MSU_WORKFLOW_LOG})"
 		[[ -f "${INSTALLER_WORKFLOW_LOG}" ]] && mv "${INSTALLER_WORKFLOW_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${INSTALLER_WORKFLOW_LOG})"
 		[[ -f "${MDM_COMMAND_LOG}" ]] && mv "${MDM_COMMAND_LOG}" "${SUPER_LOG_ARCHIVE_FOLDER}/${log_archive_name}/$(basename ${MDM_COMMAND_LOG})"
@@ -4590,10 +4704,13 @@ reset_schedule_zero_date() {
 	delete_pref_main "DeadlineDaysHardDate"
 }
 
-# Delete all workflow items, counters, and zero dates in ${SUPER_MAIN_PLIST} to reset the workflow target.
+# Delete all workflow items, counters, and zero dates in ${SUPER_MAIN_PLIST} to reset the workflow target. Also update ${SUPER_METRICS_LOG}.
 reset_workflow() {
 	log_super "Status: Resetting workflow target."
+	[[ -n "${workflow_target}" ]] && log_metrics "Workflow Complete: Total Elapsed Time" "WorkflowTargetTimestamp"
 	set_pref_main "WorkflowTarget" "FALSE"
+	unset workflow_target
+	delete_pref_main "WorkflowTargetTimestamp"
 	delete_pref_main "WorkflowScheduledInstall"
 	delete_pref_main "WorkflowDownloadMacOSAuthRequired"
 	reset_schedule_zero_date
@@ -5669,11 +5786,13 @@ check_deadlines_count() {
 			fi
 			if [[ $deadline_counter_focus_current -ge $deadline_count_focus ]]; then
 				log_super "Status: Focus maximum deferral count of ${deadline_count_focus} has passed."
+				log_metrics "Focus Count Expired: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 				deadline_count_status="FOCUS"
 				user_focus_active="FALSE"
 			else
 				display_string_deadline_count_focus=$((deadline_count_focus - deadline_counter_focus_current))
 				log_super "Status: Focus maximum deferral count of ${deadline_count_focus} not passed with ${display_string_deadline_count_focus} remaining."
+				log_metrics "Focus Count Remaining ${display_string_deadline_count_focus}: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			fi
 		else
 			log_super "Status: Focus or Do Not Disturb active, and no maximum focus deferral, so not incrementing deferral counters."
@@ -5693,10 +5812,12 @@ check_deadlines_count() {
 			fi
 			if [[ $deadline_counter_soft_current -ge $deadline_count_soft ]]; then
 				log_super "Status: Soft maximum deferral count of ${deadline_count_soft} has passed."
+				log_metrics "Soft Count Expired: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 				deadline_count_status="SOFT"
 			else
 				display_string_deadline_count_soft=$((deadline_count_soft - deadline_counter_soft_current))
 				log_super "Status: Soft maximum deferral count of ${deadline_count_soft} not passed with ${display_string_deadline_count_soft} remaining."
+				log_metrics "Soft Count Remaining ${display_string_deadline_count_soft}: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			fi
 			display_string_deadline_count="${display_string_deadline_count_soft}"
 			display_string_deadline_count_maximum="${deadline_count_soft}"
@@ -5714,10 +5835,12 @@ check_deadlines_count() {
 			fi
 			if [[ $deadline_counter_hard_current -ge $deadline_count_hard ]]; then
 				log_super "Status: Hard maximum deferral count of ${deadline_count_hard} has passed."
+				log_metrics "Hard Count Expired: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 				deadline_count_status="HARD"
 			else
 				display_string_deadline_count_hard=$((deadline_count_hard - deadline_counter_hard_current))
 				log_super "Status: Hard maximum deferral count of ${deadline_count_hard} not passed with ${display_string_deadline_count_hard} remaining."
+				log_metrics "Hard Count Remaining ${display_string_deadline_count_hard}: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			fi
 			display_string_deadline_count="${display_string_deadline_count_hard}"
 			display_string_deadline_count_maximum="${deadline_count_hard}"
@@ -5806,7 +5929,7 @@ check_software_update_status_cached() {
 		if [[ -n "${mdmclient_available_cache}" ]]; then
 			if [[ "${mdmclient_available_cache}" == "TRUE" ]]; then
 				mdmclient_available="TRUE"
-				mdmclient_list=$(sed -e '1,/^Available updates/d' -e '/^)$/d' < "${MDMCLIENT_LIST_LOG}")
+				mdmclient_list=$(sed -e '/^Available updates/q' < "${MDMCLIENT_LIST_LOG}")
 			fi
 		else
 			log_super "Status: No mdmclient available status cache, full software status check required."
@@ -6022,9 +6145,9 @@ get_mdmclient_list() {
 	
 	# If the mdmclient list completed, then collect information.
 	if [[ "${get_mdmclient_list_error}" == "FALSE" ]] && [[ "${get_mdmclient_list_timeout}" == "FALSE" ]]; then
-		mdmclient_list=$(sed -e '1,/^Available updates/d' -e '/^)$/d' < "${MDMCLIENT_LIST_LOG}")
+		mdmclient_list=$(sed -e '/^Available updates/q' < "${MDMCLIENT_LIST_LOG}")
 		set_pref_main "MDMClientListChecksum" "$(md5 -q "${MDMCLIENT_LIST_LOG}" 2>/dev/null)"
-		if [[ $(echo "${mdmclient_list}" | grep -c 'HumanReadableName') -gt 0 ]]; then
+		if [[ $(echo "${mdmclient_list}" | grep -c 'OS Update Item') -gt 0 ]]; then
 			mdmclient_available="TRUE"
 			set_pref_main "MDMClientAvailableCache" "TRUE"
 		else
@@ -6140,23 +6263,17 @@ get_msu_list() {
 }
 
 # This is the main workflow for checking all available macOS software including macOS major upgrades, macOS minor updates, and non-system software.
-# This function sets ${macos_installer_major_upgrade_target}, ${macos_installer_minor_update_target}, ${macos_msu_major_upgrade_target}, ${macos_msu_minor_update_target}, ${non_system_msu_targets}, and ${non_system_msu_safari_target}.
-# If there is a ${macos_installer_major_upgrade_target} or ${macos_installer_minor_update_target}, then this also sets ${macos_installer_title}, ${macos_installer_version}, ${macos_installer_build}, and ${macos_installer_size}.
+# This function sets ${macos_msu_major_upgrade_target}, ${macos_installer_major_upgrade_target}, ${macos_msu_minor_update_target}, ${macos_installer_minor_update_target}, ${non_system_msu_targets}, and ${non_system_msu_safari_target}.
 # If there is a ${macos_msu_major_upgrade_target} or a ${macos_msu_minor_update_target} then this also sets ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, and ${macos_msu_size}.
+# If there is a ${macos_installer_major_upgrade_target} or ${macos_installer_minor_update_target}, then this also sets ${macos_installer_title}, ${macos_installer_version}, ${macos_installer_build}, and ${macos_installer_size}.
 # If there is ${non_system_msu_targets} then this also sets ${non_system_msu_safari_target}, ${non_system_msu_labels_array[]} and ${non_system_msu_titles_array[]}.
 workflow_check_software_status() {
 	log_status "Running: Check for software update status workflow."
-	local mdmclient_macos_installer_target
-	mdmclient_macos_installer_target="FALSE"
-	local mdmclient_macos_msu_major_upgrade_target
-	mdmclient_macos_msu_major_upgrade_target="FALSE"
-	local mdmclient_macos_msu_minor_update_target
-	mdmclient_macos_msu_minor_update_target="FALSE"
-	macos_installer_major_upgrade_target="FALSE"
-	macos_installer_minor_update_target="FALSE"
 	macos_msu_major_upgrade_target="FALSE"
-	macos_msu_minor_update_target="FALSE"
+	macos_installer_major_upgrade_target="FALSE"
 	macos_major_upgrade_latest="FALSE"
+	macos_msu_minor_update_target="FALSE"
+	macos_installer_minor_update_target="FALSE"
 	macos_minor_update_latest="FALSE"
 	macos_target_mdm_compatible="FALSE"
 	non_system_msu_targets="FALSE"
@@ -6211,137 +6328,32 @@ workflow_check_software_status() {
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]]; then
 		# First clean up the structured data section of the ${mdmclient_list}.
 		local mdmclient_sanitized_list
-		mdmclient_sanitized_list=$(echo "${mdmclient_list}" | grep -e '^\s*Build ' -e '^\s*DeferredUntil ' -e '^\s*HumanReadableName ' -e '^\s*Version ' -e '},' | tr -d '\n' | sed -e 's/},/\n/g' -e 's/"//g' -e 's/  //g' -e 's/ = /:/g' -e 's/;/,/g' -e 's/HumanReadableName:/Title:/g')
+		mdmclient_sanitized_list=$(echo "${mdmclient_list}" | grep -e '^\s*Product Key' -e '^\s*Title' -e '^\s*Version' | tr '\n' ',' | sed -e 's/Product/\nProduct/g' -e 's/: */:/g' -e 's/ <[^,]*,//g' -e 's/^[[:space:]]//')
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_sanitized_list is:\n${mdmclient_sanitized_list}"
 		
 		# Create arrays for available macOS and non-system updates.
-		local mdmclient_macos_installers_array
-		mdmclient_macos_installers_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'macOS' | grep -Ev 'Build|Deferred|Installer' | awk -F ',' '{print $1 "," $2}' | uniq | sort -t ':' -k3 -V -r))
-		local mdmclient_macos_msu_array
-		mdmclient_macos_msu_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'Build.*macOS' | grep -Ev 'Deferred' | awk -F ',' '{print $2 "," $1 "," $3}' | uniq | sort -t ':' -k4 -V -r))
-		local mdmclient_non_system_array
-		mdmclient_non_system_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|Gatekeeper|DeferredUntil' | awk -F ',' '{print $1 "," $2}' | uniq))
-		
-		# Create arrays for macOS and non-system updates reporting as deferred.
-		local mdmclient_macos_installers_deferred_array
-		mdmclient_macos_installers_deferred_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'Deferred.*macOS' | grep -Ev 'Build' | awk -F ',' '{print $1 "," $2 "," $3}' | uniq | sort -t ':' -k6 -V -r))
-		local mdmclient_macos_msu_deferred_array
-		mdmclient_macos_msu_deferred_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'Build.*Deferred.*macOS' | awk -F ',' '{print $2 "," $3 "," $1 "," $4}'| uniq | sort -t ':' -k7 -V -r))
-		local mdmclient_non_system_deferred_array
-		mdmclient_non_system_deferred_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|Gatekeeper' | grep -E 'Deferred' | awk -F ',' '{print $1 "," $2 "," $3}' | uniq))
-		
-		# Create an array for security updates that can not be installed programmatically.
 		local mdmclient_security_array
-		mdmclient_security_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'XProtect|MRT|Gatekeeper' | awk -F ',' '{print $1 "," $2}' | uniq))
+		mdmclient_security_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'XProtect|MRT|Gatekeeper' | uniq))
+		local mdmclient_macos_msu_array
+		mdmclient_macos_msu_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'MSU_UPDATE' | uniq | sort -t ':' -k3 -V -r))
+		local mdmclient_macos_installer_array
+		mdmclient_macos_installer_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'MSU_UPDATE' | grep -E 'macOS' | uniq | sort -t ':' -k3 -V -r))
+		local mdmclient_non_system_array
+		mdmclient_non_system_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|Gatekeeper' | uniq | sort -t ':' -k3 -V -r))
 		
 		# Evaluate the numer of available updates and make sure there is at least one update available.
-		if [[ ${#mdmclient_macos_installers_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_installers_deferred_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_deferred_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_deferred_array[@]} -eq 0 ]] && [[ ${#mdmclient_security_array[@]} -eq 0 ]]; then
+		if [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_installer_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
 			log_super "Error: Parsing mdmclient available updates listing did not find any available or deferred updates."
 			workflow_check_software_status_error="TRUE"
 		fi
 	fi
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installers_array is:\n${mdmclient_macos_installers_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_array is:\n${mdmclient_macos_msu_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_array is:\n${mdmclient_non_system_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installers_deferred_array is:\n${mdmclient_macos_installers_deferred_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_deferred_array is:\n${mdmclient_macos_msu_deferred_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_deferred_array is:\n${mdmclient_non_system_deferred_array[*]}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_security_array is:\n${mdmclient_security_array[*]}"
-	
-	# If (no errors) split ${mdmclient_macos_msu_array[]} and into separate major upgrade and minor update arrays.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
-		local mdmclient_macos_msu_major_upgrade_array
-		mdmclient_macos_msu_major_upgrade_array=()
-		local mdmclient_macos_msu_minor_update_array
-		mdmclient_macos_msu_minor_update_array=()
-		for mdmclient_macos_msu_item in "${mdmclient_macos_msu_array[@]}"; do
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is: ${mdmclient_macos_msu_item}"
-			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -gt $macos_version_major ]] && mdmclient_macos_msu_major_upgrade_array+=("${mdmclient_macos_msu_item}")
-			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -eq $macos_version_major ]] && mdmclient_macos_msu_minor_update_array+=("${mdmclient_macos_msu_item}")
-		done
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_array is:\n${mdmclient_macos_msu_major_upgrade_array[*]}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_array is:\n${mdmclient_macos_msu_minor_update_array[*]}"
-	fi
-	
-	# If (no errors) split ${mdmclient_macos_msu_deferred_array[]} and into separate major upgrade and minor update arrays.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_deferred_array[@]} -gt 0 ]]; then
-		local mdmclient_macos_msu_major_upgrade_deferred_array
-		mdmclient_macos_msu_major_upgrade_deferred_array=()
-		local mdmclient_macos_msu_minor_update_deferred_array
-		mdmclient_macos_msu_minor_update_deferred_array=()
-		for mdmclient_macos_msu_item in "${mdmclient_macos_msu_deferred_array[@]}"; do
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_item is: ${mdmclient_macos_msu_item}"
-			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g') -gt $macos_version_major ]] && mdmclient_macos_msu_major_upgrade_deferred_array+=("${mdmclient_macos_msu_item}")
-			[[ $(echo "${mdmclient_macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g') -eq $macos_version_major ]] && mdmclient_macos_msu_minor_update_deferred_array+=("${mdmclient_macos_msu_item}")
-		done
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_deferred_array is:\n${mdmclient_macos_msu_major_upgrade_deferred_array[*]}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_deferred_array is:\n${mdmclient_macos_msu_minor_update_deferred_array[*]}"
-	fi
-	
-	# If (no errors) there are deferred items then evaluate and report to super.log. Further, if deferral restrictions are not present then erroneously deferred items are moved back to the appropriate available items array.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_minor_update_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; }; then
-		# Iterate trough the deferred arrays for logging and erroneous deferrals.
-		{ [[ "${deferral_restrictions_macOS_major_upgrades}" != "FALSE" ]] || [[ "${deferral_restrictions_macOS_minor_updates}" != "FALSE" ]] || [[ "${deferral_restrictions_non_system_updates}" != "FALSE" ]]; } && log_super "Status: Some updates may be deferred due to a deferral restrictions configuration profile."
-		{ [[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] || [[ "${deferral_restrictions_macOS_minor_updates}" == "FALSE" ]] || [[ "${deferral_restrictions_non_system_updates}" == "FALSE" ]]; } && log_super "Warning: Some updates are inaccurately reporting as deferred even though deferral restrictions configuration is not enabled. As such, these updates will still be considered for installation."
-		if [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]]; then
-			for array_index in "${!mdmclient_macos_installers_deferred_array[@]}"; do
-				if [[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] || [[ $(date -j -f "%Y-%m-%d %H:%M:%S %z" "$(echo "${mdmclient_macos_installers_deferred_array[array_index]}" | awk -F ',' '{print $1}' | sed -e 's/DeferredUntil://g')" +%s) -le $workflow_time_epoch ]]; then
-					log_super "Warning: Inaccurate deferral found for macOS major upgrade installer $((array_index + 1)) of ${#mdmclient_macos_installers_deferred_array[@]} is: ${mdmclient_macos_installers_deferred_array[array_index]}"
-					# shellcheck disable=SC2001
-					mdmclient_macos_installers_array+=($(echo "${mdmclient_macos_installers_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
-				elif [[ "${deferral_restrictions_macOS_major_upgrades}" != "FALSE" ]]; then
-					log_super "Deferral Restrictions: macOS major upgrade installer $((array_index + 1)) of ${#mdmclient_macos_installers_deferred_array[@]} is: ${mdmclient_macos_installers_deferred_array[array_index]}"
-				fi
-			done
-			[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && mdmclient_macos_installers_array=($(sort -t ':' -k4 -V -r  <<<"${mdmclient_macos_installers_array[*]}"))
-		fi
-		
-		if [[ ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} -gt 0 ]]; then
-			for array_index in "${!mdmclient_macos_msu_major_upgrade_deferred_array[@]}"; do
-				if [[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] || [[ $(date -j -f "%Y-%m-%d %H:%M:%S %z" "$(echo "${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}" | awk -F ',' '{print $1}' | sed -e 's/DeferredUntil://g')" +%s) -le $workflow_time_epoch ]]; then
-					log_super "Warning: Inaccurate deferral found for macOS major upgrade $((array_index + 1)) of ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} is: ${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}"
-					# shellcheck disable=SC2001
-					mdmclient_macos_msu_major_upgrade_array+=($(echo "${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
-				elif [[ "${deferral_restrictions_macOS_major_upgrades}" != "FALSE" ]]; then
-					log_super "Deferral Restrictions: macOS major upgrade $((array_index + 1)) of ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} is: ${mdmclient_macos_msu_major_upgrade_deferred_array[array_index]}"
-				fi
-			done
-			[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && mdmclient_macos_msu_major_upgrade_array=($(sort -t ':' -k3 -V -r  <<<"${mdmclient_macos_msu_major_upgrade_array[*]}"))
-		fi
-		
-		if [[ ${#mdmclient_macos_msu_minor_update_deferred_array[@]} -gt 0 ]]; then
-			for array_index in "${!mdmclient_macos_msu_minor_update_deferred_array[@]}"; do
-				if [[ "${deferral_restrictions_macOS_minor_updates}" == "FALSE" ]] || [[ $(date -j -f "%Y-%m-%d %H:%M:%S %z" "$(echo "${mdmclient_macos_msu_minor_update_deferred_array[array_index]}" | awk -F ',' '{print $1}' | sed -e 's/DeferredUntil://g')" +%s) -le $workflow_time_epoch ]]; then
-					log_super "Warning: Inaccurate deferral found for macOS minor update $((array_index + 1)) of ${#mdmclient_macos_msu_minor_update_deferred_array[@]} is: ${mdmclient_macos_msu_minor_update_deferred_array[array_index]}"
-					# shellcheck disable=SC2001
-					mdmclient_macos_msu_minor_update_array+=($(echo "${mdmclient_macos_msu_minor_update_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
-				elif [[ "${deferral_restrictions_macOS_minor_updates}" != "FALSE" ]]; then
-					log_super "Deferral Restrictions: macOS minor update $((array_index + 1)) of ${#mdmclient_macos_msu_minor_update_deferred_array[@]} is: ${mdmclient_macos_msu_minor_update_deferred_array[array_index]}"
-				fi
-			done
-			[[ "${deferral_restrictions_macOS_minor_updates}" == "FALSE" ]] && mdmclient_macos_msu_minor_update_array=($(sort -t ':' -k3 -V -r  <<<"${mdmclient_macos_msu_minor_update_array[*]}"))
-		fi
-		
-		if [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; then
-			for array_index in "${!mdmclient_non_system_deferred_array[@]}"; do
-				if [[ "${deferral_restrictions_non_system_updates}" == "FALSE" ]] || [[ $(date -j -f "%Y-%m-%d %H:%M:%S %z" "$(echo "${mdmclient_non_system_deferred_array[array_index]}" | awk -F ',' '{print $1}' | sed -e 's/DeferredUntil://g')" +%s) -le $workflow_time_epoch ]]; then
-					log_super "Warning: Inaccurate deferral found for Non-system update $((array_index + 1)) of ${#mdmclient_non_system_deferred_array[@]} is: ${mdmclient_non_system_deferred_array[array_index]}"
-					# shellcheck disable=SC2001
-					mdmclient_non_system_array+=($(echo "${mdmclient_non_system_deferred_array[array_index]}" | sed -e 's/^Deferred.*,T/T/g'))
-				elif [[ "${deferral_restrictions_non_system_updates}" != "FALSE" ]]; then
-					log_super "Deferral Restrictions: Non-system update $((array_index + 1)) of ${#mdmclient_non_system_deferred_array[@]} is: ${mdmclient_non_system_deferred_array[array_index]}"
-				fi
-			done
-		fi
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installers_array is:\n${mdmclient_macos_installers_array[*]}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_array is:\n${mdmclient_macos_msu_major_upgrade_array[*]}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_array is:\n${mdmclient_macos_msu_minor_update_array[*]}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_array is:\n${mdmclient_non_system_array[*]}"
-	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_array is:\n${mdmclient_macos_msu_array[*]}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_array is:\n${mdmclient_macos_installer_array[*]}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_non_system_array is:\n${mdmclient_non_system_array[*]}"
 	
 	# If (no errors) no installable updates then report any macOS security updates (that can't be installed programmatically) and then exit this function.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_installers_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
-		{ [[ ${#mdmclient_macos_installers_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_major_upgrade_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_minor_update_deferred_array[@]} -gt 0 ]] || [[ ${#mdmclient_non_system_deferred_array[@]} -gt 0 ]]; } && log_super "Status: No currently available macOS software updates due to software update deferral restrictions configuration profile."
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_installer_array[@]} -eq 0 ]]; then
 		if [[ ${#mdmclient_security_array[@]} -gt 0 ]]; then
 			[[ "${msu_automatic_security_updates}" == "TRUE" ]] && log_super "Status: The following security updates are currently available and they should be installed soon via automatic macOS software udpate:"
 			[[ "${msu_automatic_security_updates}" == "FALSE" ]] && log_super "Warning: The following security updates are available but due to macOS software update settings are not allowed for installation:"
@@ -6355,95 +6367,59 @@ workflow_check_software_status() {
 		return 0
 	fi
 	
-	# If (no errors) then evaluate versions in ${mdmclient_macos_msu_major_upgrade_array[]}, ${mdmclient_macos_installers_array[]}, and ${mdmclient_macos_msu_minor_update_array[]} for target selection and logging.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_installers_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_minor_update_array[@]} -gt 0 ]]; }; then
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_upgrades is: ${install_macos_major_upgrades}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_version_target is: ${install_macos_major_version_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_version_normalized_target is: ${install_macos_major_version_normalized_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_updates is: ${install_macos_minor_updates}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_version_target is: ${install_macos_minor_version_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_version_normalized_target is: ${install_macos_minor_version_normalized_target}"
-		
-		# If ${install_macos_major_upgrades} then attempt to resolve an "over-the air" macOS major upgrade target given ${install_macos_major_version_target} and ${mdmclient_macos_msu_major_upgrade_array[0]}.
-		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -gt 0 ]]; then
-			[[ -z "${install_macos_major_version_target}" ]] && mdmclient_macos_msu_major_upgrade_target="${mdmclient_macos_msu_major_upgrade_array[0]}"
-			if [[ -n "${install_macos_major_version_target}" ]]; then
-				if [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${mdmclient_macos_msu_major_upgrade_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_major_version_target} ]]; then
-					mdmclient_macos_msu_major_upgrade_target="${mdmclient_macos_msu_major_upgrade_array[0]}"
-				elif [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -gt 0 ]] && [[ $(echo "${mdmclient_macos_msu_major_upgrade_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq $install_macos_major_version_normalized_target ]]; then
-					mdmclient_macos_msu_major_upgrade_target="${mdmclient_macos_msu_major_upgrade_array[0]}"
-				else
-					log_super "Warning: Unable to target the latest available \"over-the-air\" macOS major upgrade given the specified --install-macos-major-version-target option of ${install_macos_major_version_target}."
-				fi
+	# If (no errors) there are available items then collect the ${msu_list} and parse to create ${macos_msu_major_upgrade}, ${macos_msu_minor_update}, and ${non_system_msu_array[]}.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_non_system_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; }; then
+		# If required collecte a new ${msu_list}.
+		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${msu_list}" == "FALSE" ]] || [[ -z "${msu_list}" ]]; then
+			get_msu_list
+			
+			# Error handling if softwareupdate is misbehaving.
+			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
+				log_super "Warning: Re-starting softwareupdate available updates listing..."
+				kick_softwareupdated
+				sleep 10
+				get_msu_list
+			elif [[ $macos_version_normalized -lt 130300 ]] && [[ $(echo "${msu_list}" | grep -c 'macOS') -eq 0 ]]; then
+				log_super "Status: macOS 11.x - macOS 13.2, double-checking softwareupdate available updates listing..."
+				sleep 10
+				get_msu_list
 			fi
-			[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" != "FALSE" ]] && macos_major_upgrade_latest="TRUE"
-		fi
-		
-		# If using an older version of macOS and the MDM workflow then major upgrades via MSU are not possible.
-		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ $macos_version_major -lt 13 ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
-			log_super "Warning: The MDM upgrade command on macOS 12 only supports full macOS installers, thus the following \"over-the-air\" macOS major upgrade is not currently possible: ${mdmclient_macos_msu_major_upgrade_target}"
-			mdmclient_macos_msu_major_upgrade_target="FALSE"
-		fi
-		
-		# If there is no ${mdmclient_macos_msu_major_upgrade_target} then attempt to resolve an installer-based macOS major upgrade target given ${install_macos_major_version_target} and ${mdmclient_macos_installers_array[]}.
-		if [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_installers_array[@]} -gt 0 ]]; then
-			if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ -z "${install_macos_major_version_target}" ]]; then
-				mdmclient_macos_installer_target="${mdmclient_macos_installers_array[0]}"
-				[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
-			fi
-			if [[ "${mdmclient_macos_installer_target}" == "FALSE" ]]; then
-				local mdmclient_macos_installers_disallowed_array
-				mdmclient_macos_installers_disallowed_array=()
-				for mdmclient_macos_installer_item in "${mdmclient_macos_installers_array[@]}"; do
-					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_item is: ${mdmclient_macos_installer_item}"
-					if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ -n "${install_macos_major_version_target}" ]] && [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${mdmclient_macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq $install_macos_major_version_target ]]; then
-						mdmclient_macos_installer_target="${mdmclient_macos_installer_item}"
-						break
-					elif [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ -n "${install_macos_major_version_target}" ]] && [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -gt 0 ]] && [[ $(echo "${mdmclient_macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq $install_macos_major_version_normalized_target ]]; then
-						mdmclient_macos_installer_target="${mdmclient_macos_installer_item}"
-						break
-					fi
-					[[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && mdmclient_macos_installers_disallowed_array+=("${mdmclient_macos_installer_item}")
-				done
+			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
+				log_super "Error: Checking for softwareupdate available updates listing did not complete after multiple attempts."
+				workflow_check_software_status_error="TRUE"
 			fi
 		fi
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_major_upgrade_target is: ${mdmclient_macos_msu_major_upgrade_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_target is: ${mdmclient_macos_installer_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_major_upgrade_latest is: ${macos_major_upgrade_latest}"
 		
-		# If there is no ${mdmclient_macos_msu_major_upgrade_target} or ${mdmclient_macos_installer_target} then attempt to resolve an "over-the-air" macOS minor update target given ${install_macos_minor_version_target} and ${mdmclient_macos_msu_minor_update_array[0]}.
-		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -gt 0 ]]; then
-			[[ -z "${install_macos_minor_version_target}" ]] && mdmclient_macos_msu_minor_update_target="${mdmclient_macos_msu_minor_update_array[0]}"
-			if [[ -n "${install_macos_minor_version_target}" ]]; then
-				if [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${mdmclient_macos_msu_minor_update_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_minor_version_target} ]]; then
-					mdmclient_macos_msu_minor_update_target="${mdmclient_macos_msu_minor_update_array[0]}"
-				elif [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -gt 0 ]] && [[ $(echo "${mdmclient_macos_msu_minor_update_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq $install_macos_minor_version_normalized_target ]]; then
-					mdmclient_macos_msu_minor_update_target="${mdmclient_macos_msu_minor_update_array[0]}"
-				else
-					log_super "Warning: Unable to target the latest available \"over-the-air\" macOS minor update given the specified --install-macos-minor-version-target option of ${install_macos_minor_version_target}."
-				fi
-			fi
-			[[ "${deferral_restrictions_macOS_minor_updates}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" != "FALSE" ]] && macos_minor_update_latest="TRUE"
-		fi
-		{ [[ "${mdmclient_macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${mdmclient_macos_installer_target}" != "FALSE" ]] || [[ "${mdmclient_macos_msu_minor_update_target}" != "FALSE" ]]; } && macos_target_mdm_compatible="TRUE"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_msu_minor_update_target is: ${mdmclient_macos_msu_minor_update_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_target_mdm_compatible is: ${macos_target_mdm_compatible}"
-	fi
-	
-	# Handle issues then targeting non-mdm macOS versions.
-	if [[ "${macos_target_mdm_compatible}" == "FALSE" ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
-		if [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ALWAYS') -gt 0 ]] || [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ERROR') -gt 0 ]]; then
-			log_super "Warning: The target macOS update or upgrade can not be authenticated via MDM, failing over to user authenticated workflow."
-			auth_mdm_failover_to_user_status="TRUE"
-		else
-			log_super "Error: The target macOS update or upgrade can not be authenticated via MDM, you must enable the --auth-mdm-failover-to-user option when targeting older macOS versions."
+		# If there is a ${msu_list} then parse items to appropriate variables.
+		if [[ "${msu_list}" == "FALSE" ]]; then
+			log_super "Error: Checking for macOS software update listing did not return any available updates."
 			workflow_check_software_status_error="TRUE"
+		else
+			local msu_sanitized_list
+			msu_sanitized_list=$(echo "${msu_list}" | grep -e 'Label' -e 'Title' | tr -d '\n' | sed -e 's/^* //' -e 's/* /\n/g' -e 's/\tTitle/,Title/g' -e 's/, /,/g' -e 's/: /:/g')
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_sanitized_list is:\n${msu_sanitized_list}"
+			local non_system_msu_array
+			non_system_msu_array=($(echo "${msu_sanitized_list}" | awk -F ',' '!/macOS/ {print $1 "," $2 "," $4 "," $3}'))
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_array is:\n${non_system_msu_array[*]}"
+			local macos_msu_array
+			macos_msu_array=($(echo "${msu_sanitized_list}" | grep 'macOS' | awk -F ',' '{print $1 "," $2 "," $4 "," $3}' | sort -t ':' -k5 -V -r))
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_array is:\n${macos_msu_array[*]}"
+			local macos_msu_major_upgrade
+			macos_msu_major_upgrade="FALSE"
+			local macos_msu_minor_update
+			macos_msu_minor_update="FALSE"
+			for macos_msu_item in "${macos_msu_array[@]}"; do
+				[[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g')" != "${macos_version_major}" ]] && macos_msu_major_upgrade="${macos_msu_item}"
+				[[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g')" == "${macos_version_major}" ]] && macos_msu_minor_update="${macos_msu_item}"
+			done
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade is: ${macos_msu_major_upgrade}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update is: ${macos_msu_minor_update}"
 		fi
+		
 	fi
 	
-	# If (no errors) there is the possibility of targeting a macOS installer then collect the ${macos_installers_list} and create the ${macos_installers_array[]}.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" == "FALSE" ]] && { [[ "${mdmclient_macos_installer_target}" != "FALSE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; }; then
+	# If (no errors) there is the possibility of targeting a macOS installer then collect the ${macos_installers_list} and parse to create ${macos_installer_major_upgrades_array[]} and ${macos_installer_minor_updates_array[]}.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; } && [[ ${#mdmclient_macos_installer_array[@]} -gt 0 ]]; then
 		# If required collecte a new ${macos_installers_list}.
 		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${macos_installers_list}" == "FALSE" ]] || [[ -z "${macos_installers_list}" ]]; then
 			get_macos_installers_list
@@ -6459,7 +6435,7 @@ workflow_check_software_status() {
 			fi
 		fi
 		
-		# Make sure we have a ${macos_installers_list} an if so create the ${macos_installers_array[]}.
+		# If there is a ${macos_installers_list} then parse items to create arrays..
 		if [[ "${macos_installers_list}" == "FALSE" ]]; then
 			log_super "Error: Checking for macOS installers listing did not return any available installers."
 			workflow_check_software_status_error="TRUE"
@@ -6484,122 +6460,224 @@ workflow_check_software_status() {
 		fi
 	fi
 	
-	# If (no errors) then evaluate versions in ${macos_installer_major_upgrades_array[]} and ${macos_installer_minor_updates_array[]} for targeting or logging.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]] || [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; }; then
+	# If (no errors) then evaluate versions in ${macos_msu_major_upgrade}, ${macos_installer_major_upgrades_array[]}, ${macos_msu_minor_update}, and ${macos_installer_minor_updates_array[]} for target selection. Also, log any available non-targetable macOS updates/upgrades.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ -n "${macos_msu_major_upgrade}" ]] || [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]] || [[ -n "${macos_msu_minor_update}" ]] || [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; }; then
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_upgrades is: ${install_macos_major_upgrades}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_version_target is: ${install_macos_major_version_target}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_major_version_normalized_target is: ${install_macos_major_version_normalized_target}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_updates is: ${install_macos_minor_updates}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_version_target is: ${install_macos_minor_version_target}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_minor_version_normalized_target is: ${install_macos_minor_version_normalized_target}"
 		
-		# Evaluate versions in ${macos_installer_major_upgrades_array[]} and set ${macos_installer_major_upgrade_target} or log disallowed installers.
-		if [[ -n "${install_macos_major_version_target}" ]] && [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]]; then
-			local macos_installer_major_upgrades_disallowed_array
-			macos_installer_major_upgrades_disallowed_array=()
-			local mdmclient_macos_installer_version_normalized_target
-			[[ "${mdmclient_macos_installer_target}" != "FALSE" ]] && mdmclient_macos_installer_version_normalized_target=$(echo "${install_macos_minor_version_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installer_version_normalized_target is: ${mdmclient_macos_installer_version_normalized_target}"
-			for macos_installer_item in "${macos_installer_major_upgrades_array[@]}"; do
-				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is: ${macos_installer_item}"
-				if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ "${mdmclient_macos_installer_target}" != "FALSE" ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq $mdmclient_macos_installer_version_normalized_target ]]; then
-					macos_installer_major_upgrade_target="${macos_installer_item}"
-					break
-				elif [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_major_version_target} ]]; then
-					macos_installer_major_upgrade_target="${macos_installer_item}"
-					break
-				elif [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 1 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d", $1, $2}') -eq ${install_macos_major_version_normalized_target:0:4} ]]; then
-					macos_installer_major_upgrade_target="${macos_installer_item}"
-					break
-				elif [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 2 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq $install_macos_major_version_normalized_target ]]; then
-					macos_installer_major_upgrade_target="${macos_installer_item}"
-					break
+		# If ${install_macos_major_upgrades} then attempt to resolve a ${macos_msu_major_upgrade_target} given ${install_macos_major_version_target} and ${macos_msu_major_upgrade}.
+		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ -n "${macos_msu_major_upgrade}" ]]; then
+			if [[ -z "${install_macos_major_version_target}" ]]; then
+				macos_msu_major_upgrade_target="${macos_msu_major_upgrade}"
+			else
+				if [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${macos_msu_major_upgrade}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_major_version_target} ]]; then
+					macos_msu_major_upgrade_target="${macos_msu_major_upgrade}"
+				elif [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 1 ]] && [[ $(echo "${macos_msu_major_upgrade}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d", $1, $2}') -eq ${install_macos_major_version_normalized_target:0:4} ]]; then
+					macos_msu_major_upgrade_target="${macos_msu_major_upgrade}"
+				elif [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 2 ]] && [[ $(echo "${macos_msu_major_upgrade}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq ${install_macos_major_version_normalized_target} ]]; then
+					macos_msu_major_upgrade_target="${macos_msu_major_upgrade}"
+				else
+					log_super "Warning: Unable to target the latest available \"over-the-air\" macOS major upgrade given the specified --install-macos-major-version-target option of ${install_macos_major_version_target}."
 				fi
-				[[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && macos_installer_major_upgrades_disallowed_array+=("${macos_installer_item}")
-			done
-			if [[ "${mdmclient_macos_installer_target}" != "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]]; then
-				log_super "Error: The mist-cli listing did not contain a macOS installer that matches targeted version: ${mdmclient_macos_installer_target}"
-				workflow_check_software_status_error="TRUE"
 			fi
-			{ [[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]]; } && log_super "Warning: Unable to target any available macOS major upgrade installer given the specified --install-macos-major-version-target option of ${install_macos_major_version_target}."
+			if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ $macos_version_major -lt 13 ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
+				log_super "Warning: The MDM upgrade command on macOS 12 only supports full macOS installers, thus the following \"over-the-air\" macOS major upgrade is not currently possible: ${macos_msu_major_upgrade_target}"
+				macos_msu_major_upgrade_target="FALSE"
+			fi
+			if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
+				macos_msu_major_upgrade_target_version_normalized=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
+				[[ $(echo "${mdmclient_macos_msu_array[*]}" | grep -c "$(echo "${macos_msu_major_upgrade_target}" | awk -F ':' '{print $5}')") -gt 0 ]] && macos_target_mdm_compatible="TRUE"
+			fi
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade_target is: ${macos_msu_major_upgrade_target}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade_target_version_normalized is: ${macos_msu_major_upgrade_target_version_normalized}"
+		
+		# If ${install_macos_major_upgrades} and there is no ${macos_msu_major_upgrade_target} then attempt to resolve a ${macos_installer_major_upgrade_target} given ${install_macos_major_version_target} and ${macos_installer_major_upgrades_array[]}.
+		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]]; then
+			if [[ -z "${install_macos_major_version_target}" ]]; then
+				macos_installer_major_upgrade_target="${macos_installer_major_upgrades_array[0]}"
+				[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
+			else
+				for macos_installer_item in "${macos_installer_major_upgrades_array[@]}"; do
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is: ${macos_installer_item}"
+					if [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_major_version_target} ]]; then
+						macos_installer_major_upgrade_target="${macos_installer_item}"
+						break
+					elif [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 1 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d", $1, $2}') -eq ${install_macos_major_version_normalized_target:0:4} ]]; then
+						macos_installer_major_upgrade_target="${macos_installer_item}"
+						break
+					elif [[ $(echo "${install_macos_major_version_target}" | grep -o '\.' | wc -l | xargs) -eq 2 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq ${install_macos_major_version_normalized_target} ]]; then
+						macos_installer_major_upgrade_target="${macos_installer_item}"
+						break
+					fi
+				done
+			fi
+			if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]]; then
+				macos_installer_major_upgrade_target_version_normalized=$(echo "${macos_installer_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ $(echo "${mdmclient_macos_installer_array[*]}" | grep -c "$(echo "${macos_installer_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')") -gt 0 ]] && macos_target_mdm_compatible="TRUE"
+			else
+				log_super "Warning: Unable to target any available macOS major upgrade installer given the specified --install-macos-major-version-target option of ${install_macos_major_version_target}."
+			fi
 		fi
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_major_upgrade_target is: ${macos_installer_major_upgrade_target}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_major_upgrade_target_version_normalized is: ${macos_installer_major_upgrade_target_version_normalized}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_major_upgrade_latest is: ${macos_major_upgrade_latest}"
 		
-		# If there is no ${macos_installer_major_upgrade_target} then evaluate versions in ${macos_installer_minor_updates_array[]} and set ${macos_installer_minor_update_target} or log disallowed installers.
-		if [[ -n "${install_macos_minor_version_target}" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
-			local macos_installer_minor_updates_disallowed_array
-			macos_installer_minor_updates_disallowed_array=()
-			for macos_installer_item in "${macos_installer_minor_updates_array[@]}"; do
-				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is: ${macos_installer_item}"
-				if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_minor_version_target} ]]; then
-					macos_installer_minor_update_target="${macos_installer_item}"
-					break
-				elif [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 1 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d", $1, $2}') -eq ${install_macos_minor_version_normalized_target:0:4} ]]; then
-					macos_installer_minor_update_target="${macos_installer_item}"
-					break
-				elif [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 2 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq $install_macos_minor_version_normalized_target ]]; then
-					macos_installer_minor_update_target="${macos_installer_item}"
-					break
+		# If ${install_macos_minor_updates} and there is no ${macos_msu_major_upgrade_target} or ${macos_installer_major_upgrade_target} then attempt to resolve a ${macos_msu_minor_update_target} target given ${install_macos_minor_version_target} and ${macos_msu_minor_update}.
+		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ -n "${macos_msu_minor_update}" ]]; then
+			if [[ -z "${install_macos_minor_version_target}" ]]; then
+				macos_msu_minor_update_target="${macos_msu_minor_update}"
+			else
+				if [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${macos_msu_minor_update}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_minor_version_target} ]]; then
+					macos_msu_minor_update_target="${macos_msu_minor_update}"
+				elif [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 1 ]] && [[ $(echo "${macos_msu_minor_update}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d", $1, $2}') -eq ${install_macos_minor_version_normalized_target:0:4} ]]; then
+					macos_msu_minor_update_target="${macos_msu_minor_update}"
+				elif [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 2 ]] && [[ $(echo "${macos_msu_minor_update}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq ${install_macos_minor_version_normalized_target} ]]; then
+					macos_msu_minor_update_target="${macos_msu_minor_update}"
+				else
+					log_super "Warning: Unable to target the latest available \"over-the-air\" macOS minor update given the specified --install-macos-minor-version-target option of ${install_macos_minor_version_target}."
 				fi
-				[[ "${macos_installer_minor_update_target}" == "FALSE" ]] && macos_installer_minor_updates_disallowed_array+=("${macos_installer_item}")
-			done
-			[[ "${macos_installer_minor_update_target}" == "FALSE" ]] && log_super "Warning: Unable to target any available macOS minor update installer given the specified --install-macos-minor-version-target option of ${install_macos_minor_version_target}."
+			fi
+			{ [[ $(echo "${macos_msu_minor_update_target}" | grep -c '(') -gt 0 ]] && [[ "${install_macos_bsi_updates}" != "TRUE" ]]; } && log_super "Warning: The default workflow ignores macOS Background Security Improvement (BSI) updates. Use the --install-macos-bsi-updates option to always install macOS BSI updates as soon as they are available." && macos_msu_minor_update_target="FALSE"
+			if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
+				macos_msu_minor_update_target_version_normalized=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ "${deferral_restrictions_macOS_minor_updates}" == "FALSE" ]] && macos_minor_update_latest="TRUE"
+				[[ $(echo "${mdmclient_macos_msu_array[*]}" | grep -c "$(echo "${macos_msu_minor_update_target}" | awk -F ':' '{print $5}')") -gt 0 ]] && macos_target_mdm_compatible="TRUE"
+			fi
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update_target is: ${macos_msu_minor_update_target}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update_target_version_normalized is: ${macos_msu_minor_update_target_version_normalized}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
+		
+		# If ${install_macos_minor_updates} and there is no ${macos_msu_major_upgrade_target} or ${macos_installer_major_upgrade_target} or ${macos_msu_minor_update} then attempt to resolve a ${macos_installer_minor_update_target} given ${install_macos_minor_version_target} and ${macos_installer_minor_updates_array[]}.
+		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+			if [[ -z "${install_macos_minor_version_target}" ]]; then
+				macos_installer_minor_update_target="${macos_installer_minor_updates_array[0]}"
+			else
+				for macos_installer_item in "${macos_installer_minor_updates_array[@]}"; do
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is: ${macos_installer_item}"
+					if [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 0 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq ${install_macos_minor_version_target} ]]; then
+						macos_installer_minor_update_target="${macos_installer_item}"
+						break
+					elif [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 1 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d", $1, $2}') -eq ${install_macos_minor_version_normalized_target:0:4} ]]; then
+						macos_installer_minor_update_target="${macos_installer_item}"
+						break
+					elif [[ $(echo "${install_macos_minor_version_target}" | grep -o '\.' | wc -l | xargs) -eq 2 ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -eq ${install_macos_minor_version_normalized_target} ]]; then
+						macos_installer_minor_update_target="${macos_installer_item}"
+						break
+					fi
+				done
+			fi
+			if [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then
+				macos_installer_minor_update_target_version_normalized=$(echo "${macos_installer_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ $(echo "${mdmclient_macos_installer_array[*]}" | grep -c "$(echo "${macos_installer_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')") -gt 0 ]] && macos_target_mdm_compatible="TRUE"
+			else
+				[[ "${macos_installer_minor_update_target}" == "FALSE" ]] && log_super "Warning: Unable to target any available macOS minor update installer given the specified --install-macos-minor-version-target option of ${install_macos_minor_version_target}."
+			fi
 		fi
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_minor_update_target is: ${macos_installer_minor_update_target}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_minor_update_target_version_normalized is: ${macos_installer_minor_update_target_version_normalized}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_target_mdm_compatible is: ${macos_target_mdm_compatible}"
 	fi
 	
-	# If (no errors) there are macOS updates or upgrades but they aren't possible or allowed then report to super.log.
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_installers_disallowed_array is:\n${mdmclient_macos_installers_disallowed_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_major_upgrades_disallowed_array is:\n${macos_installer_major_upgrades_disallowed_array[*]}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_minor_updates_disallowed_array is:\n${macos_installer_minor_updates_disallowed_array[*]}"
-	if [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_major_upgrade_array[@]} -gt 0 ]]; then
-		log_super "Disallowed: \"over-the-air\" macOS major upgrade is available but not allowed: $(echo "${mdmclient_macos_msu_major_upgrade_array[0]}" | sed -e 's/Title://' -e 's/,Build:/-/' -e 's/,.*//')"
-		[[ -n "${install_macos_major_version_target}" ]] && [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && log_super "Warning: The --install-macos-major-version-target=${install_macos_major_version_target} option is forcing the workflow to target an older macOS installer (as opposed to a more efficient \"over-the-air\" macOS major upgrade)."
-	fi
-	if [[ ${#mdmclient_macos_installers_disallowed_array[@]} -gt 0 ]] || [[ ${#macos_installer_major_upgrades_disallowed_array[@]} -gt 0 ]]; then
-		if [[ ${#mdmclient_macos_installers_disallowed_array[@]} -ge ${#macos_installer_major_upgrades_disallowed_array[@]} ]]; then
-			for macos_installer_item in "${mdmclient_macos_installers_disallowed_array[@]}"; do
-				[[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -lt $(echo "${mdmclient_macos_msu_major_upgrade_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]] && log_super "Disallowed: macOS major upgrade installer is available but not allowed: $(echo "${macos_installer_item}" | sed -e 's/Title://' -e 's/,Version:/ /' -e 's/,Build:/-/' -e 's/,.*//')"
-			done
-		else
-			for macos_installer_item in "${macos_installer_major_upgrades_disallowed_array[@]}"; do
-				[[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -lt $(echo "${mdmclient_macos_msu_major_upgrade_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]] && log_super "Disallowed: macOS major upgrade installer is available but not allowed: $(echo "${macos_installer_item}" | sed -e 's/Title://' -e 's/,Version:/ /' -e 's/,Build:/-/' -e 's/,.*//')"
+	# If (no errors) then log any disallowed or inefficient macOS targets.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]]; then
+		# Log disallowed macOS MSU items.
+		if [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
+			# Product Key:MSU_UPDATE_25C56_patch_26.2_major,Title:macOS Tahoe 26.2,Version:26.2
+			local mdmclient_macos_item_version_normalized
+			for mdmclient_macos_item in "${mdmclient_macos_msu_array[@]}"; do
+				mdmclient_macos_item_version_normalized=$(echo "${mdmclient_macos_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ ${mdmclient_macos_item_version_normalized:0:2} -gt ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS major upgrade is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
+				[[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
 			done
 		fi
-	fi
-	if [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${mdmclient_macos_installer_target}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_minor_update_array[@]} -gt 0 ]]; then
-		log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_msu_minor_update_array[0]}" | sed -e 's/Title://' -e 's/,Build:/-/' -e 's/,.*//')"
-		[[ "${macos_installer_minor_update_target}" != "FALSE" ]] && log_super "Warning: The --install-macos-minor-version-target=${install_macos_minor_version_target} option is forcing the workflow to target an older macOS installer (as opposed to a more efficient \"over-the-air\" macOS minor update)."
-	fi
-	if [[ ${#macos_installer_minor_updates_disallowed_array[@]} -gt 0 ]]; then
-		for macos_installer_item in "${macos_installer_minor_updates_disallowed_array[@]}"; do
-			{ [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -gt $macos_version_normalized ]] && [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') -lt $(echo "${mdmclient_macos_msu_minor_update_array[0]}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]]; } && log_super "Disallowed: macOS minor update installer is available but not allowed: $(echo "${macos_installer_item}" | sed -e 's/Title://' -e 's/,Version:/ /' -e 's/,Build:/-/' -e 's/,.*//')"
-		done
+		
+		#Log disallowed macOS installers.
+		if [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]] || [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+			# Title:macOS Tahoe,Version:26.2,Build:25C56,Size:17389952037
+			local macos_installer_item_version_normalized
+			for macos_installer_item in "${macos_installer_major_upgrades_array[@]}"; do
+				macos_installer_item_version_normalized=$(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				{ { [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]]; } || { [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_msu_major_upgrade_target_version_normalized} ]]; } || { [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_installer_major_upgrade_target_version_normalized} ]]; }; } && log_super "Disallowed: macOS major upgrade installer is available but not allowed: $(echo "${macos_installer_item}" | awk -F ',' '{print $1 $2}' | sed -e 's/Title://' -e 's/Version:/ /')"
+			done
+			if [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]]; then
+				for macos_installer_item in "${macos_installer_minor_updates_array[@]}"; do
+					macos_installer_item_version_normalized=$(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+					{ { [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]]; } || { [[ "${macos_msu_minor_update_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_msu_minor_update_target_version_normalized} ]]; } || { [[ "${macos_installer_minor_update_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_installer_minor_update_target_version_normalized} ]]; }; } && log_super "Disallowed: macOS minor update installer is available but not allowed: $(echo "${macos_installer_item}" | awk -F ',' '{print $1 $2}' | sed -e 's/Title://' -e 's/Version:/ /')"
+				done
+			fi
+		elif [[ ${#mdmclient_macos_installer_array[@]} -gt 0 ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]]; then
+			# Product Key:093-37361,Title:macOS Tahoe,Version:26.2
+			local mdmclient_macos_item_version_normalized
+			for mdmclient_macos_item in "${mdmclient_macos_installer_array[@]}"; do
+				mdmclient_macos_item_version_normalized=$(echo "${mdmclient_macos_item}" | awk -F ':' '{print $4}' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ ${mdmclient_macos_item_version_normalized:0:2} -gt ${macos_version_major} ]] && { [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] || { [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && [[ ${mdmclient_macos_item_version_normalized} -ne $(echo "${macos_installer_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]]; }; } && log_super "Disallowed: macOS major upgrade installer is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2 $3}' | sed -e 's/Title://' -e 's/Version:/ /')"
+				[[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && { [[ "${macos_installer_minor_update_target}" == "FALSE" ]] || { [[ "${macos_installer_minor_update_target}" != "FALSE" ]] && [[ ${mdmclient_macos_item_version_normalized} -ne $(echo "${macos_installer_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]]; }; } && log_super "Disallowed: macOS minor update installer is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2 $3}' | sed -e 's/Title://' -e 's/Version:/ /')"
+			done
+		fi
+		
+		# Log inefficient installers.
+		{ [[ -n "${install_macos_minor_version_target}" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; } && log_super "Warning: The --install-macos-minor-version-target=${install_macos_minor_version_target} option is forcing the workflow to target a full macOS installer (as opposed to a more efficient \"over-the-air\" macOS minor update)."
+		{ [[ -n "${install_macos_major_version_target}" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]]; } && log_super "Warning: The --install-macos-major-version-target=${install_macos_major_version_target} option is forcing the workflow to target a full macOS installer (as opposed to a more efficient \"over-the-air\" macOS major upgrade)."
 	fi
 	
-	# If (no errors) check for older targeted macOS version betas plus Jamf API beta limitation.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${macos_beta_program}" == "TRUE" ]] && [[ "${workflow_macos_auth}" == "JAMF" ]] && { [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; }; then
-		if { [[ -n "${install_macos_major_version_target}" ]] && [[ "${macos_major_upgrade_latest}" == "FALSE" ]]; } || { [[ -n "${install_macos_minor_version_target}" ]] && [[ "${macos_minor_update_latest}" == "FALSE" ]]; }; then
-			check_mdm_service
-			[[ "${auth_error_mdm}" == "FALSE" ]] && get_saved_authentication
-			[[ "${auth_error_saved}" == "FALSE" ]] && check_jamf_api_access_token
-			[[ "${auth_error_jamf}" == "FALSE" ]] && check_jamf_api_update_workflow
-			if [[ "${auth_error_jamf}" == "FALSE" ]]; then
-				if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then
-					log_super "Error: The Jamf Pro new Managed Software Updates API does not support targeting older macOS beta major upgrades. To target older macOS beta major upgrades you must disable the new Managed Software Updates feature in Jamf Pro or use a local authentication option."
+	# If (no errors) check for macOS targets that are incompatible with MDM authenticated workflows.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
+		if [[ "${macos_target_mdm_compatible}" == "FALSE" ]]; then
+			if [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ALWAYS') -gt 0 ]] || [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ERROR') -gt 0 ]]; then
+				log_super "Warning: The target macOS update or upgrade can not be authenticated via MDM, failing over to user authenticated workflow."
+				auth_mdm_failover_to_user_status="TRUE"
+			else
+				log_super "Error: The target macOS update or upgrade can not be authenticated via MDM, you must enable the --auth-mdm-failover-to-user option when targeting older macOS versions."
+				workflow_check_software_status_error="TRUE"
+			fi
+		fi
+		if [[ "${macos_beta_program}" == "TRUE" ]] && { [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; }; then
+			if { [[ -n "${install_macos_major_version_target}" ]] && [[ "${macos_major_upgrade_latest}" == "FALSE" ]]; } || { [[ -n "${install_macos_minor_version_target}" ]] && [[ "${macos_minor_update_latest}" == "FALSE" ]]; }; then
+				check_mdm_service
+				[[ "${auth_error_mdm}" == "FALSE" ]] && get_saved_authentication
+				[[ "${auth_error_saved}" == "FALSE" ]] && check_jamf_api_access_token
+				[[ "${auth_error_jamf}" == "FALSE" ]] && check_jamf_api_update_workflow
+				if [[ "${auth_error_jamf}" == "FALSE" ]]; then
+					if [[ "${jamf_api_update_workflow}" == "NEW" ]]; then
+						log_super "Error: The Jamf Pro new Managed Software Updates API does not support targeting older macOS beta major upgrades. To target older macOS beta major upgrades you must disable the new Managed Software Updates feature in Jamf Pro or use a local authentication option."
+						workflow_check_software_status_error="TRUE"
+					fi
+				fi
+				if [[ "${auth_error_mdm}" == "TRUE" ]] || [[ "${auth_error_saved}" == "TRUE" ]] || [[ "${auth_error_jamf}" == "TRUE" ]]; then
+					log_super "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
 					workflow_check_software_status_error="TRUE"
+					unset auth_jamf_client
+					unset auth_jamf_secret
 				fi
 			fi
-			if [[ "${auth_error_mdm}" == "TRUE" ]] || [[ "${auth_error_saved}" == "TRUE" ]] || [[ "${auth_error_jamf}" == "TRUE" ]]; then
-				log_super "Error: Failed to validate Jamf Pro API configuration. Verify Jamf Pro API configuration: https://github.com/Macjutsu/super/wiki/Apple-Silicon-Jamf-Pro-API-Credentials"
-				workflow_check_software_status_error="TRUE"
-				unset auth_jamf_client
-				unset auth_jamf_secret
-			fi
 		fi
 	fi
 	
-	# If there is a ${macos_installer_major_upgrade_target} or ${macos_installer_minor_update_target} then set the remaining individual parameters.
-	if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then
+	# If (no errors) there is a ${macos_msu_major_upgrade_target} or ${macos_msu_minor_update_target} then set the remaining individual parameters.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; }; then
+		local macos_msu_target
+		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && macos_msu_target="${macos_msu_major_upgrade_target}"
+		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && macos_msu_target="${macos_msu_minor_update_target}"
+		[[ $(echo "${macos_msu_target}" | grep -c 'Beta') -eq 0 ]] && macos_msu_title=$(echo "${macos_msu_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*//g')
+		[[ $(echo "${macos_msu_target}" | grep -c 'Beta') -gt 0 ]] && macos_msu_title=$(echo "${macos_msu_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
+		macos_msu_version=$(echo "${macos_msu_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')
+		macos_msu_build=$(echo "${macos_msu_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g' -e 's/^.*-//g')
+		macos_msu_size=$(echo "${macos_msu_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000 +1"}' | bc)
+		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && log_super "Target: \"Over-the-air\" macOS major upgrade ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
+		[[ "${macos_msu_minor_update_target}" != "FALSE" ]] && log_super "Target: \"Over-the-air\" macOS minor update ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
+		macos_msu_label=$(echo "${macos_msu_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g')
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
+	fi
+	
+	# If (no errors) there is a ${macos_installer_major_upgrade_target} or ${macos_installer_minor_update_target} then set the remaining individual parameters.
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; }; then
 		local macos_installer_target
 		[[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && macos_installer_target="${macos_installer_major_upgrade_target}"
 		[[ "${macos_installer_minor_update_target}" != "FALSE" ]] && macos_installer_target="${macos_installer_minor_update_target}"
@@ -6609,158 +6687,26 @@ workflow_check_software_status() {
 		macos_installer_size=$(echo "${macos_installer_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' | awk '{print $1"/1000000000 +1"}' | bc)
 		[[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && log_super "Target: macOS major upgrade installer ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} which is a ${macos_installer_size}GB download."
 		[[ "${macos_installer_minor_update_target}" != "FALSE" ]] && log_super "Target: macOS minor update installer ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} which is a ${macos_installer_size}GB download."
-		
-		# No longer necessary to continue this function if the target will be the macOS installer.
-		if [[ "${install_prioritize_non_restart_updates}" != "TRUE" ]] || { [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; }; then
-			IFS="${previous_ifs}"
-			set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
-			return 0
-		fi
-	fi
-	
-	# If (no errors) there is not MSU target then it's no longer necessary to continue this function.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" == "FALSE" ]]; then
-		set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
-		return 0
-	fi
-	
-	# If (no errors) the function is still running at this point then it's time to collect/verify the ${msu_list}.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]]; then
-		# If required collecte a new ${msu_list}.
-		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${msu_list}" == "FALSE" ]] || [[ -z "${msu_list}" ]]; then
-			get_msu_list
-			
-			# Error handling if softwareupdate is misbehaving.
-			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
-				log_super "Warning: Re-starting softwareupdate available updates listing..."
-				kick_softwareupdated
-				sleep 10
-				get_msu_list
-			elif [[ $macos_version_normalized -lt 130300 ]] && [[ $(echo "${msu_list}" | grep -c 'macOS') -eq 0 ]]; then
-				log_super "Status: macOS 11.x - macOS 13.2, double-checking softwareupdate available updates listing..."
-				sleep 10
-				get_msu_list
-			fi
-			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
-				log_super "Error: Checking for softwareupdate available updates listing did not complete after multiple attempts."
-				workflow_check_software_status_error="TRUE"
-			fi
-		fi
-		
-		# Make sure we have a ${msu_list}, this checks both new and cached lists.
-		if [[ "${msu_list}" == "FALSE" ]]; then
-			log_super "Error: Checking for macOS software update listing did not return any available updates."
-			workflow_check_software_status_error="TRUE"
-		fi
-	fi
-	
-	# If (no errors) and there is a ${msu_list} then parse and split the updates in to individual arrays.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${msu_list}" != "FALSE" ]]; then
-		local msu_sanitized_list
-		msu_sanitized_list=$(echo "${msu_list}" | grep -e 'Label' -e 'Title' | tr -d '\n' | sed -e 's/^* //' -e 's/* /\n/g' -e 's/\tTitle/,Title/g' -e 's/, /,/g' -e 's/: /:/g')
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_sanitized_list is:\n${msu_sanitized_list}"
-		local macos_msu_array
-		macos_msu_array=($(echo "${msu_sanitized_list}" | grep 'macOS' | awk -F ',' '{print $1 "," $2 "," $4 "," $3}' | sort -t ':' -k5 -V -r))
-		non_system_msu_array=($(echo "${msu_sanitized_list}" | grep -v 'macOS' | awk -F ',' '{print $1 "," $2 "," $4 "," $3}'))
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_array is:\n${macos_msu_array[*]}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_array is:\n${non_system_msu_array[*]}"
-	fi
-	
-	# If (no errors) there is a ${mdmclient_macos_msu_major_upgrade_target} then evaluate the ${macos_msu_array[]} to select the appropriate macOS major upgrade for the ${macos_msu_major_upgrade_target}.
-	# If a ${macos_msu_major_upgrade_target} is selected then this function will also set ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, and ${macos_msu_size }.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ ${#macos_msu_array[@]} -gt 0 ]]; then
-		# Pick the appropriate macOS major upgrade from the ${macos_msu_array} based on the ${mdmclient_macos_msu_major_upgrade_target}.
-		for macos_msu_item in "${macos_msu_array[@]}"; do
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_item is: ${macos_msu_item}"
-			if [[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')" == "$(echo "${mdmclient_macos_msu_major_upgrade_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g')" ]]; then
-				macos_msu_major_upgrade_target="${macos_msu_item}"
-				break
-			fi
-		done
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade_target is: ${macos_msu_major_upgrade_target}"
-		
-		# If there is a ${macos_msu_major_upgrade_target} then set the remaining individual parameters.
-		if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
-			macos_msu_label=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g')
-			[[ $(echo "${macos_msu_major_upgrade_target}" | grep -c 'Beta') -eq 0 ]] && macos_msu_title=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*//g')
-			[[ $(echo "${macos_msu_major_upgrade_target}" | grep -c 'Beta') -gt 0 ]] && macos_msu_title=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
-			macos_msu_version=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')
-			macos_msu_build=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g' -e 's/^.*-//g')
-			macos_msu_size=$(echo "${macos_msu_major_upgrade_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000 +1"}' | bc)
-			log_super "Target: \"Over-the-air\" macOS major upgrade ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
-			
-			# No longer necessary to continue this function if the target will be the macOS major upgrade.
-			if [[ "${install_prioritize_non_restart_updates}" != "TRUE" ]] || { [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; }; then
-				IFS="${previous_ifs}"
-				set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
-				return 0
-			fi
-		else
-			log_super "Error: The softwareupdate listing did not contain a macOS major upgrade that matches targeted version: ${mdmclient_macos_msu_major_upgrade_target}"
-			workflow_check_software_status_error="TRUE"
-		fi
-	fi
-	
-	# If (no errors) there is a ${mdmclient_macos_msu_minor_update_target} then evaluate the ${macos_msu_array[]} to select the appropriate macOS minor update for the ${macos_msu_minor_update_target}.
-	# If a ${macos_msu_minor_update_target} is selected then this function will also set ${macos_msu_label}, ${macos_msu_title}, ${macos_msu_version}, ${macos_msu_build}, and ${macos_msu_size }.
-		if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_macos_msu_minor_update_target}" != "FALSE" ]] && [[ ${#macos_msu_array[@]} -gt 0 ]]; then
-		# Pick the appropriate macOS minor update from the ${macos_msu_array} based on the ${mdmclient_macos_msu_minor_update_target}.
-		for macos_msu_item in "${macos_msu_array[@]}"; do
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_item is: ${macos_msu_item}"
-			if [[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')" == "$(echo "${mdmclient_macos_msu_minor_update_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g')" ]]; then
-				macos_msu_minor_update_target="${macos_msu_item}"
-				break
-			fi
-		done
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update_target is: ${macos_msu_minor_update_target}"
-		
-		# If there is a ${macos_msu_minor_update_target} then set the remaining individual parameters.
-		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
-			macos_msu_label=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g')
-			[[ $(echo "${macos_msu_minor_update_target}" | grep -c 'Beta') -eq 0 ]] && macos_msu_title=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*//g')
-			[[ $(echo "${macos_msu_minor_update_target}" | grep -c 'Beta') -gt 0 ]] && macos_msu_title=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/ [1-9].*/ Beta/g')
-			macos_msu_version=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')
-			macos_msu_build=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $1}' | sed -e 's/.*://g' -e 's/^.*-//g')
-			macos_msu_size=$(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' -e 's/[^0-9]//g' | awk '{print $1"/1000000 +1"}' | bc)
-			log_super "Target: macOS minor update ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} which is a ${macos_msu_size}GB download."
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
-			
-			# No longer necessary to continue this function if the target will be the macOS minor update.
-			if [[ "${install_prioritize_non_restart_updates}" != "TRUE" ]] || { [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; }; then
-				IFS="${previous_ifs}"
-				set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
-				return 0
-			fi
-		else
-			log_super "Error: The softwareupdate listing did not contain a macOS minor update that matches targeted version: ${mdmclient_macos_msu_minor_update_target}"
-			workflow_check_software_status_error="TRUE"
-		fi
 	fi
 	
 	# If (no errors) then evaluate the ${non_system_msu_array[]} and set ${non_system_msu_targets} and ${non_system_msu_safari_target}.
 	# If there are ${non_system_msu_targets} then this function will also set ${non_system_msu_labels_array[]} and ${non_system_msu_titles_array[]}.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_non_system_array[@]} -gt 0 ]] && [[ ${#non_system_msu_array[@]} -gt 0 ]]; then
-		# Make sure the number of non-system updates collected by mdmclient and msu match.
-		if [[ ${#non_system_msu_array[@]} -eq $(echo "${mdmclient_non_system_array[*]}" | awk -F ',' '{print $1}' | uniq | wc -l | xargs) ]];then
-			non_system_msu_targets="TRUE"
-			non_system_msu_labels_array=()
-			non_system_msu_titles_array=()
-			for array_index in "${!non_system_msu_array[@]}"; do
-				non_system_msu_labels_array+=($(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $1}' | sed -e 's/.*://g'))
-				non_system_msu_titles_array+=($(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $2}' | sed -e 's/.*://g'))
-				[[ $(echo "${non_system_msu_array[array_index]}" | grep -c 'Safari') -ge 1 ]] && non_system_msu_safari_target=$(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $4}' | sed -e 's/Version://')
-				log_super "Target: Non-system update $((array_index + 1)) of ${#non_system_msu_array[@]} is: ${non_system_msu_titles_array[array_index]} $(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')"
-				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_labels_array[${array_index}] is: ${non_system_msu_labels_array[array_index]}"
-			done
-		else
-			log_super "Error: The softwareupdate listing did not contain the expeted number of non-system updates."
-			workflow_check_software_status_error="TRUE"
-		fi
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#non_system_msu_array[@]} -gt 0 ]]; then
+		non_system_msu_targets="TRUE"
+		non_system_msu_labels_array=()
+		non_system_msu_titles_array=()
+		for array_index in "${!non_system_msu_array[@]}"; do
+			non_system_msu_labels_array+=($(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $1}' | sed -e 's/.*://g'))
+			non_system_msu_titles_array+=($(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $2}' | sed -e 's/.*://g'))
+			[[ $(echo "${non_system_msu_array[array_index]}" | grep -c 'Safari') -ge 1 ]] && non_system_msu_safari_target=$(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $4}' | sed -e 's/Version://')
+			log_super "Target: Non-system update $((array_index + 1)) of ${#non_system_msu_array[@]} is: ${non_system_msu_titles_array[array_index]} $(echo "${non_system_msu_array[array_index]}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_labels_array[${array_index}] is: ${non_system_msu_labels_array[array_index]}"
+		done
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_targets is: ${non_system_msu_targets}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_safari_target is: ${non_system_msu_safari_target}"
 	
+	# Handle ${workflow_check_software_status_error} or complete the workflow.
 	IFS="${previous_ifs}"
 	if [[ "${workflow_check_software_status_error}" == "TRUE" ]]; then
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then # Install now workflow mode.
@@ -6908,6 +6854,7 @@ workflow_check_download_status() {
 	macos_installer_download_required="FALSE"
 	macos_msu_download_required="FALSE"
 	macos_msu_automatic_download_deferral="FALSE"
+	macos_msu_automatic_download_ramped="FALSE"
 	
 	# If a macOS installer is targeted then evaluate any local installers and set ${macos_installer_download_required}.
 	if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then
@@ -6944,7 +6891,10 @@ workflow_check_download_status() {
 		
 		# If an MSU macOS version is cached then determine if it's valid.
 		if [[ "${macos_msu_downloaded_version}" != "FALSE" ]]; then
-			{ [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]] && [[ -z "${macos_msu_label_downloaded}" ]]; } && macos_msu_label_downloaded="${macos_msu_label}" && set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
+			if [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]] && [[ -z "${macos_msu_label_downloaded}" ]]; then
+				log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+				macos_msu_label_downloaded="${macos_msu_label}" && set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
+			fi
 			[[ "${macos_msu_downloaded_version}" != "${macos_msu_version}" ]] && log_super "Warning: Previously downloaded macOS update/upgrade version ${macos_msu_downloaded_version} doesn't match workflow target version ${macos_msu_version}." && macos_msu_downloaded_error="TRUE"
 		else # No msu download is prepared.
 			macos_msu_downloaded_error="TRUE"
@@ -6960,9 +6910,11 @@ workflow_check_download_status() {
 		# If the target is a macOS minor update and it should have been downloaded automatically, then evaluate if the workflow should automatically defer.
 		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
 			{ [[ "${msu_automatic_download}" == "TRUE" ]] && [[ "${macos_msu_download_required}" == "TRUE" ]]; } && macos_msu_automatic_download_deferral="TRUE"
+			[[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]] && macos_msu_automatic_download_ramped="$(grep "${macos_msu_build}" "/var/log/install.log" | grep "ramped, not downloadable at this time" | tail -1)"
 			[[ "${msu_automatic_download}" == "FALSE" ]] && log_super "Warning: Automatic download of macOS updates is disabled, this is not recommended for macOS minor update workflows."
 		fi
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_automatic_download_deferral is: ${macos_msu_automatic_download_deferral}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_automatic_download_ramped is: ${macos_msu_automatic_download_ramped}"
 	fi
 }
 
@@ -7126,6 +7078,7 @@ download_macos_msu() {
 	# If the macOS update/upgrade is downloaded and prepared, then collect information.
 	if [[ "${download_macos_msu_start_error}" == "FALSE" ]] || [[ "${download_macos_msu_start_timeout}" == "FALSE" ]] || [[ "${download_macos_msu_timeout_error}" == "FALSE" ]] || [[ "${download_macos_msu_title_error}" == "FALSE" ]] || [[ "${download_macos_msu_validation_error}" == "FALSE" ]]; then
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE COMPLETED ****"
+		log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		download_maocs_msu_error="FALSE"
 		macos_msu_download_required="FALSE"
 		set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
@@ -7286,6 +7239,7 @@ download_macos_installer() {
 		log_installer "Status: A macOS installer is now available at: /Applications/Install ${macos_installer_title}.app"
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS INSTALLER APP COMPLETE ****"
 		log_super_audit "Status: A macOS installer is now available at: /Applications/Install ${macos_installer_title}.app"
+		log_metrics "Installer Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		download_macos_installer_error="FALSE"
 		macos_installer_download_required="FALSE"
 		set_pref_main "MacOSInstallerDownloaded" "${macos_installer_title} ${macos_installer_version}-${macos_installer_build}"
@@ -7333,8 +7287,13 @@ workflow_download_macos() {
 		# If a macOS automatic download should be possible then automatically defer.
 		if [[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]]; then
 			if [[ "${workflow_install_now_active}" != "TRUE" ]] && [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]] && [[ "${deadline_count_status}" == "FALSE" ]]; then
-				log_super "Warning: Automatic macOS minor update downloads are enabled and should be completed by the system, trying again in ${deferral_timer_minutes} minutes."
-				log_status "Pending: Automatic macOS minor update downloads are enabled and should be completed by the system, trying again in ${deferral_timer_minutes} minutes."
+				if [[ "${macos_msu_automatic_download_ramped}" != "FALSE" ]]; then
+					log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
+					log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
+				else
+					log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+					log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+				fi
 				set_auto_launch_deferral
 			else
 				[[ "${workflow_install_now_active}" == "TRUE" ]] && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current install now workflow."
@@ -8431,6 +8390,7 @@ push_macos_mdm() {
 				log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
 				[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super "MDM: ${macos_msu_label} upgrade is downloaded and prepared."
 				[[ "${push_macos_mdm_target_type}" == "UPDATE" ]] && log_super "MDM: ${macos_msu_label} upgrade is downloaded and prepared."
+				log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 				push_macos_mdm_download_error="FALSE"
 				macos_msu_download_required="FALSE"
 				set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
@@ -9597,6 +9557,23 @@ set_display_strings_optional_buttons() {
 	fi
 }
 
+# This function is designed to run the the background and when killed will output "Active:Inactive:Total" seconds as a string to the file located at input ${1}.
+dialog_metrics_counter() {
+local dialog_metrics_active_seconds
+dialog_metrics_active_seconds=0
+local dialog_metrics_inactive_seconds
+dialog_metrics_inactive_seconds=0
+trap 'echo $dialog_metrics_active_seconds:$dialog_metrics_inactive_seconds:$((dialog_metrics_active_seconds + dialog_metrics_inactive_seconds)) > "${1}"' SIGTERM
+while true; do
+	if [[ $(($(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $6}') / 1000000000)) -gt 0 ]]; then
+		((dialog_metrics_inactive_seconds+=1))
+	else
+		((dialog_metrics_active_seconds+=1))
+	fi
+	sleep 1
+done
+}
+
 # Open ${IBM_NOTIFIER_BINARY} for non-interactive notifications using the ${ibm_notifier_array} options.
 open_notification_ibm_notifier() {
 	# Append any additional display options to the ${ibm_notifier_array}.
@@ -9732,6 +9709,15 @@ open_dialog_ibm_notifier() {
 	# Kill any previous notifications so new ones can take its place.
 	killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
 	
+	# Start background metrics collection for IBM Notifier dialog.
+	log_metrics "Open Dialog $(echo "${dialog_type}" | sed -e 's/ALERT/Interactive Alert/' -e 's/CHOICE/User Choice/' -e 's/SCHEDULE/User Schedule/' -e 's/REMINDER/Schedule Reminder/' -e 's/SOFT/Soft Deadline/' -e 's/AUTH/User Authentication/'): Workflow Elapsed Time" "WorkflowTargetTimestamp"
+	local dialog_metrics_counter_fifo
+	dialog_metrics_counter_fifo="$(mktemp).fifo"
+	mkfifo "${dialog_metrics_counter_fifo}"
+	dialog_metrics_counter "${dialog_metrics_counter_fifo}" &
+	local dialog_metrics_counter_pid
+	dialog_metrics_counter_pid="$!"
+	
 	# Start IBM Notifier and wait for ${dialog_response} and ${dialog_return}.
 	unset dialog_response
 	unset dialog_return
@@ -9740,6 +9726,16 @@ open_dialog_ibm_notifier() {
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ "${dialog_type}" != "AUTH" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_response is: ${dialog_response}"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ "${dialog_type}" == "AUTH" ]]; } && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_response is: ${dialog_response}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_return is: ${dialog_return}"
+	
+	# Collect and report dialog metrics.
+	kill "${dialog_metrics_counter_pid}"
+	local dialog_metrics_response
+	dialog_metrics_response=$(cat "${dialog_metrics_counter_fifo}")
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_metrics_response is: ${dialog_metrics_response}"
+	rm -Rf "${dialog_metrics_counter_fifo}" >/dev/null 2>&1
+	log_metrics "Close Dialog $(echo "${dialog_type}" | sed -e 's/ALERT/Interactive Alert/' -e 's/CHOICE/User Choice/' -e 's/SCHEDULE/User Schedule/' -e 's/REMINDER/Schedule Reminder/' -e 's/SOFT/Soft Deadline/' -e 's/AUTH/User Authentication/'): User Active Elapsed Time" "$(echo "${dialog_metrics_response}" | awk -F ':' '{print $1}')"
+	log_metrics "Close Dialog $(echo "${dialog_type}" | sed -e 's/ALERT/Interactive Alert/' -e 's/CHOICE/User Choice/' -e 's/SCHEDULE/User Schedule/' -e 's/REMINDER/Schedule Reminder/' -e 's/SOFT/Soft Deadline/' -e 's/AUTH/User Authentication/'): User Inactive Elapsed Time" "$(echo "${dialog_metrics_response}" | awk -F ':' '{print $2}')"
+	log_metrics "Close Dialog $(echo "${dialog_type}" | sed -e 's/ALERT/Interactive Alert/' -e 's/CHOICE/User Choice/' -e 's/SCHEDULE/User Schedule/' -e 's/REMINDER/Schedule Reminder/' -e 's/SOFT/Soft Deadline/' -e 's/AUTH/User Authentication/'): Dialog Elapsed Time" "$(echo "${dialog_metrics_response}" | awk -F ':' '{print $3}')"
 }
 
 # MARK: *** Install Now Notifications ***
@@ -9749,6 +9745,7 @@ open_dialog_ibm_notifier() {
 notification_install_now_start() {
 	set_display_strings_language
 	log_super "IBM Notifier: Install now start notification."
+	log_metrics "Open Notification Install Now Start: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_start_title}" -subtitle "${display_string_install_now_start_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 	
 	# Handle the ${display_notifications_centered_status} option.
@@ -9766,6 +9763,7 @@ notification_install_now_start() {
 notification_install_now_download() {
 	set_display_strings_language
 	log_super "IBM Notifier: Install now downloading notification."
+	log_metrics "Open Notification Install Now Downloading: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_download_title}" -subtitle "${display_string_install_now_download_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 	
 	# Handle the ${display_notifications_centered_status} option.
@@ -9784,6 +9782,7 @@ notification_install_now_up_to_date() {
 	set_display_strings_language
 	unset display_notifications_centered_status
 	log_super "IBM Notifier: Install now macOS software is already up to date notification."
+	log_metrics "Open Notification Install Now Completed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_up_to_date_title}" -subtitle "${display_string_install_now_up_to_date_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 	open_notification_ibm_notifier &
@@ -9795,6 +9794,7 @@ notification_install_now_failed() {
 	set_display_strings_language
 	unset display_notifications_centered_status
 	log_super "IBM Notifier: Install now failure notification."
+	log_metrics "Open Notification Install Now Failed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_failed_title}" -subtitle "${display_string_install_now_failed_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 	open_notification_ibm_notifier &
@@ -9825,6 +9825,7 @@ notification_jamf_pro_policy() {
 		log_super "IBM Notifier: Running Jamf Pro Policy default notification."
 		ibm_notifier_array+=(-subtitle "${display_string_jamf_pro_policy_default_body}")
 	fi
+	log_metrics "Open Notification Jamf Pro Policy Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	
 	# Handle the ${display_notifications_centered_status} option.
 	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
@@ -9858,6 +9859,7 @@ notification_prepare() {
 		log_super "IBM Notifier: Preparing update/upgrade default notification showing a ${display_string_prepare_time_estimate} minute estimate."
 		ibm_notifier_array+=(-subtitle "${display_string_prepare_default_body}")
 	fi
+	log_metrics "Open Notification Preparing Update/Upgrade: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	
 	# Handle the ${display_notifications_centered_status} option.
 	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
@@ -9891,6 +9893,7 @@ notification_restart() {
 		log_super "IBM Notifier: Restart default notification."
 		ibm_notifier_array+=(-subtitle "${display_string_restart_default_body}")
 	fi
+	log_metrics "Open Notification Restart: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	
 	# Handle the ${display_notifications_centered_status} option.
 	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
@@ -9907,6 +9910,7 @@ notification_restart() {
 notification_non_system_updates() {
 	set_display_strings_language
 	log_super "IBM Notifier: Installing non-system macOS software updates notification."
+	log_metrics "Open Notification Installing Non-System Updates: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_non_system_updates_title}" -subtitle "${display_string_non_system_updates_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 
 	# Handle the ${display_notifications_centered_status} option.
@@ -9924,6 +9928,7 @@ notification_non_system_updates() {
 notification_safari_update() {
 	set_display_strings_language
 	log_super "IBM Notifier: Installing Safari update notification."
+	log_metrics "Open Notification Installing Safari Update: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_safari_update_title}" -subtitle "${display_string_safari_update_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 
 	# Handle the ${display_notifications_centered_status} option.
@@ -9943,6 +9948,7 @@ notification_failed() {
 	set_deferral_button
 	unset display_notifications_centered_status
 	log_super "IBM Notifier: Failure notification."
+	log_metrics "Open Notification Installation Failed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_failed_title}" -subtitle "${display_string_failed_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_defer_button}")
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: ibm_notifier_array is:\n${ibm_notifier_array[*]}"
 	open_notification_ibm_notifier &
@@ -10017,6 +10023,7 @@ dialog_insufficient_storage() {
 			if [[ "${storage_ready}" == "TRUE" ]]; then
 				log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
 				killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
+				log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 				break
 			fi
 		else # "${check_storage_available_error}" == "FALSE"
@@ -10038,6 +10045,7 @@ dialog_insufficient_storage() {
 	if [[ "${dialog_insufficient_storage_error}" == "FALSE" ]] && [[ "${storage_ready}" == "FALSE" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "Error: Waiting for user to make more storage available timed out after ${dialog_timeout_seconds} seconds."
 		dialog_insufficient_storage_error="TRUE"
+		log_metrics "Dialog Insufficient Storage Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	fi
 	[[ "${display_hide_background_status}" == "TEMPOFF" ]] && display_hide_background_status="TRUE"
 }
@@ -10100,6 +10108,7 @@ dialog_power_required() {
 		if [[ "${power_required_charger_connected}" == "TRUE" ]]; then
 			log_super "Status: AC power detected, the macOS update/upgrade workflow can continue."
 			killall -9 "IBM Notifier" "IBM Notifier Popup" >/dev/null 2>&1
+			log_metrics "Dialog Power Required Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			break
 		fi
 		[[ -n "${dialog_timeout_seconds}" ]] && dialog_power_required_check_timeout=$((dialog_power_required_check_timeout - POWER_REQUIRED_RECHECK_SECONDS))
@@ -10116,6 +10125,7 @@ dialog_power_required() {
 	if [[ "${power_required_charger_connected}" == "FALSE" ]]; then
 		[[ -n "${dialog_timeout_seconds}" ]] && log_super "Error: Waiting for user to connect AC power timed out after ${dialog_timeout_seconds} seconds."
 		dialog_power_required_error="TRUE"
+		log_metrics "Dialog Power Required Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_power_required_error is: ${dialog_power_required_error}"
 }
@@ -10203,14 +10213,17 @@ dialog_user_choice() {
 			log_super "Status: User chose to defer, setting a deferral of ${deferral_timer_minutes} minutes."
 			log_status "Pending: User chose to defer, setting a deferral of ${deferral_timer_minutes} minutes."
 		fi
+		log_metrics "Dialog User Choice Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		set_auto_launch_deferral
 		;;
 	2)
 		log_super "Status: User chose to install now."
+		log_metrics "Dialog User Choice Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		workflow_install_active_user # This function includes internal power, storage, and Apple silicon authentication checks. Sub-functions include test mode logic.
 		;;
 	3)
 		log_super "Status: User chose to schedule the installation."
+		log_metrics "Dialog User Choice Schedule Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		dialog_user_schedule # This function includes all workflows to facilitate user schedule selection.
 		;;
 	4 | 137 | 255)
@@ -10223,6 +10236,7 @@ dialog_user_choice() {
 			log_super "Status: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
 			log_status "Pending: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
 		fi
+		log_metrics "Dialog User Choice Timeout Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		set_auto_launch_deferral
 		;;
 	esac
@@ -10319,16 +10333,17 @@ dialog_user_schedule() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection is: ${dialog_user_schedule_selection}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_epoch is: ${dialog_user_schedule_selection_epoch}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_minimum_selection_epoch is: ${dialog_user_schedule_minimum_selection_epoch}"
-		if [[ $dialog_user_schedule_selection_epoch -lt $dialog_user_schedule_minimum_selection_epoch ]];then
+		if [[ $dialog_user_schedule_selection_epoch -lt $dialog_user_schedule_minimum_selection_epoch ]]; then
 			log_super "Warning: Adjusting user selected scheduled installation because it's in the past or less than two minutes from now."
 			workflow_scheduled_install=$(date -r "${dialog_user_schedule_minimum_selection_epoch}" +%Y-%m-%d:%H:%M)
 		fi
-		if [[ -n "${deadline_epoch}" ]] && [[ $dialog_user_schedule_selection_epoch -gt $display_accessory_datepicker_end_epoch ]];then
+		if [[ -n "${deadline_epoch}" ]] && [[ $dialog_user_schedule_selection_epoch -gt $display_accessory_datepicker_end_epoch ]]; then
 			log_super "Warning: Adjusting user selected scheduled installation because it's past the current workflow deadline."
 			workflow_scheduled_install=$(date -r "${display_accessory_datepicker_end_epoch}" +%Y-%m-%d:%H:%M)
 		fi
 		[[ -z "${workflow_scheduled_install}" ]] && workflow_scheduled_install=$(date -r "${dialog_user_schedule_selection_epoch}" +%Y-%m-%d:%H:%M)
 		log_super "Status: User chose to schedule installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}."
+		log_metrics "Dialog User Schedule Set: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		if [[ -n "${schedule_workflow_active}" ]]; then
 			set_schedule_workflow_active_adjustments
 			if [[ -n "${workflow_scheduled_install_adjusted}" ]]; then
@@ -10357,11 +10372,13 @@ dialog_user_schedule() {
 		;;
 	2)
 		log_super "Status: User chose to cancel schedule selection."
+		log_metrics "Dialog User Schedule Cancel: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		dialog_user_choice # This function includes all workflows to facilitate user choices.
 		;;
 	4 | 137 | 255)
 		log_super "Status: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
 		log_status "Pending: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
+		log_metrics "Dialog User Schedule Timeout Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		set_auto_launch_deferral
 		;;
 	esac
@@ -10417,15 +10434,18 @@ dialog_schedule_reminder() {
 		case $dialog_return in
 		0)
 			log_super "Status: User chose to install now."
+			log_metrics "Dialog Schedule Reminder User Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
 		2)
 			delete_pref_main "WorkflowScheduledInstall"
 			log_super "Status: User chose to reschedule, removing previously scheduled installation and restarting super..."
+			log_metrics "Dialog Schedule Reminder User Reschedule: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			restart_super_sleep_seconds=1
 			restart_super
 			;;
 		4 | 137 | 255)
 			log_super "Status: Schedule reminder dialog closed due to timeout."
+			log_metrics "Dialog Schedule Reminder Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
 		esac
 	else # The schedule installation is not about to start so this dialog can exit normally or reschedule.
@@ -10452,15 +10472,18 @@ dialog_schedule_reminder() {
 		case $dialog_return in
 		0)
 			log_super "Background Schedule Reminder Dialog: User dismissed the dialog."
+			log_metrics "Dialog Schedule Reminder User Dimsissed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
 		2)
 			delete_pref_main "WorkflowScheduledInstall"
 			log_super "Background Schedule Reminder Dialog: User chose to reschedule, removing previously scheduled installation and restarting super..."
+			log_metrics "Dialog Schedule Reminder User Reschedule: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			restart_super_sleep_seconds=1
 			restart_super
 			;;
 		4 | 137 | 255)
 			log_super "Background Schedule Reminder Dialog: Closed due to timeout."
+			log_metrics "Dialog Schedule Reminder Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
 		esac
 		exit 0
@@ -10511,9 +10534,11 @@ dialog_soft_deadline() {
 	case $dialog_return in
 	0)
 		log_super "Status: User chose to restart."
+		log_metrics "Dialog Soft Deadline User Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		;;
 	4 | 137 | 255)
 		log_super "Status: Display timeout automatically chose to restart."
+		log_metrics "Dialog Soft Deadline Timeout Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		;;
 	esac
 }
@@ -10627,6 +10652,7 @@ dialog_user_auth() {
 	# If user authentication was successful then evaluate options to save password or fix bootstrap token.
 	if [[ "${dialog_user_auth_valid}" == "TRUE" ]]; then
 		log_super "Status: Credentials verified for current user: ${auth_local_account}"
+		log_metrics "Dialog User Authentication Successful: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
 			local auth_user_save_password_response
 			auth_user_save_password_response=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security add-generic-password -a "super_auth_user_password" -s "Super Update Service" -w "${auth_local_password}" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
@@ -10666,8 +10692,10 @@ dialog_user_auth() {
 	else # The user authentication dialog timed out or failed.
 		if [[ "${dialog_user_auth_timeout}" == "TRUE" ]]; then
 			log_super "Error: Waiting for user authentication timed out after ${dialog_timeout_seconds} seconds."
+			log_metrics "Dialog User Authentication Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		else
 			log_super "Error: User authentication failed."
+			log_metrics "Dialog User Authentication Failed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		fi
 		dialog_user_auth_error="TRUE"
 	fi
@@ -10728,15 +10756,15 @@ main() {
 	# Check for software update/upgrades workflow.
 	if [[ "${workflow_disable_update_check}" == "TRUE" ]]; then # Skip software updates/upgrade mode option.
 		log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - NOT CHECKING FOR SOFTWARE UPDATES/UPGRADES ****"
-		macos_installer_major_upgrade_target="FALSE"
-		macos_installer_minor_update_target="FALSE"
-		macos_msu_major_upgrade_target="FALSE"
-		macos_msu_minor_update_target="FALSE"
-		macos_major_upgrade_latest="FALSE"
-		macos_minor_update_latest="FALSE"
-		macos_target_mdm_compatible="FALSE"
 		non_system_msu_targets="FALSE"
 		non_system_msu_safari_target="FALSE"
+		macos_msu_major_upgrade_target="FALSE"
+		macos_installer_major_upgrade_target="FALSE"
+		macos_major_upgrade_latest="FALSE"
+		macos_msu_minor_update_target="FALSE"
+		macos_installer_minor_update_target="FALSE"
+		macos_minor_update_latest="FALSE"
+		macos_target_mdm_compatible="FALSE"
 		{ [[ "${workflow_disable_relaunch}" != "TRUE" ]] && [[ -z "${install_jamf_policy_triggers}" ]] && [[ "${workflow_restart_without_updates}" != "TRUE" ]]; } && log_super "Warning: When using the --workflow-disable-update-check option consider also using the --workflow-disable-relaunch option to prevent super from unecissarily re-launching."
 		if [[ "${test_mode}" == "TRUE" ]]; then
 			log_super "Test Mode: Simulating skip updates workflow."
@@ -10767,7 +10795,7 @@ main() {
 			elif [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
 				non_system_msu_targets="TRUE"
 				log_super "Test Mode: Simulating install non-system updates workflow."
-			elif [[ "${install_safari_update_without_restarting}" == "TRUE" ]]; then
+			elif [[ "${install_safari_updates_without_restarting}" == "TRUE" ]]; then
 				non_system_msu_targets="TRUE"
 				non_system_msu_safari_target="Safari 18.x"
 				log_super "Test Mode: Simulating install Safari update workflow."
@@ -10816,7 +10844,7 @@ main() {
 	
 	# Prepare workflow for specific ${workflow_target} and, if needed, set ${display_accessory_content}.
 	workflow_target="FALSE"
-	if [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && { { [[ "${non_system_msu_targets}" == "TRUE" ]] && [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; } || { [[ "${non_system_msu_safari_target}" != "FALSE" ]] && [[ "${install_safari_update_without_restarting}" == "TRUE" ]]; }; }; then
+	if [[ "${install_prioritize_non_restart_updates}" == "TRUE" ]] && [[ "${non_system_msu_targets}" == "TRUE" ]]; then
 		[[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && log_super "Warning: Non-system update workflow is being prioritized over ${macos_installer_title} ${macos_installer_version}-${macos_build} major upgrade via installer."
 		[[ "${macos_installer_minor_update_target}" != "FALSE" ]] && log_super "Warning: Non-system update workflow is being prioritized over ${macos_installer_title} ${macos_installer_version}-${macos_build} minor update via installer."
 		[[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && log_super "Warning: Non-system update workflow is being prioritized over ${macos_msu_title} ${macos_msu_version}-${macos_msu_build} major upgrade via softwareupdate."
@@ -10825,17 +10853,17 @@ main() {
 		macos_installer_minor_update_target="FALSE"
 		macos_msu_major_upgrade_target="FALSE"
 		macos_msu_minor_update_target="FALSE"
-		if [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
+		if [[ "${install_safari_updates_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
+			workflow_target="Safari Update"
+			workflow_target_log_string="SAFARI UPDATE PRIORITY"
+			[[ -n "${display_accessory_safari_update}" ]] && display_accessory_content="${display_accessory_safari_update}"
+			[[ "${install_non_system_updates_without_restarting}" == "TRUE" ]] && log_super "Warning: The --install-safari-updates-without-restarting option is currently overriding the --install-non-system-updates-without-restarting option."
+			[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-safari-updates-without-restarting option is currently overriding the --only-download option."
+		elif [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
 			workflow_target="Non-system Software Updates"
 			workflow_target_log_string="NON-SYSTEM SOFTWARE UPDATES PRIORITY"
 			[[ -n "${display_accessory_non_system_updates}" ]] && display_accessory_content="${display_accessory_non_system_updates}"
 			[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-non-system-updates-without-restarting option is currently overriding the --only-download option."
-		fi
-		if [[ "${install_safari_update_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
-			workflow_target="Safari Update"
-			workflow_target_log_string="SAFARI UPDATE PRIORITY"
-			[[ -n "${display_accessory_safari_update}" ]] && display_accessory_content="${display_accessory_safari_update}"
-			[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-safari-update-without-restarting option is currently overriding the --only-download option."
 		fi
 		workflow_macos_auth="FALSE"
 		[[ "${workflow_only_download_active}" == "TRUE" ]] && workflow_only_download_active="FALSE"
@@ -10848,40 +10876,54 @@ main() {
 			workflow_target_log_string="${workflow_target} MINOR UPDATE VIA INSTALLER"
 			[[ -n "${display_accessory_macos_minor_update}" ]] && display_accessory_content="${display_accessory_macos_minor_update}"
 		fi
-		[[ "${non_system_msu_targets}" == "TRUE" ]] && log_super "Status: The workflow will automatically re-check for non-system updates immediately after the system restarts from the pending macOS major upgrade."
+		if [[ "${non_system_msu_targets}" == "TRUE" ]]; then
+			log_super "Status: Non-system updates will be installed immediately after the system restarts from the pending macOS major upgrade."
+			if [[ "${install_safari_updates_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
+				log_super "Warning: To force Safari updates to install before a macOS update/upgrade then you must also enable the --install-prioritize-non-restart-updates option."
+			elif [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
+				log_super "Warning: To force non-system updates to install before a macOS update/upgrade then you must also enable the --install-prioritize-non-restart-updates option."
+			fi
+		fi
 	elif [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
 		workflow_target="${macos_msu_title} ${macos_msu_version}-${macos_msu_build}"
 		workflow_target_log_string="${workflow_target} MAJOR UPGRADE VIA SOFTWAREUPDATE"
 		[[ -n "${display_accessory_macos_major_upgrade}" ]] && display_accessory_content="${display_accessory_macos_major_upgrade}"
-		[[ "${non_system_msu_targets}" == "TRUE" ]] && log_super "Status: The workflow will automatically re-check for non-system updates immediately after the system restarts from the pending macOS major upgrade."
+		if [[ "${non_system_msu_targets}" == "TRUE" ]]; then
+			log_super "Status: Non-system updates will be installed immediately after the system restarts from the pending macOS major upgrade."
+			if [[ "${install_safari_updates_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
+				log_super "Warning: To force Safari updates to install before a macOS update/upgrade then you must also enable the --install-prioritize-non-restart-updates option."
+			elif [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
+				log_super "Warning: To force non-system updates to install before a macOS update/upgrade then you must also enable the --install-prioritize-non-restart-updates option."
+			fi
+		fi
 	elif [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
-		if [[ $(echo "${macos_msu_minor_update_target}" | grep -c '(') -gt 0 ]] && [[ "${install_rapid_security_responses}" != "TRUE" ]]; then
-			log_super "Warning: The default workflow ignores macOS Rapid Security Response (RSR) updates. Use the --install-rapid-security-responses option to always install macOS RSR updates as soon as they are available."
-		else
-			workflow_target="${macos_msu_title} ${macos_msu_version}-${macos_msu_build}"
-			workflow_target_log_string="${workflow_target} MINOR UPDATE VIA SOFTWAREUPDATE"
-			[[ -n "${display_accessory_macos_minor_update}" ]] && display_accessory_content="${display_accessory_macos_minor_update}"
+		workflow_target="${macos_msu_title} ${macos_msu_version}-${macos_msu_build}"
+		workflow_target_log_string="${workflow_target} MINOR UPDATE VIA SOFTWAREUPDATE"
+		[[ -n "${display_accessory_macos_minor_update}" ]] && display_accessory_content="${display_accessory_macos_minor_update}"
+		if [[ "${non_system_msu_targets}" == "TRUE" ]]; then
+			log_super "Status: Non-system updates will be installed immediately after the system restarts from the pending macOS minor update."
+			if [[ "${install_safari_updates_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
+				log_super "Warning: To force Safari updates to install before a macOS update/upgrade then you must also enable the --install-prioritize-non-restart-updates option."
+			elif [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
+				log_super "Warning: To force non-system updates to install before a macOS update/upgrade then you must also enable the --install-prioritize-non-restart-updates option."
+			fi
 		fi
-		[[ "${non_system_msu_targets}" == "TRUE" ]] && log_super "Status: The workflow will automatically re-check for non-system updates immediately after the system restarts from the pending macOS minor update."
 	elif [[ "${non_system_msu_targets}" == "TRUE" ]]; then
-		if [[ "${install_non_system_updates_without_restarting}" != "TRUE" ]] || [[ "${install_safari_update_without_restarting}" != "TRUE" ]]; then
-			log_super "Warning: The default workflow ignores non-system software updates if there is no macOS update/upgrade available. Use the --install-non-system-updates-without-restarting or the --install-safari-update-without-restarting option to install non-system items even if there is no macOS update/upgrade availalbe."
+		if [[ "${install_safari_updates_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
+			workflow_target="Safari Update"
+			workflow_target_log_string="SAFARI UPDATE PRIORITY"
+			[[ -n "${display_accessory_safari_update}" ]] && display_accessory_content="${display_accessory_safari_update}"
+			[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-safari-updates-without-restarting option is currently overriding the --only-download option."
+		elif [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
+			workflow_target="Non-system Software Updates"
+			workflow_target_log_string="NON-SYSTEM SOFTWARE UPDATES PRIORITY"
+			[[ -n "${display_accessory_non_system_updates}" ]] && display_accessory_content="${display_accessory_non_system_updates}"
+			[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-non-system-updates-without-restarting option is currently overriding the --only-download option."
 		else
-			if [[ "${install_non_system_updates_without_restarting}" == "TRUE" ]]; then
-				workflow_target="Non-system Software Updates"
-				workflow_target_log_string="NON-SYSTEM SOFTWARE UPDATES PRIORITY"
-				[[ -n "${display_accessory_non_system_updates}" ]] && display_accessory_content="${display_accessory_non_system_updates}"
-				[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-non-system-updates-without-restarting option is currently overriding the --only-download option."
-			fi
-			if [[ "${install_safari_update_without_restarting}" == "TRUE" ]] && [[ "${non_system_msu_safari_target}" != "FALSE" ]]; then
-				workflow_target="Safari Update"
-				workflow_target_log_string="SAFARI UPDATE PRIORITY"
-				[[ -n "${display_accessory_safari_update}" ]] && display_accessory_content="${display_accessory_safari_update}"
-				[[ "${workflow_only_download_active}" == "TRUE" ]] && log_super "Warning: The --install-safari-update-without-restarting option is currently overriding the --only-download option."
-			fi
-			workflow_macos_auth="FALSE"
-			[[ "${workflow_only_download_active}" == "TRUE" ]] && workflow_only_download_active="FALSE"
+			log_super "Warning: The default workflow ignores non-system software updates if there is no macOS update/upgrade available. Use the --install-non-system-updates-without-restarting or the --install-safari-updates-without-restarting option to install non-system items even if there is no macOS update/upgrade available."
 		fi
+		workflow_macos_auth="FALSE"
+		[[ "${workflow_only_download_active}" == "TRUE" ]] && workflow_only_download_active="FALSE"
 	elif [[ "${install_jamf_policy_triggers_without_restarting}" == "TRUE" ]]; then
 		workflow_target="Jamf Pro Policy Triggers Without Restarting"
 		workflow_target_log_string="JAMF PRO POLICY TRIGGERS WITHOUT RESTARTING"
@@ -10911,11 +10953,19 @@ main() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_target is: ${workflow_target}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_accessory_content is: ${display_accessory_content}"
 	
-	# Log any changes to the workflow target.
+	# Log any changes regarding the workflow target.
 	workflow_target_previous=$(get_pref "WorkflowTarget")
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_target_previous is: ${workflow_target_previous}"
-	{ [[ -z "${workflow_target_previous}" ]] && [[ "${workflow_target}" != "FALSE" ]]; } && log_super_audit "Status: Setting new workflow target to ${workflow_target}".
-	{ [[ -n "${workflow_target_previous}" ]] && [[ "${workflow_target}" != "${workflow_target_previous}" ]]; } && log_super_audit "Warning: Previous workflow target of ${workflow_target_previous} has been changed to ${workflow_target}."
+	if [[ "${workflow_target}" != "FALSE" ]] && [[ -z "${workflow_target_previous}" ]]; then
+		log_super_audit "Status: Setting new workflow target to ${workflow_target}".
+		log_metrics "New Workflow Target"
+		set_pref_main "WorkflowTargetTimestamp" "$(date -r "${workflow_time_epoch}" +%Y-%m-%d:%H:%M:%S)"
+	fi
+	if [[ "${workflow_target}" != "FALSE" ]] && [[ -n "${workflow_target_previous}" ]] && [[ "${workflow_target}" != "${workflow_target_previous}" ]]; then
+		log_super_audit "Warning: Previous workflow target of ${workflow_target_previous} has been changed to ${workflow_target}."
+		log_metrics "Replaced Previous Workflow Target"
+		set_pref_main "WorkflowTargetTimestamp" "$(date -r "${workflow_time_epoch}" +%Y-%m-%d:%H:%M:%S)"
+	fi
 	
 	# If the workflow target is only Safari, check to see if Safari is active or in test mode. If not, force an Install Now workflow.
 	if [[ "${workflow_target}" == "Safari Update" ]]; then
@@ -10950,6 +11000,7 @@ main() {
 	else # No software updates/upgrade needed so reset any leftovers.
 		{ [[ "${workflow_target_previous}" != "FALSE" ]] && [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Calling reset_workflow() function."
 		[[ "${workflow_target_previous}" != "FALSE" ]] && reset_workflow
+		workflow_target="FALSE"
 	fi
 	
 	# If needed, handle ${schedule_deferred_start_days_active} before the any installation or restart workflow starts.
@@ -11072,11 +11123,6 @@ main() {
 						log_super "Error: The active user logged out while the update was downloading, trying again in ${deferral_timer_minutes} minutes."
 						log_status "Pending: The active user logged out while the update was downloading, trying again in ${deferral_timer_minutes} minutes."
 						set_auto_launch_deferral
-					else
-						check_deadlines_days_date
-						{ [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]]; } && check_user_focus
-						{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]]; } && user_focus_active="FALSE"
-						check_deadlines_count
 					fi
 				fi
 				# Manage various workflow options when any deadline is active.

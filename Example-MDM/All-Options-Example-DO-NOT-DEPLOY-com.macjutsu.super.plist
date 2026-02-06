@@ -10,11 +10,13 @@
 	<true/>
 	<key>InstallMacOSMajorVersionTarget</key>
 	<string>26.1</string>
+	<key>InstallMacOSBSIUpdates</key>
+	<true/>
 	<key>InstallRapidSecurityResponses</key>
 	<true/>
 	<key>InstallNonSystemUpdatesWithoutRestarting</key>
 	<true/>
-	<key>InstallSafariUpdateWithoutRestarting</key>
+	<key>InstallSafariUpdatesWithoutRestarting</key>
 	<true/>
 	<key>InstallPrioritizeNonRestartUpdates</key>
 	<true/>
@@ -134,6 +136,8 @@
 	<string>https://support.apple.com/en-us/HT201541</string>
 	<key>DisplayWarningButtonString</key>
 	<string>https://support.apple.com/en-us/HT201222</string>
+	<key>ConfigCodeSignature</key>
+	<string>pretendco.com</string>
 	<key>ConfigTempOverride</key>
 	<true/>
 	<key>AuthAskUserToSavePassword</key>

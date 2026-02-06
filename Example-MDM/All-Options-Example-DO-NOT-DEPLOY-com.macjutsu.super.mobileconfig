@@ -56,6 +56,8 @@
                   <string>https://jamf-api.example.domain.com</string>
                   <key>AuthMDMFailoverToUser</key>
                   <string>ERROR</string>
+                  <key>ConfigCodeSignature</key>
+                  <string>pretendco.com</string>
                   <key>ConfigTempOverride</key>
                   <true/>
                   <key>DeadlineCountFocus</key>
@@ -142,6 +144,8 @@
                   <string>trigger1,trigger2,trigger3</string>
                   <key>InstallJamfPolicyTriggersWithoutRestarting</key>
                   <true/>
+                  <key>InstallMacOSBSIUpdates</key>
+                  <true/>
                   <key>InstallMacOSMajorUpgrades</key>
                   <true/>
                   <key>InstallMacOSMajorVersionTarget</key>
@@ -154,7 +158,7 @@
                   <true/>
                   <key>InstallRapidSecurityResponses</key>
                   <true/>
-                  <key>InstallSafariUpdateWithoutRestarting</key>
+                  <key>InstallSafariUpdatesWithoutRestarting</key>
                   <true/>
                   <key>ScheduleDeferredStartDays</key>
                   <string>7</string>

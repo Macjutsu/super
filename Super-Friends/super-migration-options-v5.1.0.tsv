@@ -6,12 +6,14 @@ YES	--install-macos-minor-version-target=macOSVersionNumber	N/A	N/A	N/A
 YES	--install-macos-major-upgrades	--install-macos-major-upgrades	--install-macos-major-upgrades	--allow-upgrade
 YES	--install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--install-macos-major-upgrades-off	--allow-upgrade-off
 YES	--install-macos-major-version-target=macOSVersionNumber	--install-macos-major-version-target=IntegerNumber	--install-macos-major-version-target=IntegerNumber	--target-upgrade=IntegerNumber
+YES	--install-macos-bsi-updates	N/A	N/A	N/A
+YES	--install-macos-bsi-updates-off	N/A	N/A	N/A
 YES	--install-rapid-security-responses	--install-rapid-security-responses	--install-rapid-security-responses	--allow-rsr-updates
 YES	--install-rapid-security-responses-off	--install-rapid-security-responses-off	--install-rapid-security-responses-off	--allow-rsr-updates-off
 YES	--install-non-system-updates-without-restarting	--install-non-system-updates-without-restarting	--install-non-system-updates-without-restarting	--enforce-non-system-updates
 YES	--install-non-system-updates-without-restarting-off	--install-non-system-updates-without-restarting-off	--install-non-system-updates-without-restarting-off	--enforce-non-system-updates-off
-YES	--install-safari-update-without-restarting	N/A	N/A	N/A
-YES	--install-safari-update-without-restarting-off	N/A	N/A	N/A
+YES	--install-safari-updates-without-restarting	N/A	N/A	N/A
+YES	--install-safari-updates-without-restarting-off	N/A	N/A	N/A
 YES	--install-prioritize-non-restart-updates	N/A	N/A	N/A
 YES	--install-prioritize-non-restart-updates-off	N/A	N/A	N/A
 YES	"--install-jamf-policy-triggers=PolicyTrigger,PolicyTrigger,etc..."	"--install-jamf-policy-triggers=PolicyTrigger,PolicyTrigger,etc..."	"--workflow-jamf-policy-triggers=PolicyTrigger,PolicyTrigger,etc..."	"--policy-triggers=PolicyTrigger,PolicyTrigger,etc..."
