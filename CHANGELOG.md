@@ -61,6 +61,7 @@
 - Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
 - Updated ["All Options" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.mobileconfig).
 - Updated ["All Options" example MDM property list](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.plist).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.1.0](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).  (Huge thanks to @tonyyo11 for maintaining this!)
 - As always, typo fixes and improvements to both regular and verbose log output.
 - `super` [5.1.0-rc2 SHA-256: fdd0891117983d9864b6c6e79af1321acfbe07c8a53dfd0f19900c364d41a9f6](https://github.com/Macjutsu/super/blob/5.1.0-rc2/super.checksum.txt)
 
