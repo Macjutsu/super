@@ -3,9 +3,10 @@ super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>InstallMacOSMinorVersionTarget</key> <string>macOSVersionNumber</string>	N/A	N/A	N/A
 <key>InstallMacOSMajorUpgrades</key> <true/> | <false/>	<key>InstallMacOSMajorUpgrades</key> <true/> | <false/>	<key>InstallMacOSMajorUpgrades</key> <true/> | <false/>	<key>AllowUpgrade</key> <true/> | <false/>
 <key>InstallMacOSMajorVersionTarget</key> <string>macOSVersionNumber</string>	<key>InstallMacOSMajorVersionTarget</key> <string>IntegerNumber</string>	<key>InstallMacOSMajorVersionTarget</key> <string>IntegerNumber</string>	<key>TargetUpgrade</key> <string>IntegerNumber</string>
+<key>InstallMacOSBSIUpdates</key> <true/> | <false/>	N/A	N/A	N/A
 <key>InstallRapidSecurityResponses</key> <true/> | <false/>	<key>InstallRapidSecurityResponses</key> <true/> | <false/>	<key>InstallRapidSecurityResponses</key> <true/> | <false/>	<key>AllowRSRUpdates</key> <true/> | <false/>
 <key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>	<key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>	<key>InstallNonSystemUpdatesWithoutRestarting</key> <true/> | <false/>	<key>EnforceNonSystemUpdates</key> <true/> | <false/>
-<key>InstallSafariUpdateWithoutRestarting</key> <true/> | <false/>	N/A	N/A	N/A
+<key>InstallSafariUpdatesWithoutRestarting</key> <true/> | <false/>	N/A	N/A	N/A
 <key>InstallPrioritizeNonRestartUpdates</key> <true/> | <false/>	N/A	N/A	N/A
 "<key>InstallJamfPolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc…</string>"	"<key>InstallJamfPolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc…</string>"	"<key>WorkflowJamfPolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>"	"<key>PolicyTriggers</key> <string>PolicyTrigger,PolicyTrigger,etc...</string>"
 <key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	<key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	N/A	N/A
@@ -65,6 +66,7 @@ super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>	<key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>	N/A	N/A
 <key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>DisplayHelpButtonString</key> <string>plain text or URL</string>	<key>HelpButton</key> <string>plain text or URL</string>
 <key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>DisplayWarningButtonString</key> <string>plain text or URL</string>	<key>WarningButton</key> <string>plain text or URL</string>
+<key>ConfigCodeSignature</key> <string>Identifier</string>	N/A	N/A	N/A
 <key>ConfigTempOverride</key> <true/> | <false/>	N/A	N/A	N/A
 <key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	<key>AuthAskUserToSavePassword</key> <true/> | <false/>	N/A
 <key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	<key>AuthJamfCustomURL</key> <string>URL</string>	N/A
