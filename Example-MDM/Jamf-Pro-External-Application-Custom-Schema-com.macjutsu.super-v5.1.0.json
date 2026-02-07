@@ -529,7 +529,7 @@
         },
         "InstallMacOSBSIUpdates": {
             "title": "Allow Background Security Improvements",
-            "description": "macOS 26.1 Tahoe supports Background Security Improvement updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions.Presently this "new" option only represents a name change as the underlying mechanism for macOS BSI updates appears to be similar to the legacy macOS Rapid Security Responses. The InstallRapidSecurityResponses option remains but is deprecated and will be removed in a future version of super.",
+            "description": "macOS 26.1 Tahoe supports Background Security Improvement updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions. Presently this new option only represents a name change as the underlying mechanism for macOS BSI updates appears to be similar to the legacy macOS Rapid Security Responses. The InstallRapidSecurityResponses option remains but is deprecated and will be removed in a future version of super.",
             "type": "boolean"
         },
         "InstallRapidSecurityResponses": {
