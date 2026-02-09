@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-rc2"
+SUPER_VERSION="5.1.0-rc2.1.1"
 readonly SUPER_VERSION
-SUPER_DATE="2026/02/06"
+SUPER_DATE="2026/02/09"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -6170,6 +6170,7 @@ get_macos_installers_list() {
 	macos_installers_list="FALSE"
 	
 	# Background the mist-cli list process and send to ${MACOS_INSTALLERS_LIST_LOG}.
+	# Note: mist list installer does not support --caching-server; caching is only used for download.
 	local get_macos_installers_list_pid
 	if [[ "${macos_beta_program}" == "FALSE" ]]; then
 		"${MIST_CLI_BINARY}" list installer --output-type csv --no-ansi --compatible >"${MACOS_INSTALLERS_LIST_LOG}" 2>&1 &
@@ -6419,7 +6420,7 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) there is the possibility of targeting a macOS installer then collect the ${macos_installers_list} and parse to create ${macos_installer_major_upgrades_array[]} and ${macos_installer_minor_updates_array[]}.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; } && [[ ${#mdmclient_macos_installer_array[@]} -gt 0 ]]; then
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; } && { [[ ${#mdmclient_macos_installer_array[@]} -gt 0 ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; }; then
 		# If required collecte a new ${macos_installers_list}.
 		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${macos_installers_list}" == "FALSE" ]] || [[ -z "${macos_installers_list}" ]]; then
 			get_macos_installers_list
@@ -7130,6 +7131,39 @@ download_macos_msu() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
 }
 
+# Determine available content cache server for mist-cli (Apple Content Caching / Caching Server).
+get_mist_cache_server() {
+	if [[ ! -x "/usr/bin/AssetCacheLocatorUtil" ]]; then
+		return 0
+	fi
+	local cache_output
+	cache_output=$(/usr/bin/AssetCacheLocatorUtil -j 2>&1)
+	cache_output="${cache_output//$'\r'/}"
+	if [[ -z "${cache_output}" ]]; then
+		return 0
+	fi
+	local cache_hostport
+	cache_hostport="${cache_output#*\"hostport\":\"}"
+	if [[ "${cache_hostport}" != "${cache_output}" ]]; then
+		cache_hostport="${cache_hostport%%\"*}"
+	else
+		cache_hostport=""
+	fi
+	if [[ -z "${cache_hostport}" ]]; then
+		local cache_line
+		while IFS= read -r cache_line; do
+			if [[ "${cache_line}" =~ ([A-Za-z0-9._-]+:[0-9]+),\ rank ]]; then
+				cache_hostport="${BASH_REMATCH[1]}"
+				break
+			fi
+		done <<< "${cache_output}"
+	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: cache_hostport is: ${cache_hostport}"
+	if [[ -n "${cache_hostport}" ]]; then
+		echo "http://${cache_hostport}"
+	fi
+}
+
 # Download macOS installer via ${MIST_CLI_BINARY}, and also save responses to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 download_macos_installer() {
 	# If ${test_mode} then it's not necessary to continue this function.
@@ -7149,12 +7183,23 @@ download_macos_installer() {
 	log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} INSTALLER APP START ****"
 	
 	# Background the ${MIST_CLI_BINARY} download process and send to ${INSTALLER_WORKFLOW_LOG}.
+	# mist download installer supports --caching-server <url:port> for Apple Content Caching (HTTP only).
 	local download_macos_installer_mist_pid
+	local mist_cache_server
+	mist_cache_server="$(get_mist_cache_server)"
+	local mist_cache_option
+	mist_cache_option=()
+	if [[ -n "${mist_cache_server}" ]]; then
+		log_super "mist_cli: Using caching server ${mist_cache_server}."
+		mist_cache_option=(--caching-server "${mist_cache_server}")
+	else
+		log_super "mist_cli: No caching server found, proceeding without cache."
+	fi
 	if [[ "${macos_beta_program}" == "FALSE" ]]; then
-		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible "${macos_installer_build}" application --application-name "Install %NAME%.app" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
+		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible "${macos_installer_build}" application --application-name "Install %NAME%.app" "${mist_cache_option[@]}" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
 		download_macos_installer_mist_pid="$!"
 	else # macOS beta workflow.
-		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible --include-betas "${macos_installer_build}" application --application-name "Install %NAME%.app" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
+		"${MIST_CLI_BINARY}" download installer --force --no-ansi --output-directory "/Applications" --compatible --include-betas "${macos_installer_build}" application --application-name "Install %NAME%.app" "${mist_cache_option[@]}" >> "${INSTALLER_WORKFLOW_LOG}" 2>&1 &
 		download_macos_installer_mist_pid="$!"
 	fi
 	
