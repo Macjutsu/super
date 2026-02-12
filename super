@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-rc2"
+SUPER_VERSION="5.1.0-rc3"
 readonly SUPER_VERSION
-SUPER_DATE="2026/02/06"
+SUPER_DATE="2026/02/12"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -6452,8 +6452,11 @@ workflow_check_software_status() {
 			macos_installer_minor_updates_array=()
 			for macos_installer_item in "${macos_installers_array[@]}"; do
 				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item is: ${macos_installer_item}"
+				local macos_installer_item_version_normalized
+				macos_installer_item_version_normalized=$(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item_version_normalized is: ${macos_installer_item_version_normalized}"
 				[[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -gt $macos_version_major ]] && macos_installer_major_upgrades_array+=("${macos_installer_item}")
-				[[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq $macos_version_major ]] && macos_installer_minor_updates_array+=("${macos_installer_item}")
+				{ [[ $(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' -e 's/\..*//g') -eq $macos_version_major ]] && [[ $macos_installer_item_version_normalized -gt $macos_version_normalized ]]; } && macos_installer_minor_updates_array+=("${macos_installer_item}")
 			done
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_major_upgrades_array is:\n${macos_installer_major_upgrades_array[*]}"
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_minor_updates_array is:\n${macos_installer_minor_updates_array[*]}"
@@ -6593,6 +6596,7 @@ workflow_check_software_status() {
 			local mdmclient_macos_item_version_normalized
 			for mdmclient_macos_item in "${mdmclient_macos_msu_array[@]}"; do
 				mdmclient_macos_item_version_normalized=$(echo "${mdmclient_macos_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_item_version_normalized is: ${mdmclient_macos_item_version_normalized}"
 				[[ ${mdmclient_macos_item_version_normalized:0:2} -gt ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS major upgrade is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
 				[[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
 			done
@@ -6601,14 +6605,15 @@ workflow_check_software_status() {
 		#Log disallowed macOS installers.
 		if [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]] || [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
 			# Title:macOS Tahoe,Version:26.2,Build:25C56,Size:17389952037
-			local macos_installer_item_version_normalized
 			for macos_installer_item in "${macos_installer_major_upgrades_array[@]}"; do
 				macos_installer_item_version_normalized=$(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item_version_normalized is: ${macos_installer_item_version_normalized}"
 				{ { [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]]; } || { [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_msu_major_upgrade_target_version_normalized} ]]; } || { [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_installer_major_upgrade_target_version_normalized} ]]; }; } && log_super "Disallowed: macOS major upgrade installer is available but not allowed: $(echo "${macos_installer_item}" | awk -F ',' '{print $1 $2}' | sed -e 's/Title://' -e 's/Version:/ /')"
 			done
 			if [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]]; then
 				for macos_installer_item in "${macos_installer_minor_updates_array[@]}"; do
 					macos_installer_item_version_normalized=$(echo "${macos_installer_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_item_version_normalized is: ${macos_installer_item_version_normalized}"
 					{ { [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]]; } || { [[ "${macos_msu_minor_update_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_msu_minor_update_target_version_normalized} ]]; } || { [[ "${macos_installer_minor_update_target}" != "FALSE" ]] && [[ ${macos_installer_item_version_normalized} -gt ${macos_installer_minor_update_target_version_normalized} ]]; }; } && log_super "Disallowed: macOS minor update installer is available but not allowed: $(echo "${macos_installer_item}" | awk -F ',' '{print $1 $2}' | sed -e 's/Title://' -e 's/Version:/ /')"
 				done
 			fi
@@ -6617,6 +6622,7 @@ workflow_check_software_status() {
 			local mdmclient_macos_item_version_normalized
 			for mdmclient_macos_item in "${mdmclient_macos_installer_array[@]}"; do
 				mdmclient_macos_item_version_normalized=$(echo "${mdmclient_macos_item}" | awk -F ':' '{print $4}' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_item_version_normalized is: ${mdmclient_macos_item_version_normalized}"
 				[[ ${mdmclient_macos_item_version_normalized:0:2} -gt ${macos_version_major} ]] && { [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] || { [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] && [[ ${mdmclient_macos_item_version_normalized} -ne $(echo "${macos_installer_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]]; }; } && log_super "Disallowed: macOS major upgrade installer is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2 $3}' | sed -e 's/Title://' -e 's/Version:/ /')"
 				[[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && { [[ "${macos_installer_minor_update_target}" == "FALSE" ]] || { [[ "${macos_installer_minor_update_target}" != "FALSE" ]] && [[ ${mdmclient_macos_item_version_normalized} -ne $(echo "${macos_installer_major_upgrade_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]]; }; } && log_super "Disallowed: macOS minor update installer is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2 $3}' | sed -e 's/Title://' -e 's/Version:/ /')"
 			done

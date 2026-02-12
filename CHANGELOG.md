@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.1.0-rc2]
+## [5.1.0-rc3]
 
-2026-02-06
+2026-02-12
 
 ## Highlights (5.1.x)
 
@@ -32,17 +32,22 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-rc2/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-rc2/Super-Friends).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc3/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc3/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-rc3/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-rc3/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-rc3/Super-Friends).
 
 ### Known Issues (5.x)
 
 - The `super` workflow does not currently support Declarative Device Management (DDM) software update settings. You should continue to use traditional MDM configuration profiles to enforce software update settings.
 - There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-rc3)
+
+- Resolved an issue that was improperly identifying macOS minor update installations as workflow targets.
+- `super` [5.1.0-rc3 SHA-256: 2974649cea78109583005160f3d32489ba02b6cd63a9aea9e0e8dadeee8a075a](https://github.com/Macjutsu/super/blob/5.1.0-rc3/super.checksum.txt)
 
 ### Specific Changes (5.1.0-rc2)
 
@@ -61,6 +66,7 @@
 - Updated [spreadsheet (tab separated values) for migrating to `super` v5.1.0 managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
 - Updated ["All Options" example MDM configuration profile](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.mobileconfig).
 - Updated ["All Options" example MDM property list](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/All-Options-Example-DO-NOT-DEPLOY-com.macjutsu.super.plist).
+- Updated [Jamf Pro External Application Custom Schema for `super` v5.1.0](https://github.com/Macjutsu/super/blob/5.1.0-rc2/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).  (Huge thanks to @tonyyo11 for maintaining this!)
 - As always, typo fixes and improvements to both regular and verbose log output.
 - `super` [5.1.0-rc2 SHA-256: fdd0891117983d9864b6c6e79af1321acfbe07c8a53dfd0f19900c364d41a9f6](https://github.com/Macjutsu/super/blob/5.1.0-rc2/super.checksum.txt)
 
