@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.1.0-rc3]
+## [5.1.0-rc4]
 
-2026-02-12
+2026-02-20
 
 ## Highlights (5.1.x)
 
@@ -32,17 +32,28 @@
 - __Several `super` 4.x command line options and managed preferences are not compatible with `super` 5.x__
 - __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.x__
 - __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/5.1.0-rc3/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/5.1.0-rc3/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/5.1.0-rc3/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/5.1.0-rc3/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/5.1.0-rc3/Super-Friends).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-options-v5.1.0.tsv).
+- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/main/Example-MDM).
+- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends).
 
 ### Known Issues (5.x)
 
 - The `super` workflow does not currently support Declarative Device Management (DDM) software update settings. You should continue to use traditional MDM configuration profiles to enforce software update settings.
 - There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated against this version of `super`.
 - The [Jamf Pro new Managed Software Updates feature](https://learn.jamf.com/en-US/bundle/jamf-pro-documentation-current/page/Updating_macOS_Groups_Using_Beta_Managed_Software_Updates.html) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the mean time, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
+
+### Specific Changes (5.1.0-rc4)
+
+- Improved free storage space detection including failover methods courtesy of @ofirgalcon.
+- Resolved a variety of issues preventing the `--display-hide-progress-bar` option from working.
+- Resolved a variety of issues that caused parameter validation to fail if "X" was specified as a string in the `super` managed configuration profile.
+- Resolved an issue that was incorrectly decrementing deferral counts before macOS update/upgrades were downloaded.
+- Resolved an issue that caused inaccurate update discovery and targeting when the system was restarted outside of the `super` workflow.
+- Resolved an issue with causing inaccurate boolean values when using a temporary alternate configuration. (Thanks to @Tuttu for providing a solution to this issue!)
+- Resolved an issue causing validation errors for the `--scheduled-install-days` option. (Thanks to @jreeber and @jtwillbanks for providing solutions to this issue!)
+- `super` [5.1.0-rc4 SHA-256: 43a08d0c1ebb735688aca8e26b013b7f52310a16eef79375f30fdf1ca9edf775](https://github.com/Macjutsu/super/blob/5.1.0-rc4/super.checksum.txt)
 
 ### Specific Changes (5.1.0-rc3)
 
