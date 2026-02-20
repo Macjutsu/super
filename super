@@ -7,9 +7,9 @@
 # The next line disables specific ShellCheck codes (https://github.com/koalaman/shellcheck) for the entire script.
 # shellcheck disable=SC2012,SC2024,SC2207
 
-SUPER_VERSION="5.1.0-rc3"
+SUPER_VERSION="5.1.0-rc4"
 readonly SUPER_VERSION
-SUPER_DATE="2026/02/12"
+SUPER_DATE="2026/02/20"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -214,7 +214,7 @@ show_usage() {
   <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplaySilently</key>
   <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
-  <key>DisplayNotificationsCentered</key>
+  <key>DisplayHideProgressBar</key>
   <string>ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplayNotificationsCentered</key>
   <string>ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
@@ -954,7 +954,7 @@ get_options() {
 			display_silently_option="${1##*=}"
 			;;
 		--display-hide-progress-bar=*)
-			display_notifications_centered_option="${1##*=}"
+			display_hide_progress_bar_option="${1##*=}"
 			;;
 		--display-notifications-centered=*)
 			display_notifications_centered_option="${1##*=}"
@@ -1151,11 +1151,18 @@ delete_pref() {
 get_pref_managed() {
 	{ [[ "${config_edit_main_option}" == "TRUE" ]] || [[ -n "${config_edit_option}" ]] || [[ -n "${config_delete_option}" ]] || [[ "${config_delete_all_option}" == "TRUE" ]]; } && return 1
 	local preference_result
-	{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -n "${alternate_temporary_plist}" ]] && [[ "${config_temp_override}" == "TRUE" ]]; } && preference_result=$(defaults read "${super_alternate_plist}" "${1}" 2>/dev/null)
-	{ [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -z "${preference_result}" ]]; } && preference_result=$(defaults read "${SUPER_MANAGED_PLIST}" "${1}" 2>/dev/null)
+	local preference_source
+	if [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -n "${alternate_temporary_plist}" ]] && [[ "${config_temp_override}" == "TRUE" ]]; then
+		preference_result=$(defaults read "${super_alternate_plist}" "${1}" 2>/dev/null)
+		[[ -n "${preference_result}" ]] && preference_source="${super_alternate_plist}"
+	fi
+	if [[ -f "${SUPER_MANAGED_PLIST}.plist" ]] && [[ -z "${preference_result}" ]]; then
+		preference_result=$(defaults read "${SUPER_MANAGED_PLIST}" "${1}" 2>/dev/null)
+		[[ -n "${preference_result}" ]] && preference_source="${SUPER_MANAGED_PLIST}"
+	fi
 	if [[ -n "${preference_result}" ]]; then
 		local preference_type
-		preference_type=$(defaults read-type "${SUPER_MANAGED_PLIST}" "${1}" 2>/dev/null)
+		preference_type=$(defaults read-type "${preference_source}" "${1}" 2>/dev/null)
 		if [[ $(echo "${preference_type}" | grep -c 'boolean') -gt 0 ]]; then
 			{ [[ "${preference_result}" == "0" ]] || [[ "${preference_result}" == "FALSE" ]]; } && echo "FALSE" && return 0
 			{ [[ "${preference_result}" == "1" ]] || [[ "${preference_result}" == "TRUE" ]]; } && echo "TRUE" && return 0
@@ -1189,7 +1196,6 @@ get_pref() {
 get_config_code_signature(){
 	local codesign_verify_response
 	codesign_verify_response=$(codesign --verify -v "${1}" 2>&1)
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: codesign_verify_response: ${codesign_verify_response}"
 	[[ $(echo "${codesign_verify_response}" | grep -c 'not signed') -gt 0 ]] && echo -e "** UNSIGNED **" && return 0
 	[[ $(echo "${codesign_verify_response}" | grep -c 'invalid') -gt 0 ]] && echo -e "** INVALID CODE SIGNATURE **\n${codesign_verify_response}"  && return 0
 	[[ $(echo "${codesign_verify_response}" | grep -c 'valid') -gt 0 ]] && echo -e "** VALID CODE SIGNATURE **\n$(codesign --display -v "${1}" 2>&1)"
@@ -1515,8 +1521,9 @@ manage_parameter_options() {
 	
 	# Validate ${install_macos_minor_version_target_option} and if a valid set the ${install_macos_minor_version_target} parameter.
 	install_macos_minor_version_target=$(get_pref_managed "InstallMacOSMinorVersionTarget")
-	if [[ -z "${install_macos_minor_version_target}" ]] && [[ "${install_macos_minor_version_target_option}" == "X" ]]; then
+	if [[ "${install_macos_minor_version_target}" == "X" ]] || { [[ -z "${install_macos_minor_version_target}" ]] && [[ "${install_macos_minor_version_target_option}" == "X" ]]; }; then
 		delete_pref "InstallMacOSMinorVersionTarget"
+		unset install_macos_minor_version_target
 	elif [[ -z "${install_macos_minor_version_target}" ]] && [[ -n "${install_macos_minor_version_target_option}" ]]; then
 		install_macos_minor_version_target="${install_macos_minor_version_target_option}"
 		set_pref "InstallMacOSMinorVersionTarget" "${install_macos_minor_version_target}"
@@ -1549,8 +1556,9 @@ manage_parameter_options() {
 	
 	# Validate ${install_macos_major_version_target_option} and if a valid set the ${install_macos_major_version_target} parameter.
 	install_macos_major_version_target=$(get_pref_managed "InstallMacOSMajorVersionTarget")
-	if [[ -z "${install_macos_major_version_target}" ]] && [[ "${install_macos_major_version_target_option}" == "X" ]]; then
+	if [[ "${install_macos_major_version_target}" == "X" ]] || { [[ -z "${install_macos_major_version_target}" ]] && [[ "${install_macos_major_version_target_option}" == "X" ]]; }; then
 		delete_pref "InstallMacOSMajorVersionTarget"
+		unset install_macos_major_version_target
 	elif [[ -z "${install_macos_major_version_target}" ]] && [[ -n "${install_macos_major_version_target_option}" ]]; then
 		install_macos_major_version_target="${install_macos_major_version_target_option}"
 		set_pref "InstallMacOSMajorVersionTarget" "${install_macos_major_version_target}"
@@ -1605,8 +1613,9 @@ manage_parameter_options() {
 	
 	# Validate ${install_jamf_policy_triggers_option} and if a valid set the ${install_jamf_policy_triggers} parameter.
 	install_jamf_policy_triggers=$(get_pref_managed "InstallJamfPolicyTriggers")
-	if [[ -z "${install_jamf_policy_triggers}" ]] && [[ "${install_jamf_policy_triggers_option}" == "X" ]]; then
+	if [[ "${install_jamf_policy_triggers}" == "X" ]] || { [[ -z "${install_jamf_policy_triggers}" ]] && [[ "${install_jamf_policy_triggers_option}" == "X" ]]; }; then
 		delete_pref "InstallJamfPolicyTriggers"
+		unset install_jamf_policy_triggers
 	elif [[ -z "${install_jamf_policy_triggers}" ]] && [[ -n "${install_jamf_policy_triggers_option}" ]]; then
 		install_jamf_policy_triggers="${install_jamf_policy_triggers_option}"
 		set_pref "InstallJamfPolicyTriggers" "${install_jamf_policy_triggers}"
@@ -1660,8 +1669,9 @@ manage_parameter_options() {
 	
 	# Validate ${deferral_timer_default_option} input and if valid set the ${deferral_timer_minutes} parameter. If there is no ${deferral_timer_minutes} then set it to ${DEFERRAL_TIMER_DEFAULT_MINUTES}.
 	deferral_timer_minutes=$(get_pref_managed "DeferralTimerDefault")
-	if [[ -z $deferral_timer_minutes ]] && [[ "${deferral_timer_default_option}" == "X" ]]; then
+	if [[ "${deferral_timer_minutes}" == "X" ]] || { [[ -z $deferral_timer_minutes ]] && [[ "${deferral_timer_default_option}" == "X" ]]; }; then
 		delete_pref "DeferralTimerDefault"
+		unset deferral_timer_minutes
 	elif [[ -z $deferral_timer_minutes ]] && [[ -n "${deferral_timer_default_option}" ]]; then
 		deferral_timer_minutes="${deferral_timer_default_option}"
 		set_pref "DeferralTimerDefault" "${deferral_timer_minutes}"
@@ -1682,8 +1692,9 @@ manage_parameter_options() {
 	
 	# Validate ${deferral_timer_menu_option} input and if valid set the ${deferral_timer_menu_minutes} parameter.
 	deferral_timer_menu_minutes=$(get_pref_managed "DeferralTimerMenu")
-	if [[ -z "${deferral_timer_menu_minutes}" ]] && [[ "${deferral_timer_menu_option}" == "X" ]]; then
+	if [[ "${deferral_timer_menu_minutes}" == "X" ]] || { [[ -z "${deferral_timer_menu_minutes}" ]] && [[ "${deferral_timer_menu_option}" == "X" ]]; }; then
 		delete_pref "DeferralTimerMenu"
+		unset deferral_timer_menu_minutes
 	elif [[ -z "${deferral_timer_menu_minutes}" ]] && [[ -n "${deferral_timer_menu_option}" ]]; then
 		deferral_timer_menu_minutes="${deferral_timer_menu_option}"
 		set_pref "DeferralTimerMenu" "${deferral_timer_menu_minutes}"
@@ -1710,8 +1721,9 @@ manage_parameter_options() {
 	
 	# Validate ${deferral_timer_focus_option} input and if valid set the ${deferral_timer_focus_minutes} parameter. If there is no ${deferral_timer_focus_minutes} then set it to ${deferral_timer_minutes}.
 	deferral_timer_focus_minutes=$(get_pref_managed "DeferralTimerFocus")
-	if [[ -z $deferral_timer_focus_minutes ]] && [[ "${deferral_timer_focus_option}" == "X" ]]; then
+	if [[ "${deferral_timer_focus_minutes}" == "X" ]] || { [[ -z $deferral_timer_focus_minutes ]] && [[ "${deferral_timer_focus_option}" == "X" ]]; } then
 		delete_pref "DeferralTimerFocus"
+		unset deferral_timer_focus_minutes
 	elif [[ -z $deferral_timer_focus_minutes ]] && [[ -n "${deferral_timer_focus_option}" ]]; then
 		deferral_timer_focus_minutes="${deferral_timer_focus_option}"
 		set_pref "DeferralTimerFocus" "${deferral_timer_focus_minutes}"
@@ -1732,8 +1744,9 @@ manage_parameter_options() {
 	
 	# Validate ${deferral_timer_error_option} input and if valid set the ${deferral_timer_error_minutes} parameter. If there is no ${deferral_timer_error_minutes} then set it to ${deferral_timer_minutes}.
 	deferral_timer_error_minutes=$(get_pref_managed "DeferralTimerError")
-	if [[ -z $deferral_timer_error_minutes ]] && [[ "${deferral_timer_error_option}" == "X" ]]; then
+	if [[ "${deferral_timer_error_minutes}" == "X" ]] || { [[ -z $deferral_timer_error_minutes ]] && [[ "${deferral_timer_error_option}" == "X" ]]; }; then
 		delete_pref "DeferralTimerError"
+		unset deferral_timer_error_minutes
 	elif [[ -z $deferral_timer_error_minutes ]] && [[ -n "${deferral_timer_error_option}" ]]; then
 		deferral_timer_error_minutes="${deferral_timer_error_option}"
 		set_pref "DeferralTimerError" "${deferral_timer_error_minutes}"
@@ -1754,8 +1767,9 @@ manage_parameter_options() {
 	
 	# Validate ${deferral_timer_workflow_relaunch_option} input and if valid set the ${deferral_timer_workflow_relaunch_minutes} parameter. If there is no ${deferral_timer_workflow_relaunch_minutes} then set it to ${DEFERRAL_TIMER_WORKFLOW_RELAUNCH_DEFAULT_MINUTES}.
 	deferral_timer_workflow_relaunch_minutes=$(get_pref_managed "DeferralTimerWorkflowRelaunch")
-	if [[ -z $deferral_timer_workflow_relaunch_minutes ]] && [[ "${deferral_timer_workflow_relaunch_option}" == "X" ]]; then
+	if [[ "${deferral_timer_workflow_relaunch_minutes}" == "X" ]] || { [[ -z $deferral_timer_workflow_relaunch_minutes ]] && [[ "${deferral_timer_workflow_relaunch_option}" == "X" ]]; }; then
 		delete_pref "DeferralTimerWorkflowRelaunch"
+		unset deferral_timer_workflow_relaunch_minutes
 	elif [[ -z $deferral_timer_workflow_relaunch_minutes ]] && [[ -n "${deferral_timer_workflow_relaunch_option}" ]]; then
 		deferral_timer_workflow_relaunch_minutes="${deferral_timer_workflow_relaunch_option}"
 		set_pref "DeferralTimerWorkflowRelaunch" "${deferral_timer_workflow_relaunch_minutes}"
@@ -1776,8 +1790,9 @@ manage_parameter_options() {
 	
 	# Validate ${schedule_workflow_active_option} input and if valid set the ${schedule_workflow_active} parameter.
 	schedule_workflow_active=$(get_pref_managed "ScheduleWorkflowActive")
-	if [[ -z "${schedule_workflow_active}" ]] && [[ "${schedule_workflow_active_option}" == "X" ]]; then
+	if [[ "${schedule_workflow_active}" == "X" ]] || { [[ -z "${schedule_workflow_active}" ]] && [[ "${schedule_workflow_active_option}" == "X" ]]; }; then
 		delete_pref "ScheduleWorkflowActive"
+		unset schedule_workflow_active
 	elif [[ -z "${schedule_workflow_active}" ]] && [[ -n "${schedule_workflow_active_option}" ]]; then
 		schedule_workflow_active="${schedule_workflow_active_option}"
 		set_pref "ScheduleWorkflowActive" "${schedule_workflow_active}"
@@ -1798,8 +1813,9 @@ manage_parameter_options() {
 	
 	# Validate ${schedule_deferred_start_file_option} input and if valid set the ${schedule_deferred_start_file} parameter.
 	schedule_deferred_start_file=$(get_pref_managed "ScheduleDeferredStartFile")
-	if [[ -z "${schedule_deferred_start_file}" ]] && [[ "${schedule_deferred_start_file_option}" == "X" ]]; then
+	if [[ "${schedule_deferred_start_file}" == "X" ]] || { [[ -z "${schedule_deferred_start_file}" ]] && [[ "${schedule_deferred_start_file_option}" == "X" ]]; }; then
 		delete_pref "ScheduleDeferredStartFile"
+		unset schedule_deferred_start_file
 	elif [[ -z "${schedule_deferred_start_file}" ]] && [[ -n "${schedule_deferred_start_file_option}" ]]; then
 		schedule_deferred_start_file="${schedule_deferred_start_file_option}"
 		set_pref "ScheduleDeferredStartFile" "${schedule_deferred_start_file}"
@@ -1809,8 +1825,9 @@ manage_parameter_options() {
 	
 	# Validate ${schedule_deferred_start_days_option} input and if valid set the ${schedule_deferred_start_days} parameter.
 	schedule_deferred_start_days=$(get_pref_managed "ScheduleDeferredStartDays")
-	if [[ -z $schedule_deferred_start_days ]] && [[ "${schedule_deferred_start_days_option}" == "X" ]]; then
+	if [[ "${schedule_deferred_start_days}" == "X" ]] || { [[ -z $schedule_deferred_start_days ]] && [[ "${schedule_deferred_start_days_option}" == "X" ]]; }; then
 		delete_pref "ScheduleDeferredStartDays"
+		unset schedule_deferred_start_days
 	elif [[ -z $schedule_deferred_start_days ]] && [[ -n "${schedule_deferred_start_days_option}" ]]; then
 		schedule_deferred_start_days="${schedule_deferred_start_days_option}"
 		set_pref "ScheduleDeferredStartDays" "${schedule_deferred_start_days}"
@@ -1836,8 +1853,9 @@ manage_parameter_options() {
 	
 	# Validate ${schedule_zero_date_sofa_custom_url_option} input and if valid set the ${sofa_macos_url} parameter.  If there is no ${sofa_macos_url} then set it to ${SOFA_MACOS_DEFAULT_URL}.
 	sofa_macos_url=$(get_pref_managed "ScheduleZeroDateSOFACustomURL")
-	if [[ -z "${sofa_macos_url}" ]] && [[ "${schedule_zero_date_sofa_custom_url_option}" == "X" ]]; then
+	if [[ "${sofa_macos_url}" == "X" ]] || { [[ -z "${sofa_macos_url}" ]] && [[ "${schedule_zero_date_sofa_custom_url_option}" == "X" ]]; }; then
 		delete_pref "ScheduleZeroDateSOFACustomURL"
+		unset sofa_macos_url
 	elif [[ -z "${sofa_macos_url}" ]] && [[ -n "${schedule_zero_date_sofa_custom_url_option}" ]]; then
 		sofa_macos_url="${schedule_zero_date_sofa_custom_url_option}"
 		set_pref "ScheduleZeroDateSOFACustomURL" "${sofa_macos_url}"
@@ -1850,8 +1868,9 @@ manage_parameter_options() {
 	
 	# Validate ${schedule_zero_date_manual_option} input and if valid set the ${schedule_zero_date_manual} parameter.
 	schedule_zero_date_manual=$(get_pref_managed "ScheduleZeroDateManual")
-	if [[ -z "${schedule_zero_date_manual}" ]] && [[ "${schedule_zero_date_manual_option}" == "X" ]]; then
+	if [[ "${schedule_zero_date_manual}" == "X" ]] || { [[ -z "${schedule_zero_date_manual}" ]] && [[ "${schedule_zero_date_manual_option}" == "X" ]]; }; then
 		delete_pref "ScheduleZeroDateManual"
+		unset schedule_zero_date_manual
 	elif [[ -z "${schedule_zero_date_manual}" ]] && [[ -n "${schedule_zero_date_manual_option}" ]]; then
 		schedule_zero_date_manual="${schedule_zero_date_manual_option}"
 		set_pref "ScheduleZeroDateManual" "${schedule_zero_date_manual}"
@@ -1893,20 +1912,21 @@ manage_parameter_options() {
 	
 	# Validate ${scheduled_install_days_option} input and if valid set the ${scheduled_install_days} parameter.
 	scheduled_install_days=$(get_pref_managed "ScheduledInstallDays")
-	if [[ -z "${scheduled_install_days}" ]] && [[ "${scheduled_install_days_option}" == "X" ]]; then
+	if [[ "${scheduled_install_days}" == "X" ]] || { [[ -z "${scheduled_install_days}" ]] && [[ "${scheduled_install_days_option}" == "X" ]]; }; then
 		delete_pref "ScheduledInstallDays"
+		unset scheduled_install_days
 	elif [[ -z "${scheduled_install_days}" ]] && [[ -n "${scheduled_install_days_option}" ]]; then
 		scheduled_install_days="${scheduled_install_days_option}"
 		set_pref "ScheduledInstallDays" "${scheduled_install_days}"
 	fi
 	[[ -z "${scheduled_install_days}" ]] && scheduled_install_days=$(get_pref "ScheduledInstallDays")
-	{ [[ -n "${scheduled_install_days}" ]] && [[ ! "${scheduled_install_days_option}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --scheduled-install-days=number value must only be a number." && parameter_error="TRUE"
+	{ [[ -n "${scheduled_install_days}" ]] && [[ ! "${scheduled_install_days}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --scheduled-install-days=number value must only be a number." && parameter_error="TRUE"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${scheduled_install_days}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_days is: ${scheduled_install_days}"
 	
 	# Validate ${scheduled_install_date_option} input and if valid set the ${scheduled_install_date} parameter.
 	scheduled_install_date=$(get_pref_managed "ScheduledInstallDate")
-	if [[ -z "${scheduled_install_date}" ]] && [[ "${scheduled_install_date_option}" == "X" ]]; then
-		delete_pref "ScheduledInstallDate"
+	if [[ "${scheduled_install_date}" == "X" ]] || { [[ -z "${scheduled_install_date}" ]] && [[ "${scheduled_install_date_option}" == "X" ]]; }; then
+		delete_pref "scheduled_install_date"
 	elif [[ -z "${scheduled_install_date}" ]] && [[ -n "${scheduled_install_date_option}" ]]; then
 		scheduled_install_date="${scheduled_install_date_option}"
 		set_pref "ScheduledInstallDate" "${scheduled_install_date}"
@@ -1961,8 +1981,9 @@ manage_parameter_options() {
 	
 	# Validate ${scheduled_install_reminder_option} input and if valid set the ${scheduled_install_reminder_minutes} parameter.
 	scheduled_install_reminder_minutes=$(get_pref_managed "ScheduledInstallReminder")
-	if [[ -z "${scheduled_install_reminder_minutes}" ]] && [[ "${scheduled_install_reminder_option}" == "X" ]]; then
+	if [[ "${scheduled_install_reminder_minutes}" == "X" ]] || { [[ -z "${scheduled_install_reminder_minutes}" ]] && [[ "${scheduled_install_reminder_option}" == "X" ]]; }; then
 		delete_pref "ScheduledInstallReminder"
+		unset scheduled_install_reminder_minutes
 	elif [[ -z "${scheduled_install_reminder_minutes}" ]] && [[ -n "${scheduled_install_reminder_option}" ]]; then
 		scheduled_install_reminder_minutes="${scheduled_install_reminder_option}"
 		set_pref "ScheduledInstallReminder" "${scheduled_install_reminder_minutes}"
@@ -1990,8 +2011,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_count_focus_option} input and if valid set the ${deadline_count_focus} parameter.
 	deadline_count_focus=$(get_pref_managed "DeadlineCountFocus")
-	if [[ -z "${deadline_count_focus}" ]] && [[ "${deadline_count_focus_option}" == "X" ]]; then
+	if [[ "${deadline_count_focus}" == "X" ]] || { [[ -z "${deadline_count_focus}" ]] && [[ "${deadline_count_focus_option}" == "X" ]]; }; then
 		delete_pref "DeadlineCountFocus"
+		unset deadline_count_focus
 	elif [[ -z "${deadline_count_focus}" ]] && [[ -n "${deadline_count_focus_option}" ]]; then
 		deadline_count_focus="${deadline_count_focus_option}"
 		set_pref "DeadlineCountFocus" "${deadline_count_focus}"
@@ -2002,8 +2024,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_count_soft_option} input and if valid set the ${deadline_count_soft} parameter.
 	deadline_count_soft=$(get_pref_managed "DeadlineCountSoft")
-	if [[ -z "${deadline_count_soft}" ]] && [[ "${deadline_count_soft_option}" == "X" ]]; then
+	if [[ "${deadline_count_soft}" == "X" ]] || { [[ -z "${deadline_count_soft}" ]] && [[ "${deadline_count_soft_option}" == "X" ]]; }; then
 		delete_pref "DeadlineCountSoft"
+		unset deadline_count_soft
 	elif [[ -z "${deadline_count_soft}" ]] && [[ -n "${deadline_count_soft_option}" ]]; then
 		deadline_count_soft="${deadline_count_soft_option}"
 		set_pref "DeadlineCountSoft" "${deadline_count_soft}"
@@ -2014,8 +2037,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_count_hard_option} input and if valid set the ${deadline_count_hard} parameter.
 	deadline_count_hard=$(get_pref_managed "DeadlineCountHard")
-	if [[ -z "${deadline_count_hard}" ]] && [[ "${deadline_count_hard_option}" == "X" ]]; then
+	if [[ "${deadline_count_hard}" == "X" ]] || { [[ -z "${deadline_count_hard}" ]] && [[ "${deadline_count_hard_option}" == "X" ]]; }; then
 		delete_pref "DeadlineCountHard"
+		unset deadline_count_hard
 	elif [[ -z "${deadline_count_hard}" ]] && [[ -n "${deadline_count_hard_option}" ]]; then
 		deadline_count_hard="${deadline_count_hard_option}"
 		set_pref "DeadlineCountHard" "${deadline_count_hard}"
@@ -2027,8 +2051,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_days_focus_option} input and if valid set the ${deadline_days_focus} parameter.
 	deadline_days_focus=$(get_pref_managed "DeadlineDaysFocus")
-	if [[ -z "${deadline_days_focus}" ]] && [[ "${deadline_days_focus_option}" == "X" ]]; then
+	if [[ "${deadline_days_focus}" == "X" ]] || { [[ -z "${deadline_days_focus}" ]] && [[ "${deadline_days_focus_option}" == "X" ]]; }; then
 		delete_pref "DeadlineDaysFocus"
+		unset deadline_days_focus
 	elif [[ -z "${deadline_days_focus}" ]] && [[ -n "${deadline_days_focus_option}" ]]; then
 		deadline_days_focus="${deadline_days_focus_option}"
 		set_pref "DeadlineDaysFocus" "${deadline_days_focus}"
@@ -2039,8 +2064,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_days_soft_option} input and if valid set the ${deadline_days_soft} parameter.
 	deadline_days_soft=$(get_pref_managed "DeadlineDaysSoft")
-	if [[ -z "${deadline_days_soft}" ]] && [[ "${deadline_days_soft_option}" == "X" ]]; then
+	if [[ "${deadline_days_soft}" == "X" ]] || { [[ -z "${deadline_days_soft}" ]] && [[ "${deadline_days_soft_option}" == "X" ]]; }; then
 		delete_pref "DeadlineDaysSoft"
+		unset deadline_days_soft
 	elif [[ -z "${deadline_days_soft}" ]] && [[ -n "${deadline_days_soft_option}" ]]; then
 		deadline_days_soft="${deadline_days_soft_option}"
 		set_pref "DeadlineDaysSoft" "${deadline_days_soft}"
@@ -2051,8 +2077,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_days_hard_option} input and if valid set the ${deadline_days_hard} parameter.
 	deadline_days_hard=$(get_pref_managed "DeadlineDaysHard")
-	if [[ -z "${deadline_days_hard}" ]] && [[ "${deadline_days_hard_option}" == "X" ]]; then
+	if [[ "${deadline_days_hard}" == "X" ]] || { [[ -z "${deadline_days_hard}" ]] && [[ "${deadline_days_hard_option}" == "X" ]]; }; then
 		delete_pref "DeadlineDaysHard"
+		unset deadline_days_hard
 	elif [[ -z "${deadline_days_hard}" ]] && [[ -n "${deadline_days_hard_option}" ]]; then
 		deadline_days_hard="${deadline_days_hard_option}"
 		set_pref "DeadlineDaysHard" "${deadline_days_hard}"
@@ -2072,8 +2099,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_date_focus_option} input and if valid set the ${deadline_date_focus} and ${deadline_date_focus_epoch} parameters.
 	deadline_date_focus=$(get_pref_managed "DeadlineDateFocus")
-	if [[ -z "${deadline_date_focus}" ]] && [[ "${deadline_date_focus_option}" == "X" ]]; then
+	if [[ "${deadline_date_focus}" == "X" ]] || { [[ -z "${deadline_date_focus}" ]] && [[ "${deadline_date_focus_option}" == "X" ]]; }; then
 		delete_pref "DeadlineDateFocus"
+		unset deadline_date_focus
 	elif [[ -z "${deadline_date_focus}" ]] && [[ -n "${deadline_date_focus_option}" ]]; then
 		deadline_date_focus="${deadline_date_focus_option}"
 		set_pref "DeadlineDateFocus" "${deadline_date_focus}"
@@ -2115,8 +2143,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_date_soft_option} input and if valid set the ${deadline_date_soft} and ${deadline_date_soft_epoch} parameters.
 	deadline_date_soft=$(get_pref_managed "DeadlineDateSoft")
-	if [[ -z "${deadline_date_soft}" ]] && [[ "${deadline_date_soft_option}" == "X" ]]; then
+	if [[ "${deadline_date_soft}" == "X" ]] || { [[ -z "${deadline_date_soft}" ]] && [[ "${deadline_date_soft_option}" == "X" ]]; }; then
 		delete_pref "DeadlineDateSoft"
+		unset deadline_date_soft
 	elif [[ -z "${deadline_date_soft}" ]] && [[ -n "${deadline_date_soft_option}" ]]; then
 		deadline_date_soft="${deadline_date_soft_option}"
 		set_pref "DeadlineDateSoft" "${deadline_date_soft}"
@@ -2158,8 +2187,9 @@ manage_parameter_options() {
 	
 	# Validate ${deadline_date_hard_option} input and if valid set the ${deadline_date_hard} and ${deadline_date_hard_epoch} parameters.
 	deadline_date_hard=$(get_pref_managed "DeadlineDateHard")
-	if [[ -z "${deadline_date_hard}" ]] && [[ "${deadline_date_hard_option}" == "X" ]]; then
+	if [[ "${deadline_date_hard}" == "X" ]] || { [[ -z "${deadline_date_hard}" ]] && [[ "${deadline_date_hard_option}" == "X" ]]; }; then
 		delete_pref "DeadlineDateHard"
+		unset deadline_date_hard
 	elif [[ -z "${deadline_date_hard}" ]] && [[ -n "${deadline_date_hard_option}" ]]; then
 		deadline_date_hard="${deadline_date_hard_option}"
 		set_pref "DeadlineDateHard" "${deadline_date_hard}"
@@ -2212,8 +2242,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_default_option} input and if valid set the ${dialog_timeout_default_seconds} parameter.
 	dialog_timeout_default_seconds=$(get_pref_managed "DialogTimeoutDefault")
-	if [[ -z $dialog_timeout_default_seconds ]] && [[ "${dialog_timeout_default_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_default_seconds}" == "X" ]] || { [[ -z $dialog_timeout_default_seconds ]] && [[ "${dialog_timeout_default_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutDefault"
+		unset dialog_timeout_default_seconds
 	elif [[ -z $dialog_timeout_default_seconds ]] && [[ -n "${dialog_timeout_default_option}" ]]; then
 		dialog_timeout_default_seconds="${dialog_timeout_default_option}"
 		set_pref "DialogTimeoutDefault" "${dialog_timeout_default_seconds}"
@@ -2233,8 +2264,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_user_auth_option} input and if valid set the ${dialog_timeout_user_auth_seconds} parameter.
 	dialog_timeout_user_auth_seconds=$(get_pref_managed "DialogTimeoutUserAuth")
-	if [[ -z $dialog_timeout_user_auth_seconds ]] && [[ "${dialog_timeout_user_auth_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_user_auth_seconds}" == "X" ]] || { [[ -z $dialog_timeout_user_auth_seconds ]] && [[ "${dialog_timeout_user_auth_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutUserAuth"
+		unset dialog_timeout_user_auth_seconds
 	elif [[ -z $dialog_timeout_user_auth_seconds ]] && [[ -n "${dialog_timeout_user_auth_option}" ]]; then
 		dialog_timeout_user_auth_seconds="${dialog_timeout_user_auth_option}"
 		set_pref "DialogTimeoutUserAuth" "${dialog_timeout_user_auth_seconds}"
@@ -2254,8 +2286,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_user_choice_option} input and if valid set the ${dialog_timeout_user_choice_seconds} parameter.
 	dialog_timeout_user_choice_seconds=$(get_pref_managed "DialogTimeoutUserChoice")
-	if [[ -z $dialog_timeout_user_choice_seconds ]] && [[ "${dialog_timeout_user_choice_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_user_choice_seconds}" == "X" ]] || { [[ -z $dialog_timeout_user_choice_seconds ]] && [[ "${dialog_timeout_user_choice_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutUserChoice"
+		unset dialog_timeout_user_choice_seconds
 	elif [[ -z $dialog_timeout_user_choice_seconds ]] && [[ -n "${dialog_timeout_user_choice_option}" ]]; then
 		dialog_timeout_user_choice_seconds="${dialog_timeout_user_choice_option}"
 		set_pref "DialogTimeoutUserChoice" "${dialog_timeout_user_choice_seconds}"
@@ -2275,8 +2308,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_user_schedule_option} input and if valid set the ${dialog_timeout_user_schedule_seconds} parameter.
 	dialog_timeout_user_schedule_seconds=$(get_pref_managed "DialogTimeoutUserSchedule")
-	if [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ "${dialog_timeout_user_schedule_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_user_schedule_seconds}" == "X" ]] || { [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ "${dialog_timeout_user_schedule_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutUserSchedule"
+		unset dialog_timeout_user_schedule_seconds
 	elif [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n "${dialog_timeout_user_schedule_option}" ]]; then
 		dialog_timeout_user_schedule_seconds="${dialog_timeout_user_schedule_option}"
 		set_pref "DialogTimeoutUserSchedule" "${dialog_timeout_user_schedule_seconds}"
@@ -2296,8 +2330,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_soft_deadline_option} input and if valid set the ${dialog_timeout_soft_deadline_seconds} parameter.
 	dialog_timeout_soft_deadline_seconds=$(get_pref_managed "DialogTimeoutSoftDeadline")
-	if [[ -z $dialog_timeout_soft_deadline_seconds ]] && [[ "${dialog_timeout_soft_deadline_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_soft_deadline_seconds}" == "X" ]] || { [[ -z $dialog_timeout_soft_deadline_seconds ]] && [[ "${dialog_timeout_soft_deadline_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutSoftDeadline"
+		unset dialog_timeout_soft_deadline_seconds
 	elif [[ -z $dialog_timeout_soft_deadline_seconds ]] && [[ -n "${dialog_timeout_soft_deadline_option}" ]]; then
 		dialog_timeout_soft_deadline_seconds="${dialog_timeout_soft_deadline_option}"
 		set_pref "DialogTimeoutSoftDeadline" "${dialog_timeout_soft_deadline_seconds}"
@@ -2317,8 +2352,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_insufficient_storage_option} input and if valid set the ${dialog_timeout_insufficient_storage_seconds} parameter.
 	dialog_timeout_insufficient_storage_seconds=$(get_pref_managed "DialogTimeoutInsufficientStorage")
-	if [[ -z $dialog_timeout_insufficient_storage_seconds ]] && [[ "${dialog_timeout_insufficient_storage_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_insufficient_storage_seconds}" == "X" ]] || { [[ -z $dialog_timeout_insufficient_storage_seconds ]] && [[ "${dialog_timeout_insufficient_storage_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutInsufficientStorage"
+		unset dialog_timeout_insufficient_storage_seconds
 	elif [[ -z $dialog_timeout_insufficient_storage_seconds ]] && [[ -n "${dialog_timeout_insufficient_storage_option}" ]]; then
 		dialog_timeout_insufficient_storage_seconds="${dialog_timeout_insufficient_storage_option}"
 		set_pref "DialogTimeoutInsufficientStorage" "${dialog_timeout_insufficient_storage_seconds}"
@@ -2338,8 +2374,9 @@ manage_parameter_options() {
 	
 	# Validate ${dialog_timeout_power_required_option} input and if valid set the ${dialog_timeout_power_required_seconds} parameter.
 	dialog_timeout_power_required_seconds=$(get_pref_managed "DialogTimeoutPowerRequired")
-	if [[ -z $dialog_timeout_power_required_seconds ]] && [[ "${dialog_timeout_power_required_option}" == "X" ]]; then
+	if [[ "${dialog_timeout_power_required_seconds}" == "X" ]] || { [[ -z $dialog_timeout_power_required_seconds ]] && [[ "${dialog_timeout_power_required_option}" == "X" ]]; }; then
 		delete_pref "DialogTimeoutPowerRequired"
+		unset dialog_timeout_power_required_seconds
 	elif [[ -z $dialog_timeout_power_required_seconds ]] && [[ -n "${dialog_timeout_power_required_option}" ]]; then
 		dialog_timeout_power_required_seconds="${dialog_timeout_power_required_option}"
 		set_pref "DialogTimeoutPowerRequired" "${dialog_timeout_power_required_seconds}"
@@ -2359,8 +2396,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_unmovable_option} input and if valid set the ${display_unmovable} parameter.
 	display_unmovable=$(get_pref_managed "DisplayUnmovable")
-	if [[ -z "${display_unmovable}" ]] && [[ "${display_unmovable_option}" == "X" ]]; then
+	if [[ "${display_unmovable}" == "X" ]] || { [[ -z "${display_unmovable}" ]] && [[ "${display_unmovable_option}" == "X" ]]; }; then
 		delete_pref "DisplayUnmovable"
+		unset display_unmovable
 	elif [[ -z "${display_unmovable}" ]] && [[ -n "${display_unmovable_option}" ]]; then
 		display_unmovable="${display_unmovable_option}"
 		set_pref "DisplayUnmovable" "${display_unmovable}"
@@ -2382,8 +2420,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_hide_background_option} input and if valid set the ${display_hide_background} parameter.
 	display_hide_background=$(get_pref_managed "DisplayHideBackground")
-	if [[ -z "${display_hide_background}" ]] && [[ "${display_hide_background_option}" == "X" ]]; then
+	if [[ "${display_hide_background}" == "X" ]] || { [[ -z "${display_hide_background}" ]] && [[ "${display_hide_background_option}" == "X" ]]; }; then
 		delete_pref "DisplayHideBackground"
+		unset display_hide_background
 	elif [[ -z "${display_hide_background}" ]] && [[ -n "${display_hide_background_option}" ]]; then
 		display_hide_background="${display_hide_background_option}"
 		set_pref "DisplayHideBackground" "${display_hide_background}"
@@ -2405,8 +2444,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_silently_option} input and if valid set the ${display_silently} parameter.
 	display_silently=$(get_pref_managed "DisplaySilently")
-	if [[ -z "${display_silently}" ]] && [[ "${display_silently_option}" == "X" ]]; then
+	if [[ "${display_silently}" == "X" ]] || { [[ -z "${display_silently}" ]] && [[ "${display_silently_option}" == "X" ]]; }; then
 		delete_pref "DisplaySilently"
+		unset display_silently
 	elif [[ -z "${display_silently}" ]] && [[ -n "${display_silently_option}" ]]; then
 		display_silently="${display_silently_option}"
 		set_pref "DisplaySilently" "${display_silently}"
@@ -2426,33 +2466,35 @@ manage_parameter_options() {
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_silently}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_silently is: ${display_silently}"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_silently_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_silently_status is: ${display_silently_status}"
 	
-	# Validate ${display_notifications_centered_option} input and if valid set the ${display_notifications_centered} parameter.
-	display_notifications_centered=$(get_pref_managed "DisplayNotificationsCentered")
-	if [[ -z "${display_notifications_centered}" ]] && [[ "${display_notifications_centered_option}" == "X" ]]; then
-		delete_pref "DisplayNotificationsCentered"
-	elif [[ -z "${display_notifications_centered}" ]] && [[ -n "${display_notifications_centered_option}" ]]; then
-		display_notifications_centered="${display_notifications_centered_option}"
-		set_pref "DisplayNotificationsCentered" "${display_notifications_centered}"
+	# Validate ${display_hide_progress_bar_option} input and if valid set the ${display_hide_progress_bar} parameter.
+	display_hide_progress_bar=$(get_pref_managed "DisplayHideProgressBar")
+	if [[ "${display_hide_progress_bar}" == "X" ]] || { [[ -z "${display_hide_progress_bar}" ]] && [[ "${display_hide_progress_bar_option}" == "X" ]]; }; then
+		delete_pref "DisplayHideProgressBar"
+		unset display_hide_progress_bar
+	elif [[ -z "${display_hide_progress_bar}" ]] && [[ -n "${display_hide_progress_bar_option}" ]]; then
+		display_hide_progress_bar="${display_hide_progress_bar_option}"
+		set_pref "DisplayHideProgressBar" "${display_hide_progress_bar}"
 	fi
-	[[ -z "${display_notifications_centered}" ]] && display_notifications_centered=$(get_pref "DisplayNotificationsCentered")
-	if [[ -n "${display_notifications_centered}" ]]; then
+	[[ -z "${display_hide_progress_bar}" ]] && display_hide_progress_bar=$(get_pref "DisplayHideProgressBar")
+	if [[ -n "${display_hide_progress_bar}" ]]; then
 		previous_ifs="${IFS}"
 		IFS=','
-		local display_notifications_centered_array
-		read -r -a display_notifications_centered_array <<<"${display_notifications_centered}"
-		for option_type in "${display_notifications_centered_array[@]}"; do
+		local display_hide_progress_bar_array
+		read -r -a display_hide_progress_bar_array <<<"${display_hide_progress_bar}"
+		for option_type in "${display_hide_progress_bar_array[@]}"; do
 			{ [[ ! "${option_type}" =~ ${REGEX_WORKFLOW_OPTIONS} ]]; } && log_super "Parameter Error: Unrecognized --display-hide-progress-bar type of ${option_type}. You can only specify the following types separated by commas (no spaces): ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR" && parameter_error="TRUE"
 		done
 		IFS="${previous_ifs}"
-		[[ $(echo "${display_notifications_centered}" | grep -c 'ALWAYS') -gt 0 ]] && display_notifications_centered_status="TRUE"
+		[[ $(echo "${display_hide_progress_bar}" | grep -c 'ALWAYS') -gt 0 ]] && display_hide_progress_bar_status="TRUE"
 	fi
-	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_notifications_centered}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_notifications_centered is: ${display_notifications_centered}"
-	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_notifications_centered_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_notifications_centered_status is: ${display_notifications_centered_status}"
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_hide_progress_bar}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_hide_progress_bar is: ${display_hide_progress_bar}"
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_hide_progress_bar_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_hide_progress_bar_status is: ${display_hide_progress_bar_status}"
 	
 	# Validate ${display_notifications_centered_option} input and if valid set the ${display_notifications_centered} parameter.
 	display_notifications_centered=$(get_pref_managed "DisplayNotificationsCentered")
-	if [[ -z "${display_notifications_centered}" ]] && [[ "${display_notifications_centered_option}" == "X" ]]; then
+	if [[ "${display_notifications_centered}" == "X" ]] || { [[ -z "${display_notifications_centered}" ]] && [[ "${display_notifications_centered_option}" == "X" ]]; }; then
 		delete_pref "DisplayNotificationsCentered"
+		unset display_notifications_centered
 	elif [[ -z "${display_notifications_centered}" ]] && [[ -n "${display_notifications_centered_option}" ]]; then
 		display_notifications_centered="${display_notifications_centered_option}"
 		set_pref "DisplayNotificationsCentered" "${display_notifications_centered}"
@@ -2474,8 +2516,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_icon_size_option} input and if valid set the ${display_icon_size} parameter. If there is no ${display_icon_size} then set it to ${DISPLAY_ICON_DEFAULT_SIZE}.
 	display_icon_size=$(get_pref_managed "DisplayIconSize")
-	if [[ -z $display_icon_size ]] && [[ "${display_icon_size_option}" == "X" ]]; then
+	if [[ "${display_icon_size}" == "X" ]] || { [[ -z $display_icon_size ]] && [[ "${display_icon_size_option}" == "X" ]]; }; then
 		delete_pref "DisplayIconSize"
+		unset display_icon_size
 	elif [[ -z $display_icon_size ]] && [[ -n "${display_icon_size_option}" ]]; then
 		display_icon_size="${display_icon_size_option}"
 		set_pref "DisplayIconSize" "${display_icon_size}"
@@ -2496,10 +2539,13 @@ manage_parameter_options() {
 	
 	# Validate ${display_icon_file_option} input and if valid set the ${display_icon_file_path} parameter.  If there is no ${display_icon_file_path} then set it to ${DISPLAY_ICON_DEFAULT_FILE}.
 	display_icon_file_path=$(get_pref_managed "DisplayIconFile")
-	if [[ -z "${display_icon_file_path}" ]] && [[ "${display_icon_file_option}" == "X" ]]; then
+	if [[ "${display_icon_file_path}" == "X" ]] || { [[ -z "${display_icon_file_path}" ]] && [[ "${display_icon_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayIconFile"
 		delete_pref "DisplayIconLightFileCachedOrigin"
 		delete_pref "DisplayIconDarkFileCachedOrigin"
+		unset display_icon_file_path
+		unset display_icon_light_file_cached_origin
+		unset display_icon_dark_file_cached_origin
 	elif [[ -z "${display_icon_file_path}" ]] && [[ -n "${display_icon_file_option}" ]]; then
 		display_icon_file_path="${display_icon_file_option}"
 		set_pref "DisplayIconFile" "${display_icon_file_path}"
@@ -2510,9 +2556,11 @@ manage_parameter_options() {
 	
 	# Validate ${display_icon_light_file_option} input and if valid set the ${display_icon_light_file_path} parameter.  If there is no ${display_icon_light_file_path} then set it to ${display_icon_file_path}.
 	display_icon_light_file_path=$(get_pref_managed "DisplayIconLightFile")
-	if [[ -z "${display_icon_light_file_path}" ]] && [[ "${display_icon_light_file_option}" == "X" ]]; then
+	if [[ "${display_icon_light_file_path}" == "X" ]] || { [[ -z "${display_icon_light_file_path}" ]] && [[ "${display_icon_light_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayIconLightFile"
 		delete_pref "DisplayIconLightFileCachedOrigin"
+		unset display_icon_light_file_path
+		unset display_icon_light_file_cached_origin
 	elif [[ -z "${display_icon_light_file_path}" ]] && [[ -n "${display_icon_light_file_option}" ]]; then
 		display_icon_light_file_path="${display_icon_light_file_option}"
 		set_pref "DisplayIconLightFile" "${display_icon_light_file_path}"
@@ -2523,9 +2571,11 @@ manage_parameter_options() {
 	
 	# Validate ${display_icon_dark_file_option} input and if valid set the ${display_icon_dark_file_path} parameter.  If there is no ${display_icon_dark_file_path} then set it to ${display_icon_file_path}.
 	display_icon_dark_file_path=$(get_pref_managed "DisplayIconDarkFile")
-	if [[ -z "${display_icon_dark_file_path}" ]] && [[ "${display_icon_dark_file_option}" == "X" ]]; then
+	if [[ "${display_icon_dark_file_path}" == "X" ]] || { [[ -z "${display_icon_dark_file_path}" ]] && [[ "${display_icon_dark_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayIconDarkFile"
 		delete_pref "DisplayIconDarkFileCachedOrigin"
+		unset display_icon_dark_file_path
+		unset display_icon_dark_file_cached_origin
 	elif [[ -z "${display_icon_dark_file_path}" ]] && [[ -n "${display_icon_dark_file_option}" ]]; then
 		display_icon_dark_file_path="${display_icon_dark_file_option}"
 		set_pref "DisplayIconDarkFile" "${display_icon_dark_file_path}"
@@ -2536,8 +2586,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_type_option} input and if valid set the ${display_accessory_type} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_type=$(get_pref_managed "DisplayAccessoryType")
-	if [[ -z "${display_accessory_type}" ]] && [[ "${display_accessory_type_option}" == "X" ]]; then
+	if [[ "${display_accessory_type}" == "X" ]] || { [[ -z "${display_accessory_type}" ]] && [[ "${display_accessory_type_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryType"
+		unset display_accessory_type
 	elif [[ -z "${display_accessory_type}" ]] && [[ -n "${display_accessory_type_option}" ]]; then
 		display_accessory_type="${display_accessory_type_option}"
 		set_pref "DisplayAccessoryType" "${display_accessory_type}"
@@ -2548,8 +2599,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_default_file_option} input and if valid set the ${display_accessory_default} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_default=$(get_pref_managed "DisplayAccessoryDefaultFile")
-	if [[ -z "${display_accessory_default}" ]] && [[ "${display_accessory_default_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_default}" == "X" ]] || { [[ -z "${display_accessory_default}" ]] && [[ "${display_accessory_default_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryDefaultFile"
+		unset display_accessory_default
 	elif [[ -z "${display_accessory_default}" ]] && [[ -n "${display_accessory_default_file_option}" ]]; then
 		display_accessory_default="${display_accessory_default_file_option}"
 		set_pref "DisplayAccessoryDefaultFile" "${display_accessory_default}"
@@ -2559,8 +2611,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_macos_minor_update_file_option} input and if valid set the ${display_accessory_macos_minor_update} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_macos_minor_update=$(get_pref_managed "DisplayAccessoryMacOSMinorUpdateFile")
-	if [[ -z "${display_accessory_macos_minor_update}" ]] && [[ "${display_accessory_macos_minor_update_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_macos_minor_update}" == "X" ]] || { [[ -z "${display_accessory_macos_minor_update}" ]] && [[ "${display_accessory_macos_minor_update_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryMacOSMinorUpdateFile"
+		unset display_accessory_macos_minor_update
 	elif [[ -z "${display_accessory_macos_minor_update}" ]] && [[ -n "${display_accessory_macos_minor_update_file_option}" ]]; then
 		display_accessory_macos_minor_update="${display_accessory_macos_minor_update_file_option}"
 		set_pref "DisplayAccessoryMacOSMinorUpdateFile" "${display_accessory_macos_minor_update}"
@@ -2570,8 +2623,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_macos_major_upgrade_file_option} input and if valid set the ${display_accessory_macos_major_upgrade} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_macos_major_upgrade=$(get_pref_managed "DisplayAccessoryMacOSMajorUpgradeFile")
-	if [[ -z "${display_accessory_macos_major_upgrade}" ]] && [[ "${display_accessory_macos_major_upgrade_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_macos_major_upgrade}" == "X" ]] || { [[ -z "${display_accessory_macos_major_upgrade}" ]] && [[ "${display_accessory_macos_major_upgrade_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryMacOSMajorUpgradeFile"
+		unset display_accessory_macos_major_upgrade
 	elif [[ -z "${display_accessory_macos_major_upgrade}" ]] && [[ -n "${display_accessory_macos_major_upgrade_file_option}" ]]; then
 		display_accessory_macos_major_upgrade="${display_accessory_macos_major_upgrade_file_option}"
 		set_pref "DisplayAccessoryMacOSMajorUpgradeFile" "${display_accessory_macos_major_upgrade}"
@@ -2581,8 +2635,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_non_system_updates_file_option} input and if valid set the ${display_accessory_non_system_updates} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_non_system_updates=$(get_pref_managed "DisplayAccessoryNonSystemUpdatesFile")
-	if [[ -z "${display_accessory_non_system_updates}" ]] && [[ "${display_accessory_non_system_updates_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_non_system_updates}" == "X" ]] || { [[ -z "${display_accessory_non_system_updates}" ]] && [[ "${display_accessory_non_system_updates_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryNonSystemUpdatesFile"
+		unset display_accessory_non_system_updates
 	elif [[ -z "${display_accessory_non_system_updates}" ]] && [[ -n "${display_accessory_non_system_updates_file_option}" ]]; then
 		display_accessory_non_system_updates="${display_accessory_non_system_updates_file_option}"
 		set_pref "DisplayAccessoryNonSystemUpdatesFile" "${display_accessory_non_system_updates}"
@@ -2592,8 +2647,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_safari_update_file_option} input and if valid set the ${display_accessory_safari_update} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_safari_update=$(get_pref_managed "DisplayAccessorySafariUpdateFile")
-	if [[ -z "${display_accessory_safari_update}" ]] && [[ "${display_accessory_safari_update_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_safari_update}" == "X" ]] || { [[ -z "${display_accessory_safari_update}" ]] && [[ "${display_accessory_safari_update_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessorySafariUpdateFile"
+		unset display_accessory_safari_update
 	elif [[ -z "${display_accessory_safari_update}" ]] && [[ -n "${display_accessory_safari_update_file_option}" ]]; then
 		display_accessory_safari_update="${display_accessory_safari_update_file_option}"
 		set_pref "DisplayAccessorySafariUpdateFile" "${display_accessory_safari_update}"
@@ -2603,8 +2659,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_jamf_policy_triggers_file_option} input and if valid set the ${display_accessory_jamf_policy_triggers} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_jamf_policy_triggers=$(get_pref_managed "DisplayAccessoryJamfPolicyTriggersFile")
-	if [[ -z "${display_accessory_jamf_policy_triggers}" ]] && [[ "${display_accessory_jamf_policy_triggers_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_jamf_policy_triggers}" == "X" ]] || { [[ -z "${display_accessory_jamf_policy_triggers}" ]] && [[ "${display_accessory_jamf_policy_triggers_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryJamfPolicyTriggersFile"
+		unset display_accessory_jamf_policy_triggers
 	elif [[ -z "${display_accessory_jamf_policy_triggers}" ]] && [[ -n "${display_accessory_jamf_policy_triggers_file_option}" ]]; then
 		display_accessory_jamf_policy_triggers="${display_accessory_jamf_policy_triggers_file_option}"
 		set_pref "DisplayAccessoryJamfPolicyTriggersFile" "${display_accessory_jamf_policy_triggers}"
@@ -2614,8 +2671,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_accessory_restart_without_updates_file_option} input and if valid set the ${display_accessory_restart_without_updates} parameter. Validating the actual display accessory files themselves are handled later during the workflow.
 	display_accessory_restart_without_updates=$(get_pref_managed "DisplayAccessoryRestartWithoutUpdatesFile")
-	if [[ -z "${display_accessory_restart_without_updates}" ]] && [[ "${display_accessory_restart_without_updates_file_option}" == "X" ]]; then
+	if [[ "${display_accessory_restart_without_updates}" == "X" ]] || { [[ -z "${display_accessory_restart_without_updates}" ]] && [[ "${display_accessory_restart_without_updates_file_option}" == "X" ]]; }; then
 		delete_pref "DisplayAccessoryRestartWithoutUpdatesFile"
+		unset display_accessory_restart_without_updates
 	elif [[ -z "${display_accessory_restart_without_updates}" ]] && [[ -n "${display_accessory_restart_without_updates_file_option}" ]]; then
 		display_accessory_restart_without_updates="${display_accessory_restart_without_updates_file_option}"
 		set_pref "DisplayAccessoryRestartWithoutUpdatesFile" "${display_accessory_restart_without_updates}"
@@ -2629,8 +2687,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_help_button_string_option} input and if valid set the ${display_help_button_string} parameter.
 	display_help_button_string=$(get_pref_managed "DisplayHelpButtonString")
-	if [[ -z "${display_help_button_string}" ]] && [[ "${display_help_button_string_option}" == "X" ]]; then
+	if [[ "${display_help_button_string}" == "X" ]] || { [[ -z "${display_help_button_string}" ]] && [[ "${display_help_button_string_option}" == "X" ]]; }; then
 		delete_pref "DisplayHelpButtonString"
+		unset display_help_button_string
 	elif [[ -z "${display_help_button_string}" ]] && [[ -n "${display_help_button_string_option}" ]]; then
 		display_help_button_string="${display_help_button_string_option}"
 		set_pref "DisplayHelpButtonString" "${display_help_button_string}"
@@ -2640,8 +2699,9 @@ manage_parameter_options() {
 	
 	# Validate ${display_warning_button_string_option} input and if valid set the ${display_warning_button_string} parameter.
 	display_warning_button_string=$(get_pref_managed "DisplayWarningButtonString")
-	if [[ -z "${display_warning_button_string}" ]] && [[ "${display_warning_button_string_option}" == "X" ]]; then
+	if [[ "${display_warning_button_string}" == "X" ]] || { [[ -z "${display_warning_button_string}" ]] && [[ "${display_warning_button_string_option}" == "X" ]]; }; then
 		delete_pref "DisplayWarningButtonString"
+		unset display_warning_button_string
 	elif [[ -z "${display_warning_button_string}" ]] && [[ -n "${display_warning_button_string_option}" ]]; then
 		display_warning_button_string="${display_warning_button_string_option}"
 		set_pref "DisplayWarningButtonString" "${display_warning_button_string}"
@@ -2674,8 +2734,9 @@ manage_parameter_options() {
 		
 		# Validate ${auth_jamf_custom_url_option} input and if valid set the ${auth_jamf_custom_url} parameter.
 		auth_jamf_custom_url=$(get_pref_managed "AuthJamfCustomURL")
-		if [[ -z "${auth_jamf_custom_url}" ]] && [[ "${auth_jamf_custom_url_option}" == "X" ]]; then
+		if [[ "${auth_jamf_custom_url}" == "X" ]] || { [[ -z "${auth_jamf_custom_url}" ]] && [[ "${auth_jamf_custom_url_option}" == "X" ]]; }; then
 			delete_pref_main "AuthJamfCustomURL"
+			unset auth_jamf_custom_url
 		elif [[ -z "${auth_jamf_custom_url}" ]] && [[ -n "${auth_jamf_custom_url_option}" ]]; then
 			auth_jamf_custom_url="${auth_jamf_custom_url_option}"
 			set_pref_main "AuthJamfCustomURL" "${auth_jamf_custom_url}"
@@ -2696,8 +2757,9 @@ manage_parameter_options() {
 		
 		# Validate ${auth_mdm_failover_to_user_option} input and if valid set the ${auth_mdm_failover_to_user} parameter.
 		auth_mdm_failover_to_user=$(get_pref_managed "AuthMDMFailoverToUser")
-		if [[ -z "${auth_mdm_failover_to_user}" ]] && [[ "${auth_mdm_failover_to_user_option}" == "X" ]]; then
+		if [[ "${auth_mdm_failover_to_user}" == "X" ]] || { [[ -z "${auth_mdm_failover_to_user}" ]] && [[ "${auth_mdm_failover_to_user_option}" == "X" ]]; }; then
 			delete_pref_main "AuthMDMFailoverToUser"
+			unset auth_mdm_failover_to_user
 		elif [[ -z "${auth_mdm_failover_to_user}" ]] && [[ -n "${auth_mdm_failover_to_user_option}" ]]; then
 			auth_mdm_failover_to_user="${auth_mdm_failover_to_user_option}"
 			set_pref_main "AuthMDMFailoverToUser" "${auth_mdm_failover_to_user}"
@@ -2726,8 +2788,9 @@ manage_parameter_options() {
 	
 	# Validate ${test_mode_timeout_option} input and if valid set the ${test_mode_timeout_seconds} parameter. If there is no ${test_mode_timeout_seconds} then set it to ${TEST_MODE_DEFAULT_TIMEOUT}.
 	test_mode_timeout_seconds=$(get_pref_managed "TestModeTimeout")
-	if [[ -z $test_mode_timeout_seconds ]] && [[ "${test_mode_timeout_option}" == "X" ]]; then
+	if [[ "${test_mode_timeout_seconds}" == "X" ]] || { [[ -z $test_mode_timeout_seconds ]] && [[ "${test_mode_timeout_option}" == "X" ]]; }; then
 		delete_pref "TestModeTimeout"
+		unset test_mode_timeout_seconds
 	elif [[ -z $test_mode_timeout_seconds ]] && [[ -n "${test_mode_timeout_option}" ]]; then
 		test_mode_timeout_seconds="${test_mode_timeout_option}"
 		set_pref "TestModeTimeout" "${test_mode_timeout_seconds}"
@@ -2779,8 +2842,9 @@ manage_parameter_options() {
 	
 	# Validate ${test_storage_update_option} input and if valid set the ${storage_required_update_gb} parameter. If there is no ${storage_required_update_gb} then set it to ${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}.
 	storage_required_update_gb=$(get_pref_managed "TestStorageUpdate")
-	if [[ -z "${storage_required_update_gb}" ]] && [[ "${test_storage_update_option}" == "X" ]]; then
+	if [[ "${storage_required_update_gb}" == "X" ]] || { [[ -z "${storage_required_update_gb}" ]] && [[ "${test_storage_update_option}" == "X" ]]; }; then
 		delete_pref "TestStorageUpdate"
+		unset storage_required_update_gb
 	elif [[ -z "${storage_required_update_gb}" ]] && [[ -n "${test_storage_update_option}" ]]; then
 		storage_required_update_gb="${test_storage_update_option}"
 		set_pref "TestStorageUpdate" "${storage_required_update_gb}"
@@ -2793,8 +2857,9 @@ manage_parameter_options() {
 	
 	# Validate ${test_storage_upgrade_option} input and if valid set the ${storage_required_upgrade_gb} parameter. If there is no ${storage_required_upgrade_gb} then set it to ${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}.
 	storage_required_upgrade_gb=$(get_pref_managed "TestStorageUpgrade")
-	if [[ -z "${storage_required_upgrade_gb}" ]] && [[ "${test_storage_upgrade_option}" == "X" ]]; then
+	if [[ "${storage_required_upgrade_gb}" == "X" ]] || { [[ -z "${storage_required_upgrade_gb}" ]] && [[ "${test_storage_upgrade_option}" == "X" ]]; }; then
 		delete_pref "TestStorageUpgrade"
+		unset storage_required_upgrade_gb
 	elif [[ -z "${storage_required_upgrade_gb}" ]] && [[ -n "${test_storage_upgrade_option}" ]]; then
 		storage_required_upgrade_gb="${test_storage_upgrade_option}"
 		set_pref "TestStorageUpgrade" "${storage_required_upgrade_gb}"
@@ -2807,8 +2872,9 @@ manage_parameter_options() {
 	
 	# Validate ${test_battery_level_option} input and if valid set the ${power_required_battery_percent} parameter. If there is no ${power_required_battery_percent} then set it to ${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}.
 	power_required_battery_percent=$(get_pref_managed "TestBatteryLevel")
-	if [[ -z "${power_required_battery_percent}" ]] && [[ "${test_battery_level_option}" == "X" ]]; then
+	if [[ "${power_required_battery_percent}" == "X" ]] || { [[ -z "${power_required_battery_percent}" ]] && [[ "${test_battery_level_option}" == "X" ]]; }; then
 		delete_pref "TestBatteryLevel"
+		unset power_required_battery_percent
 	elif [[ -z "${power_required_battery_percent}" ]] && [[ -n "${test_battery_level_option}" ]]; then
 		power_required_battery_percent="${test_battery_level_option}"
 		set_pref "TestBatteryLevel" "${power_required_battery_percent}"
@@ -3995,7 +4061,7 @@ workflow_startup() {
 		[[ $(echo "${display_unmovable}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_unmovable_status="TRUE"
 		[[ $(echo "${display_hide_background}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_hide_background_status="TRUE"
 		[[ $(echo "${display_silently}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_silently_status="TRUE"
-		[[ $(echo "${display_notifications_centered}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_notifications_centered_status="TRUE"
+		[[ $(echo "${display_hide_progress_bar}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_hide_progress_bar_status="TRUE"
 		[[ $(echo "${display_notifications_centered}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_notifications_centered_status="TRUE"
 		if [[ "${current_user_account_name}" != "FALSE" ]]; then
 			notification_install_now_start
@@ -4550,8 +4616,16 @@ check_storage_available() {
 	[[ -z "${current_user_account_name}" ]] && check_current_user
 	[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
 	[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2>/dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3;}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
+	if [[ -z "${storage_available_gigabytes}" ]] || [[ "${storage_available_gigabytes}" == "0" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		log_super "Warning: Initial attempt to determine available storage returned an unexpected value of ${storage_available_gigabytes}, attempting fallback methods..."
+		[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
+		if [[ -z "${storage_available_gigabytes}" ]] || [[ "${storage_available_gigabytes}" == "0" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+			log_super "Warning: Further attempts to determine available storage returned an unexpected value of ${storage_available_gigabytes}, trying with another method..."
+			storage_available_gigabytes=$(df -g / | tail -1 | awk '{print $4}')
+		fi
+	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_available_gigabytes: ${storage_available_gigabytes}"
-	if [[ -z "${storage_available_gigabytes}" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+	if [[ -z "${storage_available_gigabytes}" ]] || [[ "${storage_available_gigabytes}" == "0" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
 		log_super "Error: Unable to determine available storage."
 		check_storage_available_error="TRUE"
 	elif [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]] || [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
@@ -5388,7 +5462,7 @@ check_scheduled_install() {
 		[[ $(echo "${display_unmovable}" | grep -c 'SCHEDULED') -gt 0 ]] && display_unmovable_status="TRUE"
 		[[ $(echo "${display_hide_background}" | grep -c 'SCHEDULED') -gt 0 ]] && display_hide_background_status="TRUE"
 		[[ $(echo "${display_silently}" | grep -c 'SCHEDULED') -gt 0 ]] && display_silently_status="TRUE"
-		[[ $(echo "${display_notifications_centered}" | grep -c 'SCHEDULED') -gt 0 ]] && display_notifications_centered_status="TRUE"
+		[[ $(echo "${display_hide_progress_bar}" | grep -c 'SCHEDULED') -gt 0 ]] && display_hide_progress_bar_status="TRUE"
 		[[ $(echo "${display_notifications_centered}" | grep -c 'SCHEDULED') -gt 0 ]] && display_notifications_centered_status="TRUE"
 		local display_string_scheduled_install_only_date
 		display_string_scheduled_install_only_date=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")
@@ -5780,7 +5854,7 @@ check_deadlines_count() {
 			if [[ -z "${deadline_counter_focus_previous}" ]]; then
 				deadline_counter_focus_current=0
 				set_pref_main "DeadlineCounterFocus" "${deadline_counter_focus_current}"
-			else
+			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_focus_current=$((deadline_counter_focus_previous + 1))
 				set_pref_main "DeadlineCounterFocus" "${deadline_counter_focus_current}"
 			fi
@@ -5806,7 +5880,7 @@ check_deadlines_count() {
 			if [[ -z "${deadline_counter_soft_previous}" ]]; then
 				deadline_counter_soft_current=0
 				set_pref_main "DeadlineCounterSoft" "${deadline_counter_soft_current}"
-			else
+			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_soft_current=$((deadline_counter_soft_previous + 1))
 				set_pref_main "DeadlineCounterSoft" "${deadline_counter_soft_current}"
 			fi
@@ -5829,7 +5903,7 @@ check_deadlines_count() {
 			if [[ -z "${deadline_counter_hard_previous}" ]]; then
 				deadline_counter_hard_current=0
 				set_pref_main "DeadlineCounterHard" "${deadline_counter_hard_current}"
-			else
+			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_hard_current=$((deadline_counter_hard_previous + 1))
 				set_pref_main "DeadlineCounterHard" "${deadline_counter_hard_current}"
 			fi
@@ -5877,6 +5951,14 @@ check_software_update_status_cached() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: super_last_sccessful_check_epoch is: ${super_last_sccessful_check_epoch}"
 	if [[ $msu_last_sccessful_check_epoch -lt $((workflow_time_epoch - (SOFTWARE_STATUS_CACHE_AGE_MINUTES * 60))) ]] && [[ $super_last_sccessful_check_epoch -lt $((workflow_time_epoch - (SOFTWARE_STATUS_CACHE_AGE_MINUTES * 60))) ]]; then
 		log_super "Status: Last macOS software status check was more than $((SOFTWARE_STATUS_CACHE_AGE_MINUTES / 60)) hours ago, full software status check required."
+		check_software_status_required="TRUE"
+		return 0
+	fi
+	local mac_last_startup_epoch
+	mac_last_startup_epoch=$(date -j -u -f "%Y-%m-%d:%H:%M:%S" "${mac_last_startup}" +%s)
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mac_last_startup_epoch is: ${mac_last_startup_epoch}"
+	if [[ $super_last_sccessful_check_epoch -lt $mac_last_startup_epoch ]]; then
+		log_super "Status: Last macOS software status check was before last system startup time, full software status check required."
 		check_software_status_required="TRUE"
 		return 0
 	fi
@@ -9658,7 +9740,7 @@ open_dialog_ibm_notifier() {
 	# Append any additional display accessory options to the ${ibm_notifier_array}.
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_type is: ${dialog_type}"
 	if [[ "${dialog_type}" == "ALERT" ]]; then
-		if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+		if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 			ibm_notifier_array+=(-buttonless)
 			[[ -n "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-accessory_view_type timer -accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}")
 		else # The default alert dialog progress bar.
@@ -9754,8 +9836,8 @@ notification_install_now_start() {
 	log_metrics "Open Notification Install Now Start: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_start_title}" -subtitle "${display_string_install_now_start_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 	
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9772,8 +9854,8 @@ notification_install_now_download() {
 	log_metrics "Open Notification Install Now Downloading: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_download_title}" -subtitle "${display_string_install_now_download_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 	
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9786,7 +9868,7 @@ notification_install_now_download() {
 # Display a non-interactive notification informing the user that macOS is up to date.
 notification_install_now_up_to_date() {
 	set_display_strings_language
-	unset display_notifications_centered_status
+	unset display_hide_progress_bar_status
 	log_super "IBM Notifier: Install now macOS software is already up to date notification."
 	log_metrics "Open Notification Install Now Completed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_up_to_date_title}" -subtitle "${display_string_install_now_up_to_date_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
@@ -9798,7 +9880,7 @@ notification_install_now_up_to_date() {
 # Display a non-interactive notification informing the user that the install now workflow has failed.
 notification_install_now_failed() {
 	set_display_strings_language
-	unset display_notifications_centered_status
+	unset display_hide_progress_bar_status
 	log_super "IBM Notifier: Install now failure notification."
 	log_metrics "Open Notification Install Now Failed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_install_now_failed_title}" -subtitle "${display_string_install_now_failed_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_ok_button}")
@@ -9833,8 +9915,8 @@ notification_jamf_pro_policy() {
 	fi
 	log_metrics "Open Notification Jamf Pro Policy Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9867,8 +9949,8 @@ notification_prepare() {
 	fi
 	log_metrics "Open Notification Preparing Update/Upgrade: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9901,8 +9983,8 @@ notification_restart() {
 	fi
 	log_metrics "Open Notification Restart: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9919,8 +10001,8 @@ notification_non_system_updates() {
 	log_metrics "Open Notification Installing Non-System Updates: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_non_system_updates_title}" -subtitle "${display_string_non_system_updates_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9937,8 +10019,8 @@ notification_safari_update() {
 	log_metrics "Open Notification Installing Safari Update: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_safari_update_title}" -subtitle "${display_string_safari_update_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}")
 
-	# Handle the ${display_notifications_centered_status} option.
-	if [[ "${display_notifications_centered_status}" == "TRUE" ]] || [[ "${display_notifications_centered_status}" == "TEMP" ]]; then
+	# Handle the ${display_hide_progress_bar_status} option.
+	if [[ "${display_hide_progress_bar_status}" == "TRUE" ]] || [[ "${display_hide_progress_bar_status}" == "TEMP" ]]; then
 		ibm_notifier_array+=(-buttonless)
 	else # The default notification progress bar.
 		ibm_notifier_array+=(-accessory_view_type progressbar -accessory_view_payload "/percent indeterminate")
@@ -9952,7 +10034,7 @@ notification_safari_update() {
 notification_failed() {
 	set_display_strings_language
 	set_deferral_button
-	unset display_notifications_centered_status
+	unset display_hide_progress_bar_status
 	log_super "IBM Notifier: Failure notification."
 	log_metrics "Open Notification Installation Failed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	ibm_notifier_array=(-type popup -bar_title "${display_string_failed_title}" -subtitle "${display_string_failed_body}" -icon_path "${display_icon}" -icon_width "${display_icon_size}" -icon_height "${display_icon_size}" -main_button_label "${display_string_defer_button}")
@@ -10006,11 +10088,11 @@ dialog_insufficient_storage() {
 		sudo -u "${current_user_account_name}" open "/System/Library/CoreServices/Applications/Storage Management.app" &
 	fi
 	
-	# Manage ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_notifications_centered}.
+	# Manage ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_hide_progress_bar}.
 	{ [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable}" | grep -c 'ERROR') -gt 0 ]]; } && display_unmovable_status="TEMP"
 	[[ "${display_hide_background_status}" == "TRUE" ]] && display_hide_background_status="TEMPOFF" # Don't want to ever hide the background for this one so the user can try to use the storage optimizer.
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'ERROR') -gt 0 ]]; } && display_silently_status="TEMP"
-	{ [[ "${display_notifications_centered_status}" != "TRUE" ]] && [[ $(echo "${display_notifications_centered}" | grep -c 'ERROR') -gt 0 ]]; } && display_notifications_centered_status="TEMP"
+	{ [[ "${display_hide_progress_bar_status}" != "TRUE" ]] && [[ $(echo "${display_hide_progress_bar_option}" | grep -c 'ERROR') -gt 0 ]]; } && display_hide_progress_bar_status="TEMP"
 	
 	# Open the initial insufficient storage dialog.
 	dialog_type="ALERT"
@@ -10041,11 +10123,11 @@ dialog_insufficient_storage() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_insufficient_storage_error is: ${dialog_insufficient_storage_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_ready is: ${storage_ready}"
 	
-	# Reset temporary ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_notifications_centered}.
+	# Reset temporary ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_hide_progress_bar}.
 	[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
 	[[ "${display_hide_background_status}" == "TEMPOFF" ]] && unset display_hide_background_status
 	[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
-	[[ "${display_notifications_centered_status}" == "TEMP" ]] && unset display_notifications_centered_status
+	[[ "${display_hide_progress_bar_status}" == "TEMP" ]] && unset display_hide_progress_bar_status
 	
 	# If there still is not sufficient storage, then error.
 	if [[ "${dialog_insufficient_storage_error}" == "FALSE" ]] && [[ "${storage_ready}" == "FALSE" ]]; then
@@ -10091,11 +10173,11 @@ dialog_power_required() {
 	fi
 	[[ -n "${dialog_timeout_seconds}" ]] && display_string_dialog_timeout="${display_string_power_required_timeout}"
 	
-	# Manage ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_notifications_centered}.
+	# Manage ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_hide_progress_bar}.
 	{ [[ "${display_unmovable_status}" != "TRUE" ]] && [[ $(echo "${display_unmovable}" | grep -c 'ERROR') -gt 0 ]]; } && display_unmovable_status="TEMP"
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'ERROR') -gt 0 ]]; } && display_hide_background_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'ERROR') -gt 0 ]]; } && display_silently_status="TEMP"
-	{ [[ "${display_notifications_centered_status}" != "TRUE" ]] && [[ $(echo "${display_notifications_centered}" | grep -c 'ERROR') -gt 0 ]]; } && display_notifications_centered_status="TEMP"
+	{ [[ "${display_hide_progress_bar_status}" != "TRUE" ]] && [[ $(echo "${display_hide_progress_bar_option}" | grep -c 'ERROR') -gt 0 ]]; } && display_hide_progress_bar_status="TEMP"
 	
 	# Open the initial power required dialog.
 	dialog_type="ALERT"
@@ -10121,11 +10203,11 @@ dialog_power_required() {
 	done
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: power_required_charger_connected is: ${power_required_charger_connected}"
 	
-	# Reset temporary ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_notifications_centered}.
+	# Reset temporary ${display_unmovable}, ${display_hide_background}, ${display_silently}, and ${display_hide_progress_bar}.
 	[[ "${display_unmovable_status}" == "TEMP" ]] && unset display_unmovable_status
 	[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
 	[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
-	[[ "${display_notifications_centered_status}" == "TEMP" ]] && unset display_notifications_centered_status
+	[[ "${display_hide_progress_bar_status}" == "TEMP" ]] && unset display_hide_progress_bar_status
 	
 	# If there still is no AC power, then exit.
 	if [[ "${power_required_charger_connected}" == "FALSE" ]]; then
@@ -11136,7 +11218,7 @@ main() {
 					[[ $(echo "${display_unmovable}" | grep -c 'DEADLINE') -gt 0 ]] && display_unmovable_status="TRUE"
 					[[ $(echo "${display_hide_background}" | grep -c 'DEADLINE') -gt 0 ]] && display_hide_background_status="TRUE"
 					[[ $(echo "${display_silently}" | grep -c 'DEADLINE') -gt 0 ]] && display_silently_status="TRUE"
-					[[ $(echo "${display_notifications_centered}" | grep -c 'DEADLINE') -gt 0 ]] && display_notifications_centered_status="TRUE"
+					[[ $(echo "${display_hide_progress_bar}" | grep -c 'DEADLINE') -gt 0 ]] && display_hide_progress_bar_status="TRUE"
 					[[ $(echo "${display_notifications_centered}" | grep -c 'DEADLINE') -gt 0 ]] && display_notifications_centered_status="TRUE"
 					[[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'DEADLINE') -gt 0 ]] && auth_mdm_failover_to_user_status="TRUE"
 				fi
