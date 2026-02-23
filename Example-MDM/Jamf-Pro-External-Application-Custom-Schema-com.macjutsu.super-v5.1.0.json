@@ -2,6 +2,7 @@
     "title": "Super Version 5.1.0 (com.macjutsu.super)",
     "description": "Preference settings for S.U.P.E.R.M.A.N. update script. WARNING: Test Mode defaults to true. Please remember to set it to false before deploying. Full details on these settings can be found in the wiki: https://github.com/Macjutsu/super/wiki",
     "__preferencedomain": "com.macjutsu.super",
+    "__version": "5.1.0", 
     "options": {
         "remove_empty_properties": true
     },
@@ -87,7 +88,7 @@
             "title": "Scheduled Install User Choice",
             "description": "Adds a Schedule button to the standard deferral dialog. When clicked, this button opens a scheduled installation dialog that allows the user to select a date and time for installation. If any day or date deadlines are also specified, then the user is not allowed to select an installation date later than the soonest deadline.",
             "type": "boolean",
-            "default": "true"
+            "default": "false"
         },
         "ScheduledInstallReminder": {
             "title": "Scheduled Install Reminder",
@@ -168,7 +169,7 @@
             "title": "Apple Zero Day Workflow Date",
             "description": "Leverages the public MacAdmin's SOFA macOS machine readable JSON feed to discover release dates for use in workflows with deadline day options.",
             "type": "boolean",
-            "default": "true",
+            "default": "false",
             "links": [
                 {
                     "rel": "More information",
@@ -318,7 +319,7 @@
             }
         },
         "DisplayIconDarkFile": {
-            "title": "Light Display Icon",
+            "title": "Dark Display Icon",
             "description": "Local path or http(s) URL to a file that is the picture to display in notifications or dialogs when in dark mode. Failover to DisplayIconFile payload if configured. Put X to reset this to default.",
             "type": "string",
             "options": {
@@ -468,7 +469,17 @@
             "title": "Authentication Ask User to Save Password",
             "description": "Prompt the end user to save their password which can then be used to authenticate the local softwareupdate command.",
             "type": "boolean",
-            "default": "true"
+            "default": "false"
+        },
+        "ConfigCodeSignature": {
+            "title": "Config Code Signature",
+            "description": "Enforces the use of code signed alternate configuration preference files. If this key is present then the super workflow will only accept alternate configuration preference files that are code signed and match the specified identifier. Both Apple Bundle and Apple Team identifiers are supported.",
+            "type": "string",
+            "options": {
+                "inputAttributes": {
+                    "placeholder": "pretendco.com"
+                }
+            }
         },
         "ConfigTempOverride": {
             "title": "Allow Temporary Configuration Overrides",
@@ -490,7 +501,7 @@
             "title": "Credential Authentication Failover To User",
             "description": "If any managed automatic authentication method fails validation, then failover to local end user authentication.",
             "type": "boolean",
-            "default": "true"
+            "default": "false"
         },
         "InstallMacOSMajorUpgrades": {
             "title": "Enforce macOS Upgrades",
@@ -517,6 +528,11 @@
                 }
             }
         },
+        "InstallMacOSBSIUpdates": {
+            "title": "Allow Background Security Improvements",
+            "description": "macOS 26.1 Tahoe supports Background Security Improvement updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions. Presently this new option only represents a name change as the underlying mechanism for macOS BSI updates appears to be similar to the legacy macOS Rapid Security Responses. The InstallRapidSecurityResponses option remains but is deprecated and will be removed in a future version of super.",
+            "type": "boolean"
+        },
         "InstallRapidSecurityResponses": {
             "title": "Allow Rapid Security Response Updates",
             "description": "macOS 13.3+ Ventura support Rapid Security Response updates, which super will ignore if this is not enabled. super will ignore this setting on older macOS versions.",
@@ -527,7 +543,7 @@
             "description": "If you don't want the super workflow to wait for a macOS update to also install non-system Apple software updates, then you can enforce those non-system updates as soon as they become available.",
             "type": "boolean"
         },
-        "InstallSafariUpdateWithoutRestarting": {
+        "InstallSafariUpdatesWithoutRestarting": {
             "title": "Enforce Safari-only Updates",
             "description": "Target Safari updates for installation without restarting the system. This is a counter-option to Enforce Non-System Updates (InstallNonSystemUpdatesWithoutRestarting) option that targets all non-system updates for installation without restarting the system. This option is also unique in that if Safari is not active, then the workflow installs the Safari update automatically with no user interaction.",
             "type": "boolean"
@@ -639,7 +655,7 @@
             "title": "Test Mode",
             "description": "Mode to validate parameters, credentials, notifications, dialogs, deferrals, and deadline logic.",
             "type": "boolean",
-            "default": "true"
+            "default": "false"
         },
         "TestModeTimeout": {
             "title": "Test Mode Timeout",
