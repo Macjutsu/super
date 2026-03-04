@@ -5314,6 +5314,15 @@ check_schedule_zero_date() {
 			if [[ $(sqlite3 /dev/null "SELECT json_extract(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions[$sofa_osversions_array_index].SecurityReleases[$array_index].ProductVersion')" 2>/dev/null) == "${schedule_zero_date_version_target}" ]]; then
 				schedule_zero_date=$(sqlite3 /dev/null "SELECT json_extract(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions[$sofa_osversions_array_index].SecurityReleases[$array_index].ReleaseDate')" 2>/dev/null | sed -e 's/T/:/g' -e 's/:00Z//g')
 				log_super_audit "Status: Setting new automatic zero date based on the ${workflow_target} release date of ${schedule_zero_date}."
+				local deferral_restrictions_offset_days=0
+				{ [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]]; } && [[ "${deferral_restrictions_macOS_major_upgrades}" != "FALSE" ]] && deferral_restrictions_offset_days="${deferral_restrictions_macOS_major_upgrades}"
+				{ [[ "${macos_msu_minor_update_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; } && [[ "${deferral_restrictions_macOS_minor_updates}" != "FALSE" ]] && deferral_restrictions_offset_days="${deferral_restrictions_macOS_minor_updates}"
+				if [[ $deferral_restrictions_offset_days -gt 0 ]]; then
+					local schedule_zero_date_epoch_temp
+					schedule_zero_date_epoch_temp=$(date -j -f %Y-%m-%d:%H:%M:%S "${schedule_zero_date}:00" +%s)
+					schedule_zero_date=$(date -r $((schedule_zero_date_epoch_temp + (deferral_restrictions_offset_days * 86400))) +%Y-%m-%d:%H:%M)
+					log_super "Status: Restrictions configuration profile offset of ${deferral_restrictions_offset_days} days adjusting automatic zero date to ${schedule_zero_date}."
+				fi
 				set_pref_main "ScheduleZeroDateAutomaticRelease" "${schedule_zero_date}"
 				[[ -n "${schedule_zero_date_automatic_start_previous}" ]] && delete_pref_main "ScheduleZeroDateAutomaticStart" && unset schedule_zero_date_automatic_start_previous
 				break
@@ -6583,7 +6592,9 @@ workflow_check_software_status() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade_target_version_normalized is: ${macos_msu_major_upgrade_target_version_normalized}"
 		
 		# If ${install_macos_major_upgrades} and there is no ${macos_msu_major_upgrade_target} then attempt to resolve a ${macos_installer_major_upgrade_target} given ${install_macos_major_version_target} and ${macos_installer_major_upgrades_array[]}.
-		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]]; then
+		# However, if a restrictions configuration profile is deferring macOS major upgrades, also defer installer-based major upgrades to honor the same deferral window.
+		[[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]] && [[ "${deferral_restrictions_macOS_major_upgrades}" != "FALSE" ]] && log_super "Disallowed: macOS major upgrade installer is available but not allowed for ${deferral_restrictions_macOS_major_upgrades} days per restrictions configuration profile."
+		if [[ "${install_macos_major_upgrades}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ ${#macos_installer_major_upgrades_array[@]} -gt 0 ]] && [[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]]; then
 			if [[ -z "${install_macos_major_version_target}" ]]; then
 				macos_installer_major_upgrade_target="${macos_installer_major_upgrades_array[0]}"
 				[[ "${deferral_restrictions_macOS_major_upgrades}" == "FALSE" ]] && macos_major_upgrade_latest="TRUE"
@@ -6640,7 +6651,9 @@ workflow_check_software_status() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
 		
 		# If ${install_macos_minor_updates} and there is no ${macos_msu_major_upgrade_target} or ${macos_installer_major_upgrade_target} or ${macos_msu_minor_update} then attempt to resolve a ${macos_installer_minor_update_target} given ${install_macos_minor_version_target} and ${macos_installer_minor_updates_array[]}.
-		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+		# However, if a restrictions configuration profile is deferring macOS minor updates, also defer installer-based minor updates to honor the same deferral window.
+		[[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]] && [[ "${deferral_restrictions_macOS_minor_updates}" != "FALSE" ]] && log_super "Disallowed: macOS minor update installer is available but not allowed for ${deferral_restrictions_macOS_minor_updates} days per restrictions configuration profile."
+		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]] && [[ "${deferral_restrictions_macOS_minor_updates}" == "FALSE" ]]; then
 			if [[ -z "${install_macos_minor_version_target}" ]]; then
 				macos_installer_minor_update_target="${macos_installer_minor_updates_array[0]}"
 			else
