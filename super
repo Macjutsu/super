@@ -7387,20 +7387,14 @@ workflow_download_macos() {
 	if [[ "${macos_installer_download_required}" == "TRUE" ]] || [[ "${macos_msu_download_required}" == "TRUE" ]]; then
 		# If a macOS automatic download should be possible then automatically defer.
 		if [[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]]; then
-			if [[ "${workflow_install_now_active}" != "TRUE" ]] && [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]] && [[ "${deadline_count_status}" == "FALSE" ]]; then
-				# If a deadline is within 24 hours, override the download deferral to pre-download the update so it's ready when the deadline arrives.
-				if [[ -n "${deadline_epoch}" ]] && [[ $((deadline_epoch - workflow_time_epoch)) -le 86400 ]]; then
-					log_super "Warning: Ignoring automatic macOS minor update download deferral because a deadline is within 24 hours, pre-downloading update."
-				else
-					if [[ "${macos_msu_automatic_download_ramped}" != "FALSE" ]]; then
-						log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
-						log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
-					else
-						log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
-						log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
-					fi
-					set_auto_launch_deferral
-				fi
+			if [[ "${macos_msu_automatic_download_ramped}" != "FALSE" ]]; then
+				# Apple's incremental rollout is blocking the automatic background download. Rather than deferring indefinitely, proceed to download the update directly so it's ready when the user is prompted.
+				log_super "Warning: The target macOS minor update automatic download is being delayed by Apple's incremental rollout mechanism, overriding to download directly."
+			elif [[ "${workflow_install_now_active}" != "TRUE" ]] && [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]] && [[ "${deadline_count_status}" == "FALSE" ]]; then
+				# No deadline has passed and the system should be able to download automatically, defer and let the system handle it.
+				log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+				set_auto_launch_deferral
 			else
 				[[ "${workflow_install_now_active}" == "TRUE" ]] && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current install now workflow."
 				{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_count_status}" != "FALSE" ]]; } && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current deadline workflow."
