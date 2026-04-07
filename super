@@ -5680,7 +5680,7 @@ check_deadlines_days_date() {
 			deadline_date_hard_difference=$((deadline_date_hard_epoch - workflow_time_epoch))
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_date_hard_difference is: ${deadline_date_hard_difference}"
 			if [[ $deadline_date_hard_difference -le 180 ]]; then
-				log_super "Status: Hard deadline date of ${deadline_date_soft} is only ${deadline_date_hard_difference} seconds away, waiting for deadline to pass..."
+				log_super "Status: Hard deadline date of ${deadline_date_hard} is only ${deadline_date_hard_difference} seconds away, waiting for deadline to pass..."
 				sleep $((deadline_date_hard_difference + 1))
 				log_super "Status: Hard deadline date of ${deadline_date_soft} has passed."
 				deadline_date_status="HARD"
@@ -7388,14 +7388,19 @@ workflow_download_macos() {
 		# If a macOS automatic download should be possible then automatically defer.
 		if [[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]]; then
 			if [[ "${workflow_install_now_active}" != "TRUE" ]] && [[ "${deadline_date_status}" == "FALSE" ]] && [[ "${deadline_days_status}" == "FALSE" ]] && [[ "${deadline_count_status}" == "FALSE" ]]; then
-				if [[ "${macos_msu_automatic_download_ramped}" != "FALSE" ]]; then
-					log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
-					log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
+				# If a deadline is within 24 hours, override the download deferral to pre-download the update so it's ready when the deadline arrives.
+				if [[ -n "${deadline_epoch}" ]] && [[ $((deadline_epoch - workflow_time_epoch)) -le 86400 ]]; then
+					log_super "Warning: Ignoring automatic macOS minor update download deferral because a deadline is within 24 hours, pre-downloading update."
 				else
-					log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
-					log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+					if [[ "${macos_msu_automatic_download_ramped}" != "FALSE" ]]; then
+						log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
+						log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system because it's being delayed by Apple's incremental rollout mechanism, trying again in ${deferral_timer_minutes} minutes."
+					else
+						log_super "Warning: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+						log_status "Pending: The target macOS minor update has not yet automatically downloaded to the system, trying again in ${deferral_timer_minutes} minutes."
+					fi
+					set_auto_launch_deferral
 				fi
-				set_auto_launch_deferral
 			else
 				[[ "${workflow_install_now_active}" == "TRUE" ]] && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current install now workflow."
 				{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_count_status}" != "FALSE" ]]; } && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current deadline workflow."
@@ -9785,7 +9790,7 @@ open_dialog_ibm_notifier() {
 					ibm_notifier_array+=(-secondary_accessory_view_type secureinput -secondary_accessory_view_payload "${display_accessory_secure_payload}" -timeout "${dialog_timeout_seconds}")
 				fi
 			else # Remaining ${dialog_type}s; REMINDER, SOFT.
-				[[ -n "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-secondary_accessory_view_type timer -accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}")
+				[[ -n "${dialog_timeout_seconds}" ]] && ibm_notifier_array+=(-secondary_accessory_view_type timer -secondary_accessory_view_payload "${display_string_dialog_timeout} %@" -timeout "${dialog_timeout_seconds}")
 			fi
 		else # No custom display accessory.
 			if [[ "${dialog_type}" == "CHOICE" ]]; then
