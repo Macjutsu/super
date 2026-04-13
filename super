@@ -5735,6 +5735,27 @@ check_deadlines_days_date() {
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_deadline is: ${display_string_deadline}"
 	
+	# Optimize hard deadline string
+	unset display_string_deadline_hard
+
+	if [[ -n "${deadline_date_hard}" ]]; then
+		local deadline_date_hard_time_only
+		deadline_date_hard_time_only=$(date -r "${deadline_date_hard_epoch}" "+${DISPLAY_STRING_FORMAT_TIME}" | sed 's/^ *//g')
+		if [[ $(date -r "${deadline_date_hard_epoch}" +%H:%M) == "00:00" ]]; then
+			display_string_deadline_hard=$(date -r "${deadline_date_hard_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")
+		else
+			display_string_deadline_hard="$(date -r "${deadline_date_hard_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")${DISPLAY_STRING_FORMAT_DATE_TIME_SEPARATOR}${deadline_date_hard_time_only}"
+		fi
+	elif [[ -n "${deadline_days_hard}" ]]; then
+		if [[ $(date -r "${deadline_days_hard_epoch}" +%H:%M) == "00:00" ]]; then
+			display_string_deadline_hard=$(date -r "${deadline_days_hard_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")
+		else
+			local deadline_days_hard_time_only
+			deadline_days_hard_time_only=$(date -r "${deadline_days_hard_epoch}" "+${DISPLAY_STRING_FORMAT_TIME}" | sed 's/^ *//g')
+			display_string_deadline_hard="$(date -r "${deadline_days_hard_epoch}" "+${DISPLAY_STRING_FORMAT_DATE}")${DISPLAY_STRING_FORMAT_DATE_TIME_SEPARATOR}${deadline_days_hard_time_only}"
+		fi
+	fi
+	
 	# If there is a ${deadline_epoch}, then make sure no user deferral timer or display timeout exceeds the deadline.
 	if [[ -n "${deadline_epoch}" ]]; then
 		local deferral_timer_deadline_minutes
@@ -9473,7 +9494,11 @@ set_display_strings_language() {
 	display_string_soft_deadline_restart_timeout="* Automatic restart in"
 	display_string_soft_deadline_install_timeout="* Automatic installation in"
 	display_string_soft_deadline_count_body="You have deferred the maximum number of ${display_string_deadline_count_maximum} times."
-	display_string_soft_deadline_date_body="The deferment deadline has passed:\n${display_string_deadline}."
+	if [[ -n "${display_string_deadline_hard}" ]]; then
+		display_string_soft_deadline_date_body="The deferment deadline has passed:\n${display_string_deadline}.\n\nYour computer will automatically restart to apply required updates on:\n${display_string_deadline_hard}."
+	else
+		display_string_soft_deadline_date_body="The deferment deadline has passed:\n${display_string_deadline}."
+	fi
 	
 	#### Language for dialog_user_auth(), an interactive dialog to collect user credentials for macOS update/upgrade workflow
 	display_string_user_auth_title="${display_string_workflow_title} Requires Authentication"
