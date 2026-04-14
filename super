@@ -5523,17 +5523,21 @@ set_scheduled_install_deferral() {
 			if [[ $scheduled_install_reminder_item -ge $deferral_timer_scheduled_install_minutes ]]; then
 				log_super "Status: Scheduled installation reminder of ${scheduled_install_reminder_item} minutes prior to installation has passed."
 				scheduled_install_suppress_reminder="FALSE"
+				deferral_timer_minutes="${deferral_timer_scheduled_install_minutes}"
+				[[ $deferral_timer_minutes -lt 2 ]] && deferral_timer_minutes=2
+				break
 			elif [[ $scheduled_install_reminder_item -lt $deferral_timer_scheduled_install_minutes ]]; then
 				deferral_timer_minutes=$((deferral_timer_scheduled_install_minutes - scheduled_install_reminder_item))
-				[[ $deferral_timer_minutes -lt 2 ]] && deferral_timer_scheduled_install_minutes=2
+				[[ $deferral_timer_minutes -lt 2 ]] && deferral_timer_minutes=2
 				log_super "Status: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, with a warning notification ${scheduled_install_reminder_item} minutes prior, deferring for ${deferral_timer_minutes} minutes from now."
 				log_status "Pending: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, with a warning notification ${scheduled_install_reminder_item} minutes prior, deferring for ${deferral_timer_minutes} minutes from now."
-			break
+				break
 			fi
 		done
 		IFS="${previous_ifs}"
 	else # Default scheduled installation deferral.
 		deferral_timer_minutes="${deferral_timer_scheduled_install_minutes}"
+		[[ $deferral_timer_minutes -lt 2 ]] && deferral_timer_minutes=2
 		log_super "Status: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, deferring for ${deferral_timer_minutes} minutes from now."
 		log_status "Pending: Scheduled installation on $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}, deferring for ${deferral_timer_minutes} minutes from now."
 	fi
