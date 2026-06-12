@@ -6044,7 +6044,7 @@ check_software_update_status_cached() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installers_list_checksum_cache is: ${macos_installers_list_checksum_cache}"
 	if [[ -n "${macos_installers_list_checksum_cache}" ]]; then
 		if [[ "${macos_installers_list_checksum_cache}" == "$(md5 -q "${MACOS_INSTALLERS_LIST_LOG}" 2> /dev/null)" ]]; then
-			macos_installers_list=$(sed -e '1,/^Identifier/d' -e '/^$/d' < "${MACOS_INSTALLERS_LIST_LOG}")
+			macos_installers_list=$(awk 'NR > 1 && NF' "${MACOS_INSTALLERS_LIST_LOG}")
 		else
 			log_super "Status: The ${MACOS_INSTALLERS_LIST_LOG} has changed since last super workflow run, full software status check required."
 			check_software_status_required="TRUE"
@@ -6296,7 +6296,7 @@ get_macos_installers_list() {
 	
 	# If the mist-cli list completed, then collect information.
 	if [[ "${get_macos_installers_list_error}" == "FALSE" ]] && [[ "${get_macos_installers_list_timeout}" == "FALSE" ]]; then
-		macos_installers_list=$(sed -e '1,/^Identifier/d' -e '/^$/d' < "${MACOS_INSTALLERS_LIST_LOG}")
+		macos_installers_list=$(awk 'NR > 1 && NF' "${MACOS_INSTALLERS_LIST_LOG}")
 		set_pref_main "MacOSInstallersListChecksum" "$(md5 -q "${MACOS_INSTALLERS_LIST_LOG}" 2> /dev/null)"
 	else
 		[[ "${get_macos_installers_list_error}" == "TRUE" ]] && log_super "mist-cli Error: macOS installers listing failed, check ${MACOS_INSTALLERS_LIST_LOG} for more detail."
@@ -6513,7 +6513,7 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) there is the possibility of targeting a macOS installer then collect the ${macos_installers_list} and parse to create ${macos_installer_major_upgrades_array[]} and ${macos_installer_minor_updates_array[]}.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; } && [[ ${#mdmclient_macos_installer_array[@]} -gt 0 ]]; then
+		if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; }; then
 		# If required collecte a new ${macos_installers_list}.
 		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${macos_installers_list}" == "FALSE" ]] || [[ -z "${macos_installers_list}" ]]; then
 			get_macos_installers_list
@@ -6523,9 +6523,9 @@ workflow_check_software_status() {
 				log_super "Warning: Re-starting check for macOS installers..."
 				get_macos_installers_list
 			fi
-			if [[ "${get_mdmclient_list_error}" == "TRUE" ]] || [[ "${get_mdmclient_list_timeout}" == "TRUE" ]]; then
-				log_super "Error: Checking for macOS installers listing did not complete after multiple attempts."
-				workflow_check_software_status_error="TRUE"
+			if [[ "${get_macos_installers_list_error}" == "TRUE" ]] || [[ "${get_macos_installers_list_timeout}" == "TRUE" ]]; then
+    			log_super "Error: Checking for macOS installers listing did not complete after multiple attempts."
+    			workflow_check_software_status_error="TRUE"
 			fi
 		fi
 		
