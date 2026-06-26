@@ -52,7 +52,7 @@
 - All external `super` documentation (like the Wiki and this CHANGELOG file) ran through Apple Writing Tools Proofread function.
 - Resolved a deferral timer logic issue. (Thanks to @ir77io for catching this one!)
 - As always, internal typo fixes and improvements to both regular and verbose log output.
-- `super` [5.1.0-rc5 SHA-256: db823707b7e3cff004afbbc5ca3430040b77a30a76d497beb66317f804b99afe](https://github.com/Macjutsu/super/blob/5.1.0/super.checksum.txt)
+- `super` [5.1.0 SHA-256: db823707b7e3cff004afbbc5ca3430040b77a30a76d497beb66317f804b99afe](https://github.com/Macjutsu/super/blob/5.1.0/super.checksum.txt)
 
 ### Specific Changes (5.1.0-rc6)
 
