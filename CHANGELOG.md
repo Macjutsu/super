@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [5.1.0]
+## [5.1.1]
 
-2026-06-24
+2026-??
 
 ## Highlights (5.1.x)
 
@@ -40,13 +40,24 @@
 
 ### Known Issues (5.x)
 
+- __macOS 27 is still in beta. The `super` workflow relies heavily on mechanisms that are built-in to macOS. As such, support for this operating system should be considered beta-quality as well.__
+- __macOS 27 and later no longer supports MDM enforcement of macOS updates or upgrades. This completely disables any `super` workflow that leverages Jamf Pro API credentials.__
 - The `super` workflow does not currently support Declarative Device Management (DDM) software update settings. You should continue to use traditional MDM configuration profiles to enforce software update settings.
 - There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated against this version of `super`.
 - The [Jamf Pro "new" Managed Software Updates feature](https://learn.jamf.com/r/en-US/jamf-pro-documentation-current/Updating_macOS_Using_Managed_Software_Updates) remains unreliable if the workflow target is not the latest minor update or major upgrade. In the meantime, the legacy Jamf Pro software update API remains stable (although deprecated) and local authentication is always the most reliable.
 
+### Specific Changes (5.1.1)
+
+- __Note this sub-section only covers specific changes for 5.1.0 to 5.1.1. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
+- Initial support for macOS 27 betas.
+- Resolved an issue affecting the deletion of `--scheduled-install-date` option. (Thanks to @ir77io for catching this one!)
+- Resolved inaccurate error handling in the `--config-status` option. (Thanks to @ir77io for catching this one!)
+- As always, internal typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.1 SHA-256: FIXME](https://github.com/Macjutsu/super/blob/5.1.1/super.checksum.txt)
+
 ### Specific Changes (5.1.0)
 
-- __Note this sub-section only covers specific changes for 5.1.0-rc6 to 5.1.0. Please refer to other sections of the CHANGELOG for the full rundown of all the 5.1.0 changes.__
+- __Note this sub-section only covers specific changes for 5.1.0-rc6 to 5.1.0. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
 - [Main `super` Wiki significantly updated for version 5.1.x!](https://github.com/Macjutsu/super/wiki)
 - [All new example screenshots (also moved into their own folder) for version 5.1.x!](https://github.com/Macjutsu/super/blob/main/Example-Screenshots/5.1.x)
 - All external `super` documentation (like the Wiki and this CHANGELOG file) ran through Apple Writing Tools Proofread function.

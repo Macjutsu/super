@@ -8,9 +8,9 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-SUPER_VERSION="5.1.0"
+SUPER_VERSION="5.1.1"
 readonly SUPER_VERSION
-SUPER_DATE="2026/06/24"
+SUPER_DATE="2026/??"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -321,14 +321,14 @@ show_config_status() {
 		echo -e "\n**** Config Status: Contents of the super configs folder located at ${SUPER_CONFIGS_FOLDER}:"
 		ls -lah "${SUPER_CONFIGS_FOLDER}" | tail -n +4
 	else	
-		echo -e "\nConfig Error: No super working log folder in the expected location at ${SUPER_LOG_FOLDER}."
+		echo -e "\nConfig Error: No super alternate config folder in the expected location at ${SUPER_CONFIGS_FOLDER}."
 	fi
 	
 	if [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 		echo -e "\n**** Config Status: Contents of the super logs folder located at ${SUPER_LOG_FOLDER}:"
 		ls -lah "${SUPER_LOG_FOLDER}" | tail -n +4
 	else
-		echo -e "\nConfig Error: No super working log folder in the expected location at ${SUPER_LOG_FOLDER}."
+		echo -e "\nConfig Error: No super log folder in the expected location at ${SUPER_LOG_FOLDER}."
 	fi
 	
 	alternate_temporary_plist=$(get_pref "AlternateTemporaryPlist")
@@ -1950,7 +1950,8 @@ manage_parameter_options() {
 	# Validate ${scheduled_install_date_option} input and if valid set the ${scheduled_install_date} parameter.
 	scheduled_install_date=$(get_pref_managed "ScheduledInstallDate")
 	if [[ "${scheduled_install_date}" == "X" ]] || { [[ -z "${scheduled_install_date}" ]] && [[ "${scheduled_install_date_option}" == "X" ]]; }; then
-		delete_pref "scheduled_install_date"
+		delete_pref "ScheduledInstallDate"
+		unset scheduled_install_date
 	elif [[ -z "${scheduled_install_date}" ]] && [[ -n "${scheduled_install_date_option}" ]]; then
 		scheduled_install_date="${scheduled_install_date_option}"
 		set_pref "ScheduledInstallDate" "${scheduled_install_date}"
