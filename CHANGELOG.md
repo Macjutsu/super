@@ -1,8 +1,43 @@
 # CHANGELOG
 
-## [5.1.1]
+## [6.0.0-beta1]
 
 2026-??
+
+## Highlights (6.0.x)
+
+- Full upport for macOS 27 Golden Gate.
+- New support for DDM software update settings.
+- New support for DDM enforced software updates.
+- New dialogs and notifications now rendered via [swiftDialog](https://github.com/swiftDialog/swiftDialog) to provide customizable user messaging. (Thanks to @bartreardon for his dedication to the project!)
+
+### Compatibility Notes (6.0.x)
+
+- `super` 6.0.x requires macOS 15 or newer.
+- `super` 6.0.x requires a Mac computer with Apple Silicon.
+- Previously saved `super` 5.x.x local authentication credentials are compatible with `super` 6.0.x.
+- __Previously saved `super` 5.x.x Apple Jamf Pro API authentication credentials are NOT compatible with `super` 6.0.x and will be deleted from the system the first time `super` 6.0.x runs.__
+- __A major version number change (like 5.x.x to 6.x.x) indicates that previous command line options and managed preferences are NOT fully compatible with the newer version of `super`.__
+- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-options-v6.0.0.tsv).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-managed-preferences-v6.0.0.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Example-MDM).
+- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Super-Friends).
+
+### Known Issues (6.x)
+
+- __macOS 27 is still in beta. The `super` workflow relies heavily on mechanisms that are built-in to macOS. As such, support for this operating system should be considered beta-quality as well.__
+- There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated against this version of `super`.
+
+/Library/Application Support/super
+/Library/Preferences/com.macjutsu.super
+link to /var/logs?
+
+TIMEOUT_DOWNLOAD_HELPER_SECONDS
+improved downloader timeouts
+
+Removed:
+--display-unmovable
+--display-hide-progress-bar=
 
 ## Highlights (5.1.x)
 
