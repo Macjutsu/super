@@ -8,9 +8,9 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-SUPER_VERSION="5.1.0"
+SUPER_VERSION="5.1.1"
 readonly SUPER_VERSION
-SUPER_DATE="2026/06/24"
+SUPER_DATE="2026/07/21"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -321,14 +321,14 @@ show_config_status() {
 		echo -e "\n**** Config Status: Contents of the super configs folder located at ${SUPER_CONFIGS_FOLDER}:"
 		ls -lah "${SUPER_CONFIGS_FOLDER}" | tail -n +4
 	else	
-		echo -e "\nConfig Error: No super working log folder in the expected location at ${SUPER_LOG_FOLDER}."
+		echo -e "\nConfig Error: No super alternate config folder in the expected location at ${SUPER_CONFIGS_FOLDER}."
 	fi
 	
 	if [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 		echo -e "\n**** Config Status: Contents of the super logs folder located at ${SUPER_LOG_FOLDER}:"
 		ls -lah "${SUPER_LOG_FOLDER}" | tail -n +4
 	else
-		echo -e "\nConfig Error: No super working log folder in the expected location at ${SUPER_LOG_FOLDER}."
+		echo -e "\nConfig Error: No super log folder in the expected location at ${SUPER_LOG_FOLDER}."
 	fi
 	
 	alternate_temporary_plist=$(get_pref "AlternateTemporaryPlist")
@@ -1950,7 +1950,8 @@ manage_parameter_options() {
 	# Validate ${scheduled_install_date_option} input and if valid set the ${scheduled_install_date} parameter.
 	scheduled_install_date=$(get_pref_managed "ScheduledInstallDate")
 	if [[ "${scheduled_install_date}" == "X" ]] || { [[ -z "${scheduled_install_date}" ]] && [[ "${scheduled_install_date_option}" == "X" ]]; }; then
-		delete_pref "scheduled_install_date"
+		delete_pref "ScheduledInstallDate"
+		unset scheduled_install_date
 	elif [[ -z "${scheduled_install_date}" ]] && [[ -n "${scheduled_install_date_option}" ]]; then
 		scheduled_install_date="${scheduled_install_date_option}"
 		set_pref "ScheduledInstallDate" "${scheduled_install_date}"
@@ -3372,14 +3373,16 @@ manage_workflow_options() {
 				[[ "${auth_service_account_saved}" == "TRUE" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via super service account."
 				workflow_macos_auth="LOCAL"
 			elif [[ "${auth_jamf_client_saved}" == "TRUE" ]] || [[ "${auth_jamf_account_saved}" == "TRUE" ]]; then
-				if [[ $macos_version_normalized -ge 110300 ]]; then
+				if [[ $macos_version_normalized -ge 270000 ]]; then
+					[[ -n "${auth_mdm_failover_to_user}" ]] && log_super "Warning: macOS 27 and later does not support MDM software update commands, failing over to user authenticated workflow." && workflow_macos_auth="FAILOVER"
+					[[ -z "${auth_mdm_failover_to_user}" ]] && log_super "Error: macOS 27 and later does not support MDM software update commands. Use the --auth-mdm-failover-to-user option to allow for failover to user authenticated workflow." && workflow_auth_error="TRUE"
+				elif [[ $macos_version_normalized -ge 110300 ]]; then
 					[[ -n "${auth_mdm_failover_to_user}" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via Jamf Pro API with --auth-mdm-failover-to-user=${auth_mdm_failover_to_user}."
 					[[ -z "${auth_mdm_failover_to_user}" ]] && log_super "Status: macOS update/upgrade workflows automatically authenticated via Jamf Pro API with no --auth-mdm-failover-to-user options."
 					workflow_macos_auth="JAMF"
 				else # Systems older than macOS 11.3.
 					log_super "Warning: Automatic macOS update/upgrade enforcement via MDM is only available on macOS 11.3 or newer."
 					if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
-						log_super "Status: User authentication is required to perform a macOS update/upgrade."
 						workflow_macos_auth="USER"
 					else # No valid current user to authenticate workflow.
 						workflow_auth_error="TRUE"
@@ -3388,7 +3391,6 @@ manage_workflow_options() {
 			else # No Apple silicon authentication options were provided.
 				log_super "Warning: Automatic macOS update/upgrade enforcement on Apple Silicon computers requires authentication credentials."
 				if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_has_secure_token}" == "TRUE" ]] && [[ "${current_user_is_volume_owner}" == "TRUE" ]]; then
-					log_super "Status: User authentication is required to perform a macOS update/upgrade."
 					workflow_macos_auth="USER"
 				else # No valid current user to authenticate workflow.
 					workflow_auth_error="TRUE"
@@ -3419,10 +3421,11 @@ manage_workflow_options() {
 			exit_error
 		fi
 	fi
+	{ [[ "${workflow_macos_auth}" == "USER" ]] || [[ "${workflow_macos_auth}" == "FAILOVER" ]]; } && log_super "Status: User authentication is required to perform a macOS update/upgrade."
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_auth_error is: ${workflow_auth_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_macos_auth is: ${workflow_macos_auth}"
 	
-	# Provide logging for ${workflow_auth_error} conditions, which at this point is a workflow-stopper.
+	# Provide additional logging for ${workflow_auth_error} conditions, which at this point is a workflow-stopper.
 	if [[ "${workflow_auth_error}" == "TRUE" ]]; then
 		if [[ "${current_user_account_name}" == "FALSE" ]]; then
 			log_super "Auth Error: No current active user to provide local authentication."
@@ -4468,8 +4471,8 @@ check_current_user() {
 	
 	# Only collect user details if it's a "normal" GUI user.
 	if [[ "${current_user_account_name}" != "FALSE" ]] && [[ "${current_user_id}" != "FALSE" ]] && [[ -d "${SUPER_LOG_FOLDER}" ]]; then
-		current_user_guid=$(dscl . read "/Users/${current_user_account_name}" GeneratedUID 2> /dev/null | awk '{print $2;}')
-		current_user_real_name=$(dscl . read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/^RealName: //g' -e 's/^ //g')
+		current_user_guid=$(dscl /Search read "/Users/${current_user_account_name}" GeneratedUID 2> /dev/null | awk '{print $2;}')
+		current_user_real_name=$(dscl /Search read "/Users/${current_user_account_name}" RealName 2> /dev/null | tail -1 | sed -e 's/^RealName: //g' -e 's/^ //g')
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_guid is: ${current_user_guid}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_real_name is: ${current_user_real_name}"
 		current_user_is_admin="FALSE"
@@ -4479,7 +4482,7 @@ check_current_user() {
 		current_user_system_password_policies="FALSE"
 		if [[ -n "${current_user_id}" ]] && [[ -n "${current_user_guid}" ]] && [[ -n "${current_user_real_name}" ]]; then
 			[[ $(groups "${current_user_account_name}" 2> /dev/null | grep -c 'admin') -gt 0 ]] && current_user_is_admin="TRUE"
-			[[ $(dscl . read "/Users/${current_user_account_name}" AuthenticationAuthority 2> /dev/null | grep -c 'SecureToken') -gt 0 ]] && current_user_has_secure_token="TRUE"
+			[[ $(dscl /Search read "/Users/${current_user_account_name}" AuthenticationAuthority 2> /dev/null | grep -c 'SecureToken') -gt 0 ]] && current_user_has_secure_token="TRUE"
 			[[ $(diskutil apfs listcryptousers / 2> /dev/null | grep -c "${current_user_guid}") -gt 0 ]] && current_user_is_volume_owner="TRUE"
 			local current_user_appearance_mode_response
 			current_user_appearance_mode_response=$(sudo -u "${current_user_account_name}" osascript -l 'JavaScript' -e "ObjC.import('AppKit'); $.NSAppearance.currentDrawingAppearance.bestMatchFromAppearancesWithNames(['NSAppearanceNameAqua', 'NSAppearanceNameDarkAqua']).js;" 2> /dev/null)
@@ -4616,7 +4619,7 @@ check_msu_settings() {
 check_auth_local_account() {
 	auth_error_local="FALSE"
 	local auth_local_guid
-	auth_local_guid=$(dscl . read "/Users/${auth_local_account}" GeneratedUID 2> /dev/null | awk '{print $2;}')
+	auth_local_guid=$(dscl /Search read "/Users/${auth_local_account}" GeneratedUID 2> /dev/null | awk '{print $2;}')
 	if [[ -n "${auth_local_guid}" ]]; then
 		if [[ ! $(diskutil apfs listcryptousers / | grep -c "${auth_local_guid}") -gt 0 ]]; then
 			log_super "Auth Error: The account \"${auth_local_account}\" is not a system volume owner."
@@ -5997,7 +6000,7 @@ check_software_update_status_cached() {
 	local deferral_restrictions_checksum
 	deferral_restrictions_checksum=$(get_pref "DeferralRestrictionsChecksum")
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions_checksum is: ${deferral_restrictions_checksum}"
-	if { [[ $deferral_restrictions_checksum -eq 0 ]] && [[ ! -f "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; } || [[ "${deferral_restrictions_checksum}" == "$(md5 -q "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" 2> /dev/null)" ]]; then
+	if { [[ "${deferral_restrictions_checksum}" == "0" ]] && [[ ! -f "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; } || [[ "${deferral_restrictions_checksum}" == "$(md5 -q "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" 2> /dev/null)" ]]; then
 		local deferral_restrictions_cache
 		deferral_restrictions_cache=$(get_pref "DeferralRestrictionsCache")
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions_cache is: ${deferral_restrictions_cache}"
@@ -7489,7 +7492,7 @@ workflow_download_macos() {
 	if [[ "${workflow_download_macos_error}" == "FALSE" ]] && [[ "${test_mode}" == "TRUE" ]] && [[ $macos_version_major -ge 14 ]] && [[ "${mac_cpu_architecture}" == "arm64" ]] && [[ "${workflow_macos_auth}" == "USER" ]]; then
 		local current_user_password_policies
 		local current_user_system_password_policies
-		[[ $(dscl . read "/Users/${current_user_account_name}" accountPolicyData 2> /dev/null | grep -c '<key>policies</key>') -gt 0 ]] && current_user_password_policies="TRUE"
+		[[ $(dscl /Search read "/Users/${current_user_account_name}" accountPolicyData 2> /dev/null | grep -c '<key>policies</key>') -gt 0 ]] && current_user_password_policies="TRUE"
 		[[ $(system_profiler SPConfigurationProfileDataType 2> /dev/null | grep -c 'passwordpolicy') -gt 0 ]] && current_user_system_password_policies="TRUE"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_password_policies is: ${current_user_password_policies}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_system_password_policies is: ${current_user_system_password_policies}"
