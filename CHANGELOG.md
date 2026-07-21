@@ -2,7 +2,7 @@
 
 ## [5.1.1]
 
-2026-??
+2026-07-21
 
 ## Highlights (5.1.x)
 
@@ -49,11 +49,13 @@
 ### Specific Changes (5.1.1)
 
 - __Note this sub-section only covers specific changes for 5.1.0 to 5.1.1. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
-- Initial support for macOS 27 betas.
+- Initial support for macOS 27 betas. This includes new error handling for the end of support for MDM authenticated workflows.
+- Improved `dscl` search mechanism improves support for network user accounts (Thanks to @tranziq for catching this one!)
+- Resolved a cache validation issue that could cause logic errors. (Thanks to @mdicecca for catching this one!)
 - Resolved an issue affecting the deletion of `--scheduled-install-date` option. (Thanks to @ir77io for catching this one!)
 - Resolved inaccurate error handling in the `--config-status` option. (Thanks to @ir77io for catching this one!)
 - As always, internal typo fixes and improvements to both regular and verbose log output.
-- `super` [5.1.1 SHA-256: FIXME](https://github.com/Macjutsu/super/blob/5.1.1/super.checksum.txt)
+- `super` [5.1.1 SHA-256: c838f6eb4de1de4e24404c8c96c71c8afdc30cf97195b411306f6ea7ae9c408f](https://github.com/Macjutsu/super/blob/5.1.1/super.checksum.txt)
 
 ### Specific Changes (5.1.0)
 
