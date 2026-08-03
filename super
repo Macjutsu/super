@@ -8,7 +8,7 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-SUPER_VERSION="5.1.1-p14"
+SUPER_VERSION="5.1.1-p15"
 readonly SUPER_VERSION
 SUPER_DATE="2026/08/03"
 readonly SUPER_DATE
@@ -5029,6 +5029,7 @@ check_schedule_workflow_active() {
 			else
 				schedule_workflow_active_next_start_epoch_array+=("${schedule_schedule_workflow_active_time_frame_start_epoch}")
 			fi
+		#>>> LOCAL PATCH (p13): past end of today's window → next week (+7d); upstream skipped same-weekday ended windows
 		elif [[ $workflow_time_epoch -gt $schedule_schedule_workflow_active_time_frame_end_epoch ]]; then # The current time is past the end time of the ${schedule_workflow_active_time_frame}.
 			# Same weekday: this week's window already ended, so move to next week. Other weekdays: next occurrence via +Weekday.
 			if [[ "${workflow_time_weekday}" == "${schedule_workflow_active_time_frame:0:3}" ]]; then
@@ -5036,6 +5037,7 @@ check_schedule_workflow_active() {
 			else
 				schedule_workflow_active_next_start_epoch_array+=("$(date -j -v+"${schedule_workflow_active_time_frame:0:3}"d -v"${schedule_workflow_active_time_frame:4:2}"H -v"${schedule_workflow_active_time_frame:7:2}"M -v00S +%s)")
 			fi
+		#<<< END LOCAL PATCH (p13)
 		fi
 	done
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active_deferral is: ${schedule_workflow_active_deferral}"
@@ -5238,7 +5240,9 @@ set_schedule_workflow_active_adjustments() {
 		# If needed, find future ${schedule_workflow_active} time frames by looping through 7 weekdays in reverse from the scheduled day and set ${schedule_workflow_active_match_start_epochs_array[*]} accordingly.
 		if [[ -z "${schedule_workflow_active_match_start_epochs_array[*]}" ]]; then
 			local workflow_scheduled_install_days_away
+			#>>> LOCAL PATCH (p13): end-of-day typo fix (upstream used 23:23:59)
 			workflow_scheduled_install_days_away=$((($(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install:0:10}:23:59:59" +%s) - $(date -v+0d -v0H -v0M -v0S +%s)) / 86400))
+			#<<< END LOCAL PATCH (p13)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_days_away: ${workflow_scheduled_install_days_away}"
 			#>>> LOCAL PATCH (p08): recompute weekday each reverse day (upstream froze workflow_scheduled_install_weekday so counters 1–5 never matched)
 			for ((counter=0; counter<6; ++counter)); do
@@ -5286,7 +5290,9 @@ set_schedule_workflow_active_adjustments() {
 		local workflow_scheduled_install_epoch_temp
 		workflow_scheduled_install_epoch_temp=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
 		local workflow_scheduled_install_days_away
+		#>>> LOCAL PATCH (p13): end-of-day typo fix (upstream used 23:23:59)
 		workflow_scheduled_install_days_away=$((($(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install:0:10}:23:59:59" +%s) - $(date -v+0d -v0H -v0M -v0S +%s)) / 86400))
+		#<<< END LOCAL PATCH (p13)
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install: ${workflow_scheduled_install}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_epoch_temp: ${workflow_scheduled_install_epoch_temp}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_days_away: ${workflow_scheduled_install_days_away}"
@@ -5929,7 +5935,9 @@ check_deadlines_days_date() {
 	
 	# If needed adjust the ${deadline_epoch} for the ${schedule_workflow_active} and also write to log.
 	if [[ -n "${schedule_workflow_active}" ]] && [[ -n "${deadline_epoch}" ]]; then
+		#>>> LOCAL PATCH (p13): consider days OR date status (upstream duplicated deadline_date_status with &&)
 		if [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_date_status}" != "FALSE" ]]; then
+		#<<< END LOCAL PATCH (p13)
 			log_super "Warning: The past due deadline is overriding the schedule workflow active option."
 		elif [[ -n "${deadline_date_epoch}" ]] && [[ $(date -r "${deadline_epoch}" +%H:%M) != "00:00" ]]; then
 			log_super "Warning: The manually set deadline date option that also includes a specific time is overriding the schedule workflow active option."
@@ -6087,8 +6095,10 @@ check_deadlines_count() {
 			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_focus_current=$((deadline_counter_focus_previous + 1))
 				set_pref_main "DeadlineCounterFocus" "${deadline_counter_focus_current}"
+			#>>> LOCAL PATCH (p13): when download still required, reuse previous counter (upstream left current unset)
 			else # Download still required: do not increment, but still evaluate the existing counter.
 				deadline_counter_focus_current="${deadline_counter_focus_previous}"
+			#<<< END LOCAL PATCH (p13)
 			fi
 			if [[ $deadline_counter_focus_current -ge $deadline_count_focus ]]; then
 				log_super "Status: Focus maximum deferral count of ${deadline_count_focus} has passed."
@@ -6115,8 +6125,10 @@ check_deadlines_count() {
 			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_soft_current=$((deadline_counter_soft_previous + 1))
 				set_pref_main "DeadlineCounterSoft" "${deadline_counter_soft_current}"
+			#>>> LOCAL PATCH (p13): when download still required, reuse previous counter (upstream left current unset)
 			else # Download still required: do not increment, but still evaluate the existing counter.
 				deadline_counter_soft_current="${deadline_counter_soft_previous}"
+			#<<< END LOCAL PATCH (p13)
 			fi
 			if [[ $deadline_counter_soft_current -ge $deadline_count_soft ]]; then
 				log_super "Status: Soft maximum deferral count of ${deadline_count_soft} has passed."
@@ -6140,8 +6152,10 @@ check_deadlines_count() {
 			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_hard_current=$((deadline_counter_hard_previous + 1))
 				set_pref_main "DeadlineCounterHard" "${deadline_counter_hard_current}"
+			#>>> LOCAL PATCH (p13): when download still required, reuse previous counter (upstream left current unset)
 			else # Download still required: do not increment, but still evaluate the existing counter.
 				deadline_counter_hard_current="${deadline_counter_hard_previous}"
+			#<<< END LOCAL PATCH (p13)
 			fi
 			if [[ $deadline_counter_hard_current -ge $deadline_count_hard ]]; then
 				log_super "Status: Hard maximum deferral count of ${deadline_count_hard} has passed."
