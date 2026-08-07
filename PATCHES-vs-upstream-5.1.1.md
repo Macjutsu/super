@@ -2,23 +2,25 @@
 
 **Purpose:** Describe every local change in this fork relative to stock Macjutsu **v5.1.1**, so a reviewer can understand *what* changed, *why*, and *how to find it in the script*. This is the patch catalog for the local build — not upstream release notes.
 
-**Generated:** 2026-08-03 (verified against live script)  
-**Local file:** `super` (directory name `super-5.1.1-p01` is historical; the build ID is **p15**)  
-**Local identity:** `SUPER_VERSION="5.1.1-p15"` · `SUPER_DATE="2026/08/03"`  
+**For IT admins (non-developers):** see [SUPPORT-bug-fixes.md](SUPPORT-bug-fixes.md) for an explanation of the local bug fixes.
+
+**Generated:** 2026-08-07 (verified against live script)  
+**Local file:** `super` (directory name `super-5.1.1-p01` is historical; the build ID is **p16**)  
+**Local identity:** `SUPER_VERSION="5.1.1-p16"` · `SUPER_DATE="2026/08/07"`  
 **Upstream:** [Macjutsu/super](https://github.com/Macjutsu/super) `main` / tag [`v5.1.1`](https://github.com/Macjutsu/super/releases)  
 **Upstream identity:** `SUPER_VERSION="5.1.1"` · `SUPER_DATE="2026/07/21"`
 
 ## Summary
 
-| | Upstream 5.1.1 | Local 5.1.1-p15 |
+| | Upstream 5.1.1 | Local 5.1.1-p16 |
 |---|---|---|
-| Lines | 11,403 | 11,993 |
-| Diff size | — | local fork on 5.1.1 (+p01–p15 markers) |
+| Lines | 11,403 | 12,184 |
+| Diff size | — | local fork on 5.1.1 (+p01–p16 markers) |
 | Patch markers | none | see **Marker conventions** below |
 
-Local work is a **forked patch series on top of stock 5.1.1**, not a rebase onto a newer upstream release. Upstream `main` at comparison time still matches tagged **v5.1.1** (2026-07-21). Patch numbers (`p01`…`p15`) are chronological local notes, not upstream release tags.
+Local work is a **forked patch series on top of stock 5.1.1**, not a rebase onto a newer upstream release. Upstream `main` at comparison time still matches tagged **v5.1.1** (2026-07-21). Patch numbers (`p01`…`p16`) are chronological local notes, not upstream release tags.
 
-**p04** was never used (number skipped). **p15** is a marker/docs pass: in-script `#>>> LOCAL PATCH (p13)` wrappers were added for previously unmarked schedule/deadline fixes; no behavioral change beyond the version string.
+**p04** was never used (number skipped). **p15** is a marker/docs pass: in-script `#>>> LOCAL PATCH (p13)` wrappers were added for previously unmarked schedule/deadline fixes; no behavioral change beyond the version string. **p16** hardens Failed-to-queue / restart-validate false success / MDM-deferred newer minor wait (upstream gaps; not a p01–p15 regression).
 
 ### Marker conventions
 
@@ -56,15 +58,16 @@ There is **no** `#>>> LOCAL PATCH (p15)` block — p15 only bumps `SUPER_VERSION
 | **p13** | in-script | Schedule past-end same-day → `+7d`; `23:23:59`→`23:59:59` (2× `days_away`); deadline days/date status `\|\|` fix; deferral-count `else` when download still required |
 | **p14** | in-script | Storage floors 15→25 / 25→35 GB; remove `macos_msu_size*2` undercut; install-time SPACE detect + log |
 | **p15** | version bump only | `SUPER_VERSION`/`SUPER_DATE` → `5.1.1-p15` / `2026/08/03`; add in-script **p13** markers (behavior unchanged from p14 aside from version) |
+| **p16** | in-script | Failed-to-queue QUEUE_WATCH + early validate prefs; restart PreBuild land check; MDM-deferred newer minor wait (gate installer fall-through) |
 
 ---
 
-## 1. Version (**p15**) and usage docs (**p01**)
+## 1. Version (**p16**) and usage docs (**p01**)
 
-- **[p15]** Version string: `5.1.1` → **`5.1.1-p15`** (logs, `--version`, user-agent); date `2026/07/21` → **`2026/08/03`**
+- **[p16]** Version string: → **`5.1.1-p16`** (logs, `--version`, user-agent); date → **`2026/08/07`** (prior local was `5.1.1-p15` / `2026/08/03`)
 - **[p01]** `--usage` / help MDM key list: documents `--workflow-macos-minor-auto-download-deferral` and `WorkflowMacOSMinorAutoDownloadDeferral`
 
-Treat **`5.1.1-p15`** as the authoritative build ID (`SUPER_VERSION` / `--version` / logs). The folder name `super-5.1.1-p01` does not change with later patch numbers.
+Treat **`5.1.1-p16`** as the authoritative build ID (`SUPER_VERSION` / `--version` / logs). The folder name `super-5.1.1-p01` does not change with later patch numbers.
 
 ---
 
@@ -353,9 +356,25 @@ Upstream blocked on `cat "${fifo}"` waiting for IBM Notifier metrics. If Notifie
 
 ---
 
-## 9. Behavior matrix (practical impact)
+## 9. Failed-to-queue / deferred-newer / restart land check (**p16**)
 
-| Area | Patch | Upstream 5.1.1 | Local p15 |
+Upstream gaps (confirmed vs stock **v5.1.1** and local **p15**): Apple can list an older installable minor via `softwareupdate` while MDM shows a **newer** same-major update as **Deferred: YES**, and/or emit `Failed to queue update and restart` after `Downloaded`/`Restarting...`. Stock/`p15` treated queue failure as COMPLETED + `WorkflowRestartValidate`, then restart validation could declare **All … completed!** while still on the pre-update build.
+
+Local **p16** (markers `#>>> LOCAL PATCH (p16)`):
+
+| Piece | Behavior |
+|---|---|
+| **B** `install_macos_msu` | On PREPARING 100% / `Downloaded` / `Restarting...`: early-set `WorkflowRestartValidate` + `WorkflowRestartValidatePreBuild`/`Target`, enter **QUEUE_WATCH** with `TIMEOUT_MSU_QUEUE_GRACE_SECONDS` (60). Detect `Failed to queue` in-watch → clear prefs, FAILED, error deferral. Grace expiry ≠ download timeout. COMPLETED + scheduled-install delete only after grace success. |
+| **C** restart validate | Land check: if PreBuild exists and current `macos_build` unchanged → Warning + restart-validation error deferral (leave prefs). Success path clears via `clear_workflow_restart_validate_os_prefs`. Restart-without-updates sets validate only and clears stale C prefs. |
+| **A** target select | Separate mdmclient **Deferred** parse (Product Key → YES/NO). If newer same-major `MSU_UPDATE` is Deferred YES → clear older SU minor, set `macos_minor_deferred_wait`, gate installer-minor fall-through. Exact pin exempt when normalized pin equals SU target (e.g. `26.6` or `26.6.0`). No `reset_workflow()` in A. |
+
+Helpers: `set_workflow_restart_validate_os_prefs` / `clear_workflow_restart_validate_os_prefs`.
+
+---
+
+## 10. Behavior matrix (practical impact)
+
+| Area | Patch | Upstream 5.1.1 | Local p16 |
 |---|---|---|---|
 | Minor update auto-download deferral | p01 | Always on when Apple auto-download applies | Optional via `WorkflowMacOSMinorAutoDownloadDeferral` (default on) |
 | Free-space floors | p14 | 15 GB / 25 GB | 25 GB / 35 GB; no `size*2` undercut |
@@ -378,11 +397,14 @@ Upstream blocked on `cat "${fifo}"` waiting for IBM Notifier metrics. If Notifie
 | Helper validate after failed get | p11 | Unset can look valid | Fail-closed `FALSE` defaults |
 | Test-mode no-user restart | p06 | Could still reboot | Skips reboot |
 | Restrictions checksum churn | p03 | Zeroed when keys absent | Zeroed only if plist missing |
-| In-script p13 markers | p15 | n/a | Markers added; version `5.1.1-p15` |
+| In-script p13 markers | p15 | n/a | Markers added; version was `5.1.1-p15` |
+| Failed to queue → false COMPLETED | p16 | Treated as success | QUEUE_WATCH + FAILED; early validate for reboot race |
+| Restart validate false “all completed” | p16 | Possible if listing empty | PreBuild land check |
+| Older SU while newer MDM-deferred | p16 | Installs older SU | Wait; no installer promotion |
 
 ---
 
-## 10. References
+## 11. References
 
 - Repo: https://github.com/Macjutsu/super  
 - Script: https://github.com/Macjutsu/super/blob/main/super  

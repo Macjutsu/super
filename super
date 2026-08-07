@@ -8,9 +8,9 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-SUPER_VERSION="5.1.1-p15"
+SUPER_VERSION="5.1.1-p16"
 readonly SUPER_VERSION
-SUPER_DATE="2026/08/03"
+SUPER_DATE="2026/08/07"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -668,6 +668,10 @@ set_defaults() {
 	# The number of seconds to timeout the macOS 11+ softwareupdate download/prepare workflow if no progress is reported.
 	TIMEOUT_MSU_SYSTEM_SECONDS=1200
 	readonly TIMEOUT_MSU_SYSTEM_SECONDS
+	#>>> LOCAL PATCH (p16): short grace after Downloaded/prepare to catch Failed to queue (not TIMEOUT_MSU_SYSTEM_SECONDS)
+	TIMEOUT_MSU_QUEUE_GRACE_SECONDS=60
+	readonly TIMEOUT_MSU_QUEUE_GRACE_SECONDS
+	#<<< END LOCAL PATCH (p16)
 	
 	# The number of seconds to timeout the softwareupdate non-system update workflow if no progress is reported.
 	TIMEOUT_NON_SYSTEM_MSU_SECONDS=600
@@ -1166,6 +1170,22 @@ set_pref() {
 delete_pref_main() {
 	defaults delete "${SUPER_MAIN_PLIST}" "${1}" 2> /dev/null
 }
+
+#>>> LOCAL PATCH (p16): set/clear WorkflowRestartValidate + land-check prefs (PreBuild/Target)
+# ${1} = target label for logging (e.g. 26.6-25G72); PreBuild is always current ${macos_build}.
+set_workflow_restart_validate_os_prefs() {
+	/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+	set_pref_main "WorkflowRestartValidate" "TRUE"
+	set_pref_main "WorkflowRestartValidatePreBuild" "${macos_build}"
+	[[ -n "${1}" ]] && set_pref_main "WorkflowRestartValidateTarget" "${1}"
+}
+
+clear_workflow_restart_validate_os_prefs() {
+	delete_pref_main "WorkflowRestartValidate"
+	delete_pref_main "WorkflowRestartValidatePreBuild"
+	delete_pref_main "WorkflowRestartValidateTarget"
+}
+#<<< END LOCAL PATCH (p16)
 
 # Delete a preference by name ${1} from either the current ${super_alternate_plist} or the ${SUPER_MAIN_PLIST}.
 delete_pref() {
@@ -6702,6 +6722,9 @@ workflow_check_software_status() {
 	macos_major_upgrade_latest="FALSE"
 	macos_msu_minor_update_target="FALSE"
 	macos_installer_minor_update_target="FALSE"
+	#>>> LOCAL PATCH (p16): gate installer fall-through when waiting on newer MDM-deferred minor
+	macos_minor_deferred_wait="FALSE"
+	#<<< END LOCAL PATCH (p16)
 	macos_minor_update_latest="FALSE"
 	macos_target_mdm_compatible="FALSE"
 	non_system_msu_targets="FALSE"
@@ -6800,6 +6823,25 @@ workflow_check_software_status() {
 		local mdmclient_sanitized_list
 		mdmclient_sanitized_list=$(echo "${mdmclient_list}" | grep -e '^\s*Product Key' -e '^\s*Title' -e '^\s*Version' | tr '\n' ',' | sed -e 's/Product/\nProduct/g' -e 's/: */:/g' -e 's/ <[^,]*,//g' -e 's/^[[:space:]]//')
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_sanitized_list is:\n${mdmclient_sanitized_list}"
+		#>>> LOCAL PATCH (p16): separate Deferred parse (Product Key → YES/NO); do not fold into three-field sanitize
+		local mdmclient_msu_deferred_pairs
+		mdmclient_msu_deferred_pairs=$(echo "${mdmclient_list}" | awk '
+			/^[[:space:]]*Product Key:/ {
+				key=$0
+				sub(/^[[:space:]]*Product Key:[[:space:]]*/, "", key)
+				gsub(/[[:space:]]+$/, "", key)
+			}
+			/^[[:space:]]*Deferred:/ {
+				def=$0
+				sub(/^[[:space:]]*Deferred:[[:space:]]*/, "", def)
+				split(def, a, /[[:space:]]+/)
+				d=toupper(a[1])
+				if (d != "YES") d="NO"
+				if (key != "") print key "," d
+			}
+		')
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_msu_deferred_pairs is:\n${mdmclient_msu_deferred_pairs}"
+		#<<< END LOCAL PATCH (p16)
 		
 		# Create arrays for available macOS and non-system updates.
 		mdmclient_macos_msu_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'MSU_UPDATE' | uniq | sort -t ':' -k3 -V -r))
@@ -7047,8 +7089,45 @@ workflow_check_software_status() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update_target_version_normalized is: ${macos_msu_minor_update_target_version_normalized}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
 		
+		#>>> LOCAL PATCH (p16): if mdmclient has a newer same-major MSU_UPDATE with Deferred YES, do not install older softwareupdate minor
+		if [[ "${mdmclient_available}" == "TRUE" ]] && [[ "${macos_msu_minor_update_target}" != "FALSE" ]] && [[ -n "${macos_msu_minor_update_target_version_normalized}" ]]; then
+			local macos_minor_exact_pin
+			macos_minor_exact_pin="FALSE"
+			# Exact pin exempt: pin normalizing to the same version as the SU target (e.g. 26.6 or 26.6.0).
+			# Major-only pins are not valid InstallMacOSMinorVersionTarget values; a major-only value would not normalize equal to 26.6.
+			if [[ -n "${install_macos_minor_version_target}" ]] && [[ "${install_macos_minor_version_normalized_target}" == "${macos_msu_minor_update_target_version_normalized}" ]]; then
+				macos_minor_exact_pin="TRUE"
+			fi
+			if [[ "${macos_minor_exact_pin}" != "TRUE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
+				local mdmclient_macos_deferred_item
+				local mdmclient_macos_deferred_key
+				local mdmclient_macos_deferred_ver_norm
+				local mdmclient_macos_deferred_flag
+				local mdmclient_macos_deferred_title
+				for mdmclient_macos_deferred_item in "${mdmclient_macos_msu_array[@]}"; do
+					mdmclient_macos_deferred_ver_norm=$(echo "${mdmclient_macos_deferred_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+					[[ "${mdmclient_macos_deferred_ver_norm:0:2}" != "$(printf "%02d" "${macos_version_major}")" ]] && continue
+					[[ ${mdmclient_macos_deferred_ver_norm} -le ${macos_msu_minor_update_target_version_normalized} ]] && continue
+					mdmclient_macos_deferred_key=$(echo "${mdmclient_macos_deferred_item}" | awk -F ',' '{print $1}' | sed -e 's/.*Product Key://' -e 's/^Product Key://')
+					mdmclient_macos_deferred_flag=$(echo "${mdmclient_msu_deferred_pairs}" | awk -F ',' -v k="${mdmclient_macos_deferred_key}" '$1 == k {print $2; exit}')
+					[[ "$(echo "${mdmclient_macos_deferred_flag}" | tr '[:lower:]' '[:upper:]')" != "YES" ]] && continue
+					mdmclient_macos_deferred_title=$(echo "${mdmclient_macos_deferred_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')
+					log_super "Status: Newer macOS minor update is deferred by MDM (${mdmclient_macos_deferred_title}); not installing older softwareupdate target $(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g') $(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')."
+					macos_msu_minor_update_target="FALSE"
+					unset macos_msu_minor_update_target_version_normalized
+					macos_minor_update_latest="FALSE"
+					macos_minor_deferred_wait="TRUE"
+					break
+				done
+			fi
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_deferred_wait is: ${macos_minor_deferred_wait}"
+		#<<< END LOCAL PATCH (p16)
+		
 		# If ${install_macos_minor_updates} and there is no ${macos_msu_major_upgrade_target} or ${macos_installer_major_upgrade_target} or ${macos_msu_minor_update} then attempt to resolve a ${macos_installer_minor_update_target} given ${install_macos_minor_version_target} and ${macos_installer_minor_updates_array[]}.
-		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+		#>>> LOCAL PATCH (p16): do not promote installer minor while waiting on MDM-deferred newer OTA
+		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${macos_minor_deferred_wait}" != "TRUE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+		#<<< END LOCAL PATCH (p16)
 			if [[ -z "${install_macos_minor_version_target}" ]]; then
 				macos_installer_minor_update_target="${macos_installer_minor_updates_array[0]}"
 			else
@@ -7088,7 +7167,9 @@ workflow_check_software_status() {
 				mdmclient_macos_item_version_normalized=$(echo "${mdmclient_macos_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
 				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_item_version_normalized is: ${mdmclient_macos_item_version_normalized}"
 				[[ ${mdmclient_macos_item_version_normalized:0:2} -gt ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS major upgrade is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
-				[[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
+				#>>> LOCAL PATCH (p16): skip misleading Disallowed while waiting on MDM-deferred newer minor
+				[[ "${macos_minor_deferred_wait}" != "TRUE" ]] && [[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
+				#<<< END LOCAL PATCH (p16)
 			done
 		fi
 		
@@ -8403,12 +8484,24 @@ install_macos_msu() {
 	
 	# Watch ${MSU_WORKFLOW_LOG} while waiting for the softwareupdate installation workflow to complete.
 	# Note this while read loop has a timeout based on ${TIMEOUT_START_SECONDS} then changes to ${TIMEOUT_MSU_SYSTEM_SECONDS}.
+	#>>> LOCAL PATCH (p16): read -t flag matrix for install watch
+	# install_macos_msu_start_error: TRUE until first real progress; SPACE on disk failure; stays FALSE after progress.
+	# install_macos_msu_start_timeout: TRUE until cleared on prepare/Downloaded; grace expiry must leave this FALSE.
+	# install_macos_msu_timeout_error: TRUE until cleared on prepare/Downloaded; grace expiry must leave this FALSE
+	#   (grace timeout must NOT be treated as download/prepare timeout_error).
+	# install_macos_msu_queue_error: TRUE only when "Failed to queue" seen during QUEUE_WATCH; distinct from timeouts.
+	# QUEUE_WATCH grace expiry with all FALSE + queue FALSE → success (COMPLETED after loop).
+	#<<< END LOCAL PATCH (p16)
 	local install_macos_msu_start_error
 	install_macos_msu_start_error="TRUE"
 	local install_macos_msu_start_timeout
 	install_macos_msu_start_timeout="TRUE"
 	local install_macos_msu_timeout_error
 	install_macos_msu_timeout_error="TRUE"
+	#>>> LOCAL PATCH (p16): Failed to queue detection state
+	local install_macos_msu_queue_error
+	install_macos_msu_queue_error="FALSE"
+	#<<< END LOCAL PATCH (p16)
 	local install_macos_msu_timeout_seconds
 	install_macos_msu_timeout_seconds="${TIMEOUT_START_SECONDS}"
 	local install_macos_msu_phase
@@ -8421,8 +8514,13 @@ install_macos_msu() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
 	while read -t "${install_macos_msu_timeout_seconds}" -r log_line; do
 		# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+		#>>> LOCAL PATCH (p16): Failed to queue during QUEUE_WATCH (match without requiring trailing period)
+		if [[ "${install_macos_msu_phase}" == "QUEUE_WATCH" ]] && [[ $(echo "${log_line}" | grep -ci 'Failed to queue update and restart') -gt 0 ]]; then
+			install_macos_msu_queue_error="TRUE"
+			break
+		#<<< END LOCAL PATCH (p16)
 		#>>> LOCAL PATCH (p14): detect Apple disk-space failures during install (download path already handled SPACE)
-		if [[ $(echo "${log_line}" | grep -c 'Not enough free disk space') -gt 0 ]]; then
+		elif [[ $(echo "${log_line}" | grep -c 'Not enough free disk space') -gt 0 ]]; then
 			install_macos_msu_start_error="SPACE"
 			break
 		elif [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]]; then
@@ -8457,10 +8555,16 @@ install_macos_msu() {
 			if [[ $install_macos_msu_complete_percent -ge 100 ]]; then
 				log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: 100%\n"
 				log_msu "**** TIMESTAMP ****"
+				#>>> LOCAL PATCH (p16): enter QUEUE_WATCH — early-set validate prefs (reboot race); do not break/COMPLETED yet
 				install_macos_msu_start_error="FALSE"
 				install_macos_msu_start_timeout="FALSE"
 				install_macos_msu_timeout_error="FALSE"
-				break
+				set_workflow_restart_validate_os_prefs "${macos_msu_version}-${macos_msu_build}"
+				install_macos_msu_phase="QUEUE_WATCH"
+				install_macos_msu_timeout_seconds="${TIMEOUT_MSU_QUEUE_GRACE_SECONDS}"
+				log_super "softwareupdate: Watching for Failed to queue for up to ${TIMEOUT_MSU_QUEUE_GRACE_SECONDS} seconds..."
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
+				#<<< END LOCAL PATCH (p16)
 			elif [[ $install_macos_msu_complete_percent -gt $install_macos_msu_complete_percent_previous ]]; then
 				install_macos_msu_complete_percent_display=$(((install_macos_msu_complete_percent - 60) * 2))
 				log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: ${install_macos_msu_complete_percent_display}%"
@@ -8469,23 +8573,75 @@ install_macos_msu() {
 		elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]]; then
 			macos_msu_title_downloaded=$(echo "${log_line}" | sed -e 's/://' -e 's/Downloaded //')
 			log_msu "**** TIMESTAMP ****"
+			#>>> LOCAL PATCH (p16): enter QUEUE_WATCH — early-set validate prefs (reboot race); do not break/COMPLETED yet
 			install_macos_msu_start_error="FALSE"
 			install_macos_msu_start_timeout="FALSE"
 			install_macos_msu_timeout_error="FALSE"
-			break
+			if [[ "${install_macos_msu_phase}" != "QUEUE_WATCH" ]]; then
+				set_workflow_restart_validate_os_prefs "${macos_msu_version}-${macos_msu_build}"
+				install_macos_msu_phase="QUEUE_WATCH"
+				install_macos_msu_timeout_seconds="${TIMEOUT_MSU_QUEUE_GRACE_SECONDS}"
+				log_super "softwareupdate: Watching for Failed to queue for up to ${TIMEOUT_MSU_QUEUE_GRACE_SECONDS} seconds..."
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
+			fi
+			#<<< END LOCAL PATCH (p16)
+		#>>> LOCAL PATCH (p16): Restarting... also enters QUEUE_WATCH if not already (same early-set rule)
+		elif [[ $(echo "${log_line}" | grep -c 'Restarting') -gt 0 ]] && [[ "${install_macos_msu_phase}" != "QUEUE_WATCH" ]]; then
+			log_msu "**** TIMESTAMP ****"
+			install_macos_msu_start_error="FALSE"
+			install_macos_msu_start_timeout="FALSE"
+			install_macos_msu_timeout_error="FALSE"
+			set_workflow_restart_validate_os_prefs "${macos_msu_version}-${macos_msu_build}"
+			install_macos_msu_phase="QUEUE_WATCH"
+			install_macos_msu_timeout_seconds="${TIMEOUT_MSU_QUEUE_GRACE_SECONDS}"
+			log_super "softwareupdate: Watching for Failed to queue for up to ${TIMEOUT_MSU_QUEUE_GRACE_SECONDS} seconds..."
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
+		#<<< END LOCAL PATCH (p16)
 		fi
 	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_start_error is: ${install_macos_msu_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_start_timeout is: ${install_macos_msu_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_error is: ${install_macos_msu_timeout_error}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_queue_error is: ${install_macos_msu_queue_error}"
 	
+	#>>> LOCAL PATCH (p16): Failed to queue → clear early validate prefs and fail (before COMPLETED)
+	if [[ "${install_macos_msu_queue_error}" == "TRUE" ]]; then
+		clear_workflow_restart_validate_os_prefs
+		log_msu "Error: softwareupdate failed to queue update and restart."
+		log_super "Error: softwareupdate failed to queue update and restart."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA SOFTWAREUPDATE FAILED ****"
+		kill -9 "${install_macos_msu_pid}" > /dev/null 2>&1
+		kick_softwareupdated
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed, install now workflow can not continue."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed, install now workflow can not continue."
+			log_status "Inactive Error: Installation of macOS update/upgrade via softwareupdate failed, install now workflow can not continue."
+			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
+			exit_error
+		else
+			deferral_timer_minutes=$deferral_timer_error_minutes
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			log_status "Pending: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
+			set_auto_launch_deferral
+		fi
+	#<<< END LOCAL PATCH (p16)
 	# If the softwareupdate installation workflow completed, then prepare for restart.
-	if [[ "${install_macos_msu_start_error}" == "FALSE" ]] && [[ "${install_macos_msu_start_timeout}" == "FALSE" ]] && [[ "${install_macos_msu_timeout_error}" == "FALSE" ]]; then
+	elif [[ "${install_macos_msu_start_error}" == "FALSE" ]] && [[ "${install_macos_msu_start_timeout}" == "FALSE" ]] && [[ "${install_macos_msu_timeout_error}" == "FALSE" ]]; then
+		#>>> LOCAL PATCH (p16): confirm success after grace — scheduled-install delete + COMPLETED only here (prefs already early-set)
 		/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+		set_pref_main "WorkflowRestartValidate" "TRUE"
+		[[ -z "$(get_pref "WorkflowRestartValidatePreBuild")" ]] && set_pref_main "WorkflowRestartValidatePreBuild" "${macos_build}"
+		[[ -z "$(get_pref "WorkflowRestartValidateTarget")" ]] && set_pref_main "WorkflowRestartValidateTarget" "${macos_msu_version}-${macos_msu_build}"
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA SOFTWAREUPDATE COMPLETED ****"
 		log_super_audit "softwareupdate: macOS update/upgrade is prepared and ready for restart!"
+		#<<< END LOCAL PATCH (p16)
 	else # Some part of the softwareupdate installation workflow failed.
+		#>>> LOCAL PATCH (p16): clear any early validate prefs from a partial QUEUE_WATCH entry
+		clear_workflow_restart_validate_os_prefs
+		#<<< END LOCAL PATCH (p16)
 		#>>> LOCAL PATCH (p14): log install SPACE failures like the download SPACE handler
 		if [[ "${install_macos_msu_start_error}" == "SPACE" ]]; then
 			log_msu "Error: Not enough available storage to download macOS update/upgrade."
@@ -8611,7 +8767,9 @@ install_macos_app() {
 	
 	# If the startosinstall workflow completed, then prepare for restart.
 	if [[ "${install_macos_app_start_error}" == "FALSE" ]] && [[ "${install_macos_app_start_timeout}" == "FALSE" ]] && [[ "${install_macos_app_timeout}" == "FALSE" ]]; then
-		/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+		#>>> LOCAL PATCH (p16): set restart-validate + PreBuild/Target for land check
+		set_workflow_restart_validate_os_prefs "${macos_installer_version}-${macos_installer_build}"
+		#<<< END LOCAL PATCH (p16)
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS COMPLETED ****"
 		log_super_audit "Status: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} is prepared and ready for restart!"
@@ -9096,7 +9254,13 @@ push_macos_mdm() {
 				set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
 			fi
 		else # Install workflow at this point is a success.
-			/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+			#>>> LOCAL PATCH (p16): set restart-validate + PreBuild/Target for land check
+			if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]]; then
+				set_workflow_restart_validate_os_prefs "${macos_installer_version}-${macos_installer_build}"
+			else
+				set_workflow_restart_validate_os_prefs "${macos_msu_version}-${macos_msu_build}"
+			fi
+			#<<< END LOCAL PATCH (p16)
 			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
 			[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super_audit "MDM: ${macos_msu_label} upgrade is prepared and ready for restart!"
@@ -9407,7 +9571,11 @@ workflow_install_no_user() {
 			[[ -n "${install_jamf_policy_triggers}" ]] && run_jamf_policy_triggers
 			#>>> LOCAL PATCH (p06): honor test mode in no-user restart-without-updates (mirror workflow_install_active_user)
 			if [[ "${test_mode}" != "TRUE" ]]; then
+				#>>> LOCAL PATCH (p16): restart-without-updates — validate only; clear stale C prefs (no PreBuild write)
 				set_pref_main "WorkflowRestartValidate" "TRUE"
+				delete_pref_main "WorkflowRestartValidatePreBuild"
+				delete_pref_main "WorkflowRestartValidateTarget"
+				#<<< END LOCAL PATCH (p16)
 				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
 				log_super_audit "Status: Restarting computer in one minute..."
 				shutdown -o -r +1 > /dev/null 2>&1 &
@@ -9561,7 +9729,11 @@ workflow_install_active_user() {
 			[[ -n "${install_jamf_policy_triggers}" ]] && run_jamf_policy_triggers
 			notification_restart
 			if [[ "${test_mode}" != "TRUE" ]]; then
+				#>>> LOCAL PATCH (p16): restart-without-updates — validate only; clear stale C prefs (no PreBuild write)
 				set_pref_main "WorkflowRestartValidate" "TRUE"
+				delete_pref_main "WorkflowRestartValidatePreBuild"
+				delete_pref_main "WorkflowRestartValidateTarget"
+				#<<< END LOCAL PATCH (p16)
 				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
 				log_super_audit "Status: Restarting computer in one minute..."
 				shutdown -o -r +1 > /dev/null 2>&1 &
@@ -9602,6 +9774,14 @@ workflow_install_active_user() {
 # This function checks the macOS upgrade/update status after a previous super macOS upgrade/update restart.
 workflow_restart_validate() {
 	log_status "Running: Restart validation workflow."
+	#>>> LOCAL PATCH (p16): read land-check prefs before status check (MacOSMSU*Downloaded may be wiped)
+	local workflow_restart_validate_pre_build
+	workflow_restart_validate_pre_build=$(get_pref "WorkflowRestartValidatePreBuild")
+	local workflow_restart_validate_target
+	workflow_restart_validate_target=$(get_pref "WorkflowRestartValidateTarget")
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_restart_validate_pre_build is: ${workflow_restart_validate_pre_build}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_restart_validate_target is: ${workflow_restart_validate_target}"
+	#<<< END LOCAL PATCH (p16)
 	if [[ "${workflow_disable_update_check}" != "TRUE" ]]; then # Skip software updates/upgrade mode option.
 		check_software_status_required="TRUE"
 		workflow_check_software_status
@@ -9621,8 +9801,17 @@ workflow_restart_validate() {
 	
 	# Log status of updates/upgrade completion.
 	if [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "FALSE" ]]; then
-		log_super_audit "Status: All available and enabled macOS software updates/upgrades completed!"
-		check_software_status_required="FALSE"
+		#>>> LOCAL PATCH (p16): land check — same build as PreBuild means update did not land (false success)
+		if [[ -n "${workflow_restart_validate_pre_build}" ]] && [[ "${macos_build}" == "${workflow_restart_validate_pre_build}" ]]; then
+			deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
+			log_super "Warning: Restart validation expected an OS build change (pre-update build ${workflow_restart_validate_pre_build}$([[ -n "${workflow_restart_validate_target}" ]] && echo ", target ${workflow_restart_validate_target}"), current ${macos_build}); update did not land, trying again in ${deferral_timer_minutes} minutes."
+			log_status "Pending: Restart validation detected no OS build change after update attempt, trying again in ${deferral_timer_minutes} minutes."
+			set_auto_launch_deferral
+		else
+			log_super_audit "Status: All available and enabled macOS software updates/upgrades completed!"
+			check_software_status_required="FALSE"
+		fi
+		#<<< END LOCAL PATCH (p16)
 	elif [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "TRUE" ]]; then
 		deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
 		log_super "Error: Some non-system macOS software updates remain available for installation, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
@@ -11492,7 +11681,9 @@ main() {
 		log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - RESTART VALIDATION WORKFLOW ****"
 		workflow_restart_validate # This function will automatically defer if there are any errors.
 		# At this point the workflow_restart_validate() function was succesfull, so reset for future workflow runs.
-		delete_pref_main "WorkflowRestartValidate"
+		#>>> LOCAL PATCH (p16): clear land-check prefs whenever WorkflowRestartValidate is cleared
+		clear_workflow_restart_validate_os_prefs
+		#<<< END LOCAL PATCH (p16)
 		unset workflow_restart_validate_active
 		set_pref_main "MacLastStartup" "${mac_last_startup}"
 		workflow_time_epoch=$(date +%s)
