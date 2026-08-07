@@ -5,22 +5,22 @@
 **For IT admins (non-developers):** see [SUPPORT-bug-fixes.md](SUPPORT-bug-fixes.md) for an explanation of the local bug fixes.
 
 **Generated:** 2026-08-07 (verified against live script)  
-**Local file:** `super` (directory name `super-5.1.1-p01` is historical; the build ID is **p16**)  
-**Local identity:** `SUPER_VERSION="5.1.1-p16"` · `SUPER_DATE="2026/08/07"`  
+**Local file:** `super` (directory name `super-5.1.1-p01` is historical; the build ID is **p19**)  
+**Local identity:** `SUPER_VERSION="5.1.1-p19"` · `SUPER_DATE="2026/08/07"`  
 **Upstream:** [Macjutsu/super](https://github.com/Macjutsu/super) `main` / tag [`v5.1.1`](https://github.com/Macjutsu/super/releases)  
 **Upstream identity:** `SUPER_VERSION="5.1.1"` · `SUPER_DATE="2026/07/21"`
 
 ## Summary
 
-| | Upstream 5.1.1 | Local 5.1.1-p16 |
+| | Upstream 5.1.1 | Local 5.1.1-p19 |
 |---|---|---|
-| Lines | 11,403 | 12,184 |
-| Diff size | — | local fork on 5.1.1 (+p01–p16 markers) |
+| Lines | 11,401 | 12,639 |
+| Diff size | — | local fork on 5.1.1 (+p01–p19 markers) |
 | Patch markers | none | see **Marker conventions** below |
 
-Local work is a **forked patch series on top of stock 5.1.1**, not a rebase onto a newer upstream release. Upstream `main` at comparison time still matches tagged **v5.1.1** (2026-07-21). Patch numbers (`p01`…`p16`) are chronological local notes, not upstream release tags.
+Local work is a **forked patch series on top of stock 5.1.1**, not a rebase onto a newer upstream release. Upstream `main` at comparison time still matches tagged **v5.1.1** (2026-07-21). Patch numbers (`p01`…`p19`) are chronological local notes, not upstream release tags.
 
-**p04** was never used (number skipped). **p15** is a marker/docs pass: in-script `#>>> LOCAL PATCH (p13)` wrappers were added for previously unmarked schedule/deadline fixes; no behavioral change beyond the version string. **p16** hardens Failed-to-queue / restart-validate false success / MDM-deferred newer minor wait (upstream gaps; not a p01–p15 regression).
+**p04** was never used (number skipped). **p15** is a marker/docs pass: in-script `#>>> LOCAL PATCH (p13)` wrappers were added for previously unmarked schedule/deadline fixes; no behavioral change beyond the version string. **p16** hardens Failed-to-queue / restart-validate false success / MDM-deferred newer minor wait (upstream gaps; not a p01–p15 regression). **p17** adds size-aware storage formula, live Apple snapshot-prepare capture, and pre-producer proceed gates (builds on p14 floors). **p18** hardens p17 production readiness: MDM UPDATE/UPGRADE residual gate, SIGTERM/HUP stream cleanup, parser drain order, fail-closed max file. **p19** hardens Apple prepare capture races/orphans: mkdir lock on max updates; parent-tracked tail + FIFO; stop order reap-then-sync.
 
 ### Marker conventions
 
@@ -59,15 +59,18 @@ There is **no** `#>>> LOCAL PATCH (p15)` block — p15 only bumps `SUPER_VERSION
 | **p14** | in-script | Storage floors 15→25 / 25→35 GB; remove `macos_msu_size*2` undercut; install-time SPACE detect + log |
 | **p15** | version bump only | `SUPER_VERSION`/`SUPER_DATE` → `5.1.1-p15` / `2026/08/03`; add in-script **p13** markers (behavior unchanged from p14 aside from version) |
 | **p16** | in-script | Failed-to-queue QUEUE_WATCH + early validate prefs; restart PreBuild land check; MDM-deferred newer minor wait (gate installer fall-through) |
+| **p17** | in-script | Size-aware storage formula + safe floor 25/35 when Apple prepare max unseen; live snapshot-prepare stream; pre-producer proceed gates; residual skip-notify; SPACE wording |
+| **p18** | in-script | MDM UPDATE/UPGRADE residual storage gate; SIGTERM/HUP stream cleanup + reap; producer→drain→parser stop order; fail-closed secure per-run max file (`mktemp`) |
+| **p19** | in-script | mkdir lock on prepare-max updates; parent-tracked `tail` + FIFO parser (no process-substitution orphans); stop order **reap then sync-parse** |
 
 ---
 
-## 1. Version (**p16**) and usage docs (**p01**)
+## 1. Version (**p19**) and usage docs (**p01**)
 
-- **[p16]** Version string: → **`5.1.1-p16`** (logs, `--version`, user-agent); date → **`2026/08/07`** (prior local was `5.1.1-p15` / `2026/08/03`)
+- **[p19]** Version string: → **`5.1.1-p19`** (logs, `--version`, user-agent); date → **`2026/08/07`** (prior local was `5.1.1-p18` / `2026/08/07`)
 - **[p01]** `--usage` / help MDM key list: documents `--workflow-macos-minor-auto-download-deferral` and `WorkflowMacOSMinorAutoDownloadDeferral`
 
-Treat **`5.1.1-p16`** as the authoritative build ID (`SUPER_VERSION` / `--version` / logs). The folder name `super-5.1.1-p01` does not change with later patch numbers.
+Treat **`5.1.1-p19`** as the authoritative build ID (`SUPER_VERSION` / `--version` / logs). The folder name `super-5.1.1-p01` does not change with later patch numbers.
 
 ---
 
@@ -97,18 +100,27 @@ Logic lives in `workflow_check_download_status()`. When the option is **`FALSE`*
 
 ---
 
-## 3. Storage requirements (**p14**)
+## 3. Storage requirements (**p14**, **p17**, **p18**, **p19**)
 
 These changes address false “enough free space” decisions that later failed when Apple actually prepared/installed the update.
 
-### Default floors
+### Default floors (**p14**, retained as safe floor in **p17**)
 
 | Constant | Upstream | Local |
 |---|---|---|
-| `STORAGE_REQUIRED_UPDATE_DEFAULT_GB` | 15 | **25** |
-| `STORAGE_REQUIRED_UPGRADE_DEFAULT_GB` | 25 | **35** |
+| `STORAGE_REQUIRED_UPDATE_DEFAULT_GB` / `STORAGE_SAFE_FLOOR_MINOR_GB` | 15 | **25** |
+| `STORAGE_REQUIRED_UPGRADE_DEFAULT_GB` / `STORAGE_SAFE_FLOOR_MAJOR_GB` | 25 | **35** |
 
-Used as the baseline required free space for minor updates and major upgrades before adding any still-needed download size. Raised because small OTA *download* sizes were undercutting Apple’s real install need (~19 GB observed for Tahoe 26.6).
+### Size-aware formula + proceed gates (**p17**, hardened **p18** / **p19**)
+
+- Precheck (`check_storage_available`): `headroom = max(PREPARE_MIN, listed×MULT)` then `formula_required = headroom (+ listed if download still needed)`; apply **safe floor 25/35** (Apple prepare max is never available yet at precheck). Constants: minor **MULT=4** / **PREPARE_MIN=15**; major **MULT=2** / **PREPARE_MIN=25**. Minor MSU → minor constants; major MSU and **any installer** → major constants. No restored `size*2` undercut.
+- Live capture: per-run `log stream` of `snapshot prepare size:N bytes` → secure max file via `mktemp` (ignore &lt; 1 000 000); wired into MSU download/install, `startosinstall`, MDM DOWNLOAD+INSTALL; cleaned on all exits including **SIGINT/SIGTERM/SIGHUP** (**p18**). **p19:** parent-tracked `tail` + FIFO parser (no process-substitution orphan `tail -F`); max-file updates use a **mkdir lock**; stop order is kill producer → bounded drain → **reap parser/tail → sync-parse** (sole writer after reap). Reset failure fails closed (treat max as 0 / safe-floor path).
+- Proceed gate (`check_storage_ready_to_proceed`): when Apple max &gt; 0 use `max(formula_required, apple_gb)` **without** forcing safe floor; when max is 0 keep safe floor 25/35. Pre-producer gates before restart-capable actions terminate via `exit_error` / `set_auto_launch_deferral` (not ignored error flags). Residual post-watch only skips notify/audit — reboot may already be owned:
+  - Local `startosinstall` success notify/audit
+  - MDM INSTALLER mid-watch restart notify
+  - MDM UPDATE/UPGRADE/INSTALLER success audit (**p18**; p17 only covered installer mid-watch notify)
+- Explicit `TestStorage*` sets `test_storage_*_active` (defaults alone do not); overrides formula and Apple bump.
+- Install SPACE log wording: “install/prepare” (not “download”).
 
 ### Removed `macos_msu_size * 2` undercut
 
@@ -125,9 +137,7 @@ Example failure mode: a ~4 GB reported OTA made required space ~8 GB, so `su
 Upstream already handled log line `Not enough free disk space` on the **download** watch path. Local also:
 
 1. Detects that string during the **install** log watch → `install_macos_msu_start_error="SPACE"`
-2. Adds a SPACE branch in install failure logging
-
-**Known leftover:** the install SPACE log text still says “to **download**…” (copied from the download handler). Behavior/routing is correct; wording is not install-specific.
+2. Adds a SPACE branch in install failure logging (**p17**: wording says install/prepare)
 
 Without (1)–(2), install-time SPACE failures fell into a generic install-failed path and were harder to diagnose/retry correctly.
 
@@ -137,11 +147,12 @@ Without (1)–(2), install-time SPACE failures fell into a generic install-faile
 
 These changes keep downloads alive across relaunches, avoid killing the wrong process, and stop incomplete downloads from being marked complete.
 
-### SIGINT handler (**p01**)
+### SIGINT / SIGTERM / SIGHUP handler (**p01**, **p18**)
 
-New `handle_super_interrupt`, trapped in `main` only after prefs/logging are ready:
+New `handle_super_interrupt`, trapped in `main` only after prefs/logging are ready (`SIGINT` **p01**; also `SIGTERM`/`SIGHUP` **p18**):
 
 - Leaves in-progress `softwareupdate` / `mist` alone (so a Ctrl-C does not abort Apple’s prepare mid-flight)
+- Cleans Apple prepare `log stream` / parser children (**p17**/**p18**)
 - Sets `NextAutoLaunch` to `FALSE` so the LaunchDaemon does not immediately relaunch into a fight with that leftover process
 - Clears Jamf API token / PID file; exits 130
 
@@ -374,17 +385,19 @@ Helpers: `set_workflow_restart_validate_os_prefs` / `clear_workflow_restart_vali
 
 ## 10. Behavior matrix (practical impact)
 
-| Area | Patch | Upstream 5.1.1 | Local p16 |
+| Area | Patch | Upstream 5.1.1 | Local p19 |
 |---|---|---|---|
 | Minor update auto-download deferral | p01 | Always on when Apple auto-download applies | Optional via `WorkflowMacOSMinorAutoDownloadDeferral` (default on) |
 | Free-space floors | p14 | 15 GB / 25 GB | 25 GB / 35 GB; no `size*2` undercut |
-| Install SPACE errors | p14 | Download watch only | Download + install watch/logging (log text still says “download”) |
+| Install SPACE errors | p14 / p17 | Download watch only | Download + install watch/logging; failure log says “install/prepare” |
 | Hung `tail -F` on **list** helpers | p01+p12 | Possible | Hard-timeout polling in list helpers |
 | Empty mdmclient list | p01 | Limited | `softwareupdate` fallback |
 | `softwareupdate` “No new software” | p05 | Treated as status **error** | Clean “no updates” Status (unless list fetch failed) |
 | Incomplete download marked complete | p01+p06 | Possible (final OR gate) | Fixed (final AND gate) |
 | In-progress download on relaunch | p02+p12 | Always killed at startup | Preserved only with recent log progress; attach/resume |
-| SIGINT / Ctrl-C | p01 | Default shell behavior | Disable immediate LaunchDaemon relaunch |
+| SIGINT / SIGTERM / SIGHUP | p01/p18 | Default shell behavior | Disable immediate LaunchDaemon relaunch; clean Apple prepare stream |
+| Prepare-max concurrent writers | p19 | n/a (local) | mkdir lock; stop reap-then-sync (no clobber) |
+| Prepare `tail -F` orphans | p19 | n/a (local) | Parent-tracked tail + FIFO + path-scoped pkill |
 | SOFA zero date | p09 | `sed` strip `Z`, treat as local | True UTC→local |
 | Schedule weekday counters | p08 | Frozen weekday in reverse loops | Recomputed each day |
 | `days=0` window pick | p10 | Latest window | Soonest window |

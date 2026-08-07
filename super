@@ -8,7 +8,7 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-SUPER_VERSION="5.1.1-p16"
+SUPER_VERSION="5.1.1-p19"
 readonly SUPER_VERSION
 SUPER_DATE="2026/08/07"
 readonly SUPER_DATE
@@ -486,6 +486,15 @@ set_defaults() {
 	MSU_LIST_LOG="${SUPER_LOG_FOLDER}/msu-list.log"
 	readonly MSU_LIST_LOG
 	
+	#>>> LOCAL PATCH (p17): per-run Apple snapshot prepare size stream + max files
+	APPLE_SNAPSHOT_PREPARE_STREAM_LOG="${SUPER_LOG_FOLDER}/apple-snapshot-prepare-stream.log"
+	readonly APPLE_SNAPSHOT_PREPARE_STREAM_LOG
+	#>>> LOCAL PATCH (p18): secure per-run max path via mktemp (runtime var apple_snapshot_prepare_max_file)
+	APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE="${SUPER_LOG_FOLDER}/.apple-snapshot-prepare-max.XXXXXX"
+	readonly APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE
+	#<<< END LOCAL PATCH (p18)
+	#<<< END LOCAL PATCH (p17)
+	
 	# OPTIONAL path to an existing static msu-list.log for debugging and testing only. Leave this value empty for the default workflow behavior:
 	MSU_LIST_DEBUG_LOG=""
 	readonly MSU_LIST_DEBUG_LOG
@@ -640,6 +649,20 @@ set_defaults() {
 	STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=35
 	readonly STORAGE_REQUIRED_UPGRADE_DEFAULT_GB
 	#<<< END LOCAL PATCH (p14)
+	#>>> LOCAL PATCH (p17): size-aware prepare headroom + safe floors when Apple prepare max is unseen
+	STORAGE_PREPARE_MULT_MINOR=4
+	readonly STORAGE_PREPARE_MULT_MINOR
+	STORAGE_PREPARE_MULT_MAJOR=2
+	readonly STORAGE_PREPARE_MULT_MAJOR
+	STORAGE_PREPARE_MIN_MINOR_GB=15
+	readonly STORAGE_PREPARE_MIN_MINOR_GB
+	STORAGE_PREPARE_MIN_MAJOR_GB=25
+	readonly STORAGE_PREPARE_MIN_MAJOR_GB
+	STORAGE_SAFE_FLOOR_MINOR_GB=25
+	readonly STORAGE_SAFE_FLOOR_MINOR_GB
+	STORAGE_SAFE_FLOOR_MAJOR_GB=35
+	readonly STORAGE_SAFE_FLOOR_MAJOR_GB
+	#<<< END LOCAL PATCH (p17)
 	
 	# The number of seconds between storage checks when displaying the insufficient storage notification via the dialog_insufficient_storage() function.
 	STORAGE_REQUIRED_RECHECK_SECONDS=5
@@ -2910,6 +2933,8 @@ manage_parameter_options() {
 	fi
 	
 	# Validate ${test_storage_update_option} input and if valid set the ${storage_required_update_gb} parameter. If there is no ${storage_required_update_gb} then set it to ${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}.
+	#>>> LOCAL PATCH (p17): track explicit TestStorageUpdate so formula/proceed do not treat defaults as overrides
+	test_storage_update_active="FALSE"
 	storage_required_update_gb=$(get_pref_managed "TestStorageUpdate")
 	if [[ "${storage_required_update_gb}" == "X" ]] || { [[ -z "${storage_required_update_gb}" ]] && [[ "${test_storage_update_option}" == "X" ]]; }; then
 		delete_pref "TestStorageUpdate"
@@ -2921,10 +2946,18 @@ manage_parameter_options() {
 	[[ -z "${storage_required_update_gb}" ]] && storage_required_update_gb=$(get_pref "TestStorageUpdate")
 	[[ -n "${storage_required_upgrade_gb}" ]] && log_super "Parameter Warning: Specifying the --test-storage-update option should only be used for testing purposes."
 	{ [[ -n "${storage_required_update_gb}" ]] && [[ ! "${storage_required_update_gb}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --test-storage-update=gigabytes value must only be a number." && parameter_error="TRUE"
-	[[ -z "${storage_required_update_gb}" ]] && storage_required_update_gb="${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}"
+	if [[ -n "${storage_required_update_gb}" ]]; then
+		test_storage_update_active="TRUE"
+	else
+		storage_required_update_gb="${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}"
+	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_update_gb is: ${storage_required_update_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: test_storage_update_active is: ${test_storage_update_active}"
+	#<<< END LOCAL PATCH (p17)
 	
 	# Validate ${test_storage_upgrade_option} input and if valid set the ${storage_required_upgrade_gb} parameter. If there is no ${storage_required_upgrade_gb} then set it to ${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}.
+	#>>> LOCAL PATCH (p17): track explicit TestStorageUpgrade so formula/proceed do not treat defaults as overrides
+	test_storage_upgrade_active="FALSE"
 	storage_required_upgrade_gb=$(get_pref_managed "TestStorageUpgrade")
 	if [[ "${storage_required_upgrade_gb}" == "X" ]] || { [[ -z "${storage_required_upgrade_gb}" ]] && [[ "${test_storage_upgrade_option}" == "X" ]]; }; then
 		delete_pref "TestStorageUpgrade"
@@ -2936,8 +2969,14 @@ manage_parameter_options() {
 	[[ -z "${storage_required_upgrade_gb}" ]] && storage_required_upgrade_gb=$(get_pref "TestStorageUpgrade")
 	[[ -n "${storage_required_upgrade_gb}" ]] && log_super "Parameter Warning: Specifying the --test-storage-upgrade option should only be used for testing purposes."
 	{ [[ -n "${storage_required_upgrade_gb}" ]] && [[ ! "${storage_required_upgrade_gb}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --test-storage-upgrade=gigabytes value must only be a number." && parameter_error="TRUE"
-	[[ -z "${storage_required_upgrade_gb}" ]] && storage_required_upgrade_gb="${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}"
+	if [[ -n "${storage_required_upgrade_gb}" ]]; then
+		test_storage_upgrade_active="TRUE"
+	else
+		storage_required_upgrade_gb="${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}"
+	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_upgrade_gb is: ${storage_required_upgrade_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: test_storage_upgrade_active is: ${test_storage_upgrade_active}"
+	#<<< END LOCAL PATCH (p17)
 	
 	# Validate ${test_battery_level_option} input and if valid set the ${power_required_battery_percent} parameter. If there is no ${power_required_battery_percent} then set it to ${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}.
 	power_required_battery_percent=$(get_pref_managed "TestBatteryLevel")
@@ -4308,11 +4347,13 @@ workflow_startup() {
 ################################################################################
 
 #>>> LOCAL PATCH (p01): clean Ctrl-C / SIGINT handling so LaunchDaemon does not immediately relaunch and softwareupdate prepare is not killed
-# On interactive interrupt: leave any in-progress softwareupdate/mist alone, disable immediate auto-relaunch, and exit.
-# Invoked via: trap handle_super_interrupt SIGINT (in main). ShellCheck SC2329 does not treat trap handlers as call sites.
+#>>> LOCAL PATCH (p18): also trap SIGTERM/SIGHUP; reap Apple prepare stream children; leave softwareupdate/mist alone
+# On interrupt/termination: leave any in-progress softwareupdate/mist alone, disable immediate auto-relaunch, and exit.
+# Invoked via: trap handle_super_interrupt SIGINT SIGTERM SIGHUP (in main). ShellCheck SC2329 does not treat trap handlers as call sites.
 # shellcheck disable=SC2329
 handle_super_interrupt() {
-	trap - SIGINT
+	trap - SIGINT SIGTERM SIGHUP
+	cleanup_apple_snapshot_prepare_stream
 	if [[ -d "${SUPER_LOG_FOLDER}" ]]; then
 		log_super "Warning: Interrupt signal received; leaving any in-progress softwareupdate/mist download or prepare running."
 		log_super "Status: Setting NextAutoLaunch to FALSE to prevent an immediate LaunchDaemon relaunch after interrupt."
@@ -4325,6 +4366,7 @@ handle_super_interrupt() {
 	[[ -d "${SUPER_LOG_FOLDER}" ]] && log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT INTERRUPT ****"
 	exit 130
 }
+#<<< END LOCAL PATCH (p18)
 #<<< END LOCAL PATCH (p01)
 
 #>>> LOCAL PATCH (p02): helpers for scoped msu-workflow.log reads, softwareupdate --download PID selection, and kill waits
@@ -4433,6 +4475,9 @@ interactive_interrupt() {
 
 # Restart super via the LaunchDaemon after waiting for ${restart_super_sleep_seconds} seconds.
 restart_super() {
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream before restart exit
+	cleanup_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	/usr/libexec/PlistBuddy -c "Delete :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 	{
 		sleep $restart_super_sleep_seconds
@@ -4462,6 +4507,9 @@ set_auto_launch_deferral() {
 
 # This function is used when the super workflow exits with no errors.
 exit_clean() {
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream on clean exit
+	cleanup_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ -n "${jamf_access_token}" ]] && delete_jamf_api_access_token
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file at clean exit: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2> /dev/null)"
 	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT CLEAN ****"
@@ -4471,6 +4519,9 @@ exit_clean() {
 
 # This function is used when the super workflow must exit due to an unrecoverable error.
 exit_error() {
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream on error exit
+	cleanup_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ -n "${jamf_access_token}" ]] && delete_jamf_api_access_token
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file at error exit: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2> /dev/null)"
 	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT ERROR ****"
@@ -4825,10 +4876,9 @@ check_auth_local_account() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_local_password: ${auth_local_password}"
 }
 
-# Collect the available storage and set ${storage_ready} accordingly. This also sets ${storage_available_gigabytes} and ${storage_required_gigabytes}.
-check_storage_available() {
-	check_storage_available_error="FALSE"
-	storage_ready="FALSE"
+#>>> LOCAL PATCH (p17): free-space read, formula, proceed gate, Apple prepare stream, terminal fail
+# Read free space via ImportantUsage (user) / mdmclient (no user) / capacity / df fallbacks. Sets ${storage_available_gigabytes}.
+read_storage_available_gigabytes() {
 	[[ -z "${current_user_account_name}" ]] && check_current_user
 	[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
 	[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3;}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
@@ -4842,38 +4892,90 @@ check_storage_available() {
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_available_gigabytes: ${storage_available_gigabytes}"
 	if [[ -z "${storage_available_gigabytes}" ]] || [[ "${storage_available_gigabytes}" == "0" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		return 1
+	fi
+	return 0
+}
+
+# Compute size-aware formula fields: storage_listed_gb, storage_headroom_gb, storage_download_needed, storage_formula_required_gb, storage_safe_floor_gb, storage_test_override_active.
+# Does not apply safe floor or Apple max — callers do.
+compute_storage_formula_required() {
+	storage_listed_gb=0
+	storage_headroom_gb=0
+	storage_download_needed="FALSE"
+	storage_formula_required_gb=0
+	storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MINOR_GB}"
+	storage_test_override_active="FALSE"
+	local storage_prepare_mult
+	storage_prepare_mult="${STORAGE_PREPARE_MULT_MINOR}"
+	local storage_prepare_min
+	storage_prepare_min="${STORAGE_PREPARE_MIN_MINOR_GB}"
+	
+	if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then
+		# Any installer target uses major constants (matches prior upgrade storage path).
+		storage_prepare_mult="${STORAGE_PREPARE_MULT_MAJOR}"
+		storage_prepare_min="${STORAGE_PREPARE_MIN_MAJOR_GB}"
+		storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MAJOR_GB}"
+		[[ -n "${macos_installer_size}" ]] && storage_listed_gb="${macos_installer_size}"
+		[[ "${macos_installer_download_required}" == "TRUE" ]] && storage_download_needed="TRUE"
+		[[ "${test_storage_upgrade_active}" == "TRUE" ]] && storage_test_override_active="TRUE" && storage_formula_required_gb="${storage_required_upgrade_gb}"
+	elif [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
+		storage_prepare_mult="${STORAGE_PREPARE_MULT_MAJOR}"
+		storage_prepare_min="${STORAGE_PREPARE_MIN_MAJOR_GB}"
+		storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MAJOR_GB}"
+		[[ -n "${macos_msu_size}" ]] && storage_listed_gb="${macos_msu_size}"
+		[[ "${macos_msu_download_required}" == "TRUE" ]] && storage_download_needed="TRUE"
+		[[ "${test_storage_upgrade_active}" == "TRUE" ]] && storage_test_override_active="TRUE" && storage_formula_required_gb="${storage_required_upgrade_gb}"
+	elif [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
+		storage_prepare_mult="${STORAGE_PREPARE_MULT_MINOR}"
+		storage_prepare_min="${STORAGE_PREPARE_MIN_MINOR_GB}"
+		storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MINOR_GB}"
+		[[ -n "${macos_msu_size}" ]] && storage_listed_gb="${macos_msu_size}"
+		[[ "${macos_msu_download_required}" == "TRUE" ]] && storage_download_needed="TRUE"
+		[[ "${test_storage_update_active}" == "TRUE" ]] && storage_test_override_active="TRUE" && storage_formula_required_gb="${storage_required_update_gb}"
+	fi
+	
+	[[ -z "${storage_listed_gb}" ]] && storage_listed_gb=0
+	[[ ! "${storage_listed_gb}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]] && storage_listed_gb=0
+	
+	if [[ "${storage_test_override_active}" != "TRUE" ]]; then
+		storage_headroom_gb=$((storage_listed_gb * storage_prepare_mult))
+		[[ $storage_headroom_gb -lt $storage_prepare_min ]] && storage_headroom_gb="${storage_prepare_min}"
+		if [[ "${storage_download_needed}" == "TRUE" ]]; then
+			storage_formula_required_gb=$((storage_headroom_gb + storage_listed_gb))
+		else
+			storage_formula_required_gb="${storage_headroom_gb}"
+		fi
+	else
+		storage_headroom_gb=0
+	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_listed_gb: ${storage_listed_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_headroom_gb: ${storage_headroom_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_download_needed: ${storage_download_needed}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_formula_required_gb: ${storage_formula_required_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_safe_floor_gb: ${storage_safe_floor_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_test_override_active: ${storage_test_override_active}"
+}
+
+# Collect the available storage and set ${storage_ready} accordingly. This also sets ${storage_available_gigabytes} and ${storage_required_gigabytes}.
+# Precheck: formula + safe floor only (no live Apple prepare bump).
+check_storage_available() {
+	check_storage_available_error="FALSE"
+	storage_ready="FALSE"
+	if ! read_storage_available_gigabytes; then
 		log_super "Error: Unable to determine available storage."
 		check_storage_available_error="TRUE"
 	elif [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]] || [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
 		#>>> LOCAL PATCH (p14): do not replace the minor floor with macos_msu_size*2 for downloads <5GB (that undercut allowed ~8GB when Apple required ~19GB)
 		#<<< END LOCAL PATCH (p14)
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required: ${macos_installer_download_required}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_size: ${macos_installer_size}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required: ${macos_msu_download_required}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_size: ${macos_msu_size}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_upgrade_gb: ${storage_required_upgrade_gb}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_update_gb: ${storage_required_update_gb}"
-		if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then # Target is a macOS installer.
-			if [[ "${macos_installer_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_upgrade_gb + macos_installer_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_upgrade_gb}"
-			fi
+		compute_storage_formula_required
+		if [[ "${storage_test_override_active}" == "TRUE" ]]; then
+			storage_required_gigabytes="${storage_formula_required_gb}"
+		else
+			storage_required_gigabytes="${storage_formula_required_gb}"
+			[[ $storage_required_gigabytes -lt $storage_safe_floor_gb ]] && storage_required_gigabytes="${storage_safe_floor_gb}"
 		fi
-		if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via MSU.
-			if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_upgrade_gb + macos_msu_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_upgrade_gb}"
-			fi
-		fi
-		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then # Target is a macOS minor update.
-			if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_update_gb + macos_msu_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_update_gb}"
-			fi
-		fi
+		log_super "Status: Storage: required=${storage_required_gigabytes}GB (listed=${storage_listed_gb}GB headroom=${storage_headroom_gb}GB download_needed=${storage_download_needed} safe_floor=${storage_safe_floor_gb})"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_gigabytes: ${storage_required_gigabytes}"
 		[[ $storage_available_gigabytes -ge $storage_required_gigabytes ]] && storage_ready="TRUE"
 	else # No macOS update/upgrade is available.
@@ -4882,6 +4984,275 @@ check_storage_available() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: check_storage_available_error: ${check_storage_available_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_ready: ${storage_ready}"
 }
+
+# Proceed gate: formula + Apple prepare max when seen; safe floor when max_bytes==0. Sets ${storage_ready}, ${storage_required_gigabytes}, ${storage_available_gigabytes}.
+check_storage_ready_to_proceed() {
+	check_storage_ready_to_proceed_error="FALSE"
+	storage_ready="FALSE"
+	if ! read_storage_available_gigabytes; then
+		log_super "Error: Unable to determine available storage."
+		check_storage_ready_to_proceed_error="TRUE"
+		return 0
+	fi
+	if [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]]; then
+		storage_ready="TRUE"
+		return 0
+	fi
+	compute_storage_formula_required
+	local storage_apple_prepare_max_bytes
+	storage_apple_prepare_max_bytes="$(get_apple_snapshot_prepare_max_bytes)"
+	local storage_apple_gb
+	storage_apple_gb=0
+	if [[ -n "${storage_apple_prepare_max_bytes}" ]] && [[ "${storage_apple_prepare_max_bytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]] && [[ $storage_apple_prepare_max_bytes -gt 0 ]]; then
+		storage_apple_gb=$(( (storage_apple_prepare_max_bytes + 999999999) / 1000000000 ))
+	fi
+	if [[ "${storage_test_override_active}" == "TRUE" ]]; then
+		storage_required_gigabytes="${storage_formula_required_gb}"
+	elif [[ $storage_apple_prepare_max_bytes -gt 0 ]]; then
+		storage_required_gigabytes="${storage_formula_required_gb}"
+		[[ $storage_apple_gb -gt $storage_required_gigabytes ]] && storage_required_gigabytes="${storage_apple_gb}"
+	else
+		storage_required_gigabytes="${storage_formula_required_gb}"
+		[[ $storage_required_gigabytes -lt $storage_safe_floor_gb ]] && storage_required_gigabytes="${storage_safe_floor_gb}"
+	fi
+	log_super "Status: Storage proceed: required=${storage_required_gigabytes}GB (listed=${storage_listed_gb}GB headroom=${storage_headroom_gb}GB download_needed=${storage_download_needed} apple_prepare=${storage_apple_gb}GB safe_floor=${storage_safe_floor_gb} free=${storage_available_gigabytes}GB)"
+	[[ $storage_available_gigabytes -ge $storage_required_gigabytes ]] && storage_ready="TRUE"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: check_storage_ready_to_proceed_error: ${check_storage_ready_to_proceed_error}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_ready: ${storage_ready}"
+}
+
+# Terminal fail for pre-producer storage gate (exit_error / set_auto_launch_deferral). Does not rely on ignored parent error flags.
+handle_storage_proceed_failure() {
+	cleanup_apple_snapshot_prepare_stream
+	log_super "Error: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs required to proceed with macOS update/upgrade."
+	if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+		log_super "Error: Insufficient storage to proceed, install now workflow can not continue."
+		log_status "Inactive Error: Insufficient storage to proceed, install now workflow can not continue."
+		[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
+		exit_error
+	else
+		deferral_timer_minutes=$deferral_timer_error_minutes
+		log_super "Error: Insufficient storage to proceed, trying again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: Insufficient storage to proceed, trying again in ${deferral_timer_minutes} minutes."
+		[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
+		set_auto_launch_deferral
+	fi
+}
+
+# Pre-producer gate: proceed helper, optional proceed-aware dialog, then terminal fail if still not ready.
+ensure_storage_ready_to_proceed() {
+	check_storage_ready_to_proceed
+	if [[ "${check_storage_ready_to_proceed_error}" == "TRUE" ]]; then
+		handle_storage_proceed_failure
+	fi
+	if [[ "${storage_ready}" == "FALSE" ]]; then
+		if [[ "${current_user_account_name}" != "FALSE" ]]; then
+			dialog_insufficient_storage_proceed_mode="TRUE"
+			dialog_insufficient_storage
+			unset dialog_insufficient_storage_proceed_mode
+			if [[ "${dialog_insufficient_storage_error}" == "TRUE" ]] || [[ "${storage_ready}" == "FALSE" ]]; then
+				handle_storage_proceed_failure
+			fi
+		else
+			handle_storage_proceed_failure
+		fi
+	fi
+}
+
+# Return current Apple snapshot prepare max bytes from the per-run max file (0 if missing/invalid/forced-zero).
+get_apple_snapshot_prepare_max_bytes() {
+	local apple_max_bytes
+	apple_max_bytes=0
+	#>>> LOCAL PATCH (p18): fail closed — treat reset failure as max 0 (safe-floor path)
+	if [[ "${apple_snapshot_prepare_max_forced_zero}" == "TRUE" ]]; then
+		echo "0"
+		return 0
+	fi
+	#<<< END LOCAL PATCH (p18)
+	if [[ -n "${apple_snapshot_prepare_max_file}" ]] && [[ -f "${apple_snapshot_prepare_max_file}" ]]; then
+		apple_max_bytes=$(cat "${apple_snapshot_prepare_max_file}" 2> /dev/null)
+	fi
+	if [[ -z "${apple_max_bytes}" ]] || [[ ! "${apple_max_bytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		apple_max_bytes=0
+	fi
+	echo "${apple_max_bytes}"
+}
+
+# Raise the per-run Apple prepare max if ${1} is larger (ignore values < 1000000).
+#>>> LOCAL PATCH (p19): mkdir lock serializes compare-and-write so concurrent parser/sync cannot clobber a higher max
+update_apple_snapshot_prepare_max_bytes() {
+	local new_bytes="${1:-0}"
+	local current_bytes
+	local tmp_max
+	local lock_dir
+	local lock_tries
+	[[ -z "${new_bytes}" ]] && return 0
+	[[ ! "${new_bytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]] && return 0
+	[[ $new_bytes -lt 1000000 ]] && return 0
+	#>>> LOCAL PATCH (p18): skip persist when fail-closed or no max file
+	[[ "${apple_snapshot_prepare_max_forced_zero}" == "TRUE" ]] && return 0
+	[[ -z "${apple_snapshot_prepare_max_file}" ]] && return 0
+	#<<< END LOCAL PATCH (p18)
+	lock_dir="${apple_snapshot_prepare_max_file}.lock"
+	lock_tries=0
+	while ! mkdir "${lock_dir}" 2> /dev/null; do
+		lock_tries=$((lock_tries + 1))
+		[[ $lock_tries -gt 200 ]] && return 0
+		sleep 0.01
+	done
+	current_bytes="$(get_apple_snapshot_prepare_max_bytes)"
+	if [[ $new_bytes -gt $current_bytes ]]; then
+		#>>> LOCAL PATCH (p18): mktemp in protected log dir then rename (not predictable .tmp)
+		tmp_max=$(mktemp "${APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE}" 2> /dev/null) || { rmdir "${lock_dir}" 2> /dev/null || true; return 0; }
+		if echo "${new_bytes}" > "${tmp_max}" 2> /dev/null; then
+			mv -f "${tmp_max}" "${apple_snapshot_prepare_max_file}" 2> /dev/null || rm -f "${tmp_max}" 2> /dev/null
+		else
+			rm -f "${tmp_max}" 2> /dev/null
+		fi
+		#<<< END LOCAL PATCH (p18)
+	fi
+	rmdir "${lock_dir}" 2> /dev/null || true
+}
+#<<< END LOCAL PATCH (p19)
+
+# Background parser: read FIFO fed by a parent-tracked tail (no process-substitution orphans).
+parse_apple_snapshot_prepare_stream() {
+	local parse_line
+	local parse_bytes
+	[[ -z "${apple_snapshot_prepare_fifo}" ]] && return 0
+	while IFS= read -r parse_line; do
+		parse_bytes=$(echo "${parse_line}" | sed -n 's/.*snapshot prepare size:\([0-9][0-9]*\) bytes.*/\1/p')
+		[[ -n "${parse_bytes}" ]] && update_apple_snapshot_prepare_max_bytes "${parse_bytes}"
+	done < "${apple_snapshot_prepare_fifo}"
+}
+
+#>>> LOCAL PATCH (p18): sync-parse stream log once (used after producer stop / drain)
+sync_parse_apple_snapshot_prepare_stream_log() {
+	local parse_line
+	local parse_bytes
+	[[ ! -f "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" ]] && return 0
+	while IFS= read -r parse_line || [[ -n "${parse_line}" ]]; do
+		parse_bytes=$(echo "${parse_line}" | sed -n 's/.*snapshot prepare size:\([0-9][0-9]*\) bytes.*/\1/p')
+		[[ -n "${parse_bytes}" ]] && update_apple_snapshot_prepare_max_bytes "${parse_bytes}"
+	done < "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}"
+}
+
+# Reap tracked Apple prepare parser + dedicated tail (+ path-scoped leftover tails). Does not touch softwareupdate/mist.
+#>>> LOCAL PATCH (p19): kill parent-tracked tail PID; path-scoped pkill; two-level child reap
+reap_apple_snapshot_prepare_parser() {
+	local stop_child
+	local stop_grandchild
+	if [[ -n "${apple_snapshot_prepare_tail_pid}" ]]; then
+		kill "${apple_snapshot_prepare_tail_pid}" > /dev/null 2>&1
+		wait "${apple_snapshot_prepare_tail_pid}" > /dev/null 2>&1 || true
+		apple_snapshot_prepare_tail_pid=""
+	fi
+	if [[ -n "${apple_snapshot_prepare_parser_pid}" ]]; then
+		for stop_child in $(pgrep -P "${apple_snapshot_prepare_parser_pid}" 2> /dev/null); do
+			for stop_grandchild in $(pgrep -P "${stop_child}" 2> /dev/null); do
+				kill "${stop_grandchild}" > /dev/null 2>&1
+				wait "${stop_grandchild}" > /dev/null 2>&1 || true
+			done
+			kill "${stop_child}" > /dev/null 2>&1
+			wait "${stop_child}" > /dev/null 2>&1 || true
+		done
+		kill "${apple_snapshot_prepare_parser_pid}" > /dev/null 2>&1
+		wait "${apple_snapshot_prepare_parser_pid}" > /dev/null 2>&1 || true
+		apple_snapshot_prepare_parser_pid=""
+	fi
+	# Belt-and-suspenders: only this run's stream log path (never bare "tail").
+	if [[ -n "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" ]]; then
+		pkill -f "tail -n0 -F ${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" > /dev/null 2>&1 || true
+	fi
+	if [[ -n "${apple_snapshot_prepare_fifo}" ]]; then
+		rm -f "${apple_snapshot_prepare_fifo}" 2> /dev/null
+		apple_snapshot_prepare_fifo=""
+	fi
+	if [[ -n "${apple_snapshot_prepare_max_file}" ]]; then
+		rmdir "${apple_snapshot_prepare_max_file}.lock" 2> /dev/null || true
+	fi
+}
+#<<< END LOCAL PATCH (p19)
+#<<< END LOCAL PATCH (p18)
+
+# Start per-run Apple snapshot prepare size capture (idempotent). Nonfatal on failure.
+start_apple_snapshot_prepare_stream() {
+	if [[ -n "${apple_snapshot_prepare_stream_pid}" ]] && kill -0 "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1; then
+		return 0
+	fi
+	#>>> LOCAL PATCH (p18): if stream died, reap stale parser/tail before clearing PIDs
+	if [[ -n "${apple_snapshot_prepare_parser_pid}" ]] || [[ -n "${apple_snapshot_prepare_tail_pid}" ]]; then
+		reap_apple_snapshot_prepare_parser
+	fi
+	#<<< END LOCAL PATCH (p18)
+	: > "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" 2> /dev/null
+	# Reset max once per super process; preserve across stop/start within the same run (download then install).
+	if [[ "${apple_snapshot_prepare_session_started}" != "TRUE" ]]; then
+		#>>> LOCAL PATCH (p18): secure per-run max file; fail closed → forced zero / safe-floor path
+		apple_snapshot_prepare_max_forced_zero="FALSE"
+		apple_snapshot_prepare_max_file=$(mktemp "${APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE}" 2> /dev/null) || apple_snapshot_prepare_max_file=""
+		if [[ -z "${apple_snapshot_prepare_max_file}" ]] || ! echo "0" > "${apple_snapshot_prepare_max_file}" 2> /dev/null; then
+			log_super "Warning: Unable to create/reset Apple snapshot prepare max file; continuing with safe-floor storage estimate."
+			apple_snapshot_prepare_max_forced_zero="TRUE"
+			[[ -n "${apple_snapshot_prepare_max_file}" ]] && rm -f "${apple_snapshot_prepare_max_file}" 2> /dev/null
+			apple_snapshot_prepare_max_file=""
+		fi
+		#<<< END LOCAL PATCH (p18)
+		apple_snapshot_prepare_session_started="TRUE"
+	fi
+	apple_snapshot_prepare_stream_pid=""
+	apple_snapshot_prepare_parser_pid=""
+	apple_snapshot_prepare_tail_pid=""
+	apple_snapshot_prepare_fifo=""
+	log stream --level default --style compact --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "snapshot prepare size:"' >> "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" 2> /dev/null &
+	apple_snapshot_prepare_stream_pid="$!"
+	if [[ -n "${apple_snapshot_prepare_stream_pid}" ]] && kill -0 "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1; then
+		#>>> LOCAL PATCH (p19): parent-tracked tail + FIFO parser (avoids process-substitution orphan tails)
+		apple_snapshot_prepare_fifo=$(mktemp -u "${SUPER_LOG_FOLDER}/.apple-snapshot-prepare-fifo.XXXXXX" 2> /dev/null) || apple_snapshot_prepare_fifo=""
+		if [[ -n "${apple_snapshot_prepare_fifo}" ]] && mkfifo "${apple_snapshot_prepare_fifo}" 2> /dev/null; then
+			tail -n0 -F "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" > "${apple_snapshot_prepare_fifo}" 2> /dev/null &
+			apple_snapshot_prepare_tail_pid="$!"
+			parse_apple_snapshot_prepare_stream &
+			apple_snapshot_prepare_parser_pid="$!"
+		else
+			log_super "Warning: Unable to create Apple snapshot prepare parser FIFO; continuing with sync-parse-only storage capture."
+			apple_snapshot_prepare_fifo=""
+			apple_snapshot_prepare_tail_pid=""
+			apple_snapshot_prepare_parser_pid=""
+		fi
+		#<<< END LOCAL PATCH (p19)
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: apple_snapshot_prepare_stream_pid: ${apple_snapshot_prepare_stream_pid}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: apple_snapshot_prepare_parser_pid: ${apple_snapshot_prepare_parser_pid}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: apple_snapshot_prepare_tail_pid: ${apple_snapshot_prepare_tail_pid}"
+	else
+		log_super "Warning: Unable to start Apple snapshot prepare size log stream; continuing with formula storage estimate."
+		apple_snapshot_prepare_stream_pid=""
+		#>>> LOCAL PATCH (p18): no orphan parser when stream fails to start
+		reap_apple_snapshot_prepare_parser
+		#<<< END LOCAL PATCH (p18)
+	fi
+}
+
+# Stop Apple prepare stream and parser; drain briefly so late lines can update the max file. Idempotent. Leaves softwareupdate/mist alone.
+stop_apple_snapshot_prepare_stream() {
+	#>>> LOCAL PATCH (p19): stop producer → bounded drain → reap parser/tail → sync-parse (sole writer; no overlap race)
+	if [[ -n "${apple_snapshot_prepare_stream_pid}" ]]; then
+		kill "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1
+		wait "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1 || true
+		apple_snapshot_prepare_stream_pid=""
+	fi
+	# Bounded drain so the live parser can consume lines already written before reap.
+	sleep 1
+	reap_apple_snapshot_prepare_parser
+	sync_parse_apple_snapshot_prepare_stream_log
+	#<<< END LOCAL PATCH (p19)
+}
+
+# Idempotent cleanup used on all exits.
+cleanup_apple_snapshot_prepare_stream() {
+	stop_apple_snapshot_prepare_stream
+}
+#<<< END LOCAL PATCH (p17)
 
 # Validate if current system power is adequate for performing a macOS update/upgrade and set ${power_ready} accordingly. Desktops, obviously, always return that they are ready.
 check_power_required() {
@@ -7577,6 +7948,12 @@ download_macos_msu() {
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 	
+	#>>> LOCAL PATCH (p17): capture Apple prepare size during download/prepare (before producer)
+	if [[ "${download_macos_msu_skip_watch}" != "TRUE" ]]; then
+		start_apple_snapshot_prepare_stream
+	fi
+	#<<< END LOCAL PATCH (p17)
+	
 	# Launch a new softwareupdate download only when we did not attach to an existing one.
 	if [[ "${download_macos_msu_started_by_super}" == "TRUE" ]]; then
 		# The softwareupdate download process is backgrounded and is watched via a while loop later on. Also note the difference between macOS versions.
@@ -7782,6 +8159,9 @@ download_macos_msu() {
 		fi
 	fi
 	#<<< END LOCAL PATCH (p01)
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream after download watch/poll (drain before reading max later)
+	stop_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_start_timeout is: ${download_macos_msu_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_start_error is: ${download_macos_msu_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_timeout_error is: ${download_macos_msu_timeout_error}"
@@ -8394,6 +8774,9 @@ install_safari_update_msu() {
 
 # Install macOS updates via the softwareupdate command, and also save responses to ${SUPER_LOG}, ${MSU_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 install_macos_msu() {
+	#>>> LOCAL PATCH (p17): pre-producer storage gate before notification_restart / --restart (test + production)
+	ensure_storage_ready_to_proceed
+	#<<< END LOCAL PATCH (p17)
 	[[ "${current_user_account_name}" != "FALSE" ]] && notification_restart
 	# If ${test_mode} then it's not necessary to continue this function.
 	if [[ "${test_mode}" == "TRUE" ]]; then
@@ -8408,6 +8791,10 @@ install_macos_msu() {
 		reset_workflow
 		return 0
 	fi
+	
+	#>>> LOCAL PATCH (p17): start Apple prepare stream after gate, before --install --restart
+	start_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	
 	# Start with log and status updates.
 	if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then # macOS major upgrade via MSU.
@@ -8599,6 +8986,9 @@ install_macos_msu() {
 		#<<< END LOCAL PATCH (p16)
 		fi
 	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream after install watch/QUEUE_WATCH grace
+	stop_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_start_error is: ${install_macos_msu_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_start_timeout is: ${install_macos_msu_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_error is: ${install_macos_msu_timeout_error}"
@@ -8644,8 +9034,10 @@ install_macos_msu() {
 		#<<< END LOCAL PATCH (p16)
 		#>>> LOCAL PATCH (p14): log install SPACE failures like the download SPACE handler
 		if [[ "${install_macos_msu_start_error}" == "SPACE" ]]; then
-			log_msu "Error: Not enough available storage to download macOS update/upgrade."
-			log_super "Error: Not enough available storage to download macOS update/upgrade."
+			#>>> LOCAL PATCH (p17): SPACE wording — install/prepare (not download)
+			log_msu "Error: Not enough available storage to install/prepare macOS update/upgrade."
+			log_super "Error: Not enough available storage to install/prepare macOS update/upgrade."
+			#<<< END LOCAL PATCH (p17)
 		elif [[ "${install_macos_msu_start_error}" == "TRUE" ]]; then
 		#<<< END LOCAL PATCH (p14)
 			log_msu "Error: The softwareupdate process was unable to reach macOS software update servers or find the requested macOS update/upgrade."
@@ -8681,6 +9073,9 @@ install_macos_msu() {
 
 # Install via macOS installer application, and also save responses to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 install_macos_app() {
+	#>>> LOCAL PATCH (p17): pre-producer storage gate before test notify / startosinstall
+	ensure_storage_ready_to_proceed
+	#<<< END LOCAL PATCH (p17)
 	# If ${test_mode} then it's not necessary to continue this function.
 	if [[ "${test_mode}" == "TRUE" ]]; then
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
@@ -8697,6 +9092,10 @@ install_macos_app() {
 		reset_workflow
 		return 0
 	fi
+	
+	#>>> LOCAL PATCH (p17): start Apple prepare stream after gate, before startosinstall
+	start_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	
 	# Start with log and status updates.
 	log_super "startosinstall: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow, check ${INSTALLER_WORKFLOW_LOG} for more detail."
@@ -8761,6 +9160,9 @@ install_macos_app() {
 			break
 		fi
 	done < <(tail -n1 -F "${INSTALLER_WORKFLOW_LOG}" | tr -u '%' '\n')
+	#>>> LOCAL PATCH (p17): stop/drain Apple prepare stream before residual proceed check
+	stop_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_app_start_error is: ${install_macos_app_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_app_start_timeout is: ${install_macos_app_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_app_timeout is: ${install_macos_app_timeout}"
@@ -8772,8 +9174,15 @@ install_macos_app() {
 		#<<< END LOCAL PATCH (p16)
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS COMPLETED ****"
-		log_super_audit "Status: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} is prepared and ready for restart!"
-		[[ "${current_user_account_name}" != "FALSE" ]] && notification_restart
+		#>>> LOCAL PATCH (p17): residual post-watch — skip notify/audit only if free < required (reboot may already be owned)
+		check_storage_ready_to_proceed
+		if [[ "${check_storage_ready_to_proceed_error}" == "FALSE" ]] && [[ "${storage_ready}" == "TRUE" ]]; then
+			log_super_audit "Status: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} is prepared and ready for restart!"
+			[[ "${current_user_account_name}" != "FALSE" ]] && notification_restart
+		else
+			log_super "Warning: Insufficient storage after startosinstall prepare (free=${storage_available_gigabytes}GB required=${storage_required_gigabytes}GB); skipping restart notification/audit (residual)."
+		fi
+		#<<< END LOCAL PATCH (p17)
 	else # Some part of the startosinstall workflow failed.
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS FAILED ****"
 		kill -9 "${install_macos_app_pid}" > /dev/null 2>&1
@@ -8808,6 +9217,9 @@ install_macos_app() {
 
 # Download and/or install macOS update/upgrade via MDM push command, and also save responses to ${SUPER_LOG}, ${MDM_COMMAND_LOG}, ${MDM_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 push_macos_mdm() {
+	#>>> LOCAL PATCH (p17): pre-producer storage gate before streams/POST and test-mode restart notify
+	ensure_storage_ready_to_proceed
+	#<<< END LOCAL PATCH (p17)
 	# If ${test_mode} then it's not necessary to continue this function.
 	if [[ "${test_mode}" == "TRUE" ]] && [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
 		log_super "Test Mode: Skipping the download macOS update/upgrade via MDM workflow."
@@ -8899,6 +9311,9 @@ push_macos_mdm() {
 	
 	# Only continue workflow if Jamf Pro API configuration is valid.
 	if [[ "${auth_error_jamf}" == "FALSE" ]]; then
+		#>>> LOCAL PATCH (p17): start Apple prepare stream before MDM POST (with other MDM streams)
+		start_apple_snapshot_prepare_stream
+		#<<< END LOCAL PATCH (p17)
 		# Start log streaming for MDM push commands and send to ${MDM_COMMAND_LOG}.
 		local log_stream_mdm_command_pid
 		log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "${MDM_COMMAND_LOG}" &
@@ -9205,7 +9620,17 @@ push_macos_mdm() {
 					fi
 				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
 			fi
-			{ [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_restart
+			#>>> LOCAL PATCH (p18): residual mid-watch INSTALLER — skip restart notify only if free < required (success-path residual also covers audit)
+			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
+				sleep 1
+				check_storage_ready_to_proceed
+				if [[ "${check_storage_ready_to_proceed_error}" == "FALSE" ]] && [[ "${storage_ready}" == "TRUE" ]]; then
+					notification_restart
+				else
+					log_super "Warning: Insufficient storage after MDM prepare (free=${storage_available_gigabytes}GB required=${storage_required_gigabytes}GB); skipping restart notification (residual)."
+				fi
+			fi
+			#<<< END LOCAL PATCH (p18)
 			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
 				push_macos_mdm_timeout_error="TRUE"
 				while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
@@ -9225,6 +9650,9 @@ push_macos_mdm() {
 	
 	# If the macOS update/upgrade completed, then prepare for restart.
 	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${push_macos_mdm_api_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_timeout}" == "FALSE" ]] && [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
+		#>>> LOCAL PATCH (p17): stop Apple prepare stream after MDM watch success path
+		stop_apple_snapshot_prepare_stream
+		#<<< END LOCAL PATCH (p17)
 		kill -9 "${log_stream_mdm_workflow_pid}" > /dev/null 2>&1
 		[[ "${verbose_mode}" == "TRUE" ]] && kill -9 "${log_stream_mdm_workflow_debug_pid}" > /dev/null 2>&1
 		if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
@@ -9263,19 +9691,29 @@ push_macos_mdm() {
 			#<<< END LOCAL PATCH (p16)
 			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
-			[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super_audit "MDM: ${macos_msu_label} upgrade is prepared and ready for restart!"
-			[[ "${push_macos_mdm_target_type}" == "UPDATE" ]] && log_super_audit "MDM: ${macos_msu_label} update is prepared and ready for restart!"
-			[[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && log_super_audit "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared and ready for restart!"
-			if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
-				log_super "MDM: Forcing logout for current user: ${current_user_account_name}."
-				launchctl bootout "user/${current_user_id}" &
-				disown %
+			#>>> LOCAL PATCH (p18): residual post-watch for MDM UPDATE/UPGRADE/INSTALLER — skip success audit/notify if free < required
+			check_storage_ready_to_proceed
+			if [[ "${check_storage_ready_to_proceed_error}" == "FALSE" ]] && [[ "${storage_ready}" == "TRUE" ]]; then
+				[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super_audit "MDM: ${macos_msu_label} upgrade is prepared and ready for restart!"
+				[[ "${push_macos_mdm_target_type}" == "UPDATE" ]] && log_super_audit "MDM: ${macos_msu_label} update is prepared and ready for restart!"
+				[[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && log_super_audit "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared and ready for restart!"
+				if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
+					log_super "MDM: Forcing logout for current user: ${current_user_account_name}."
+					launchctl bootout "user/${current_user_id}" &
+					disown %
+				fi
+			else
+				log_super "Warning: Insufficient storage after MDM prepare (free=${storage_available_gigabytes}GB required=${storage_required_gigabytes}GB); skipping restart notification/audit (residual)."
 			fi
+			#<<< END LOCAL PATCH (p18)
 		fi
 	fi
 	
 	# Handle MDM workflow failures.
 	if [[ "${auth_error_jamf}" == "TRUE" ]] || [[ "${push_macos_mdm_api_error}" == "TRUE" ]] || [[ "${push_macos_mdm_start_error}" == "TRUE" ]] || [[ "${push_macos_mdm_start_timeout}" == "TRUE" ]] || [[ "${push_macos_mdm_timeout_error}" == "TRUE" ]] || [[ "${push_macos_mdm_download_validation_error}" == "TRUE" ]]; then
+		#>>> LOCAL PATCH (p17): stop Apple prepare stream on MDM failure path
+		stop_apple_snapshot_prepare_stream
+		#<<< END LOCAL PATCH (p17)
 		kill -9 "${log_stream_mdm_command_pid}" > /dev/null 2>&1
 		[[ "${verbose_mode}" == "TRUE" ]] && kill -9 "${log_stream_mdm_command_debug_pid}" > /dev/null 2>&1
 		kill -9 "${log_stream_mdm_workflow_pid}" > /dev/null 2>&1
@@ -10946,18 +11384,35 @@ dialog_insufficient_storage() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: STORAGE_REQUIRED_RECHECK_SECONDS is: ${STORAGE_REQUIRED_RECHECK_SECONDS}"
 	while [[ $dialog_insufficient_storage_check_timeout -ge 0 ]]; do
 		sleep $STORAGE_REQUIRED_RECHECK_SECONDS
-		check_storage_available
-		if [[ "${check_storage_available_error}" == "FALSE" ]]; then
-			if [[ "${storage_ready}" == "TRUE" ]]; then
-				log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
-				killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-				log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		#>>> LOCAL PATCH (p17): proceed-aware dialog recheck uses proceed helper; precheck dialogs stay on formula
+		if [[ "${dialog_insufficient_storage_proceed_mode}" == "TRUE" ]]; then
+			check_storage_ready_to_proceed
+			if [[ "${check_storage_ready_to_proceed_error}" == "FALSE" ]]; then
+				if [[ "${storage_ready}" == "TRUE" ]]; then
+					log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
+					killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+					log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+					break
+				fi
+			else
+				dialog_insufficient_storage_error="TRUE"
 				break
 			fi
-		else # "${check_storage_available_error}" == "FALSE"
-			dialog_insufficient_storage_error="TRUE"
-			break
+		else
+			check_storage_available
+			if [[ "${check_storage_available_error}" == "FALSE" ]]; then
+				if [[ "${storage_ready}" == "TRUE" ]]; then
+					log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
+					killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+					log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+					break
+				fi
+			else # "${check_storage_available_error}" == "TRUE"
+				dialog_insufficient_storage_error="TRUE"
+				break
+			fi
 		fi
+		#<<< END LOCAL PATCH (p17)
 		[[ -n "${dialog_timeout_seconds}" ]] && dialog_insufficient_storage_check_timeout=$((dialog_insufficient_storage_check_timeout - STORAGE_REQUIRED_RECHECK_SECONDS))
 	done
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_insufficient_storage_error is: ${dialog_insufficient_storage_error}"
@@ -11667,10 +12122,10 @@ main() {
 	set_defaults
 	get_options "$@"
 	workflow_startup
-	#>>> LOCAL PATCH (p01): install Ctrl-C handler after startup logging/prefs are ready
+	#>>> LOCAL PATCH (p01/p18): install interrupt handler after startup logging/prefs are ready (SIGINT + SIGTERM/SIGHUP)
 	# Unquoted trap target so ShellCheck SC2329 sees the reference (same runtime behavior).
-	trap handle_super_interrupt SIGINT
-	#<<< END LOCAL PATCH (p01)
+	trap handle_super_interrupt SIGINT SIGTERM SIGHUP
+	#<<< END LOCAL PATCH (p01/p18)
 	workflow_time_epoch=$(date +%s)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
 	[[ -n "${schedule_workflow_active}" ]] && check_schedule_workflow_active

@@ -1,7 +1,7 @@
 # Patched `super` bug fixes (IT admin view)
 
 **Audience:** Mac / MDM admins (Jamf, Mosyle, etc.)  
-**Build:** local **`5.1.1-p16`** (folder name `super-5.1.1-p01` is historical)  
+**Build:** local **`5.1.1-p19`** (folder name `super-5.1.1-p01` is historical)  
 **Based on:** upstream Macjutsu [super v5.1.1](https://github.com/Macjutsu/super/releases)  
 **Engineer detail:** [PATCHES-vs-upstream-5.1.1.md](PATCHES-vs-upstream-5.1.1.md)
 
@@ -11,10 +11,30 @@ Confirm the build:
 
 ```bash
 sudo /Library/Management/super/super --version
-# expect: 5.1.1-p16
+# expect: 5.1.1-p19
 ```
 
-Also look for `5.1.1-p16` in `/Library/Management/super/logs/super.log`.
+Also look for `5.1.1-p19` in `/Library/Management/super/logs/super.log`.
+
+---
+
+## Free space looked OK — Apple still fails the install (p14 + p17 + p18 + p19)
+
+**Symptom**
+
+- Workflow proceeds on free-space checks
+- Later: not enough free disk space during prepare/install (common with larger Tahoe OTAs)
+
+**What went wrong**
+
+Upstream floors (15 GB / 25 GB) and size-based undercuts were too low for real OTA prepare needs; install-time SPACE failures were easy to miss. Even with higher floors, a small listed download size did not reflect Apple’s snapshot prepare budget (~14 GB observed).
+
+**Fix**
+
+- **p14:** Higher default floors (~**25 GB** minors / **35 GB** majors); floors not undercut by a small reported download size; clearer install-time SPACE detection
+- **p17:** Size-aware formula (listed × multiplier with soft mins); **safe floor 25/35 when Apple’s prepare size is not yet seen**; when Apple logs `snapshot prepare size` during this run, proceed gates use `max(formula, apple_gb)` instead of always forcing 25/35; blocks restart-capable install/MDM actions before they start if free space is still too low; residual skip of restart notify after prepare if space collapsed (reboot may already be owned — not a full cancel)
+- **p18:** Residual skip-notify/audit also covers **MDM UPDATE/UPGRADE** success paths (not only installer mid-watch); Apple prepare stream cleaned on SIGTERM/HUP; safer max-file handling
+- **p19:** Hardens Apple prepare capture: **mkdir lock** on max-file updates (no lost higher max under concurrent writers); **parent-tracked tail + FIFO** (no orphan `tail -F`); stop order **reap then sync-parse** so only one writer remains
 
 ---
 
@@ -56,25 +76,6 @@ Stock treated the queue failure as a successful prepare, set restart-validation,
 - Exact pin matching the SU target (e.g. pin `26.6`) still keeps that target
 
 **Ops note:** Lift or shorten the Restrictions deferral when you want the newer build; until then, waiting avoids burning cycles on the older one.
-
----
-
-## Free space looked OK — Apple still fails the install (p14)
-
-**Symptom**
-
-- Workflow proceeds on free-space checks
-- Later: not enough free disk space during prepare/install (common with larger Tahoe OTAs)
-
-**What went wrong**
-
-Upstream floors (15 GB / 25 GB) and size-based undercuts were too low for real OTA prepare needs; install-time SPACE failures were easy to miss.
-
-**Fix**
-
-- Higher default floors (~**25 GB** minors / **35 GB** majors)
-- Floors are not undercut by a small reported download size
-- Clearer install-time SPACE detection so retries behave correctly
 
 ---
 
@@ -198,7 +199,7 @@ p16 Failed-to-queue / deferred-wait / land-check behavior needs **no** new MDM k
 |---|---|
 | `Failed to queue update and restart` then later **All … completed!** | p16 (queue failure + land check) |
 | MDM Deferred **YES** on a newer minor + install of older SU label | p16 (deferred wait) |
-| Not enough free disk space after workflow already started | p14 |
+| Not enough free disk space after workflow already started | p14 / p17 / p18 / p19 |
 | Download restarts every relaunch | p02 / p12 |
 | Error deferral when Apple says no new software | p05 |
 
@@ -214,4 +215,4 @@ p16 Failed-to-queue / deferred-wait / land-check behavior needs **no** new MDM k
 
 ---
 
-*Local build **5.1.1-p16** (2026-08-07). Re-check this note if upstream ships equivalent fixes in a later official release.*
+*Local build **5.1.1-p19** (2026-08-07). Re-check this note if upstream ships equivalent fixes in a later official release.*
