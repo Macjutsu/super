@@ -1,9 +1,10 @@
 # Patched `super` bug fixes (IT admin view)
 
 **Audience:** Mac / MDM admins (Jamf, Mosyle, etc.)  
-**Build:** local **`5.1.1-p19`** (folder name `super-5.1.1-p01` is historical)  
+**Build:** local **`5.1.1-p29`** (folder name `super-5.1.1-p01` is historical)  
 **Based on:** upstream Macjutsu [super v5.1.1](https://github.com/Macjutsu/super/releases)  
-**Engineer detail:** [PATCHES-vs-upstream-5.1.1.md](PATCHES-vs-upstream-5.1.1.md)
+**Engineer detail:** [PATCHES-vs-upstream-5.1.1.md](PATCHES-vs-upstream-5.1.1.md)  
+**Release-gate checklist:** [RELEASE-REVIEW-p23.md](RELEASE-REVIEW-p23.md)
 
 This note describes **what was broken in stock 5.1.1 for real fleets**, how it shows up in the field, and what each local fix changes. Same install path, LaunchDaemon, and `com.macjutsu.super` prefs unless noted.
 
@@ -11,10 +12,10 @@ Confirm the build:
 
 ```bash
 sudo /Library/Management/super/super --version
-# expect: 5.1.1-p19
+# expect: 5.1.1-p29
 ```
 
-Also look for `5.1.1-p19` in `/Library/Management/super/logs/super.log`.
+Also look for `5.1.1-p29` in `/Library/Management/super/logs/super.log`.
 
 ---
 
@@ -79,6 +80,26 @@ Stock treated the queue failure as a successful prepare, set restart-validation,
 
 ---
 
+## Stuck on a pulled minor after Apple ships the next point release (p20)
+
+**Symptom**
+
+- Target stays on an older prepared OTA (e.g. **26.6**) after Apple ships **26.6.1** and pulls 26.6
+- `softwareupdate` fails (“No such update” / unable to find requested update)
+- `super` retries every ~hour without picking the new latest
+
+**What went wrong**
+
+Install uses `--no-scan` against the prepared label. When Apple removes that label, upstream kept MSU list caches and the old `WorkflowTarget`, so rediscovery did not happen promptly.
+
+**Fix**
+
+- Detect **No such update**, clear software-update list caches and prepared-download / `WorkflowTarget`
+- Relaunch in **~2 minutes** to re-list and target the new latest
+- Days deadlines still **restart** for the new target (same as upstream when `WorkflowTarget` changes)
+
+---
+
 ## Downloads reset on relaunch, or incomplete looks “done” (p01 / p02 / p12)
 
 **Symptom**
@@ -138,6 +159,26 @@ Empty/successful “no new software” was treated like a list failure; list hel
 
 ---
 
+## Update available in Software Update, but super keeps saying none (p21)
+
+**Symptom**
+
+- `softwareupdate -l` (or System Settings) shows a new minor (e.g. 26.6.1)
+- `super.log` repeatedly: “verifying via softwareupdate list…” then “No available macOS software updates” in the **same second**
+- `logs/msu-list.log` is days old and still says “No new software available.”
+
+**What went wrong**
+
+On Macs where `mdmclient` reports nothing, local p01 falls back to `softwareupdate`. A cache hit could reuse an old empty list, claim it was verifying, and refresh `LastSuccessfulCheckDate` — so with Apple Automatic Check keeping its own date warm, super never re-listed for days.
+
+**Fix**
+
+- In the empty-`mdmclient` path only: re-run `softwareupdate --list` when `msu-list.log` is missing, unreadable, or older than **6 hours**
+- Cache hits log that a **cached** list is used and do **not** bump `LastSuccessfulCheckDate`
+- Does **not** change the global software-status cache rules used when `mdmclient` does list updates
+
+---
+
 ## MDM download-only never finishes (p07 / p12)
 
 **Symptom**
@@ -184,6 +225,114 @@ p16 Failed-to-queue / deferred-wait / land-check behavior needs **no** new MDM k
 
 ---
 
+## Interrupt / reboot stopped all future super runs (p24)
+
+**Symptom**
+
+- After a reboot that interrupted an in-progress install watch, or after `kill`/SIGTERM, LaunchDaemon never started super again
+- Prefs showed `NextAutoLaunch = FALSE` until someone ran super manually
+
+**What went wrong**
+
+Local interrupt handling (p01/p18) set `NextAutoLaunch=FALSE` for *any* signal, including shutdown SIGTERM during the post-prepare “Failed to queue” watch. That permanently disabled auto-relaunch. The same path could clear restart land-check prefs needed after a real reboot.
+
+**Fix (p24)**
+
+- **Ctrl-C (SIGINT):** schedules a short relaunch time (error/default deferral minutes) — does **not** set `FALSE`
+- **SIGTERM / SIGHUP (shutdown, etc.):** leaves auto-relaunch enabled and keeps land-check prefs so restart validation can run after reboot
+
+---
+
+## Restart validation looped every 5 minutes with nothing to install (p25)
+
+**Symptom**
+
+- After an update attempt that did not change the OS build, and Apple/MDM showed no remaining targets (e.g. a newer minor still MDM-deferred), super kept entering restart validation every ~5 minutes
+
+**What went wrong**
+
+Land-check failure deferred while `WorkflowRestartValidate` stayed set, so the LaunchDaemon kept re-entering restart validation instead of a normal workflow.
+
+**Fix (p25)**
+
+- Clears restart-validation prefs when the land check fails and there are **no** remaining targets
+- Schedules a normal retry using the error deferral timer (typically ~60 minutes unless configured otherwise)
+
+---
+
+## Apple pulled a minor — endless 2‑minute retries (p26)
+
+**Symptom**
+
+- After Apple supersedes an OTA label (`No such update`), super cleared caches and retried every **2 minutes** without limit
+- On install failures, users could see a “failed” dialog on every cycle
+
+**What went wrong**
+
+Local p20 intentionally used a short relaunch for fast rediscovery when Apple publishes a replacement label. That is still useful for the first retries. If the old label stayed listed, the short timer never stopped.
+
+**Fix (p26)**
+
+- Attempts 1–2: still **2 minutes** (fast rediscovery)
+- Attempt 3: **15 minutes**
+- Later: normal **error** deferral timer
+- Install failed dialog only on the first attempt and when backing off (not every 2‑minute hop)
+
+---
+
+## Restart with low free space skipped the user warning (p27)
+
+**Symptom**
+
+- After MDM or installer prepare succeeded, if free space looked “too low” vs the storage formula, super skipped the restart notification (and installer forced logout) even though the Mac was still about to reboot
+
+**What went wrong**
+
+Local residual storage checks after prepare treated a tight disk as a reason to skip user-facing restart messaging. Prepare/restart was already committed.
+
+**Fix (p27)**
+
+- Always show the restart notification and keep installer logout behavior
+- Still log a storage warning when free &lt; required
+
+---
+
+## Already-downloaded update blocked by 25 GB floor (p28)
+
+**Symptom**
+
+- Update already downloaded/prepared, but Macs with ~20 GB free kept hitting insufficient-storage deferrals because the check still required 25 GB (minor) / 35 GB (major)
+
+**What went wrong**
+
+Raised download/prepare floors (p14/p17) also applied when no further download was needed.
+
+**Fix (p28)**
+
+- If download is **not** required: install-only floors **19 GB** (minor) / **25 GB** (major)
+- If download is still required: keep **25 GB** / **35 GB**
+
+---
+
+## Leftover Apple prepare temp files in the log folder (p29)
+
+**Symptom**
+
+- Hidden files like `.apple-snapshot-prepare-max.XXXXXX` accumulate under `/Library/Management/super/logs/` after update runs
+
+**What went wrong**
+
+Local Apple snapshot-prepare size capture (p17–p19) wrote a per-run temp file but did not delete it on exit; log archival also skips dotfiles.
+
+**Fix (p29)**
+
+- Cleanup on exit removes the current run’s max temp
+- Next startup sweeps any leftovers from crashed prior runs
+
+No admin action required beyond deploying **p29**.
+
+---
+
 ## What stays the same
 
 - Install: run `super` as root from **outside** `/Library/Management/super/`
@@ -200,6 +349,8 @@ p16 Failed-to-queue / deferred-wait / land-check behavior needs **no** new MDM k
 | `Failed to queue update and restart` then later **All … completed!** | p16 (queue failure + land check) |
 | MDM Deferred **YES** on a newer minor + install of older SU label | p16 (deferred wait) |
 | Not enough free disk space after workflow already started | p14 / p17 / p18 / p19 |
+| Stuck retrying a pulled minor (e.g. 26.6 after 26.6.1 ships) | p20 |
+| Same-second “verifying via softwareupdate…” + no updates; stale `msu-list.log` | p21 |
 | Download restarts every relaunch | p02 / p12 |
 | Error deferral when Apple says no new software | p05 |
 
@@ -215,4 +366,4 @@ p16 Failed-to-queue / deferred-wait / land-check behavior needs **no** new MDM k
 
 ---
 
-*Local build **5.1.1-p19** (2026-08-07). Re-check this note if upstream ships equivalent fixes in a later official release.*
+*Local build **5.1.1-p29** (2026-08-09). Re-check this note if upstream ships equivalent fixes in a later official release.*

@@ -4,23 +4,25 @@
 
 **For IT admins (non-developers):** see [SUPPORT-bug-fixes.md](SUPPORT-bug-fixes.md) for an explanation of the local bug fixes.
 
-**Generated:** 2026-08-07 (verified against live script)  
-**Local file:** `super` (directory name `super-5.1.1-p01` is historical; the build ID is **p19**)  
-**Local identity:** `SUPER_VERSION="5.1.1-p19"` · `SUPER_DATE="2026/08/07"`  
+**Release-gate working checklist (open P0/P2s, statuses):** see [RELEASE-REVIEW-p23.md](RELEASE-REVIEW-p23.md). Update that file when fixing findings; keep this catalog in sync when adding new `pNN` markers.
+
+**Generated:** 2026-08-09 (verified against live script; build now **p29**)  
+**Local file:** `super` (directory name `super-5.1.1-p01` is historical; the build ID is **p29**)  
+**Local identity:** `SUPER_VERSION="5.1.1-p29"` · `SUPER_DATE="2026/08/09"`  
 **Upstream:** [Macjutsu/super](https://github.com/Macjutsu/super) `main` / tag [`v5.1.1`](https://github.com/Macjutsu/super/releases)  
 **Upstream identity:** `SUPER_VERSION="5.1.1"` · `SUPER_DATE="2026/07/21"`
 
 ## Summary
 
-| | Upstream 5.1.1 | Local 5.1.1-p19 |
+| | Upstream 5.1.1 | Local 5.1.1-p29 |
 |---|---|---|
-| Lines | 11,401 | 12,639 |
-| Diff size | — | local fork on 5.1.1 (+p01–p19 markers) |
+| Lines | 11,401 | ~12,850 |
+| Diff size | — | local fork on 5.1.1 (+p01–p29 markers) |
 | Patch markers | none | see **Marker conventions** below |
 
-Local work is a **forked patch series on top of stock 5.1.1**, not a rebase onto a newer upstream release. Upstream `main` at comparison time still matches tagged **v5.1.1** (2026-07-21). Patch numbers (`p01`…`p19`) are chronological local notes, not upstream release tags.
+Local work is a **forked patch series on top of stock 5.1.1**, not a rebase onto a newer upstream release. Upstream `main` at comparison time still matches tagged **v5.1.1** (2026-07-21). Patch numbers (`p01`…`p29`) are chronological local notes, not upstream release tags.
 
-**p04** was never used (number skipped). **p15** is a marker/docs pass: in-script `#>>> LOCAL PATCH (p13)` wrappers were added for previously unmarked schedule/deadline fixes; no behavioral change beyond the version string. **p16** hardens Failed-to-queue / restart-validate false success / MDM-deferred newer minor wait (upstream gaps; not a p01–p15 regression). **p17** adds size-aware storage formula, live Apple snapshot-prepare capture, and pre-producer proceed gates (builds on p14 floors). **p18** hardens p17 production readiness: MDM UPDATE/UPGRADE residual gate, SIGTERM/HUP stream cleanup, parser drain order, fail-closed max file. **p19** hardens Apple prepare capture races/orphans: mkdir lock on max updates; parent-tracked tail + FIFO; stop order reap-then-sync.
+**p04** was never used (number skipped). **p15** is a marker/docs pass: in-script `#>>> LOCAL PATCH (p13)` wrappers were added for previously unmarked schedule/deadline fixes; no behavioral change beyond the version string. **p16** hardens Failed-to-queue / restart-validate false success / MDM-deferred newer minor wait (upstream gaps; not a p01–p15 regression). **p17** adds size-aware storage formula, live Apple snapshot-prepare capture, and pre-producer proceed gates (builds on p14 floors). **p18** hardens p17 production readiness: MDM UPDATE/UPGRADE residual gate, SIGTERM/HUP stream cleanup, parser drain order, fail-closed max file. **p19** hardens Apple prepare capture races/orphans: mkdir lock on max updates; parent-tracked tail + FIFO; stop order reap-then-sync. **p20** rediscovers the latest minor when Apple pulls a superseded OTA label (`No such update`). **p21** expires the p01 empty-`mdmclient` `softwareupdate` fallback list by `msu-list.log` mtime (does **not** change upstream global cache `AND` TTL). **p22** splits QUEUE_WATCH land-check prefs from the `WorkflowRestartValidate` LaunchDaemon gate (wall-clock grace; promote-after-reboot / orphan-clear). **p23** honors Failed-to-queue on the wall-clock deadline-break line. **p24** fixes interrupt handling so SIGTERM/SIGHUP never set permanent `NextAutoLaunch=FALSE` and preserve land-check prefs for p22 (SIGINT uses a short deferral date instead of FALSE). **p25** exits restart-validation when land check fails and no targets remain (clear WRV + error-timer normal retry; no unbounded 5‑min WRV loop). **p26** bounds p20 withdrawn-label rediscovery (2→2→15→error timer) and throttles install failed dialogs. **p27** always restart-notifies/audits/logs out after prepare; residual storage shortfall is logged, not used to skip user warning. **p28** uses install-only safe floors (19 GB minor / 25 GB major) when download is not needed; download paths keep 25/35. **p29** deletes the per-run Apple prepare max temp on cleanup (after final sync-parse) and sweeps leftover `.apple-snapshot-prepare-max.*` in `archive_logs` (P3-1).
 
 ### Marker conventions
 
@@ -58,19 +60,29 @@ There is **no** `#>>> LOCAL PATCH (p15)` block — p15 only bumps `SUPER_VERSION
 | **p13** | in-script | Schedule past-end same-day → `+7d`; `23:23:59`→`23:59:59` (2× `days_away`); deadline days/date status `\|\|` fix; deferral-count `else` when download still required |
 | **p14** | in-script | Storage floors 15→25 / 25→35 GB; remove `macos_msu_size*2` undercut; install-time SPACE detect + log |
 | **p15** | version bump only | `SUPER_VERSION`/`SUPER_DATE` → `5.1.1-p15` / `2026/08/03`; add in-script **p13** markers (behavior unchanged from p14 aside from version) |
-| **p16** | in-script | Failed-to-queue QUEUE_WATCH + early validate prefs; restart PreBuild land check; MDM-deferred newer minor wait (gate installer fall-through) |
+| **p16** | in-script | Failed-to-queue QUEUE_WATCH + land-check prefs; restart PreBuild land check; MDM-deferred newer minor wait (gate installer fall-through) |
 | **p17** | in-script | Size-aware storage formula + safe floor 25/35 when Apple prepare max unseen; live snapshot-prepare stream; pre-producer proceed gates; residual skip-notify; SPACE wording |
 | **p18** | in-script | MDM UPDATE/UPGRADE residual storage gate; SIGTERM/HUP stream cleanup + reap; producer→drain→parser stop order; fail-closed secure per-run max file (`mktemp`) |
 | **p19** | in-script | mkdir lock on prepare-max updates; parent-tracked `tail` + FIFO parser (no process-substitution orphans); stop order **reap then sync-parse** |
+| **p20** | in-script | On `No such update` (Apple superseded prior minor): clear MSU list caches + `WorkflowTarget`; 2‑minute relaunch to rediscover; classify install CONNECT/NOUPDATE/FAILED; days deadlines still **restart** via upstream target-change path |
+| **p21** | in-script | Empty-`mdmclient` `softwareupdate` fallback: re-list when `msu-list.log` older than 360m; no `LastSuccessfulCheckDate` bump on cache hits; **does not** change global cache `AND` TTL |
+| **p22** | in-script | QUEUE_WATCH sets land prefs only (no early WRV); wall-clock grace; promote WRV after reboot / clear same-boot orphans; interrupt clears orphan land prefs |
+| **p23** | in-script | On QUEUE_WATCH wall-clock deadline `break`, honor Failed-to-queue on the current `log_line` before exiting (do not discard → false WRV arm) |
+| **p24** | in-script | Interrupt: SIGINT → short `NextAutoLaunch` deferral (not FALSE) + clear orphan land prefs; SIGTERM/SIGHUP → leave NextAutoLaunch unset + **keep** land-check prefs for p22 |
+| **p25** | in-script | Failed land-check + no targets: clear WRV/land prefs; defer with error timer for normal workflow retry (no unbounded 5‑min restart-validate loop) |
+| **p26** | in-script | Bound p20 withdrawn rediscovery: `MacOSMSUWithdrawnRetryCount` → 2m/2m/15m/error; throttle install `notification_failed`; clear count on success/`reset_workflow` |
+| **p27** | in-script | After prepare success: always restart notify/audit/INSTALLER logout; residual free&lt;required only warns in log (does not skip user warning) |
+| **p28** | in-script | Install-only safe floors 19 GB minor / 25 GB major when download not needed; download/prepare-start keeps 25/35 |
+| **p29** | in-script | Delete per-run Apple prepare max temp in cleanup (after sync-parse); sweep leftover `.apple-snapshot-prepare-max.*` in `archive_logs` |
 
 ---
 
-## 1. Version (**p19**) and usage docs (**p01**)
+## 1. Version (**p29**) and usage docs (**p01**)
 
-- **[p19]** Version string: → **`5.1.1-p19`** (logs, `--version`, user-agent); date → **`2026/08/07`** (prior local was `5.1.1-p18` / `2026/08/07`)
+- **[p29]** Version string: → **`5.1.1-p29`** (logs, `--version`, user-agent); date → **`2026/08/09`** (prior local was `5.1.1-p28`)
 - **[p01]** `--usage` / help MDM key list: documents `--workflow-macos-minor-auto-download-deferral` and `WorkflowMacOSMinorAutoDownloadDeferral`
 
-Treat **`5.1.1-p19`** as the authoritative build ID (`SUPER_VERSION` / `--version` / logs). The folder name `super-5.1.1-p01` does not change with later patch numbers.
+Treat **`5.1.1-p29`** as the authoritative build ID (`SUPER_VERSION` / `--version` / logs). The folder name `super-5.1.1-p01` does not change with later patch numbers.
 
 ---
 
@@ -100,7 +112,7 @@ Logic lives in `workflow_check_download_status()`. When the option is **`FALSE`*
 
 ---
 
-## 3. Storage requirements (**p14**, **p17**, **p18**, **p19**)
+## 3. Storage requirements (**p14**, **p17**, **p18**, **p19**, **p28**, **p29**)
 
 These changes address false “enough free space” decisions that later failed when Apple actually prepared/installed the update.
 
@@ -114,7 +126,7 @@ These changes address false “enough free space” decisions that later failed 
 ### Size-aware formula + proceed gates (**p17**, hardened **p18** / **p19**)
 
 - Precheck (`check_storage_available`): `headroom = max(PREPARE_MIN, listed×MULT)` then `formula_required = headroom (+ listed if download still needed)`; apply **safe floor 25/35** (Apple prepare max is never available yet at precheck). Constants: minor **MULT=4** / **PREPARE_MIN=15**; major **MULT=2** / **PREPARE_MIN=25**. Minor MSU → minor constants; major MSU and **any installer** → major constants. No restored `size*2` undercut.
-- Live capture: per-run `log stream` of `snapshot prepare size:N bytes` → secure max file via `mktemp` (ignore &lt; 1 000 000); wired into MSU download/install, `startosinstall`, MDM DOWNLOAD+INSTALL; cleaned on all exits including **SIGINT/SIGTERM/SIGHUP** (**p18**). **p19:** parent-tracked `tail` + FIFO parser (no process-substitution orphan `tail -F`); max-file updates use a **mkdir lock**; stop order is kill producer → bounded drain → **reap parser/tail → sync-parse** (sole writer after reap). Reset failure fails closed (treat max as 0 / safe-floor path).
+- Live capture: per-run `log stream` of `snapshot prepare size:N bytes` → secure max file via `mktemp` (ignore &lt; 1 000 000); wired into MSU download/install, `startosinstall`, MDM DOWNLOAD+INSTALL; cleaned on all exits including **SIGINT/SIGTERM/SIGHUP** (**p18**). **p19:** parent-tracked `tail` + FIFO parser (no process-substitution orphan `tail -F`); max-file updates use a **mkdir lock**; stop order is kill producer → bounded drain → **reap parser/tail → sync-parse** (sole writer after reap). Reset failure fails closed (treat max as 0 / safe-floor path). **p29:** `cleanup` deletes the max file after that final sync-parse (not in `reap`, so mid-run stop/start keeps the session max); `archive_logs` sweeps leftover `.apple-snapshot-prepare-max.*` dotfiles.
 - Proceed gate (`check_storage_ready_to_proceed`): when Apple max &gt; 0 use `max(formula_required, apple_gb)` **without** forcing safe floor; when max is 0 keep safe floor 25/35. Pre-producer gates before restart-capable actions terminate via `exit_error` / `set_auto_launch_deferral` (not ignored error flags). Residual post-watch only skips notify/audit — reboot may already be owned:
   - Local `startosinstall` success notify/audit
   - MDM INSTALLER mid-watch restart notify
@@ -205,7 +217,7 @@ Local requires **all** of those to be `FALSE` (**AND**). Same fix for mist insta
 
 ---
 
-## 5. Update discovery / list workflows (**p01**, **p05**, **p12**)
+## 5. Update discovery / list workflows (**p01**, **p05**, **p12**, **p20**)
 
 ### Hard-timeout log polling (**p01** + **p12**)
 
@@ -213,7 +225,7 @@ Upstream waited on `tail -F | read -t` for list completion. When the child exite
 
 Replaced inside `get_mdmclient_list`, `get_msu_list`, and `get_macos_installers_list` with a second-by-second `grep` poll, process-alive checks, and a **bounded post-marker wait** so a hung list process cannot block forever (**p12**).
 
-### `softwareupdate` fallback when `mdmclient` is empty (**p01**)
+### `softwareupdate` fallback when `mdmclient` is empty (**p01** + **p21**)
 
 `workflow_check_software_status` normally prefers `mdmclient`. When that reports no updates (including macOS 27+ / no-mdmclient paths), local:
 
@@ -223,6 +235,12 @@ Replaced inside `get_mdmclient_list`, `get_msu_list`, and `get_macos_installers_
 - Fixes an upstream typo: installer-list error vars use `get_macos_installers_list_*` instead of `get_mdmclient_list_*`
 
 Several of these fallback sites use single-line `#>> LOCAL PATCH (p01)` comments (no matching `END`); see Marker conventions.
+
+**p21** (sticky empty-list cache): the p01 fallback could log “verifying via softwareupdate…” while reusing a cached empty `msu_list`, then refresh `LastSuccessfulCheckDate`, so with Apple Automatic Check keeping `LastSuccessfulDate` warm the global `AND` TTL never forced a re-list. Local **p21** only in that empty-`mdmclient` block:
+
+- Re-lists when `msu-list.log` is missing, unreadable, or older than `SOFTWARE_STATUS_CACHE_AGE_MINUTES` (360)
+- On a fresh cache hit: logs that a **cached** list is used (no fake verify); does **not** bump `LastSuccessfulCheckDate`
+- Does **not** change `check_software_update_status_cached` global `AND` TTL (hosts where `mdmclient` lists updates are unchanged)
 
 ### Trust empty `softwareupdate` list (**p05**)
 
@@ -241,6 +259,20 @@ Also:
 
 - If mdmclient still listed items, logs a **Warning** about the mismatch, then still treats as no installable updates
 - If an installer-based major/minor workflow is still possible, **continues** so mist-cli evaluation can run; otherwise returns after updating `LastSuccessfulCheckDate`
+
+### Superseded OTA label rediscovery (**p20**)
+
+Apple **always** pulls the prior minor point release when shipping the next (e.g. 25.5.1→25.5.2, 26.6→26.6.1). Upstream install uses `softwareupdate --install … --no-scan` against a prepared label. When that label is gone, install/download can fail with `No such update`, but upstream only error-deferred (~60 min) and kept MSU list caches / `WorkflowTarget`, so the Mac could keep chasing the dead build.
+
+Local **p20**:
+
+- Classifies install start failures like download: `CONNECT` / `NOUPDATE` / `FAILED`
+- On `NOUPDATE`: `clear_macos_msu_withdrawn_target` → `reset_software_update_status` + clear `WorkflowTarget` (not full `reset_workflow`)
+- Default workflow: **2‑minute** relaunch to re-list and pick the new latest
+- Days deadlines still **restart** when the new `WorkflowTarget` differs (upstream target-change / zero-date behavior). Future: optional carry-remaining-days across same-major supersession
+
+Network/`CONNECT` failures do **not** wipe list caches.
+
 - Leaves `macos_msu_major_upgrade` / `macos_msu_minor_update` unset on the empty path so later `-n` gates do not treat the literal `"FALSE"` as a real MSU item
 
 ### AutomaticCheck variable bug (**p01**)
@@ -375,28 +407,36 @@ Local **p16** (markers `#>>> LOCAL PATCH (p16)`):
 
 | Piece | Behavior |
 |---|---|
-| **B** `install_macos_msu` | On PREPARING 100% / `Downloaded` / `Restarting...`: early-set `WorkflowRestartValidate` + `WorkflowRestartValidatePreBuild`/`Target`, enter **QUEUE_WATCH** with `TIMEOUT_MSU_QUEUE_GRACE_SECONDS` (60). Detect `Failed to queue` in-watch → clear prefs, FAILED, error deferral. Grace expiry ≠ download timeout. COMPLETED + scheduled-install delete only after grace success. |
+| **B** `install_macos_msu` | On PREPARING 100% / `Downloaded` / `Restarting...`: set **only** `WorkflowRestartValidatePreBuild`/`Target` (p22; no early WRV gate), enter **QUEUE_WATCH** with wall-clock `TIMEOUT_MSU_QUEUE_GRACE_SECONDS` (60). Detect `Failed to queue` in-watch → clear prefs, FAILED, error deferral. Grace expiry ≠ download timeout. COMPLETED arms `WorkflowRestartValidate` + scheduled-install delete only after grace success. Mid-watch reboot: `workflow_startup` promotes PreBuild→WRV. Same-boot crash/orphan: clear PreBuild/Target. |
 | **C** restart validate | Land check: if PreBuild exists and current `macos_build` unchanged → Warning + restart-validation error deferral (leave prefs). Success path clears via `clear_workflow_restart_validate_os_prefs`. Restart-without-updates sets validate only and clears stale C prefs. |
 | **A** target select | Separate mdmclient **Deferred** parse (Product Key → YES/NO). If newer same-major `MSU_UPDATE` is Deferred YES → clear older SU minor, set `macos_minor_deferred_wait`, gate installer-minor fall-through. Exact pin exempt when normalized pin equals SU target (e.g. `26.6` or `26.6.0`). No `reset_workflow()` in A. |
 
-Helpers: `set_workflow_restart_validate_os_prefs` / `clear_workflow_restart_validate_os_prefs`.
+Helpers: `set_workflow_restart_validate_land_prefs` / `set_workflow_restart_validate_os_prefs` / `clear_workflow_restart_validate_os_prefs` (p22 splits land-check from LaunchDaemon gate).
 
 ---
 
+## 9b. QUEUE_WATCH LaunchDaemon gate split (**p22**)
+
+**Problem:** p16 early-set `WorkflowRestartValidate` during QUEUE_WATCH armed LaunchDaemon’s “wait for reboot” gate before queue success was known. Crash / Ctrl-C / silent no-reboot mid-watch could suppress auto-relaunch until reboot or manual run.
+
+**Change:** QUEUE_WATCH sets land-check prefs only; WRV is set on grace COMPLETED (or promoted after a real reboot). Wall-clock grace. Interrupt clears orphan land prefs when WRV was never armed.
+
 ## 10. Behavior matrix (practical impact)
 
-| Area | Patch | Upstream 5.1.1 | Local p19 |
+| Area | Patch | Upstream 5.1.1 | Local p22 |
 |---|---|---|---|
 | Minor update auto-download deferral | p01 | Always on when Apple auto-download applies | Optional via `WorkflowMacOSMinorAutoDownloadDeferral` (default on) |
 | Free-space floors | p14 | 15 GB / 25 GB | 25 GB / 35 GB; no `size*2` undercut |
 | Install SPACE errors | p14 / p17 | Download watch only | Download + install watch/logging; failure log says “install/prepare” |
 | Hung `tail -F` on **list** helpers | p01+p12 | Possible | Hard-timeout polling in list helpers |
 | Empty mdmclient list | p01 | Limited | `softwareupdate` fallback |
+| Sticky empty `softwareupdate` cache | p21 | N/A (no fallback) | Re-list by `msu-list.log` mtime in empty-mdmclient path; no date bump on cache hits; global `AND` TTL unchanged |
 | `softwareupdate` “No new software” | p05 | Treated as status **error** | Clean “no updates” Status (unless list fetch failed) |
 | Incomplete download marked complete | p01+p06 | Possible (final OR gate) | Fixed (final AND gate) |
 | In-progress download on relaunch | p02+p12 | Always killed at startup | Preserved only with recent log progress; attach/resume |
 | SIGINT / SIGTERM / SIGHUP | p01/p18 | Default shell behavior | Disable immediate LaunchDaemon relaunch; clean Apple prepare stream |
 | Prepare-max concurrent writers | p19 | n/a (local) | mkdir lock; stop reap-then-sync (no clobber) |
+| Prepare-max temp left in log folder | p29 | n/a (local) | Delete on cleanup after sync-parse; startup `archive_logs` sweeps leftovers |
 | Prepare `tail -F` orphans | p19 | n/a (local) | Parent-tracked tail + FIFO + path-scoped pkill |
 | SOFA zero date | p09 | `sed` strip `Z`, treat as local | True UTC→local |
 | Schedule weekday counters | p08 | Frozen weekday in reverse loops | Recomputed each day |
@@ -411,9 +451,10 @@ Helpers: `set_workflow_restart_validate_os_prefs` / `clear_workflow_restart_vali
 | Test-mode no-user restart | p06 | Could still reboot | Skips reboot |
 | Restrictions checksum churn | p03 | Zeroed when keys absent | Zeroed only if plist missing |
 | In-script p13 markers | p15 | n/a | Markers added; version was `5.1.1-p15` |
-| Failed to queue → false COMPLETED | p16 | Treated as success | QUEUE_WATCH + FAILED; early validate for reboot race |
+| Failed to queue → false COMPLETED | p16/p22 | Treated as success | QUEUE_WATCH + FAILED; land prefs mid-watch; WRV on COMPLETED / promote-after-reboot |
 | Restart validate false “all completed” | p16 | Possible if listing empty | PreBuild land check |
 | Older SU while newer MDM-deferred | p16 | Installs older SU | Wait; no installer promotion |
+| Pulled/superseded OTA label | p20 | Error deferral; may keep chasing dead label | Clear MSU caches; 2‑min rediscovery |
 
 ---
 
