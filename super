@@ -8,9 +8,9 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-SUPER_VERSION="5.1.1"
+SUPER_VERSION="5.1.1-p29"
 readonly SUPER_VERSION
-SUPER_DATE="2026/07/21"
+SUPER_DATE="2026/08/09"
 readonly SUPER_DATE
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')"
 readonly SUPER_USER_AGENT
@@ -60,6 +60,8 @@ show_usage() {
   [--workflow-only-download]  [--workflow-only-download-off]
   [--workflow-require-active-user]  [--workflow-require-active-user-off]
   [--workflow-restart-without-updates]  [--workflow-restart-without-updates-off]
+  [--workflow-macos-minor-auto-download-deferral]
+  [--workflow-macos-minor-auto-download-deferral-off]
   [--workflow-disable-update-check]  [--workflow-disable-update-check-off]
   [--workflow-disable-relaunch]  [--workflow-disable-relaunch-off]
   [--workflow-reset-super-after-completion]
@@ -173,6 +175,7 @@ show_usage() {
   <key>WorkflowOnlyDownload</key> <true/> | <false/>
   <key>WorkflowRequireActiveUser</key> <true/> | <false/>
   <key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>
+  <key>WorkflowMacOSMinorAutoDownloadDeferral</key> <true/> | <false/>
   <key>WorkflowDisableUpdateCheck</key> <true/> | <false/>
   <key>WorkflowDisableRelaunch</key> <true/> | <false/>
   <key>DeferralTimerDefault</key> <string>minutes</string>
@@ -483,6 +486,15 @@ set_defaults() {
 	MSU_LIST_LOG="${SUPER_LOG_FOLDER}/msu-list.log"
 	readonly MSU_LIST_LOG
 	
+	#>>> LOCAL PATCH (p17): per-run Apple snapshot prepare size stream + max files
+	APPLE_SNAPSHOT_PREPARE_STREAM_LOG="${SUPER_LOG_FOLDER}/apple-snapshot-prepare-stream.log"
+	readonly APPLE_SNAPSHOT_PREPARE_STREAM_LOG
+	#>>> LOCAL PATCH (p18): secure per-run max path via mktemp (runtime var apple_snapshot_prepare_max_file)
+	APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE="${SUPER_LOG_FOLDER}/.apple-snapshot-prepare-max.XXXXXX"
+	readonly APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE
+	#<<< END LOCAL PATCH (p18)
+	#<<< END LOCAL PATCH (p17)
+	
 	# OPTIONAL path to an existing static msu-list.log for debugging and testing only. Leave this value empty for the default workflow behavior:
 	MSU_LIST_DEBUG_LOG=""
 	readonly MSU_LIST_DEBUG_LOG
@@ -629,12 +641,35 @@ set_defaults() {
 	readonly DISPLAY_STRING_FORMAT_TIME
 	
 	# The default minium storage space in gigabytes required for a macOS minor update.
-	STORAGE_REQUIRED_UPDATE_DEFAULT_GB=15
+	#>>> LOCAL PATCH (p14): raise floors so small OTA checks cannot undercut Apple's real install need (~19GB for Tahoe 26.6)
+	STORAGE_REQUIRED_UPDATE_DEFAULT_GB=25
 	readonly STORAGE_REQUIRED_UPDATE_DEFAULT_GB
 	
 	# The default minium storage space in gigabytes required for a macOS major upgrade.
-	STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=25
+	STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=35
 	readonly STORAGE_REQUIRED_UPGRADE_DEFAULT_GB
+	#<<< END LOCAL PATCH (p14)
+	#>>> LOCAL PATCH (p17): size-aware prepare headroom + safe floors when Apple prepare max is unseen
+	STORAGE_PREPARE_MULT_MINOR=4
+	readonly STORAGE_PREPARE_MULT_MINOR
+	STORAGE_PREPARE_MULT_MAJOR=2
+	readonly STORAGE_PREPARE_MULT_MAJOR
+	STORAGE_PREPARE_MIN_MINOR_GB=15
+	readonly STORAGE_PREPARE_MIN_MINOR_GB
+	STORAGE_PREPARE_MIN_MAJOR_GB=25
+	readonly STORAGE_PREPARE_MIN_MAJOR_GB
+	STORAGE_SAFE_FLOOR_MINOR_GB=25
+	readonly STORAGE_SAFE_FLOOR_MINOR_GB
+	STORAGE_SAFE_FLOOR_MAJOR_GB=35
+	readonly STORAGE_SAFE_FLOOR_MAJOR_GB
+	#>>> LOCAL PATCH (p28): install-only floors when download already done (keep 25/35 for download/prepare start)
+	# Minor ~19GB matches observed Apple snapshot-prepare need; major install-only aligns with prepare soft min.
+	STORAGE_SAFE_FLOOR_INSTALL_ONLY_MINOR_GB=19
+	readonly STORAGE_SAFE_FLOOR_INSTALL_ONLY_MINOR_GB
+	STORAGE_SAFE_FLOOR_INSTALL_ONLY_MAJOR_GB=25
+	readonly STORAGE_SAFE_FLOOR_INSTALL_ONLY_MAJOR_GB
+	#<<< END LOCAL PATCH (p28)
+	#<<< END LOCAL PATCH (p17)
 	
 	# The number of seconds between storage checks when displaying the insufficient storage notification via the dialog_insufficient_storage() function.
 	STORAGE_REQUIRED_RECHECK_SECONDS=5
@@ -663,6 +698,10 @@ set_defaults() {
 	# The number of seconds to timeout the macOS 11+ softwareupdate download/prepare workflow if no progress is reported.
 	TIMEOUT_MSU_SYSTEM_SECONDS=1200
 	readonly TIMEOUT_MSU_SYSTEM_SECONDS
+	#>>> LOCAL PATCH (p16): short grace after Downloaded/prepare to catch Failed to queue (not TIMEOUT_MSU_SYSTEM_SECONDS)
+	TIMEOUT_MSU_QUEUE_GRACE_SECONDS=60
+	readonly TIMEOUT_MSU_QUEUE_GRACE_SECONDS
+	#<<< END LOCAL PATCH (p16)
 	
 	# The number of seconds to timeout the softwareupdate non-system update workflow if no progress is reported.
 	TIMEOUT_NON_SYSTEM_MSU_SECONDS=600
@@ -818,6 +857,14 @@ get_options() {
 		--workflow-restart-without-updates-off)
 			workflow_restart_without_updates_option="FALSE"
 			;;
+		#>>> LOCAL PATCH (p01): --workflow-macos-minor-auto-download-deferral option
+		--workflow-macos-minor-auto-download-deferral)
+			workflow_macos_minor_auto_download_deferral_option="TRUE"
+			;;
+		--workflow-macos-minor-auto-download-deferral-off)
+			workflow_macos_minor_auto_download_deferral_option="FALSE"
+			;;
+		#<<< END LOCAL PATCH (p01)
 		--workflow-disable-update-check)
 			workflow_disable_update_check_option="TRUE"
 			;;
@@ -1153,6 +1200,30 @@ set_pref() {
 delete_pref_main() {
 	defaults delete "${SUPER_MAIN_PLIST}" "${1}" 2> /dev/null
 }
+
+#>>> LOCAL PATCH (p16): set/clear WorkflowRestartValidate + land-check prefs (PreBuild/Target)
+#>>> LOCAL PATCH (p22): split LaunchDaemon gate (WRV) from land-check evidence (PreBuild/Target)
+# ${1} = target label for logging (e.g. 26.6-25G72); PreBuild is always current ${macos_build}.
+# Land-check evidence only — does NOT set WorkflowRestartValidate (avoids arming LaunchDaemon reboot-wait mid-QUEUE_WATCH).
+set_workflow_restart_validate_land_prefs() {
+	set_pref_main "WorkflowRestartValidatePreBuild" "${macos_build}"
+	[[ -n "${1}" ]] && set_pref_main "WorkflowRestartValidateTarget" "${1}"
+}
+
+# Full gate + land-check prefs (call on confirmed install COMPLETED / app-MDM success / promote-after-reboot).
+set_workflow_restart_validate_os_prefs() {
+	/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+	set_pref_main "WorkflowRestartValidate" "TRUE"
+	set_workflow_restart_validate_land_prefs "${1}"
+}
+
+clear_workflow_restart_validate_os_prefs() {
+	delete_pref_main "WorkflowRestartValidate"
+	delete_pref_main "WorkflowRestartValidatePreBuild"
+	delete_pref_main "WorkflowRestartValidateTarget"
+}
+#<<< END LOCAL PATCH (p22)
+#<<< END LOCAL PATCH (p16)
 
 # Delete a preference by name ${1} from either the current ${super_alternate_plist} or the ${SUPER_MAIN_PLIST}.
 delete_pref() {
@@ -1677,6 +1748,16 @@ manage_parameter_options() {
 	{ [[ -z "${workflow_restart_without_updates}" ]] && [[ -n "${workflow_restart_without_updates_option}" ]]; } && workflow_restart_without_updates="${workflow_restart_without_updates_option}" && set_pref "WorkflowRestartWithoutUpdates" "${workflow_restart_without_updates_option}"
 	[[ -z "${workflow_restart_without_updates}" ]] && workflow_restart_without_updates=$(get_pref "WorkflowRestartWithoutUpdates")
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${workflow_restart_without_updates}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_restart_without_updates is: ${workflow_restart_without_updates}"
+	
+	#>>> LOCAL PATCH (p01): manage --workflow-macos-minor-auto-download-deferral parameter
+	# Manage ${workflow_macos_minor_auto_download_deferral} parameter.
+	workflow_macos_minor_auto_download_deferral=$(get_pref_managed "WorkflowMacOSMinorAutoDownloadDeferral")
+	{ [[ -z "${workflow_macos_minor_auto_download_deferral}" ]] && [[ -n "${workflow_macos_minor_auto_download_deferral_option}" ]]; } && workflow_macos_minor_auto_download_deferral="${workflow_macos_minor_auto_download_deferral_option}" && set_pref "WorkflowMacOSMinorAutoDownloadDeferral" "${workflow_macos_minor_auto_download_deferral_option}"
+	[[ -z "${workflow_macos_minor_auto_download_deferral}" ]] && workflow_macos_minor_auto_download_deferral=$(get_pref "WorkflowMacOSMinorAutoDownloadDeferral")
+	[[ -z "${workflow_macos_minor_auto_download_deferral}" ]] && workflow_macos_minor_auto_download_deferral="TRUE"
+	{ [[ "${workflow_macos_minor_auto_download_deferral}" != "TRUE" ]] && [[ "${workflow_macos_minor_auto_download_deferral}" != "FALSE" ]]; } && log_super "Parameter Error: The --workflow-macos-minor-auto-download-deferral option must be true or false." && parameter_error="TRUE"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_macos_minor_auto_download_deferral is: ${workflow_macos_minor_auto_download_deferral}"
+	#<<< END LOCAL PATCH (p01)
 	
 	# Manage ${workflow_disable_update_check} parameter.
 	workflow_disable_update_check=$(get_pref_managed "WorkflowDisableUpdateCheck")
@@ -2867,6 +2948,8 @@ manage_parameter_options() {
 	fi
 	
 	# Validate ${test_storage_update_option} input and if valid set the ${storage_required_update_gb} parameter. If there is no ${storage_required_update_gb} then set it to ${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}.
+	#>>> LOCAL PATCH (p17): track explicit TestStorageUpdate so formula/proceed do not treat defaults as overrides
+	test_storage_update_active="FALSE"
 	storage_required_update_gb=$(get_pref_managed "TestStorageUpdate")
 	if [[ "${storage_required_update_gb}" == "X" ]] || { [[ -z "${storage_required_update_gb}" ]] && [[ "${test_storage_update_option}" == "X" ]]; }; then
 		delete_pref "TestStorageUpdate"
@@ -2878,10 +2961,18 @@ manage_parameter_options() {
 	[[ -z "${storage_required_update_gb}" ]] && storage_required_update_gb=$(get_pref "TestStorageUpdate")
 	[[ -n "${storage_required_upgrade_gb}" ]] && log_super "Parameter Warning: Specifying the --test-storage-update option should only be used for testing purposes."
 	{ [[ -n "${storage_required_update_gb}" ]] && [[ ! "${storage_required_update_gb}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --test-storage-update=gigabytes value must only be a number." && parameter_error="TRUE"
-	[[ -z "${storage_required_update_gb}" ]] && storage_required_update_gb="${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}"
+	if [[ -n "${storage_required_update_gb}" ]]; then
+		test_storage_update_active="TRUE"
+	else
+		storage_required_update_gb="${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}"
+	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_update_gb is: ${storage_required_update_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: test_storage_update_active is: ${test_storage_update_active}"
+	#<<< END LOCAL PATCH (p17)
 	
 	# Validate ${test_storage_upgrade_option} input and if valid set the ${storage_required_upgrade_gb} parameter. If there is no ${storage_required_upgrade_gb} then set it to ${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}.
+	#>>> LOCAL PATCH (p17): track explicit TestStorageUpgrade so formula/proceed do not treat defaults as overrides
+	test_storage_upgrade_active="FALSE"
 	storage_required_upgrade_gb=$(get_pref_managed "TestStorageUpgrade")
 	if [[ "${storage_required_upgrade_gb}" == "X" ]] || { [[ -z "${storage_required_upgrade_gb}" ]] && [[ "${test_storage_upgrade_option}" == "X" ]]; }; then
 		delete_pref "TestStorageUpgrade"
@@ -2893,8 +2984,14 @@ manage_parameter_options() {
 	[[ -z "${storage_required_upgrade_gb}" ]] && storage_required_upgrade_gb=$(get_pref "TestStorageUpgrade")
 	[[ -n "${storage_required_upgrade_gb}" ]] && log_super "Parameter Warning: Specifying the --test-storage-upgrade option should only be used for testing purposes."
 	{ [[ -n "${storage_required_upgrade_gb}" ]] && [[ ! "${storage_required_upgrade_gb}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && log_super "Parameter Error: The --test-storage-upgrade=gigabytes value must only be a number." && parameter_error="TRUE"
-	[[ -z "${storage_required_upgrade_gb}" ]] && storage_required_upgrade_gb="${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}"
+	if [[ -n "${storage_required_upgrade_gb}" ]]; then
+		test_storage_upgrade_active="TRUE"
+	else
+		storage_required_upgrade_gb="${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}"
+	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_upgrade_gb is: ${storage_required_upgrade_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: test_storage_upgrade_active is: ${test_storage_upgrade_active}"
+	#<<< END LOCAL PATCH (p17)
 	
 	# Validate ${test_battery_level_option} input and if valid set the ${power_required_battery_percent} parameter. If there is no ${power_required_battery_percent} then set it to ${STORAGE_REQUIRED_UPGRADE_DEFAULT_GB}.
 	power_required_battery_percent=$(get_pref_managed "TestBatteryLevel")
@@ -3862,6 +3959,9 @@ check_mist_cli() {
 # Install and validate helper items that may be used by super.
 manage_helpers() {
 	helper_error="FALSE"
+	#>>> LOCAL PATCH (p11): default helpers invalid so failed download (check_* never runs) fails closed
+	ibm_notifier_valid="FALSE"
+	#<<< END LOCAL PATCH (p11)
 	# Validate the IBM Notifier.app, if missing or invalid then install and check again.
 	if [[ ! -d "${IBM_NOTIFIER_APP}" ]]; then
 		get_ibm_notifier
@@ -3882,6 +3982,9 @@ manage_helpers() {
 	
 	# If needed, validate mist-cli and if missing or invalid then install and check again.
 	if [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; then
+		#>>> LOCAL PATCH (p11): default mist-cli invalid so failed download (check_* never runs) fails closed
+		mist_cli_valid="FALSE"
+		#<<< END LOCAL PATCH (p11)
 		if [[ ! -f "${MIST_CLI_BINARY}" ]]; then
 			get_mist_cli
 			[[ -f "${MIST_CLI_BINARY}" ]] && check_mist_cli
@@ -3983,7 +4086,27 @@ workflow_startup() {
 	[[ "${config_status_option}" == "TRUE" ]] && show_config_status
 	
 	# Check for any previous super processes and kill them.
-	killall -9 "softwareupdate" "mist" > /dev/null 2>&1
+	#>>> LOCAL PATCH (p12): preserve --download only with recent log progress (p02 dropped this and left hung jobs forever)
+	local preserve_msu_download
+	preserve_msu_download="FALSE"
+	if find_softwareupdate_download_pid > /dev/null 2>&1; then
+		if [[ -f "${MSU_WORKFLOW_LOG}" ]]; then
+			local msu_workflow_log_mtime
+			msu_workflow_log_mtime=$(stat -f %m "${MSU_WORKFLOW_LOG}" 2> /dev/null)
+			if [[ -n "${msu_workflow_log_mtime}" ]] && [[ $(( $(date +%s) - msu_workflow_log_mtime )) -le 300 ]] && grep -qE 'Downloading|Downloaded:' "${MSU_WORKFLOW_LOG}" 2> /dev/null; then
+				preserve_msu_download="TRUE"
+			fi
+		fi
+	fi
+	if [[ "${preserve_msu_download}" == "TRUE" ]]; then
+		[[ -d "${SUPER_LOG_FOLDER}" ]] && log_super "Status: In-progress softwareupdate download/prepare detected, not killing softwareupdate."
+		[[ ! -d "${SUPER_LOG_FOLDER}" ]] && log_echo "Status: In-progress softwareupdate download/prepare detected, not killing softwareupdate."
+		killall -9 "mist" > /dev/null 2>&1
+	else
+		killall -9 "softwareupdate" "mist" > /dev/null 2>&1
+		wait_for_softwareupdate_exit 30
+	fi
+	#<<< END LOCAL PATCH (p12)
 	killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
 	local super_previous_pid
 	super_previous_pid=$(pgrep -F "${SUPER_PID_FILE}" 2> /dev/null)
@@ -4134,6 +4257,22 @@ workflow_startup() {
 	
 	# Initial preparation for various workflow modes. This enforces a hierarchy of workflows as follows: Restart Validate > Install Now > Scheduled Installation > Only Download > Default Workflow.
 	[[ "${test_mode}" == "TRUE" ]] && log_super "Status: Test mode active with ${test_mode_timeout_seconds} second timeout."
+	#>>> LOCAL PATCH (p22): promote land-check prefs after mid-QUEUE_WATCH reboot; clear same-boot orphans (no WRV gate yet)
+	# PreBuild/Target alone survive a reboot race without arming LaunchDaemon. Promote to WRV only after a real reboot.
+	if [[ -n "$(get_pref "WorkflowRestartValidatePreBuild")" ]] && [[ $(get_pref "WorkflowRestartValidate") != "TRUE" ]]; then
+		local mac_last_startup_saved_epoch
+		mac_last_startup_saved_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "$(get_pref "MacLastStartup")" +%s 2> /dev/null)
+		if [[ -z "${mac_last_startup_saved_epoch}" ]] || [[ ${mac_last_startup_saved_epoch} -lt ${kernel_boot_epoch} ]]; then
+			log_super "Status: Restart land-check prefs found after reboot; promoting WorkflowRestartValidate for restart validation workflow."
+			/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+			set_pref_main "WorkflowRestartValidate" "TRUE"
+		else
+			log_super "Status: Clearing orphan restart land-check prefs from an incomplete install watch (no reboot since they were set)."
+			delete_pref_main "WorkflowRestartValidatePreBuild"
+			delete_pref_main "WorkflowRestartValidateTarget"
+		fi
+	fi
+	#<<< END LOCAL PATCH (p22)
 	if [[ $(get_pref "WorkflowRestartValidate") == "TRUE" ]]; then
 		log_super "Status: Restart validation workflow active."
 		workflow_restart_validate_active="TRUE"
@@ -4238,6 +4377,157 @@ workflow_startup() {
 # MARK: *** Process Management ***
 ################################################################################
 
+#>>> LOCAL PATCH (p01): clean Ctrl-C / SIGINT handling so LaunchDaemon does not immediately relaunch and softwareupdate prepare is not killed
+#>>> LOCAL PATCH (p18): also trap SIGTERM/SIGHUP; reap Apple prepare stream children; leave softwareupdate/mist alone
+#>>> LOCAL PATCH (p24): SIGINT vs SIGTERM/SIGHUP — never permanent NextAutoLaunch=FALSE; keep land-check prefs on shutdown
+# On interrupt/termination: leave any in-progress softwareupdate/mist alone, then exit.
+# Invoked via: trap 'handle_super_interrupt SIGNAL' SIGNAL (in main). $1 is the signal name.
+# shellcheck disable=SC2329
+handle_super_interrupt() {
+	local interrupt_signal="${1:-SIGINT}"
+	trap - SIGINT SIGTERM SIGHUP
+	cleanup_apple_snapshot_prepare_stream
+	if [[ -d "${SUPER_LOG_FOLDER}" ]]; then
+		log_super "Warning: ${interrupt_signal} received; leaving any in-progress softwareupdate/mist download or prepare running."
+	fi
+	/usr/libexec/PlistBuddy -c "Delete :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+	if [[ "${interrupt_signal}" == "SIGINT" ]]; then
+		# Interactive cancel: short deferral avoids an immediate LaunchDaemon relaunch without permanently disabling super.
+		local interrupt_defer_minutes
+		interrupt_defer_minutes="${deferral_timer_error_minutes:-}"
+		[[ -z "${interrupt_defer_minutes}" ]] && interrupt_defer_minutes="${deferral_timer_minutes:-}"
+		[[ -z "${interrupt_defer_minutes}" || ! "${interrupt_defer_minutes}" =~ ^[0-9]+$ ]] && interrupt_defer_minutes=5
+		[[ ${interrupt_defer_minutes} -lt 2 ]] && interrupt_defer_minutes=2
+		local interrupt_defer_epoch
+		interrupt_defer_epoch=$(($(date +%s) + (interrupt_defer_minutes * 60)))
+		local interrupt_next_auto_launch
+		interrupt_next_auto_launch="$(date -j -f %s "${interrupt_defer_epoch}" +%Y-%m-%d:%H:%M:00 | xargs)"
+		/usr/libexec/PlistBuddy -c "Add :NextAutoLaunch string ${interrupt_next_auto_launch}" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+		if [[ -d "${SUPER_LOG_FOLDER}" ]]; then
+			log_super "Status: SIGINT — scheduling NextAutoLaunch at ${interrupt_next_auto_launch} (not FALSE) to avoid immediate relaunch."
+			log_status "Pending: Workflow interrupted by SIGINT; automatic relaunch scheduled at ${interrupt_next_auto_launch}."
+		fi
+		# Mid-QUEUE_WATCH interactive cancel — drop land-check orphans; keep prefs if WRV gate already armed (COMPLETED).
+		#>>> LOCAL PATCH (p22): mid-QUEUE_WATCH interrupt land-check cleanup (SIGINT only after p24)
+		if [[ $(get_pref "WorkflowRestartValidate") != "TRUE" ]]; then
+			delete_pref_main "WorkflowRestartValidatePreBuild"
+			delete_pref_main "WorkflowRestartValidateTarget"
+		fi
+		#<<< END LOCAL PATCH (p22)
+	else
+		# SIGTERM/SIGHUP (shutdown, launchctl kill, etc.): missing NextAutoLaunch allows LaunchDaemon start after reboot.
+		# Do not set FALSE (that permanently stopped fleet relaunch). Do not clear land-check prefs — p22 promotes them after a real reboot.
+		if [[ -d "${SUPER_LOG_FOLDER}" ]]; then
+			log_super "Status: ${interrupt_signal} — leaving NextAutoLaunch unset (auto-relaunch allowed); preserving restart land-check prefs if present."
+			log_status "Inactive: Workflow interrupted by ${interrupt_signal}; automatic relaunch remains enabled."
+		fi
+	fi
+	[[ -n "${jamf_access_token}" ]] && delete_jamf_api_access_token
+	rm -f "${SUPER_PID_FILE}" 2> /dev/null
+	[[ -d "${SUPER_LOG_FOLDER}" ]] && log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT INTERRUPT (${interrupt_signal}) ****"
+	exit 130
+}
+#<<< END LOCAL PATCH (p24)
+#<<< END LOCAL PATCH (p18)
+#<<< END LOCAL PATCH (p01)
+
+#>>> LOCAL PATCH (p02): helpers for scoped msu-workflow.log reads, softwareupdate --download PID selection, and kill waits
+# Return ${MSU_WORKFLOW_LOG} content after the latest DOWNLOAD ... SOFTWAREUPDATE START marker (empty if none/file missing).
+get_msu_workflow_log_current_session() {
+	[[ ! -f "${MSU_WORKFLOW_LOG}" ]] && return 0
+	awk '/DOWNLOAD .* SOFTWAREUPDATE START/{s=$0 ORS; next} {s=s $0 ORS} END{printf "%s", s}' "${MSU_WORKFLOW_LOG}" 2> /dev/null
+}
+
+# Echo PID of a running softwareupdate --download process.
+# If label ${1} is set, only match that label (no cross-download fallback). Without a label, return any --download.
+find_softwareupdate_download_pid() {
+	local find_su_label="${1:-}"
+	local find_su_pid
+	local find_su_args
+	local find_su_fallback_pid
+	find_su_fallback_pid=""
+	while read -r find_su_pid; do
+		[[ -z "${find_su_pid}" ]] && continue
+		find_su_args=$(ps -p "${find_su_pid}" -o args= 2> /dev/null)
+		echo "${find_su_args}" | grep -q -- '--download' || continue
+		if [[ -n "${find_su_label}" ]]; then
+			#>>> LOCAL PATCH (p12): label requested — never fall back to a different --download
+			if echo "${find_su_args}" | grep -qF -- "${find_su_label}"; then
+				echo "${find_su_pid}"
+				return 0
+			fi
+			continue
+			#<<< END LOCAL PATCH (p12)
+		fi
+		[[ -z "${find_su_fallback_pid}" ]] && find_su_fallback_pid="${find_su_pid}"
+	done < <(pgrep -x "softwareupdate" 2> /dev/null)
+	[[ -z "${find_su_label}" ]] && [[ -n "${find_su_fallback_pid}" ]] && echo "${find_su_fallback_pid}" && return 0
+	return 1
+}
+
+# Wait up to ${2:-30} seconds for PID ${1} to exit; kill -9 on timeout, then reap with wait.
+wait_pid_with_timeout() {
+	local wait_pid="${1:-}"
+	local wait_timeout="${2:-30}"
+	local wait_deadline
+	[[ -z "${wait_pid}" ]] && return 0
+	[[ ${wait_timeout} -lt 1 ]] && wait_timeout=1
+	wait_deadline=$(($(date +%s) + wait_timeout))
+	while kill -0 "${wait_pid}" > /dev/null 2>&1; do
+		if [[ $(date +%s) -ge ${wait_deadline} ]]; then
+			kill -9 "${wait_pid}" > /dev/null 2>&1
+			wait "${wait_pid}" > /dev/null 2>&1 || true
+			return 1
+		fi
+		sleep 1
+	done
+	wait "${wait_pid}" > /dev/null 2>&1 || true
+	return 0
+}
+
+# Wait up to ${1:-30} seconds for all softwareupdate processes to exit.
+wait_for_softwareupdate_exit() {
+	local wait_su_timeout="${1:-30}"
+	local wait_su_deadline
+	wait_su_deadline=$(($(date +%s) + wait_su_timeout))
+	while pgrep -x "softwareupdate" > /dev/null 2>&1; do
+		[[ $(date +%s) -ge ${wait_su_deadline} ]] && return 1
+		sleep 1
+	done
+	return 0
+}
+
+# Resolve the real softwareupdate --download PID after a backgrounded launch (pipelines/launchctl make $! unreliable).
+resolve_softwareupdate_download_pid() {
+	local resolve_su_label="${1:-}"
+	local resolve_su_fallback="${2:-}"
+	local resolve_su_pid
+	local resolve_su_try
+	for resolve_su_try in 1 2 3 4 5 6 7 8 9 10; do
+		if resolve_su_pid="$(find_softwareupdate_download_pid "${resolve_su_label}")"; then
+			echo "${resolve_su_pid}"
+			return 0
+		fi
+		sleep 1
+	done
+	[[ -n "${resolve_su_fallback}" ]] && echo "${resolve_su_fallback}" && return 0
+	return 1
+}
+
+# Kill tracked download PID and any remaining softwareupdate --download for optional label ${1}.
+kill_softwareupdate_download() {
+	local kill_su_label="${1:-}"
+	local kill_su_tracked="${2:-}"
+	local kill_su_pid
+	[[ -n "${kill_su_tracked}" ]] && kill -9 "${kill_su_tracked}" > /dev/null 2>&1
+	while kill_su_pid="$(find_softwareupdate_download_pid "${kill_su_label}")"; do
+		kill -9 "${kill_su_pid}" > /dev/null 2>&1
+		sleep 1
+	done
+	wait_for_softwareupdate_exit 15 || true
+}
+#<<< END LOCAL PATCH (p02)
+
 # This function is only used for debugging from the command line to interrupt the workflow and wait for the user to press Enter to continue. Insert the following line wherever you want an interrupt to occur:
 # [[ "${current_user_account_name}" != "FALSE" ]] && interactive_interrupt
 interactive_interrupt() {
@@ -4247,6 +4537,9 @@ interactive_interrupt() {
 
 # Restart super via the LaunchDaemon after waiting for ${restart_super_sleep_seconds} seconds.
 restart_super() {
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream before restart exit
+	cleanup_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	/usr/libexec/PlistBuddy -c "Delete :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 	{
 		sleep $restart_super_sleep_seconds
@@ -4276,6 +4569,9 @@ set_auto_launch_deferral() {
 
 # This function is used when the super workflow exits with no errors.
 exit_clean() {
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream on clean exit
+	cleanup_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ -n "${jamf_access_token}" ]] && delete_jamf_api_access_token
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file at clean exit: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2> /dev/null)"
 	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT CLEAN ****"
@@ -4285,6 +4581,9 @@ exit_clean() {
 
 # This function is used when the super workflow must exit due to an unrecoverable error.
 exit_error() {
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream on error exit
+	cleanup_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ -n "${jamf_access_token}" ]] && delete_jamf_api_access_token
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file at error exit: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2> /dev/null)"
 	log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT ERROR ****"
@@ -4429,6 +4728,10 @@ archive_logs() {
 			rm -rf "${log_archive_file:?}" 2> /dev/null
 		fi
 	done
+
+	#>>> LOCAL PATCH (p29): archive does not move dotfiles; sweep leftover prepare-max temps from prior runs (startup-only call site)
+	rm -f "${SUPER_LOG_FOLDER}"/.apple-snapshot-prepare-max.* 2> /dev/null
+	#<<< END LOCAL PATCH (p29)
 }
 
 # MARK: *** Local System Validation ***
@@ -4561,8 +4864,10 @@ check_msu_settings() {
 	msu_automatic_check_local=$(defaults read "${MSU_LOCAL_PLIST}" AutomaticCheckEnabled 2> /dev/null)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_check_managed is: ${msu_automatic_check_managed}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_check_local is: ${msu_automatic_check_local}"
-	[[ -n $msu_automatic_check_managed ]] && [[ $msu_automatic_check_managed -eq 0 ]] && msu_automatic_download="FALSE"
-	[[ -z $msu_automatic_check_managed ]] && [[ -n $msu_automatic_check_local ]] && [[ $msu_automatic_check_local -eq 0 ]] && msu_automatic_download="FALSE"
+	#>>> LOCAL PATCH (p01): official 5.1.1 assigns msu_automatic_download here by mistake; correct target is msu_automatic_check
+	[[ -n $msu_automatic_check_managed ]] && [[ $msu_automatic_check_managed -eq 0 ]] && msu_automatic_check="FALSE"
+	[[ -z $msu_automatic_check_managed ]] && [[ -n $msu_automatic_check_local ]] && [[ $msu_automatic_check_local -eq 0 ]] && msu_automatic_check="FALSE"
+	#<<< END LOCAL PATCH (p01)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_automatic_check is: ${msu_automatic_check}"
 	if [[ "${msu_automatic_check}" == "TRUE" ]]; then
 		# Automatic download check.
@@ -4637,10 +4942,9 @@ check_auth_local_account() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_local_password: ${auth_local_password}"
 }
 
-# Collect the available storage and set ${storage_ready} accordingly. This also sets ${storage_available_gigabytes} and ${storage_required_gigabytes}.
-check_storage_available() {
-	check_storage_available_error="FALSE"
-	storage_ready="FALSE"
+#>>> LOCAL PATCH (p17): free-space read, formula, proceed gate, Apple prepare stream, terminal fail
+# Read free space via ImportantUsage (user) / mdmclient (no user) / capacity / df fallbacks. Sets ${storage_available_gigabytes}.
+read_storage_available_gigabytes() {
 	[[ -z "${current_user_account_name}" ]] && check_current_user
 	[[ "${current_user_account_name}" != "FALSE" ]] && storage_available_gigabytes=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")
 	[[ "${current_user_account_name}" == "FALSE" ]] && storage_available_gigabytes=$(/usr/libexec/mdmclient QueryDeviceInformation 2> /dev/null | grep 'AvailableDeviceCapacity' | head -n 1 | awk '{print $3;}' | sed -e 's/;//g' -e 's/"//g' -e 's/\.[0-9]*//g')
@@ -4654,37 +4958,99 @@ check_storage_available() {
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_available_gigabytes: ${storage_available_gigabytes}"
 	if [[ -z "${storage_available_gigabytes}" ]] || [[ "${storage_available_gigabytes}" == "0" ]] || [[ ! "${storage_available_gigabytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		return 1
+	fi
+	return 0
+}
+
+# Compute size-aware formula fields: storage_listed_gb, storage_headroom_gb, storage_download_needed, storage_formula_required_gb, storage_safe_floor_gb, storage_test_override_active.
+# Does not apply safe floor or Apple max — callers do.
+compute_storage_formula_required() {
+	storage_listed_gb=0
+	storage_headroom_gb=0
+	storage_download_needed="FALSE"
+	storage_formula_required_gb=0
+	storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MINOR_GB}"
+	storage_test_override_active="FALSE"
+	local storage_prepare_mult
+	storage_prepare_mult="${STORAGE_PREPARE_MULT_MINOR}"
+	local storage_prepare_min
+	storage_prepare_min="${STORAGE_PREPARE_MIN_MINOR_GB}"
+	
+	if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then
+		# Any installer target uses major constants (matches prior upgrade storage path).
+		storage_prepare_mult="${STORAGE_PREPARE_MULT_MAJOR}"
+		storage_prepare_min="${STORAGE_PREPARE_MIN_MAJOR_GB}"
+		storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MAJOR_GB}"
+		[[ -n "${macos_installer_size}" ]] && storage_listed_gb="${macos_installer_size}"
+		[[ "${macos_installer_download_required}" == "TRUE" ]] && storage_download_needed="TRUE"
+		[[ "${test_storage_upgrade_active}" == "TRUE" ]] && storage_test_override_active="TRUE" && storage_formula_required_gb="${storage_required_upgrade_gb}"
+	elif [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then
+		storage_prepare_mult="${STORAGE_PREPARE_MULT_MAJOR}"
+		storage_prepare_min="${STORAGE_PREPARE_MIN_MAJOR_GB}"
+		storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MAJOR_GB}"
+		[[ -n "${macos_msu_size}" ]] && storage_listed_gb="${macos_msu_size}"
+		[[ "${macos_msu_download_required}" == "TRUE" ]] && storage_download_needed="TRUE"
+		[[ "${test_storage_upgrade_active}" == "TRUE" ]] && storage_test_override_active="TRUE" && storage_formula_required_gb="${storage_required_upgrade_gb}"
+	elif [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
+		storage_prepare_mult="${STORAGE_PREPARE_MULT_MINOR}"
+		storage_prepare_min="${STORAGE_PREPARE_MIN_MINOR_GB}"
+		storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_MINOR_GB}"
+		[[ -n "${macos_msu_size}" ]] && storage_listed_gb="${macos_msu_size}"
+		[[ "${macos_msu_download_required}" == "TRUE" ]] && storage_download_needed="TRUE"
+		[[ "${test_storage_update_active}" == "TRUE" ]] && storage_test_override_active="TRUE" && storage_formula_required_gb="${storage_required_update_gb}"
+	fi
+	
+	[[ -z "${storage_listed_gb}" ]] && storage_listed_gb=0
+	[[ ! "${storage_listed_gb}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]] && storage_listed_gb=0
+	
+	if [[ "${storage_test_override_active}" != "TRUE" ]]; then
+		storage_headroom_gb=$((storage_listed_gb * storage_prepare_mult))
+		[[ $storage_headroom_gb -lt $storage_prepare_min ]] && storage_headroom_gb="${storage_prepare_min}"
+		if [[ "${storage_download_needed}" == "TRUE" ]]; then
+			storage_formula_required_gb=$((storage_headroom_gb + storage_listed_gb))
+		else
+			storage_formula_required_gb="${storage_headroom_gb}"
+		fi
+	else
+		storage_headroom_gb=0
+	fi
+	#>>> LOCAL PATCH (p28): already-prepared / no-download runs use install-only floors (not download 25/35)
+	if [[ "${storage_download_needed}" != "TRUE" ]] && [[ "${storage_test_override_active}" != "TRUE" ]]; then
+		if [[ ${storage_safe_floor_gb} -eq ${STORAGE_SAFE_FLOOR_MAJOR_GB} ]]; then
+			storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_INSTALL_ONLY_MAJOR_GB}"
+		else
+			storage_safe_floor_gb="${STORAGE_SAFE_FLOOR_INSTALL_ONLY_MINOR_GB}"
+		fi
+	fi
+	#<<< END LOCAL PATCH (p28)
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_listed_gb: ${storage_listed_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_headroom_gb: ${storage_headroom_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_download_needed: ${storage_download_needed}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_formula_required_gb: ${storage_formula_required_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_safe_floor_gb: ${storage_safe_floor_gb}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_test_override_active: ${storage_test_override_active}"
+}
+
+# Collect the available storage and set ${storage_ready} accordingly. This also sets ${storage_available_gigabytes} and ${storage_required_gigabytes}.
+# Precheck: formula + safe floor only (no live Apple prepare bump).
+check_storage_available() {
+	check_storage_available_error="FALSE"
+	storage_ready="FALSE"
+	if ! read_storage_available_gigabytes; then
 		log_super "Error: Unable to determine available storage."
 		check_storage_available_error="TRUE"
 	elif [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]] || [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
-		{ [[ -z "${test_storage_update_option}" ]] && [[ $macos_msu_size -lt 5 ]]; } && storage_required_update_gb=$((macos_msu_size * 2))
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_download_required: ${macos_installer_download_required}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_installer_size: ${macos_installer_size}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_download_required: ${macos_msu_download_required}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_size: ${macos_msu_size}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_upgrade_gb: ${storage_required_upgrade_gb}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_update_gb: ${storage_required_update_gb}"
-		if [[ "${macos_installer_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_installer_minor_update_target}" != "FALSE" ]]; then # Target is a macOS installer.
-			if [[ "${macos_installer_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_upgrade_gb + macos_installer_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_upgrade_gb}"
-			fi
+		#>>> LOCAL PATCH (p14): do not replace the minor floor with macos_msu_size*2 for downloads <5GB (that undercut allowed ~8GB when Apple required ~19GB)
+		#<<< END LOCAL PATCH (p14)
+		compute_storage_formula_required
+		if [[ "${storage_test_override_active}" == "TRUE" ]]; then
+			storage_required_gigabytes="${storage_formula_required_gb}"
+		else
+			storage_required_gigabytes="${storage_formula_required_gb}"
+			[[ $storage_required_gigabytes -lt $storage_safe_floor_gb ]] && storage_required_gigabytes="${storage_safe_floor_gb}"
 		fi
-		if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then # Target is a macOS major upgrade via MSU.
-			if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_upgrade_gb + macos_msu_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_upgrade_gb}"
-			fi
-		fi
-		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then # Target is a macOS minor update.
-			if [[ "${macos_msu_download_required}" == "TRUE" ]]; then
-				storage_required_gigabytes=$((storage_required_update_gb + macos_msu_size))
-			else # Download calculation is not required.
-				storage_required_gigabytes="${storage_required_update_gb}"
-			fi
-		fi
+		log_super "Status: Storage: required=${storage_required_gigabytes}GB (listed=${storage_listed_gb}GB headroom=${storage_headroom_gb}GB download_needed=${storage_download_needed} safe_floor=${storage_safe_floor_gb})"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_required_gigabytes: ${storage_required_gigabytes}"
 		[[ $storage_available_gigabytes -ge $storage_required_gigabytes ]] && storage_ready="TRUE"
 	else # No macOS update/upgrade is available.
@@ -4693,6 +5059,284 @@ check_storage_available() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: check_storage_available_error: ${check_storage_available_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_ready: ${storage_ready}"
 }
+
+# Proceed gate: formula + Apple prepare max when seen; safe floor when max_bytes==0. Sets ${storage_ready}, ${storage_required_gigabytes}, ${storage_available_gigabytes}.
+check_storage_ready_to_proceed() {
+	check_storage_ready_to_proceed_error="FALSE"
+	storage_ready="FALSE"
+	if ! read_storage_available_gigabytes; then
+		log_super "Error: Unable to determine available storage."
+		check_storage_ready_to_proceed_error="TRUE"
+		return 0
+	fi
+	if [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]]; then
+		storage_ready="TRUE"
+		return 0
+	fi
+	compute_storage_formula_required
+	local storage_apple_prepare_max_bytes
+	storage_apple_prepare_max_bytes="$(get_apple_snapshot_prepare_max_bytes)"
+	local storage_apple_gb
+	storage_apple_gb=0
+	if [[ -n "${storage_apple_prepare_max_bytes}" ]] && [[ "${storage_apple_prepare_max_bytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]] && [[ $storage_apple_prepare_max_bytes -gt 0 ]]; then
+		storage_apple_gb=$(( (storage_apple_prepare_max_bytes + 999999999) / 1000000000 ))
+	fi
+	if [[ "${storage_test_override_active}" == "TRUE" ]]; then
+		storage_required_gigabytes="${storage_formula_required_gb}"
+	elif [[ $storage_apple_prepare_max_bytes -gt 0 ]]; then
+		storage_required_gigabytes="${storage_formula_required_gb}"
+		[[ $storage_apple_gb -gt $storage_required_gigabytes ]] && storage_required_gigabytes="${storage_apple_gb}"
+	else
+		storage_required_gigabytes="${storage_formula_required_gb}"
+		[[ $storage_required_gigabytes -lt $storage_safe_floor_gb ]] && storage_required_gigabytes="${storage_safe_floor_gb}"
+	fi
+	log_super "Status: Storage proceed: required=${storage_required_gigabytes}GB (listed=${storage_listed_gb}GB headroom=${storage_headroom_gb}GB download_needed=${storage_download_needed} apple_prepare=${storage_apple_gb}GB safe_floor=${storage_safe_floor_gb} free=${storage_available_gigabytes}GB)"
+	[[ $storage_available_gigabytes -ge $storage_required_gigabytes ]] && storage_ready="TRUE"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: check_storage_ready_to_proceed_error: ${check_storage_ready_to_proceed_error}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: storage_ready: ${storage_ready}"
+}
+
+# Terminal fail for pre-producer storage gate (exit_error / set_auto_launch_deferral). Does not rely on ignored parent error flags.
+handle_storage_proceed_failure() {
+	cleanup_apple_snapshot_prepare_stream
+	log_super "Error: Current available storage is at ${storage_available_gigabytes} GBs which is below the ${storage_required_gigabytes} GBs required to proceed with macOS update/upgrade."
+	if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+		log_super "Error: Insufficient storage to proceed, install now workflow can not continue."
+		log_status "Inactive Error: Insufficient storage to proceed, install now workflow can not continue."
+		[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
+		exit_error
+	else
+		deferral_timer_minutes=$deferral_timer_error_minutes
+		log_super "Error: Insufficient storage to proceed, trying again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: Insufficient storage to proceed, trying again in ${deferral_timer_minutes} minutes."
+		[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
+		set_auto_launch_deferral
+	fi
+}
+
+# Pre-producer gate: proceed helper, optional proceed-aware dialog, then terminal fail if still not ready.
+ensure_storage_ready_to_proceed() {
+	check_storage_ready_to_proceed
+	if [[ "${check_storage_ready_to_proceed_error}" == "TRUE" ]]; then
+		handle_storage_proceed_failure
+	fi
+	if [[ "${storage_ready}" == "FALSE" ]]; then
+		if [[ "${current_user_account_name}" != "FALSE" ]]; then
+			dialog_insufficient_storage_proceed_mode="TRUE"
+			dialog_insufficient_storage
+			unset dialog_insufficient_storage_proceed_mode
+			if [[ "${dialog_insufficient_storage_error}" == "TRUE" ]] || [[ "${storage_ready}" == "FALSE" ]]; then
+				handle_storage_proceed_failure
+			fi
+		else
+			handle_storage_proceed_failure
+		fi
+	fi
+}
+
+# Return current Apple snapshot prepare max bytes from the per-run max file (0 if missing/invalid/forced-zero).
+get_apple_snapshot_prepare_max_bytes() {
+	local apple_max_bytes
+	apple_max_bytes=0
+	#>>> LOCAL PATCH (p18): fail closed — treat reset failure as max 0 (safe-floor path)
+	if [[ "${apple_snapshot_prepare_max_forced_zero}" == "TRUE" ]]; then
+		echo "0"
+		return 0
+	fi
+	#<<< END LOCAL PATCH (p18)
+	if [[ -n "${apple_snapshot_prepare_max_file}" ]] && [[ -f "${apple_snapshot_prepare_max_file}" ]]; then
+		apple_max_bytes=$(cat "${apple_snapshot_prepare_max_file}" 2> /dev/null)
+	fi
+	if [[ -z "${apple_max_bytes}" ]] || [[ ! "${apple_max_bytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		apple_max_bytes=0
+	fi
+	echo "${apple_max_bytes}"
+}
+
+# Raise the per-run Apple prepare max if ${1} is larger (ignore values < 1000000).
+#>>> LOCAL PATCH (p19): mkdir lock serializes compare-and-write so concurrent parser/sync cannot clobber a higher max
+update_apple_snapshot_prepare_max_bytes() {
+	local new_bytes="${1:-0}"
+	local current_bytes
+	local tmp_max
+	local lock_dir
+	local lock_tries
+	[[ -z "${new_bytes}" ]] && return 0
+	[[ ! "${new_bytes}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]] && return 0
+	[[ $new_bytes -lt 1000000 ]] && return 0
+	#>>> LOCAL PATCH (p18): skip persist when fail-closed or no max file
+	[[ "${apple_snapshot_prepare_max_forced_zero}" == "TRUE" ]] && return 0
+	[[ -z "${apple_snapshot_prepare_max_file}" ]] && return 0
+	#<<< END LOCAL PATCH (p18)
+	lock_dir="${apple_snapshot_prepare_max_file}.lock"
+	lock_tries=0
+	while ! mkdir "${lock_dir}" 2> /dev/null; do
+		lock_tries=$((lock_tries + 1))
+		[[ $lock_tries -gt 200 ]] && return 0
+		sleep 0.01
+	done
+	current_bytes="$(get_apple_snapshot_prepare_max_bytes)"
+	if [[ $new_bytes -gt $current_bytes ]]; then
+		#>>> LOCAL PATCH (p18): mktemp in protected log dir then rename (not predictable .tmp)
+		tmp_max=$(mktemp "${APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE}" 2> /dev/null) || { rmdir "${lock_dir}" 2> /dev/null || true; return 0; }
+		if echo "${new_bytes}" > "${tmp_max}" 2> /dev/null; then
+			mv -f "${tmp_max}" "${apple_snapshot_prepare_max_file}" 2> /dev/null || rm -f "${tmp_max}" 2> /dev/null
+		else
+			rm -f "${tmp_max}" 2> /dev/null
+		fi
+		#<<< END LOCAL PATCH (p18)
+	fi
+	rmdir "${lock_dir}" 2> /dev/null || true
+}
+#<<< END LOCAL PATCH (p19)
+
+# Background parser: read FIFO fed by a parent-tracked tail (no process-substitution orphans).
+parse_apple_snapshot_prepare_stream() {
+	local parse_line
+	local parse_bytes
+	[[ -z "${apple_snapshot_prepare_fifo}" ]] && return 0
+	while IFS= read -r parse_line; do
+		parse_bytes=$(echo "${parse_line}" | sed -n 's/.*snapshot prepare size:\([0-9][0-9]*\) bytes.*/\1/p')
+		[[ -n "${parse_bytes}" ]] && update_apple_snapshot_prepare_max_bytes "${parse_bytes}"
+	done < "${apple_snapshot_prepare_fifo}"
+}
+
+#>>> LOCAL PATCH (p18): sync-parse stream log once (used after producer stop / drain)
+sync_parse_apple_snapshot_prepare_stream_log() {
+	local parse_line
+	local parse_bytes
+	[[ ! -f "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" ]] && return 0
+	while IFS= read -r parse_line || [[ -n "${parse_line}" ]]; do
+		parse_bytes=$(echo "${parse_line}" | sed -n 's/.*snapshot prepare size:\([0-9][0-9]*\) bytes.*/\1/p')
+		[[ -n "${parse_bytes}" ]] && update_apple_snapshot_prepare_max_bytes "${parse_bytes}"
+	done < "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}"
+}
+
+# Reap tracked Apple prepare parser + dedicated tail (+ path-scoped leftover tails). Does not touch softwareupdate/mist.
+#>>> LOCAL PATCH (p19): kill parent-tracked tail PID; path-scoped pkill; two-level child reap
+reap_apple_snapshot_prepare_parser() {
+	local stop_child
+	local stop_grandchild
+	if [[ -n "${apple_snapshot_prepare_tail_pid}" ]]; then
+		kill "${apple_snapshot_prepare_tail_pid}" > /dev/null 2>&1
+		wait "${apple_snapshot_prepare_tail_pid}" > /dev/null 2>&1 || true
+		apple_snapshot_prepare_tail_pid=""
+	fi
+	if [[ -n "${apple_snapshot_prepare_parser_pid}" ]]; then
+		for stop_child in $(pgrep -P "${apple_snapshot_prepare_parser_pid}" 2> /dev/null); do
+			for stop_grandchild in $(pgrep -P "${stop_child}" 2> /dev/null); do
+				kill "${stop_grandchild}" > /dev/null 2>&1
+				wait "${stop_grandchild}" > /dev/null 2>&1 || true
+			done
+			kill "${stop_child}" > /dev/null 2>&1
+			wait "${stop_child}" > /dev/null 2>&1 || true
+		done
+		kill "${apple_snapshot_prepare_parser_pid}" > /dev/null 2>&1
+		wait "${apple_snapshot_prepare_parser_pid}" > /dev/null 2>&1 || true
+		apple_snapshot_prepare_parser_pid=""
+	fi
+	# Belt-and-suspenders: only this run's stream log path (never bare "tail").
+	if [[ -n "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" ]]; then
+		pkill -f "tail -n0 -F ${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" > /dev/null 2>&1 || true
+	fi
+	if [[ -n "${apple_snapshot_prepare_fifo}" ]]; then
+		rm -f "${apple_snapshot_prepare_fifo}" 2> /dev/null
+		apple_snapshot_prepare_fifo=""
+	fi
+	if [[ -n "${apple_snapshot_prepare_max_file}" ]]; then
+		rmdir "${apple_snapshot_prepare_max_file}.lock" 2> /dev/null || true
+	fi
+}
+#<<< END LOCAL PATCH (p19)
+#<<< END LOCAL PATCH (p18)
+
+# Start per-run Apple snapshot prepare size capture (idempotent). Nonfatal on failure.
+start_apple_snapshot_prepare_stream() {
+	if [[ -n "${apple_snapshot_prepare_stream_pid}" ]] && kill -0 "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1; then
+		return 0
+	fi
+	#>>> LOCAL PATCH (p18): if stream died, reap stale parser/tail before clearing PIDs
+	if [[ -n "${apple_snapshot_prepare_parser_pid}" ]] || [[ -n "${apple_snapshot_prepare_tail_pid}" ]]; then
+		reap_apple_snapshot_prepare_parser
+	fi
+	#<<< END LOCAL PATCH (p18)
+	: > "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" 2> /dev/null
+	# Reset max once per super process; preserve across stop/start within the same run (download then install).
+	if [[ "${apple_snapshot_prepare_session_started}" != "TRUE" ]]; then
+		#>>> LOCAL PATCH (p18): secure per-run max file; fail closed → forced zero / safe-floor path
+		apple_snapshot_prepare_max_forced_zero="FALSE"
+		apple_snapshot_prepare_max_file=$(mktemp "${APPLE_SNAPSHOT_PREPARE_MAX_TEMPLATE}" 2> /dev/null) || apple_snapshot_prepare_max_file=""
+		if [[ -z "${apple_snapshot_prepare_max_file}" ]] || ! echo "0" > "${apple_snapshot_prepare_max_file}" 2> /dev/null; then
+			log_super "Warning: Unable to create/reset Apple snapshot prepare max file; continuing with safe-floor storage estimate."
+			apple_snapshot_prepare_max_forced_zero="TRUE"
+			[[ -n "${apple_snapshot_prepare_max_file}" ]] && rm -f "${apple_snapshot_prepare_max_file}" 2> /dev/null
+			apple_snapshot_prepare_max_file=""
+		fi
+		#<<< END LOCAL PATCH (p18)
+		apple_snapshot_prepare_session_started="TRUE"
+	fi
+	apple_snapshot_prepare_stream_pid=""
+	apple_snapshot_prepare_parser_pid=""
+	apple_snapshot_prepare_tail_pid=""
+	apple_snapshot_prepare_fifo=""
+	log stream --level default --style compact --predicate 'process == "softwareupdated" AND composedMessage CONTAINS "snapshot prepare size:"' >> "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" 2> /dev/null &
+	apple_snapshot_prepare_stream_pid="$!"
+	if [[ -n "${apple_snapshot_prepare_stream_pid}" ]] && kill -0 "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1; then
+		#>>> LOCAL PATCH (p19): parent-tracked tail + FIFO parser (avoids process-substitution orphan tails)
+		apple_snapshot_prepare_fifo=$(mktemp -u "${SUPER_LOG_FOLDER}/.apple-snapshot-prepare-fifo.XXXXXX" 2> /dev/null) || apple_snapshot_prepare_fifo=""
+		if [[ -n "${apple_snapshot_prepare_fifo}" ]] && mkfifo "${apple_snapshot_prepare_fifo}" 2> /dev/null; then
+			tail -n0 -F "${APPLE_SNAPSHOT_PREPARE_STREAM_LOG}" > "${apple_snapshot_prepare_fifo}" 2> /dev/null &
+			apple_snapshot_prepare_tail_pid="$!"
+			parse_apple_snapshot_prepare_stream &
+			apple_snapshot_prepare_parser_pid="$!"
+		else
+			log_super "Warning: Unable to create Apple snapshot prepare parser FIFO; continuing with sync-parse-only storage capture."
+			apple_snapshot_prepare_fifo=""
+			apple_snapshot_prepare_tail_pid=""
+			apple_snapshot_prepare_parser_pid=""
+		fi
+		#<<< END LOCAL PATCH (p19)
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: apple_snapshot_prepare_stream_pid: ${apple_snapshot_prepare_stream_pid}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: apple_snapshot_prepare_parser_pid: ${apple_snapshot_prepare_parser_pid}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: apple_snapshot_prepare_tail_pid: ${apple_snapshot_prepare_tail_pid}"
+	else
+		log_super "Warning: Unable to start Apple snapshot prepare size log stream; continuing with formula storage estimate."
+		apple_snapshot_prepare_stream_pid=""
+		#>>> LOCAL PATCH (p18): no orphan parser when stream fails to start
+		reap_apple_snapshot_prepare_parser
+		#<<< END LOCAL PATCH (p18)
+	fi
+}
+
+# Stop Apple prepare stream and parser; drain briefly so late lines can update the max file. Idempotent. Leaves softwareupdate/mist alone.
+stop_apple_snapshot_prepare_stream() {
+	#>>> LOCAL PATCH (p19): stop producer → bounded drain → reap parser/tail → sync-parse (sole writer; no overlap race)
+	if [[ -n "${apple_snapshot_prepare_stream_pid}" ]]; then
+		kill "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1
+		wait "${apple_snapshot_prepare_stream_pid}" > /dev/null 2>&1 || true
+		apple_snapshot_prepare_stream_pid=""
+	fi
+	# Bounded drain so the live parser can consume lines already written before reap.
+	sleep 1
+	reap_apple_snapshot_prepare_parser
+	sync_parse_apple_snapshot_prepare_stream_log
+	#<<< END LOCAL PATCH (p19)
+}
+
+# Idempotent cleanup used on all exits.
+cleanup_apple_snapshot_prepare_stream() {
+	stop_apple_snapshot_prepare_stream
+	#>>> LOCAL PATCH (p29): delete per-run max after final sync-parse (not in reap — stop syncs after reap; mid-run stop/start must keep max)
+	if [[ -n "${apple_snapshot_prepare_max_file}" ]]; then
+		rmdir "${apple_snapshot_prepare_max_file}.lock" 2> /dev/null || true
+		rm -f "${apple_snapshot_prepare_max_file}" 2> /dev/null
+		apple_snapshot_prepare_max_file=""
+	fi
+	apple_snapshot_prepare_max_forced_zero="FALSE"
+	apple_snapshot_prepare_session_started="FALSE"
+	#<<< END LOCAL PATCH (p29)
+}
+#<<< END LOCAL PATCH (p17)
 
 # Validate if current system power is adequate for performing a macOS update/upgrade and set ${power_ready} accordingly. Desktops, obviously, always return that they are ready.
 check_power_required() {
@@ -4815,6 +5459,9 @@ reset_workflow() {
 	delete_pref_main "WorkflowTargetTimestamp"
 	delete_pref_main "WorkflowScheduledInstall"
 	delete_pref_main "WorkflowDownloadMacOSAuthRequired"
+	#>>> LOCAL PATCH (p26): clear withdrawn rediscovery backoff when workflow target resets
+	clear_macos_msu_withdrawn_retry_count
+	#<<< END LOCAL PATCH (p26)
 	reset_schedule_zero_date
 	reset_deadline_counters
 }
@@ -4860,8 +5507,15 @@ check_schedule_workflow_active() {
 			else
 				schedule_workflow_active_next_start_epoch_array+=("${schedule_schedule_workflow_active_time_frame_start_epoch}")
 			fi
-		elif [[ $workflow_time_epoch -gt $schedule_schedule_workflow_active_time_frame_end_epoch ]] && [[ "${workflow_time_weekday}" != "${schedule_workflow_active_time_frame:0:3}" ]]; then # The current time is past the end time of the ${schedule_workflow_active_time_frame} and it's not today.
-			schedule_workflow_active_next_start_epoch_array+=("$(date -j -v+"${schedule_workflow_active_time_frame:0:3}"d -v"${schedule_workflow_active_time_frame:4:2}"H -v"${schedule_workflow_active_time_frame:7:2}"M -v00S +%s)")
+		#>>> LOCAL PATCH (p13): past end of today's window → next week (+7d); upstream skipped same-weekday ended windows
+		elif [[ $workflow_time_epoch -gt $schedule_schedule_workflow_active_time_frame_end_epoch ]]; then # The current time is past the end time of the ${schedule_workflow_active_time_frame}.
+			# Same weekday: this week's window already ended, so move to next week. Other weekdays: next occurrence via +Weekday.
+			if [[ "${workflow_time_weekday}" == "${schedule_workflow_active_time_frame:0:3}" ]]; then
+				schedule_workflow_active_next_start_epoch_array+=("$(date -r "${schedule_schedule_workflow_active_time_frame_start_epoch}" -v+7d +%s)")
+			else
+				schedule_workflow_active_next_start_epoch_array+=("$(date -j -v+"${schedule_workflow_active_time_frame:0:3}"d -v"${schedule_workflow_active_time_frame:4:2}"H -v"${schedule_workflow_active_time_frame:7:2}"M -v00S +%s)")
+			fi
+		#<<< END LOCAL PATCH (p13)
 		fi
 	done
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active_deferral is: ${schedule_workflow_active_deferral}"
@@ -4988,10 +5642,11 @@ set_schedule_workflow_active_adjustments() {
 		# If needed, find future ${schedule_workflow_active} time frames by looping through 7 weekdays in reverse from the deadline day and set ${schedule_workflow_active_match_start_epochs_array[*]} accordingly.
 		if [[ -z "${schedule_workflow_active_match_start_epochs_array[*]}" ]]; then
 			local deadline_weekday
-			deadline_weekday="$(date -j -f %s "${deadline_epoch_temp}" +%a | tr '[:lower:]' '[:upper:]')"
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_weekday: ${deadline_weekday}"
+			#>>> LOCAL PATCH (p08): recompute weekday each reverse day (upstream froze deadline_weekday so counters 1–5 never matched)
 			for ((counter=0; counter<6; ++counter)); do
 				if [[ $((deadline_days_away - counter)) -ge 1 ]]; then
+					deadline_weekday="$(date -v+$((deadline_days_away - counter))d +%a | tr '[:lower:]' '[:upper:]')"
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_weekday: ${deadline_weekday}"
 					for schedule_workflow_active_time_frame in "${schedule_workflow_active_array[@]}"; do
 						[[ "${schedule_workflow_active_time_frame:0:3}" == "${deadline_weekday}" ]] && schedule_workflow_active_match_start_epochs_array+=($(date -j -v+$((deadline_days_away - counter))d -v"${schedule_workflow_active_time_frame:4:2}"H -v"${schedule_workflow_active_time_frame:7:2}"M -v00S +%s))
 					done
@@ -4999,6 +5654,7 @@ set_schedule_workflow_active_adjustments() {
 					break
 				fi
 			done
+			#<<< END LOCAL PATCH (p08)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active_match_start_epochs_array is:\n${schedule_workflow_active_match_start_epochs_array[*]}"
 		fi
 		
@@ -5062,12 +5718,15 @@ set_schedule_workflow_active_adjustments() {
 		# If needed, find future ${schedule_workflow_active} time frames by looping through 7 weekdays in reverse from the scheduled day and set ${schedule_workflow_active_match_start_epochs_array[*]} accordingly.
 		if [[ -z "${schedule_workflow_active_match_start_epochs_array[*]}" ]]; then
 			local workflow_scheduled_install_days_away
-			workflow_scheduled_install_days_away=$((($(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install:0:10}:23:23:59" +%s) - $(date -v+0d -v0H -v0M -v0S +%s)) / 86400))
-			workflow_scheduled_install_weekday="$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%a | tr '[:lower:]' '[:upper:]')"
+			#>>> LOCAL PATCH (p13): end-of-day typo fix (upstream used 23:23:59)
+			workflow_scheduled_install_days_away=$((($(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install:0:10}:23:59:59" +%s) - $(date -v+0d -v0H -v0M -v0S +%s)) / 86400))
+			#<<< END LOCAL PATCH (p13)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_days_away: ${workflow_scheduled_install_days_away}"
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_weekday: ${workflow_scheduled_install_weekday}"
+			#>>> LOCAL PATCH (p08): recompute weekday each reverse day (upstream froze workflow_scheduled_install_weekday so counters 1–5 never matched)
 			for ((counter=0; counter<6; ++counter)); do
 				if [[ $((workflow_scheduled_install_days_away - counter)) -ge 1 ]]; then
+					workflow_scheduled_install_weekday="$(date -v+$((workflow_scheduled_install_days_away - counter))d +%a | tr '[:lower:]' '[:upper:]')"
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_weekday: ${workflow_scheduled_install_weekday}"
 					for schedule_workflow_active_time_frame in "${schedule_workflow_active_array[@]}"; do
 						[[ "${schedule_workflow_active_time_frame:0:3}" == "${workflow_scheduled_install_weekday}" ]] && schedule_workflow_active_match_start_epochs_array+=($(date -j -v+$((workflow_scheduled_install_days_away - counter))d -v"${schedule_workflow_active_time_frame:4:2}"H -v"${schedule_workflow_active_time_frame:7:2}"M -v00S +%s))
 					done
@@ -5075,6 +5734,7 @@ set_schedule_workflow_active_adjustments() {
 					break
 				fi
 			done
+			#<<< END LOCAL PATCH (p08)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active_match_start_epochs_array is:\n${schedule_workflow_active_match_start_epochs_array[*]}"
 		fi
 		
@@ -5082,7 +5742,15 @@ set_schedule_workflow_active_adjustments() {
 		if [[ -n "${schedule_workflow_active_match_start_epochs_array[*]}" ]]; then
 			IFS=$'\n'
 			[[ "${schedule_workflow_active_matches_now}" == "TRUE" ]] && schedule_workflow_active_match_weekday_start_epoch=${schedule_workflow_active_match_start_epochs_array[0]}
-			[[ "${schedule_workflow_active_matches_now}" == "FALSE" ]] && schedule_workflow_active_match_weekday_start_epoch=$(echo "${schedule_workflow_active_match_start_epochs_array[*]}" | sort -r | head -1)
+			#>>> LOCAL PATCH (p10): days=0 wants soonest window; other paths keep latest on the original scheduled day
+			if [[ "${schedule_workflow_active_matches_now}" == "FALSE" ]]; then
+				if [[ -n "${scheduled_install_days}" ]] && [[ $scheduled_install_days -eq 0 ]]; then
+					schedule_workflow_active_match_weekday_start_epoch=$(echo "${schedule_workflow_active_match_start_epochs_array[*]}" | sort | head -1)
+				else
+					schedule_workflow_active_match_weekday_start_epoch=$(echo "${schedule_workflow_active_match_start_epochs_array[*]}" | sort -r | head -1)
+				fi
+			fi
+			#<<< END LOCAL PATCH (p10)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active_match_weekday_start_epoch: ${schedule_workflow_active_match_weekday_start_epoch}"
 			workflow_scheduled_install_adjusted="$(date -j -f %s "${schedule_workflow_active_match_weekday_start_epoch}" +%Y-%m-%d:%H:%M)"
 			[[ -n "${scheduled_install_days}" ]] && log_super "Warning: Adjusting the original scheduled installation of $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install:0:10} (${scheduled_install_days} days after zero day) to coordinate with a schedule workflow active time frame."
@@ -5100,7 +5768,9 @@ set_schedule_workflow_active_adjustments() {
 		local workflow_scheduled_install_epoch_temp
 		workflow_scheduled_install_epoch_temp=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
 		local workflow_scheduled_install_days_away
-		workflow_scheduled_install_days_away=$((($(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install:0:10}:23:23:59" +%s) - $(date -v+0d -v0H -v0M -v0S +%s)) / 86400))
+		#>>> LOCAL PATCH (p13): end-of-day typo fix (upstream used 23:23:59)
+		workflow_scheduled_install_days_away=$((($(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install:0:10}:23:59:59" +%s) - $(date -v+0d -v0H -v0M -v0S +%s)) / 86400))
+		#<<< END LOCAL PATCH (p13)
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install: ${workflow_scheduled_install}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_epoch_temp: ${workflow_scheduled_install_epoch_temp}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_days_away: ${workflow_scheduled_install_days_away}"
@@ -5125,11 +5795,12 @@ set_schedule_workflow_active_adjustments() {
 		# If needed, find future ${schedule_workflow_active} time frames by looping through 7 weekdays in reverse from the scheduled day and set ${schedule_workflow_active_match_start_epochs_array[*]} accordingly.
 		if [[ "${scheduled_install_user_choice_match}" == "FALSE" ]]; then
 			local workflow_scheduled_install_weekday
-			workflow_scheduled_install_weekday="$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%a | tr '[:lower:]' '[:upper:]')"
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_days_away: ${workflow_scheduled_install_days_away}"
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_weekday: ${workflow_scheduled_install_weekday}"
+			#>>> LOCAL PATCH (p08): recompute weekday each reverse day (upstream froze workflow_scheduled_install_weekday so counters 1–5 never matched)
 			for ((counter=0; counter<6; ++counter)); do
 				if [[ $((workflow_scheduled_install_days_away - counter)) -ge 0 ]]; then
+					workflow_scheduled_install_weekday="$(date -v+$((workflow_scheduled_install_days_away - counter))d +%a | tr '[:lower:]' '[:upper:]')"
+					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_scheduled_install_weekday: ${workflow_scheduled_install_weekday}"
 					for schedule_workflow_active_time_frame in "${schedule_workflow_active_array[@]}"; do
 						if [[ "${schedule_workflow_active_time_frame:0:3}" == "${workflow_scheduled_install_weekday}" ]]; then
 							schedule_workflow_active_match_start_epoch=$(date -j -v+$((workflow_scheduled_install_days_away - counter))d -v"${schedule_workflow_active_time_frame:4:2}"H -v"${schedule_workflow_active_time_frame:7:2}"M -v00S +%s)
@@ -5146,6 +5817,7 @@ set_schedule_workflow_active_adjustments() {
 					break
 				fi
 			done
+			#<<< END LOCAL PATCH (p08)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_user_choice_match: ${scheduled_install_user_choice_match}"
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_workflow_active_match_start_epochs_array is:\n${schedule_workflow_active_match_start_epochs_array[*]}"
 		fi
@@ -5340,10 +6012,19 @@ check_schedule_zero_date() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: sofa_osversions_array_index: ${sofa_osversions_array_index}"
 		for array_index in $(seq 0 "$(sqlite3 /dev/null "SELECT json_array_length(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions[$sofa_osversions_array_index].SecurityReleases')"-1 2> /dev/null)"); do
 			if [[ $(sqlite3 /dev/null "SELECT json_extract(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions[$sofa_osversions_array_index].SecurityReleases[$array_index].ProductVersion')" 2> /dev/null) == "${schedule_zero_date_version_target}" ]]; then
-				schedule_zero_date=$(sqlite3 /dev/null "SELECT json_extract(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions[$sofa_osversions_array_index].SecurityReleases[$array_index].ReleaseDate')" 2> /dev/null | sed -e 's/T/:/g' -e 's/:00Z//g')
-				log_super_audit "Status: Setting new automatic zero date based on the ${workflow_target} release date of ${schedule_zero_date}."
-				set_pref_main "ScheduleZeroDateAutomaticRelease" "${schedule_zero_date}"
-				[[ -n "${schedule_zero_date_automatic_start_previous}" ]] && delete_pref_main "ScheduleZeroDateAutomaticStart" && unset schedule_zero_date_automatic_start_previous
+				#>>> LOCAL PATCH (p09): parse SOFA ReleaseDate as UTC (Zulu), store local YYYY-MM-DD:HH:MM (upstream stripped Z and treated wall time as local)
+				local sofa_release_date_raw
+				sofa_release_date_raw=$(sqlite3 /dev/null "SELECT json_extract(readfile('${SOFA_MACOS_JSON_CACHE}'), '$.OSVersions[$sofa_osversions_array_index].SecurityReleases[$array_index].ReleaseDate')" 2> /dev/null)
+				local sofa_release_date_epoch
+				if sofa_release_date_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "${sofa_release_date_raw}" "+%s" 2> /dev/null); then
+					schedule_zero_date=$(date -r "${sofa_release_date_epoch}" "+%Y-%m-%d:%H:%M")
+					log_super_audit "Status: Setting new automatic zero date based on the ${workflow_target} release date of ${schedule_zero_date}."
+					set_pref_main "ScheduleZeroDateAutomaticRelease" "${schedule_zero_date}"
+					[[ -n "${schedule_zero_date_automatic_start_previous}" ]] && delete_pref_main "ScheduleZeroDateAutomaticStart" && unset schedule_zero_date_automatic_start_previous
+				else
+					log_super "Warning: Unable to parse SOFA release date \"${sofa_release_date_raw}\" as UTC."
+				fi
+				#<<< END LOCAL PATCH (p09)
 				break
 			fi
 		done
@@ -5732,7 +6413,9 @@ check_deadlines_days_date() {
 	
 	# If needed adjust the ${deadline_epoch} for the ${schedule_workflow_active} and also write to log.
 	if [[ -n "${schedule_workflow_active}" ]] && [[ -n "${deadline_epoch}" ]]; then
-		if [[ "${deadline_date_status}" != "FALSE" ]] && [[ "${deadline_date_status}" != "FALSE" ]]; then
+		#>>> LOCAL PATCH (p13): consider days OR date status (upstream duplicated deadline_date_status with &&)
+		if [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_date_status}" != "FALSE" ]]; then
+		#<<< END LOCAL PATCH (p13)
 			log_super "Warning: The past due deadline is overriding the schedule workflow active option."
 		elif [[ -n "${deadline_date_epoch}" ]] && [[ $(date -r "${deadline_epoch}" +%H:%M) != "00:00" ]]; then
 			log_super "Warning: The manually set deadline date option that also includes a specific time is overriding the schedule workflow active option."
@@ -5890,6 +6573,10 @@ check_deadlines_count() {
 			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_focus_current=$((deadline_counter_focus_previous + 1))
 				set_pref_main "DeadlineCounterFocus" "${deadline_counter_focus_current}"
+			#>>> LOCAL PATCH (p13): when download still required, reuse previous counter (upstream left current unset)
+			else # Download still required: do not increment, but still evaluate the existing counter.
+				deadline_counter_focus_current="${deadline_counter_focus_previous}"
+			#<<< END LOCAL PATCH (p13)
 			fi
 			if [[ $deadline_counter_focus_current -ge $deadline_count_focus ]]; then
 				log_super "Status: Focus maximum deferral count of ${deadline_count_focus} has passed."
@@ -5916,6 +6603,10 @@ check_deadlines_count() {
 			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_soft_current=$((deadline_counter_soft_previous + 1))
 				set_pref_main "DeadlineCounterSoft" "${deadline_counter_soft_current}"
+			#>>> LOCAL PATCH (p13): when download still required, reuse previous counter (upstream left current unset)
+			else # Download still required: do not increment, but still evaluate the existing counter.
+				deadline_counter_soft_current="${deadline_counter_soft_previous}"
+			#<<< END LOCAL PATCH (p13)
 			fi
 			if [[ $deadline_counter_soft_current -ge $deadline_count_soft ]]; then
 				log_super "Status: Soft maximum deferral count of ${deadline_count_soft} has passed."
@@ -5939,6 +6630,10 @@ check_deadlines_count() {
 			elif [[ "${test_mode}" == "TRUE" ]] || { [[ "${macos_installer_download_required}" != "TRUE" ]] && [[ "${macos_msu_download_required}" != "TRUE" ]]; }; then
 				deadline_counter_hard_current=$((deadline_counter_hard_previous + 1))
 				set_pref_main "DeadlineCounterHard" "${deadline_counter_hard_current}"
+			#>>> LOCAL PATCH (p13): when download still required, reuse previous counter (upstream left current unset)
+			else # Download still required: do not increment, but still evaluate the existing counter.
+				deadline_counter_hard_current="${deadline_counter_hard_previous}"
+			#<<< END LOCAL PATCH (p13)
 			fi
 			if [[ $deadline_counter_hard_current -ge $deadline_count_hard ]]; then
 				log_super "Status: Hard maximum deferral count of ${deadline_count_hard} has passed."
@@ -6131,6 +6826,50 @@ reset_software_update_status() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Main preference file after reset_software_update_status: ${SUPER_MAIN_PLIST}:\n$(defaults read "${SUPER_MAIN_PLIST}" 2> /dev/null)"
 }
 
+#>>> LOCAL PATCH (p20): Apple supersedes minors by pulling the prior label; clear MSU caches so the next run rediscovers the new latest.
+# Does not call reset_workflow (upstream days-deadline restart happens when WorkflowTarget changes on the next successful target selection).
+clear_macos_msu_withdrawn_target() {
+	log_super "Warning: Requested macOS update/upgrade label is no longer available (likely superseded by Apple). Clearing software update caches to rediscover the current target."
+	log_msu "Warning: Requested macOS update/upgrade label is no longer available (likely superseded by Apple). Clearing software update caches to rediscover the current target."
+	reset_software_update_status
+	set_pref_main "WorkflowTarget" "FALSE"
+	unset workflow_target
+	delete_pref_main "WorkflowTargetTimestamp"
+	delete_pref_main "WorkflowDownloadMacOSAuthRequired"
+	macos_msu_target_withdrawn="TRUE"
+}
+
+#>>> LOCAL PATCH (p26): bound withdrawn-label rediscovery — keep 2‑min fast retries briefly, then back off (no uncapped storm)
+# Sets deferral_timer_minutes and macos_msu_withdrawn_should_notify (TRUE/FALSE) for the caller.
+schedule_macos_msu_withdrawn_retry() {
+	local withdrawn_retry_count
+	withdrawn_retry_count=$(get_pref "MacOSMSUWithdrawnRetryCount")
+	[[ ! "${withdrawn_retry_count}" =~ ^[0-9]+$ ]] && withdrawn_retry_count=0
+	withdrawn_retry_count=$((withdrawn_retry_count + 1))
+	set_pref_main "MacOSMSUWithdrawnRetryCount" "${withdrawn_retry_count}"
+	macos_msu_withdrawn_should_notify="FALSE"
+	if [[ ${withdrawn_retry_count} -le 2 ]]; then
+		# Intentional fast rediscovery while Apple's catalog rotates to the new label.
+		deferral_timer_minutes=2
+		[[ ${withdrawn_retry_count} -eq 1 ]] && macos_msu_withdrawn_should_notify="TRUE"
+	elif [[ ${withdrawn_retry_count} -eq 3 ]]; then
+		deferral_timer_minutes=15
+		macos_msu_withdrawn_should_notify="TRUE"
+	else
+		deferral_timer_minutes="${deferral_timer_error_minutes}"
+		[[ -z "${deferral_timer_minutes}" || ! "${deferral_timer_minutes}" =~ ^[0-9]+$ ]] && deferral_timer_minutes="${DEFERRAL_TIMER_DEFAULT_MINUTES}"
+		[[ ${deferral_timer_minutes} -lt 2 ]] && deferral_timer_minutes=2
+		macos_msu_withdrawn_should_notify="TRUE"
+	fi
+	log_super "Status: Withdrawn-label rediscovery attempt ${withdrawn_retry_count}; next automatic relaunch in ${deferral_timer_minutes} minutes."
+}
+
+clear_macos_msu_withdrawn_retry_count() {
+	delete_pref_main "MacOSMSUWithdrawnRetryCount"
+}
+#<<< END LOCAL PATCH (p26)
+#<<< END LOCAL PATCH (p20)
+
 # Check for restrictions configuration profile deferrals and set ${deferral_restrictions_macOS_minor_updates}, ${deferral_restrictions_macOS_major_upgrades}, and ${deferral_restrictions_non_system_updates} accordingly.
 check_deferral_restrictions() {
 	deferral_restrictions_macOS_major_upgrades="FALSE"
@@ -6162,7 +6901,11 @@ check_deferral_restrictions() {
 			log_super "Status: Restrictions configuration profile is deferring non-system updates for ${deferral_restrictions_non_system_updates} days."
 		fi
 	else
-		set_pref_main "DeferralRestrictionsChecksum" "0"
+		#>>> LOCAL PATCH (p03): keep real MD5 when applicationaccess.plist exists but has no update-deferral keys (upstream overwrote with "0", forcing a full software status check every run)
+		if [[ ! -f "${APPLICATION_ACCESS_MANAGED_PLIST}.plist" ]]; then
+			set_pref_main "DeferralRestrictionsChecksum" "0"
+		fi
+		#<<< END LOCAL PATCH (p03)
 		set_pref_main "DeferralRestrictionsCache" "FALSE"
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deferral_restrictions_macOS_major_upgrades is: ${deferral_restrictions_macOS_major_upgrades}"
@@ -6256,15 +6999,32 @@ get_mdmclient_list() {
 		get_mdmclient_list_timeout="TRUE"
 		local get_mdmclient_list_timeout_seconds
 		get_mdmclient_list_timeout_seconds="${TIMEOUT_START_SECONDS}"
-		while read -t "${get_mdmclient_list_timeout_seconds}" -r log_line; do
-			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-			if [[ $(echo "${log_line}" | grep -c 'Available updates') -gt 0 ]]; then
+		#>>> LOCAL PATCH (p01): poll the log with a hard timeout instead of "tail -F | read -t" (avoids a hung tail process)
+		#>>> LOCAL PATCH (p12): bound post-marker wait so a hung list process cannot block forever
+		local get_mdmclient_list_elapsed_seconds
+		get_mdmclient_list_elapsed_seconds=0
+		while [[ ${get_mdmclient_list_elapsed_seconds} -lt ${get_mdmclient_list_timeout_seconds} ]]; do
+			if [[ $(grep -c 'Available updates' "${get_mdmclient_list_log}" 2> /dev/null) -gt 0 ]]; then
 				get_mdmclient_list_error="FALSE"
 				get_mdmclient_list_timeout="FALSE"
-				wait "${get_mdmclient_list_pid}"
+				wait_pid_with_timeout "${get_mdmclient_list_pid}" $((get_mdmclient_list_timeout_seconds - get_mdmclient_list_elapsed_seconds))
 				break
 			fi
-		done < <(tail -n1 -F "${get_mdmclient_list_log}")
+			if ! kill -0 "${get_mdmclient_list_pid}" > /dev/null 2>&1; then
+				wait "${get_mdmclient_list_pid}" > /dev/null 2>&1
+				if [[ $(grep -c 'Available updates' "${get_mdmclient_list_log}" 2> /dev/null) -gt 0 ]]; then
+					get_mdmclient_list_error="FALSE"
+					get_mdmclient_list_timeout="FALSE"
+				else
+					get_mdmclient_list_timeout="FALSE"
+				fi
+				break
+			fi
+			sleep 1
+			get_mdmclient_list_elapsed_seconds=$((get_mdmclient_list_elapsed_seconds + 1))
+		done
+		#<<< END LOCAL PATCH (p12)
+		#<<< END LOCAL PATCH (p01)
 	else
 		get_mdmclient_list_error="FALSE"
 		get_mdmclient_list_timeout="FALSE"
@@ -6319,21 +7079,41 @@ get_macos_installers_list() {
 		get_macos_installers_list_timeout="TRUE"
 		local get_macos_installers_list_timeout_seconds
 		get_macos_installers_list_timeout_seconds="${TIMEOUT_START_SECONDS}"
-		while read -t "${get_macos_installers_list_timeout_seconds}" -r log_line; do
-			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-			if [[ $(echo "${log_line}" | grep -c 'SEARCH') -gt 0 ]]; then
+		#>>> LOCAL PATCH (p01): poll the log with a hard timeout instead of "tail -F | read -t" (avoids a hung tail process)
+		#>>> LOCAL PATCH (p12): bound post-marker wait so a hung list process cannot block forever
+		local get_macos_installers_list_elapsed_seconds
+		get_macos_installers_list_elapsed_seconds=0
+		local get_macos_installers_search_logged
+		get_macos_installers_search_logged="FALSE"
+		while [[ ${get_macos_installers_list_elapsed_seconds} -lt ${get_macos_installers_list_timeout_seconds} ]]; do
+			if [[ "${get_macos_installers_search_logged}" != "TRUE" ]] && [[ $(grep -c 'SEARCH' "${get_macos_installers_list_log}" 2> /dev/null) -gt 0 ]]; then
 				log_super "mist-cli: Waiting for macOS installers listing..."
-			elif [[ $(echo "${log_line}" | grep -c 'Found 0') -gt 0 ]]; then
+				get_macos_installers_search_logged="TRUE"
+			elif [[ $(grep -c 'Found 0' "${get_macos_installers_list_log}" 2> /dev/null) -gt 0 ]]; then
 				get_macos_installers_list_timeout="FALSE"
-				wait "${get_macos_installers_list_pid}"
+				wait_pid_with_timeout "${get_macos_installers_list_pid}" $((get_macos_installers_list_timeout_seconds - get_macos_installers_list_elapsed_seconds))
 				break
-			elif [[ $(echo "${log_line}" | grep -c 'Found') -gt 0 ]]; then
+			elif [[ $(grep -c 'Found' "${get_macos_installers_list_log}" 2> /dev/null) -gt 0 ]]; then
 				get_macos_installers_list_error="FALSE"
 				get_macos_installers_list_timeout="FALSE"
-				wait "${get_macos_installers_list_pid}"
+				wait_pid_with_timeout "${get_macos_installers_list_pid}" $((get_macos_installers_list_timeout_seconds - get_macos_installers_list_elapsed_seconds))
 				break
 			fi
-		done < <(tail -n1 -F "${get_macos_installers_list_log}")
+			if ! kill -0 "${get_macos_installers_list_pid}" > /dev/null 2>&1; then
+				wait "${get_macos_installers_list_pid}" > /dev/null 2>&1
+				if [[ $(grep -c 'Found' "${get_macos_installers_list_log}" 2> /dev/null) -gt 0 ]]; then
+					get_macos_installers_list_error="FALSE"
+					get_macos_installers_list_timeout="FALSE"
+				else
+					get_macos_installers_list_timeout="FALSE"
+				fi
+				break
+			fi
+			sleep 1
+			get_macos_installers_list_elapsed_seconds=$((get_macos_installers_list_elapsed_seconds + 1))
+		done
+		#<<< END LOCAL PATCH (p12)
+		#<<< END LOCAL PATCH (p01)
 	else
 		get_macos_installers_list_error="FALSE"
 		get_macos_installers_list_timeout="FALSE"
@@ -6378,22 +7158,41 @@ get_msu_list() {
 		local get_msu_list_timeout_seconds
 		get_msu_list_timeout_seconds="${TIMEOUT_START_SECONDS}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: get_msu_list_timeout is: ${get_msu_list_timeout}"
-		while read -t "${get_msu_list_timeout_seconds}" -r log_line; do
-			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-			if [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]]; then
+		#>>> LOCAL PATCH (p01): poll the log with a hard timeout instead of "tail -F | read -t" (avoids a hung tail process)
+		#>>> LOCAL PATCH (p12): bound post-marker wait so a hung list process cannot block forever
+		local get_msu_list_elapsed_seconds
+		get_msu_list_elapsed_seconds=0
+		while [[ ${get_msu_list_elapsed_seconds} -lt ${get_msu_list_timeout_seconds} ]]; do
+			if [[ $(grep -c "Can’t connect" "${get_msu_list_log}" 2> /dev/null) -gt 0 ]] || [[ $(grep -c "Couldn't communicate" "${get_msu_list_log}" 2> /dev/null) -gt 0 ]]; then
+				wait_pid_with_timeout "${get_msu_list_pid}" $((get_msu_list_timeout_seconds - get_msu_list_elapsed_seconds))
+				get_msu_list_timeout="FALSE"
 				break
-			elif [[ $(echo "${log_line}" | grep -c 'Software Update found') -gt 0 ]]; then
+			elif [[ $(grep -c 'Software Update found' "${get_msu_list_log}" 2> /dev/null) -gt 0 ]]; then
 				get_msu_list_error="FALSE"
 				get_msu_list_timeout="FALSE"
-				wait "${get_msu_list_pid}"
+				wait_pid_with_timeout "${get_msu_list_pid}" $((get_msu_list_timeout_seconds - get_msu_list_elapsed_seconds))
 				break
-			elif [[ $(echo "${log_line}" | grep -c 'No new software available.') -gt 0 ]]; then
+			elif [[ $(grep -c 'No new software available.' "${get_msu_list_log}" 2> /dev/null) -gt 0 ]]; then
 				get_msu_list_error="FALSE"
 				get_msu_list_timeout="FALSE"
-				wait "${get_msu_list_pid}"
+				wait_pid_with_timeout "${get_msu_list_pid}" $((get_msu_list_timeout_seconds - get_msu_list_elapsed_seconds))
 				break
 			fi
-		done < <(tail -n1 -F "${get_msu_list_log}")
+			if ! kill -0 "${get_msu_list_pid}" > /dev/null 2>&1; then
+				wait "${get_msu_list_pid}" > /dev/null 2>&1
+				if [[ $(grep -c 'Software Update found' "${get_msu_list_log}" 2> /dev/null) -gt 0 ]] || [[ $(grep -c 'No new software available.' "${get_msu_list_log}" 2> /dev/null) -gt 0 ]]; then
+					get_msu_list_error="FALSE"
+					get_msu_list_timeout="FALSE"
+				else
+					get_msu_list_timeout="FALSE"
+				fi
+				break
+			fi
+			sleep 1
+			get_msu_list_elapsed_seconds=$((get_msu_list_elapsed_seconds + 1))
+		done
+		#<<< END LOCAL PATCH (p12)
+		#<<< END LOCAL PATCH (p01)
 	else
 		get_msu_list_error="FALSE"
 		get_msu_list_timeout="FALSE"
@@ -6425,12 +7224,27 @@ workflow_check_software_status() {
 	macos_major_upgrade_latest="FALSE"
 	macos_msu_minor_update_target="FALSE"
 	macos_installer_minor_update_target="FALSE"
+	#>>> LOCAL PATCH (p16): gate installer fall-through when waiting on newer MDM-deferred minor
+	macos_minor_deferred_wait="FALSE"
+	#<<< END LOCAL PATCH (p16)
 	macos_minor_update_latest="FALSE"
 	macos_target_mdm_compatible="FALSE"
 	non_system_msu_targets="FALSE"
 	non_system_msu_safari_target="FALSE"
 	local workflow_check_software_status_error
 	workflow_check_software_status_error="FALSE"
+	#>>> LOCAL PATCH (p01): declare fallback flag + mdmclient arrays up-front (shared with the softwareupdate fallback path)
+	local use_softwareupdate_fallback
+	use_softwareupdate_fallback="FALSE"
+	local mdmclient_macos_msu_array
+	mdmclient_macos_msu_array=()
+	local mdmclient_macos_installer_array
+	mdmclient_macos_installer_array=()
+	local mdmclient_non_system_array
+	mdmclient_non_system_array=()
+	local mdmclient_security_array
+	mdmclient_security_array=()
+	#<<< END LOCAL PATCH (p01)
 	
 	# First check caches to see if a full check can be avoided.
 	{ [[ -n "${MDMCLIENT_LIST_DEBUG_LOG}" ]] || [[ -n "${MACOS_INSTALLERS_LIST_DEBUG_LOG}" ]] || [[ -n "${MSU_LIST_DEBUG_LOG}" ]]; } && check_software_status_required="TRUE"
@@ -6466,31 +7280,101 @@ workflow_check_software_status() {
 		fi
 	fi
 	
-	# If (no errors) there are no macOS software updates available, then exit this function.
+	#>>> LOCAL PATCH (p01): softwareupdate fallback when mdmclient reports no updates (also covers macOS 27+/no-mdmclient)
+	#>>> LOCAL PATCH (p21): expire cached msu-list by file mtime in this path only; do not bump LastSuccessfulCheckDate on cache hits
+	# If mdmclient reports no updates, fall back to softwareupdate before concluding there are no updates.
+	# Do not change global check_software_update_status_cached AND TTL (upstream) — only this fallback's list freshness.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_available}" == "FALSE" ]]; then
-		log_super "Status: No available macOS software updates."
-		set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
-		return 0
+		local msu_list_fetch_required
+		msu_list_fetch_required="FALSE"
+		local msu_list_fetched_this_run
+		msu_list_fetched_this_run="FALSE"
+		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${msu_list}" == "FALSE" ]] || [[ -z "${msu_list}" ]]; then
+			msu_list_fetch_required="TRUE"
+		elif [[ ! -f "${MSU_LIST_LOG}" ]]; then
+			# Fail open toward discovery when the cache file is missing.
+			msu_list_fetch_required="TRUE"
+		else
+			local msu_list_mtime_epoch
+			msu_list_mtime_epoch=$(stat -f %m "${MSU_LIST_LOG}" 2> /dev/null)
+			# Fail open toward discovery when mtime cannot be read, or when the list is older than the software-status cache age.
+			if [[ -z "${msu_list_mtime_epoch}" ]] || [[ ${msu_list_mtime_epoch} -lt $((workflow_time_epoch - (SOFTWARE_STATUS_CACHE_AGE_MINUTES * 60))) ]]; then
+				msu_list_fetch_required="TRUE"
+			fi
+		fi
+		if [[ "${msu_list_fetch_required}" == "TRUE" ]]; then
+			log_super "Warning: mdmclient did not report available updates, verifying via softwareupdate list..."
+			get_msu_list
+			msu_list_fetched_this_run="TRUE"
+			
+			# Error handling if softwareupdate is misbehaving.
+			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
+				log_super "Warning: Re-starting softwareupdate available updates listing..."
+				kick_softwareupdated
+				sleep 10
+				get_msu_list
+			elif [[ $macos_version_normalized -lt 130300 ]] && [[ $(echo "${msu_list}" | grep -c 'macOS') -eq 0 ]]; then
+				log_super "Status: macOS 11.x - macOS 13.2, double-checking softwareupdate available updates listing..."
+				sleep 10
+				get_msu_list
+			fi
+			if [[ "${get_msu_list_error}" == "TRUE" ]] || [[ "${get_msu_list_timeout}" == "TRUE" ]]; then
+				log_super "Error: Checking for softwareupdate available updates listing did not complete after multiple attempts."
+				workflow_check_software_status_error="TRUE"
+			fi
+		else
+			log_super "Status: mdmclient did not report available updates; using cached softwareupdate list (age within $((SOFTWARE_STATUS_CACHE_AGE_MINUTES / 60)) hours)."
+		fi
+		if [[ "${workflow_check_software_status_error}" == "FALSE" ]]; then
+			if [[ "${msu_list}" == "FALSE" ]] || [[ $(echo "${msu_list}" | grep -c 'No new software available.') -gt 0 ]] || [[ $(echo "${msu_list}" | grep -c 'Label:') -eq 0 ]]; then
+				log_super "Status: No available macOS software updates."
+				# Only refresh LastSuccessfulCheckDate after a real list fetch; cache hits must not extend the sticky empty-list window.
+				if [[ "${msu_list_fetched_this_run}" == "TRUE" ]]; then
+					set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
+				fi
+				return 0
+			fi
+			use_softwareupdate_fallback="TRUE"
+			log_super "Warning: mdmclient did not report updates, continuing with softwareupdate fallback parsing."
+		fi
 	fi
+	#<<< END LOCAL PATCH (p21)
+	#<<< END LOCAL PATCH (p01)
 	
 	# If (no errors) then parse ${mdmclient_list} for all update items.
 	local previous_ifs
 	previous_ifs="${IFS}"
 	IFS=$'\n'
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]]; then
+	#>> LOCAL PATCH (p01): only parse mdmclient list when mdmclient_available (fallback path uses softwareupdate instead)
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_available}" == "TRUE" ]]; then
 		# First clean up the structured data section of the ${mdmclient_list}.
 		local mdmclient_sanitized_list
 		mdmclient_sanitized_list=$(echo "${mdmclient_list}" | grep -e '^\s*Product Key' -e '^\s*Title' -e '^\s*Version' | tr '\n' ',' | sed -e 's/Product/\nProduct/g' -e 's/: */:/g' -e 's/ <[^,]*,//g' -e 's/^[[:space:]]//')
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_sanitized_list is:\n${mdmclient_sanitized_list}"
+		#>>> LOCAL PATCH (p16): separate Deferred parse (Product Key → YES/NO); do not fold into three-field sanitize
+		local mdmclient_msu_deferred_pairs
+		mdmclient_msu_deferred_pairs=$(echo "${mdmclient_list}" | awk '
+			/^[[:space:]]*Product Key:/ {
+				key=$0
+				sub(/^[[:space:]]*Product Key:[[:space:]]*/, "", key)
+				gsub(/[[:space:]]+$/, "", key)
+			}
+			/^[[:space:]]*Deferred:/ {
+				def=$0
+				sub(/^[[:space:]]*Deferred:[[:space:]]*/, "", def)
+				split(def, a, /[[:space:]]+/)
+				d=toupper(a[1])
+				if (d != "YES") d="NO"
+				if (key != "") print key "," d
+			}
+		')
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_msu_deferred_pairs is:\n${mdmclient_msu_deferred_pairs}"
+		#<<< END LOCAL PATCH (p16)
 		
 		# Create arrays for available macOS and non-system updates.
-		local mdmclient_macos_msu_array
 		mdmclient_macos_msu_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'MSU_UPDATE' | uniq | sort -t ':' -k3 -V -r))
-		local mdmclient_macos_installer_array
 		mdmclient_macos_installer_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'MSU_UPDATE' | grep -E 'macOS' | uniq | sort -t ':' -k3 -V -r))
-		local mdmclient_non_system_array
 		mdmclient_non_system_array=($(echo "${mdmclient_sanitized_list}" | grep -Ev 'macOS|XProtect|MRT|Gatekeeper' | uniq | sort -t ':' -k3 -V -r))
-		local mdmclient_security_array
 		mdmclient_security_array=($(echo "${mdmclient_sanitized_list}" | grep -E 'XProtect|MRT|Gatekeeper' | uniq))
 		
 		# Evaluate the numer of available updates and make sure there is at least one update available.
@@ -6505,7 +7389,8 @@ workflow_check_software_status() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_security_array is:\n${mdmclient_security_array[*]}"
 	
 	# If (no errors) no installable updates then report any macOS security updates (that can't be installed programmatically) and then exit this function.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_installer_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
+	#>> LOCAL PATCH (p01): only take the mdmclient security-only exit when mdmclient_available (fallback path continues below)
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${mdmclient_available}" == "TRUE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -eq 0 ]] && [[ ${#mdmclient_macos_installer_array[@]} -eq 0 ]] && [[ ${#mdmclient_non_system_array[@]} -eq 0 ]]; then
 		if [[ ${#mdmclient_security_array[@]} -gt 0 ]]; then
 			[[ "${msu_automatic_security_updates}" == "TRUE" ]] && log_super "Status: The following security updates are currently available and they should be installed soon via automatic macOS software update:"
 			[[ "${msu_automatic_security_updates}" == "FALSE" ]] && log_super "Warning: The following security updates are available but due to macOS software update settings are not allowed for installation:"
@@ -6520,9 +7405,11 @@ workflow_check_software_status() {
 	fi
 	
 	# If (no errors) there are available items then collect the ${msu_list} and parse to create ${macos_msu_major_upgrade}, ${macos_msu_minor_update}, and ${non_system_msu_array[]}.
-	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_non_system_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; }; then
+	#>> LOCAL PATCH (p01): also enter this block in the softwareupdate fallback path (use_softwareupdate_fallback)
+	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && { [[ ${#mdmclient_non_system_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]] || [[ "${use_softwareupdate_fallback}" == "TRUE" ]]; }; then
 		# If required collecte a new ${msu_list}.
-		if [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${msu_list}" == "FALSE" ]] || [[ -z "${msu_list}" ]]; then
+		#>> LOCAL PATCH (p01): skip re-fetch when the softwareupdate fallback path already fetched a fresh ${msu_list}
+		if { [[ "${check_software_status_required}" == "TRUE" ]] || [[ "${msu_list}" == "FALSE" ]] || [[ -z "${msu_list}" ]]; } && [[ "${use_softwareupdate_fallback}" != "TRUE" ]]; then
 			get_msu_list
 			
 			# Error handling if softwareupdate is misbehaving.
@@ -6543,30 +7430,50 @@ workflow_check_software_status() {
 		fi
 		
 		# If there is a ${msu_list} then parse items to appropriate variables.
-		if [[ "${msu_list}" == "FALSE" ]] || [[ $(echo "${msu_list}" | grep -c 'No new software available.') -gt 0 ]]; then
-			log_super "Error: Checking for macOS software update listing did not return any available updates."
-			workflow_check_software_status_error="TRUE"
-		else
-			local msu_sanitized_list
-			msu_sanitized_list=$(echo "${msu_list}" | grep -e 'Label' -e 'Title' | tr -d '\n' | sed -e 's/^* //' -e 's/* /\n/g' -e 's/\tTitle/,Title/g' -e 's/, /,/g' -e 's/: /:/g')
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_sanitized_list is:\n${msu_sanitized_list}"
-			local non_system_msu_array
-			non_system_msu_array=($(echo "${msu_sanitized_list}" | awk -F ',' '!/macOS/ {print $1 "," $2 "," $4 "," $3}'))
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_array is:\n${non_system_msu_array[*]}"
-			local macos_msu_array
-			macos_msu_array=($(echo "${msu_sanitized_list}" | grep 'macOS' | awk -F ',' '{print $1 "," $2 "," $4 "," $3}' | sort -t ':' -k5 -V -r))
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_array is:\n${macos_msu_array[*]}"
-			local macos_msu_major_upgrade
-			macos_msu_major_upgrade="FALSE"
-			local macos_msu_minor_update
-			macos_msu_minor_update="FALSE"
-			for macos_msu_item in "${macos_msu_array[@]}"; do
-				[[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g')" != "${macos_version_major}" ]] && macos_msu_major_upgrade="${macos_msu_item}"
-				[[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g')" == "${macos_version_major}" ]] && macos_msu_minor_update="${macos_msu_item}"
-			done
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade is: ${macos_msu_major_upgrade}"
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update is: ${macos_msu_minor_update}"
+		#>>> LOCAL PATCH (p05): trust softwareupdate when it reports nothing installable.
+		# mdmclient often still lists deferred/uninstallable items; treating that mismatch as Error caused 60-minute error deferrals on current systems (e.g. macOS 27 beta with no newer build).
+		# Keep msu_list==FALSE as Error (failed/empty list fetch). Only "No new software" / no Label: after a successful list is a clean no-updates path.
+		# If an installer-based major/minor workflow is still possible, continue (do not return) so mist-cli evaluation can run.
+		# Leave macos_msu_* unset/empty on the empty-list path so later `-n` gates do not treat the literal "FALSE" as a real MSU item.
+		local macos_msu_major_upgrade
+		local macos_msu_minor_update
+		if [[ "${workflow_check_software_status_error}" == "FALSE" ]]; then
+			if [[ "${msu_list}" == "FALSE" ]]; then
+				log_super "Error: Checking for macOS software update listing did not return any available updates."
+				workflow_check_software_status_error="TRUE"
+			elif [[ $(echo "${msu_list}" | grep -c 'No new software available.') -gt 0 ]] || [[ $(echo "${msu_list}" | grep -c 'Label:') -eq 0 ]]; then
+				if [[ "${use_softwareupdate_fallback}" != "TRUE" ]] && { [[ ${#mdmclient_non_system_array[@]} -gt 0 ]] || [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; }; then
+					log_super "Warning: mdmclient reported updates that softwareupdate does not list as installable; treating as no available updates."
+				fi
+				log_super "Status: No available macOS software updates."
+				if { [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; } && [[ ${#mdmclient_macos_installer_array[@]} -gt 0 ]]; then
+					log_super "Status: Continuing to evaluate macOS installer targets despite empty softwareupdate list."
+				else
+					IFS="${previous_ifs}"
+					set_pref_main "LastSuccessfulCheckDate" "$(date +%Y-%m-%d:%H:%M:%S)"
+					return 0
+				fi
+			else
+				local msu_sanitized_list
+				msu_sanitized_list=$(echo "${msu_list}" | grep -e 'Label' -e 'Title' | tr -d '\n' | sed -e 's/^* //' -e 's/* /\n/g' -e 's/\tTitle/,Title/g' -e 's/, /,/g' -e 's/: /:/g')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_sanitized_list is:\n${msu_sanitized_list}"
+				local non_system_msu_array
+				non_system_msu_array=($(echo "${msu_sanitized_list}" | awk -F ',' '!/macOS/ {print $1 "," $2 "," $4 "," $3}'))
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: non_system_msu_array is:\n${non_system_msu_array[*]}"
+				local macos_msu_array
+				macos_msu_array=($(echo "${msu_sanitized_list}" | grep 'macOS' | awk -F ',' '{print $1 "," $2 "," $4 "," $3}' | sort -t ':' -k5 -V -r))
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_array is:\n${macos_msu_array[*]}"
+				macos_msu_major_upgrade="FALSE"
+				macos_msu_minor_update="FALSE"
+				for macos_msu_item in "${macos_msu_array[@]}"; do
+					[[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g')" != "${macos_version_major}" ]] && macos_msu_major_upgrade="${macos_msu_item}"
+					[[ "$(echo "${macos_msu_item}" | awk -F ',' '{print $4}' | sed -e 's/.*://g' -e 's/\..*//g')" == "${macos_version_major}" ]] && macos_msu_minor_update="${macos_msu_item}"
+				done
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_major_upgrade is: ${macos_msu_major_upgrade}"
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update is: ${macos_msu_minor_update}"
+			fi
 		fi
+		#<<< END LOCAL PATCH (p05)
 		
 	fi
 	
@@ -6581,7 +7488,8 @@ workflow_check_software_status() {
 				log_super "Warning: Re-starting check for macOS installers..."
 				get_macos_installers_list
 			fi
-			if [[ "${get_mdmclient_list_error}" == "TRUE" ]] || [[ "${get_mdmclient_list_timeout}" == "TRUE" ]]; then
+			#>> LOCAL PATCH (p01): upstream 5.1.1 checks get_mdmclient_list_* here by mistake; use get_macos_installers_list_*
+			if [[ "${get_macos_installers_list_error}" == "TRUE" ]] || [[ "${get_macos_installers_list_timeout}" == "TRUE" ]]; then
 				log_super "Error: Checking for macOS installers listing did not complete after multiple attempts."
 				workflow_check_software_status_error="TRUE"
 			fi
@@ -6709,8 +7617,45 @@ workflow_check_software_status() {
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_minor_update_target_version_normalized is: ${macos_msu_minor_update_target_version_normalized}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_update_latest is: ${macos_minor_update_latest}"
 		
+		#>>> LOCAL PATCH (p16): if mdmclient has a newer same-major MSU_UPDATE with Deferred YES, do not install older softwareupdate minor
+		if [[ "${mdmclient_available}" == "TRUE" ]] && [[ "${macos_msu_minor_update_target}" != "FALSE" ]] && [[ -n "${macos_msu_minor_update_target_version_normalized}" ]]; then
+			local macos_minor_exact_pin
+			macos_minor_exact_pin="FALSE"
+			# Exact pin exempt: pin normalizing to the same version as the SU target (e.g. 26.6 or 26.6.0).
+			# Major-only pins are not valid InstallMacOSMinorVersionTarget values; a major-only value would not normalize equal to 26.6.
+			if [[ -n "${install_macos_minor_version_target}" ]] && [[ "${install_macos_minor_version_normalized_target}" == "${macos_msu_minor_update_target_version_normalized}" ]]; then
+				macos_minor_exact_pin="TRUE"
+			fi
+			if [[ "${macos_minor_exact_pin}" != "TRUE" ]] && [[ ${#mdmclient_macos_msu_array[@]} -gt 0 ]]; then
+				local mdmclient_macos_deferred_item
+				local mdmclient_macos_deferred_key
+				local mdmclient_macos_deferred_ver_norm
+				local mdmclient_macos_deferred_flag
+				local mdmclient_macos_deferred_title
+				for mdmclient_macos_deferred_item in "${mdmclient_macos_msu_array[@]}"; do
+					mdmclient_macos_deferred_ver_norm=$(echo "${mdmclient_macos_deferred_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
+					[[ "${mdmclient_macos_deferred_ver_norm:0:2}" != "$(printf "%02d" "${macos_version_major}")" ]] && continue
+					[[ ${mdmclient_macos_deferred_ver_norm} -le ${macos_msu_minor_update_target_version_normalized} ]] && continue
+					mdmclient_macos_deferred_key=$(echo "${mdmclient_macos_deferred_item}" | awk -F ',' '{print $1}' | sed -e 's/.*Product Key://' -e 's/^Product Key://')
+					mdmclient_macos_deferred_flag=$(echo "${mdmclient_msu_deferred_pairs}" | awk -F ',' -v k="${mdmclient_macos_deferred_key}" '$1 == k {print $2; exit}')
+					[[ "$(echo "${mdmclient_macos_deferred_flag}" | tr '[:lower:]' '[:upper:]')" != "YES" ]] && continue
+					mdmclient_macos_deferred_title=$(echo "${mdmclient_macos_deferred_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')
+					log_super "Status: Newer macOS minor update is deferred by MDM (${mdmclient_macos_deferred_title}); not installing older softwareupdate target $(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $2}' | sed -e 's/.*://g') $(echo "${macos_msu_minor_update_target}" | awk -F ',' '{print $4}' | sed -e 's/.*://g')."
+					macos_msu_minor_update_target="FALSE"
+					unset macos_msu_minor_update_target_version_normalized
+					macos_minor_update_latest="FALSE"
+					macos_minor_deferred_wait="TRUE"
+					break
+				done
+			fi
+		fi
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_minor_deferred_wait is: ${macos_minor_deferred_wait}"
+		#<<< END LOCAL PATCH (p16)
+		
 		# If ${install_macos_minor_updates} and there is no ${macos_msu_major_upgrade_target} or ${macos_installer_major_upgrade_target} or ${macos_msu_minor_update} then attempt to resolve a ${macos_installer_minor_update_target} given ${install_macos_minor_version_target} and ${macos_installer_minor_updates_array[]}.
-		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+		#>>> LOCAL PATCH (p16): do not promote installer minor while waiting on MDM-deferred newer OTA
+		if [[ "${install_macos_minor_updates}" == "TRUE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${macos_minor_deferred_wait}" != "TRUE" ]] && [[ ${#macos_installer_minor_updates_array[@]} -gt 0 ]]; then
+		#<<< END LOCAL PATCH (p16)
 			if [[ -z "${install_macos_minor_version_target}" ]]; then
 				macos_installer_minor_update_target="${macos_installer_minor_updates_array[0]}"
 			else
@@ -6750,7 +7695,9 @@ workflow_check_software_status() {
 				mdmclient_macos_item_version_normalized=$(echo "${mdmclient_macos_item}" | awk -F ',' '{print $3}' | sed -e 's/.*://g' | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}')
 				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: mdmclient_macos_item_version_normalized is: ${mdmclient_macos_item_version_normalized}"
 				[[ ${mdmclient_macos_item_version_normalized:0:2} -gt ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS major upgrade is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
-				[[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
+				#>>> LOCAL PATCH (p16): skip misleading Disallowed while waiting on MDM-deferred newer minor
+				[[ "${macos_minor_deferred_wait}" != "TRUE" ]] && [[ ${mdmclient_macos_item_version_normalized:0:2} -eq ${macos_version_major} ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && log_super "Disallowed: \"over-the-air\" macOS minor update is available but not allowed: $(echo "${mdmclient_macos_item}" | awk -F ',' '{print $2}' | sed -e 's/.*://g')"
+				#<<< END LOCAL PATCH (p16)
 			done
 		fi
 		
@@ -6788,13 +7735,18 @@ workflow_check_software_status() {
 	# If (no errors) check for macOS targets that are incompatible with MDM authenticated workflows.
 	if [[ "${workflow_check_software_status_error}" == "FALSE" ]] && [[ "${workflow_macos_auth}" == "JAMF" ]]; then
 		if [[ "${macos_target_mdm_compatible}" == "FALSE" ]]; then
-			if [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ALWAYS') -gt 0 ]] || [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ERROR') -gt 0 ]]; then
+			#>>> LOCAL PATCH (p01): softwareupdate fallback has no mdmclient product keys; auto-failover to user auth
+			if [[ "${use_softwareupdate_fallback}" == "TRUE" ]] && { [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]] || [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; }; then
+				log_super "Warning: softwareupdate fallback path cannot authenticate via MDM (no mdmclient product keys); failing over to user authenticated workflow."
+				auth_mdm_failover_to_user_status="TRUE"
+			elif [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ALWAYS') -gt 0 ]] || [[ $(echo "${auth_mdm_failover_to_user}" | grep -c 'ERROR') -gt 0 ]]; then
 				log_super "Warning: The target macOS update or upgrade can not be authenticated via MDM, failing over to user authenticated workflow."
 				auth_mdm_failover_to_user_status="TRUE"
 			else
 				log_super "Error: The target macOS update or upgrade can not be authenticated via MDM, you must enable the --auth-mdm-failover-to-user option when targeting older macOS versions."
 				workflow_check_software_status_error="TRUE"
 			fi
+			#<<< END LOCAL PATCH (p01)
 		fi
 		if [[ "${macos_beta_program}" == "TRUE" ]] && { [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; }; then
 			if { [[ -n "${install_macos_major_version_target}" ]] && [[ "${macos_major_upgrade_latest}" == "FALSE" ]]; } || { [[ -n "${install_macos_minor_version_target}" ]] && [[ "${macos_minor_update_latest}" == "FALSE" ]]; }; then
@@ -7071,8 +8023,16 @@ workflow_check_download_status() {
 		
 		# If the target is a macOS minor update and it should have been downloaded automatically, then evaluate if the workflow should automatically defer.
 		if [[ "${macos_msu_minor_update_target}" != "FALSE" ]]; then
-			{ [[ "${msu_automatic_download}" == "TRUE" ]] && [[ "${macos_msu_download_required}" == "TRUE" ]]; } && macos_msu_automatic_download_deferral="TRUE"
-			[[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]] && macos_msu_automatic_download_ramped="$(grep "${macos_msu_build}" "/var/log/install.log" | grep "ramped, not downloadable at this time" | tail -1)"
+			#>>> LOCAL PATCH (p01): honor --workflow-macos-minor-auto-download-deferral (upstream always defers)
+			if [[ "${workflow_macos_minor_auto_download_deferral}" == "TRUE" ]]; then
+				{ [[ "${msu_automatic_download}" == "TRUE" ]] && [[ "${macos_msu_download_required}" == "TRUE" ]]; } && macos_msu_automatic_download_deferral="TRUE"
+				[[ "${macos_msu_automatic_download_deferral}" == "TRUE" ]] && macos_msu_automatic_download_ramped="$(grep "${macos_msu_build}" "/var/log/install.log" | grep "ramped, not downloadable at this time" | tail -1)"
+			else
+				# Default to immediate download attempts for minor updates.
+				macos_msu_automatic_download_deferral="FALSE"
+				macos_msu_automatic_download_ramped="FALSE"
+			fi
+			#<<< END LOCAL PATCH (p01)
 			[[ "${msu_automatic_download}" == "FALSE" ]] && log_super "Warning: Automatic download of macOS updates is disabled, this is not recommended for macOS minor update workflows."
 		fi
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_automatic_download_deferral is: ${macos_msu_automatic_download_deferral}"
@@ -7094,47 +8054,100 @@ download_macos_msu() {
 	fi
 	
 	# Start with log and status updates.
-	if [[ $macos_version_major -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
-		log_super "softwareupdate: Starting ${macos_msu_title} authenticated download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
-		log_status "Running: softwareupdate: Starting ${macos_msu_title} authenticated download workflow."
-		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA AUTHENTICATED SOFTWAREUPDATE START ****"
+	#>>> LOCAL PATCH (p02): decide attach-vs-start before writing START (so resume can seed from prior session)
+	local download_macos_msu_pid
+	local download_macos_msu_started_by_super
+	download_macos_msu_started_by_super="FALSE"
+	local download_macos_msu_skip_watch
+	download_macos_msu_skip_watch="FALSE"
+	local download_macos_msu_bg_pid
+	download_macos_msu_bg_pid=""
+	local download_macos_msu_attach
+	download_macos_msu_attach="FALSE"
+	check_macos_msu_download
+	if [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]]; then
+		log_super "Status: Target macOS update/upgrade is already prepared; skipping download wait."
+		macos_msu_title_downloaded="${macos_msu_title}"
+		download_macos_msu_skip_watch="TRUE"
+		download_macos_msu_pid="$(find_softwareupdate_download_pid "${macos_msu_label}" 2> /dev/null || true)"
+	elif download_macos_msu_pid="$(find_softwareupdate_download_pid "${macos_msu_label}")"; then
+		download_macos_msu_attach="TRUE"
+		log_super "Status: softwareupdate --download already running (PID ${download_macos_msu_pid}), monitoring existing download/prepare..."
 	else
-		log_super "softwareupdate: Starting ${macos_msu_title} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
-		log_status "Running: softwareupdate: Starting ${macos_msu_title} download workflow."
-		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA SOFTWAREUPDATE START ****"
+		# Leave any unrelated softwareupdate (e.g. --list) out of the way before starting our download.
+		if pgrep -x "softwareupdate" > /dev/null 2>&1; then
+			log_super "Status: Stopping leftover softwareupdate process(es) before starting download..."
+			killall -9 "softwareupdate" > /dev/null 2>&1
+			if ! wait_for_softwareupdate_exit 30; then
+				log_super "Warning: softwareupdate process(es) still present after kill wait; download may fail to start."
+			fi
+		fi
+		download_macos_msu_started_by_super="TRUE"
+	fi
+	
+	# Only open a new DOWNLOAD START session when launching a new softwareupdate; attaching must keep prior progress lines for seeding.
+	if [[ "${download_macos_msu_started_by_super}" == "TRUE" ]]; then
+		if [[ $macos_version_major -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
+			log_super "softwareupdate: Starting ${macos_msu_title} authenticated download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+			log_status "Running: softwareupdate: Starting ${macos_msu_title} authenticated download workflow."
+			log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA AUTHENTICATED SOFTWAREUPDATE START ****"
+		else
+			log_super "softwareupdate: Starting ${macos_msu_title} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+			log_status "Running: softwareupdate: Starting ${macos_msu_title} download workflow."
+			log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA SOFTWAREUPDATE START ****"
+		fi
+	elif [[ "${download_macos_msu_attach}" == "TRUE" ]]; then
+		log_super "softwareupdate: Resuming monitor of ${macos_msu_title} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+		log_status "Running: softwareupdate: Resuming monitor of ${macos_msu_title} download workflow."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${macos_msu_title} VIA SOFTWAREUPDATE RESUME ****"
+	elif [[ "${download_macos_msu_skip_watch}" == "TRUE" ]]; then
+		log_super "softwareupdate: ${macos_msu_title} already prepared."
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_label is: ${macos_msu_label}"
 	
-	# The softwareupdate download process is backgrounded and is watched via a while loop later on. Also note the difference between macOS versions.
-	local download_macos_msu_pid
-	if [[ $macos_version_major -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then # macOS 14+ on Apple Silicon systems that require authenticated downloads.
-		echo "${auth_local_password}" | launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license --user "${auth_local_account}" --stdinpass >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-		download_macos_msu_pid="$!"
-	elif [[ $macos_version_major -ge 13 ]]; then # macOS 13+
-		if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
-			echo ' ' | launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" softwareupdate --download "${macos_msu_label}" --agree-to-license --user "${current_user_account_name}" --stdinpass >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-			download_macos_msu_pid="$!"
-		else # Intel.
-			launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-			download_macos_msu_pid="$!"
-		fi
-	elif [[ $macos_version_major -ge 12 ]]; then # macOS 12
-		if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
-			launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license --user "root" --stdinpass "" >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-			download_macos_msu_pid="$!"
-		else # Intel.
-			launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-			download_macos_msu_pid="$!"
-		fi
-	else # macOS 11
-		if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
-			echo ' ' | softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-		else # Intel.
-			softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
-			download_macos_msu_pid="$!"
-		fi
+	#>>> LOCAL PATCH (p17): capture Apple prepare size during download/prepare (before producer)
+	if [[ "${download_macos_msu_skip_watch}" != "TRUE" ]]; then
+		start_apple_snapshot_prepare_stream
 	fi
+	#<<< END LOCAL PATCH (p17)
 	
+	# Launch a new softwareupdate download only when we did not attach to an existing one.
+	if [[ "${download_macos_msu_started_by_super}" == "TRUE" ]]; then
+		# The softwareupdate download process is backgrounded and is watched via a while loop later on. Also note the difference between macOS versions.
+		if [[ $macos_version_major -ge 14 ]] && [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then # macOS 14+ on Apple Silicon systems that require authenticated downloads.
+			echo "${auth_local_password}" | launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license --user "${auth_local_account}" --stdinpass >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+			download_macos_msu_bg_pid="$!"
+		elif [[ $macos_version_major -ge 13 ]]; then # macOS 13+
+			if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
+				echo ' ' | launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" softwareupdate --download "${macos_msu_label}" --agree-to-license --user "${current_user_account_name}" --stdinpass >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+				download_macos_msu_bg_pid="$!"
+			else # Intel.
+				launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+				download_macos_msu_bg_pid="$!"
+			fi
+		elif [[ $macos_version_major -ge 12 ]]; then # macOS 12
+			if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
+				launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license --user "root" --stdinpass "" >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+				download_macos_msu_bg_pid="$!"
+			else # Intel.
+				launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+				download_macos_msu_bg_pid="$!"
+			fi
+		else # macOS 11
+			if [[ "${mac_cpu_architecture}" == "arm64" ]]; then # Apple Silicon.
+				echo ' ' | softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+				download_macos_msu_bg_pid="$!"
+			else # Intel.
+				softwareupdate --download "${macos_msu_label}" --agree-to-license >> "${MSU_WORKFLOW_LOG}" 2>&1 &
+				download_macos_msu_bg_pid="$!"
+			fi
+		fi
+		# $! is often launchctl/pipeline, not softwareupdate; resolve the real --download PID.
+		download_macos_msu_pid="$(resolve_softwareupdate_download_pid "${macos_msu_label}" "${download_macos_msu_bg_pid}")"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_bg_pid is: ${download_macos_msu_bg_pid}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_pid is: ${download_macos_msu_pid}"
+	fi
+	#<<< END LOCAL PATCH (p02)
 	# Watch ${MSU_WORKFLOW_LOG} while waiting for the softwareupdate download workflow to complete.
 	# Note this while read loop has a timeout based on ${TIMEOUT_START_SECONDS} then changes to ${TIMEOUT_MSU_SYSTEM_SECONDS}.
 	local download_macos_msu_start_error
@@ -7152,80 +8165,170 @@ download_macos_msu() {
 	local download_macos_msu_complete_perecent_previous
 	download_macos_msu_complete_perecent_previous=0
 	local download_macos_msu_complete_display
-	unset macos_msu_title_downloaded
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_timeout_seconds is: ${download_macos_msu_timeout_seconds}"
-	while read -t "${download_macos_msu_timeout_seconds}" -r log_line; do
-		# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-		if [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]]; then
-			download_macos_msu_start_error="CONNECT"
-			break
-		elif [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]]; then
-			download_macos_msu_start_error="NOUPDATE"
-			break
-		elif [[ $(echo "${log_line}" | grep -c 'Not enough free disk space') -gt 0 ]]; then
-			download_macos_msu_start_error="SPACE"
-			break
-		elif [[ $(echo "${log_line}" | grep -c 'Failed to authenticate') -gt 0 ]]; then
-			download_macos_msu_start_error="AUTH"
-			break
-		elif [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]]; then
-			download_macos_msu_start_error="FAILED"
-			break
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_msu_phase}" == "START" ]]; then
-			macos_msu_title_downloaded="${log_line/Downloading /}"
-			log_super "softwareupdate: ${macos_msu_title_downloaded} is downloading..."
-			log_msu "**** TIMESTAMP ****"
-			download_macos_msu_phase="DOWNLOADING"
-			download_macos_msu_timeout_seconds="${TIMEOUT_MSU_SYSTEM_SECONDS}"
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_timeout_seconds is: ${download_macos_msu_timeout_seconds}"
+	if [[ "${download_macos_msu_skip_watch}" != "TRUE" ]]; then
+		unset macos_msu_title_downloaded
+	fi
+	# If attaching to an in-progress download, seed phase from the current DOWNLOAD session only (not stale prior runs).
+	if [[ "${download_macos_msu_skip_watch}" != "TRUE" ]] && [[ "${download_macos_msu_started_by_super}" == "FALSE" ]] && [[ -f "${MSU_WORKFLOW_LOG}" ]]; then
+		local download_macos_msu_log_current
+		local download_macos_msu_seed_percent
+		download_macos_msu_log_current="$(get_msu_workflow_log_current_session)"
+		download_macos_msu_seed_percent=$(echo "${download_macos_msu_log_current}" | grep -o 'Downloading: [0-9.]*' 2> /dev/null | tail -1 | awk '{print $2}' | cut -d '.' -f1)
+		if echo "${download_macos_msu_log_current}" | grep -q 'Downloaded:'; then
+			check_macos_msu_download
+			if [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]]; then
+				macos_msu_title_downloaded="${macos_msu_title}"
+				download_macos_msu_phase="DONE"
+				download_macos_msu_start_error="FALSE"
+				download_macos_msu_start_timeout="FALSE"
+				download_macos_msu_timeout_error="FALSE"
+				download_macos_msu_skip_watch="TRUE"
+				log_super_audit "softwareupdate: ${macos_msu_title_downloaded} download and preparation complete."
+			fi
+		elif [[ -n "${download_macos_msu_seed_percent}" ]]; then
+			macos_msu_title_downloaded=$(echo "${download_macos_msu_log_current}" | grep -E '^Downloading macOS|^Downloading ' 2> /dev/null | grep -v 'Downloading:' | tail -1 | sed -e 's/^Downloading //')
+			[[ -z "${macos_msu_title_downloaded}" ]] && macos_msu_title_downloaded="${macos_msu_title}"
 			download_macos_msu_start_error="FALSE"
 			download_macos_msu_start_timeout="FALSE"
-			[[ $(echo "${macos_msu_title_downloaded}" | grep -c 'macOS') -gt 0 ]] && download_macos_msu_phase="DOWNLOADING"
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_msu_phase}" == "DOWNLOADING" ]]; then
-			download_macos_msu_complete_perecent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_complete_perecent is: ${download_macos_msu_complete_perecent}"
-			if [[ $download_macos_msu_complete_perecent -ge 60 ]]; then
-				log_echo_replace_line "${macos_msu_title_downloaded} download progress: 100%\n"
-				log_super "softwareupdate: ${macos_msu_title_downloaded} download complete, now preparing..."
-				log_msu "**** TIMESTAMP ****"
+			download_macos_msu_timeout_seconds="${TIMEOUT_MSU_SYSTEM_SECONDS}"
+			download_macos_msu_complete_perecent_previous="${download_macos_msu_seed_percent}"
+			if [[ ${download_macos_msu_seed_percent} -ge 60 ]]; then
 				download_macos_msu_phase="PREPARING"
-			elif [[ $download_macos_msu_complete_perecent -gt $download_macos_msu_complete_perecent_previous ]]; then
-				download_macos_msu_complete_display=$( (echo "${download_macos_msu_complete_perecent} * 1.69" | bc) | cut -d '.' -f1)
-				log_echo_replace_line "${macos_msu_title_downloaded} download progress: ${download_macos_msu_complete_display}%"
-				download_macos_msu_complete_perecent_previous=${download_macos_msu_complete_perecent}
+				log_super "softwareupdate: ${macos_msu_title_downloaded} download complete, now preparing (resuming monitor)..."
+			else
+				download_macos_msu_phase="DOWNLOADING"
+				log_super "softwareupdate: ${macos_msu_title_downloaded} is downloading (resuming monitor)..."
 			fi
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_msu_phase}" == "PREPARING" ]]; then
-			download_macos_msu_complete_perecent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_complete_perecent is: ${download_macos_msu_complete_perecent}"
-			if [[ ${download_macos_msu_complete_perecent} -ge 100 ]]; then
-				log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: 100%\n"
+		elif [[ "${download_macos_msu_attach}" == "TRUE" ]]; then
+			# Attached process is still starting (e.g. "Finding available software"); use the long timeout instead of failing at TIMEOUT_START_SECONDS.
+			macos_msu_title_downloaded="${macos_msu_title}"
+			download_macos_msu_timeout_seconds="${TIMEOUT_MSU_SYSTEM_SECONDS}"
+			log_super "softwareupdate: Attached download has not reported progress yet; waiting up to ${TIMEOUT_MSU_SYSTEM_SECONDS} seconds..."
+		fi
+	fi
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_timeout_seconds is: ${download_macos_msu_timeout_seconds}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_started_by_super is: ${download_macos_msu_started_by_super}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_skip_watch is: ${download_macos_msu_skip_watch}"
+	if [[ "${download_macos_msu_skip_watch}" != "TRUE" ]]; then
+		while read -t "${download_macos_msu_timeout_seconds}" -r log_line; do
+			# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
+			if [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]]; then
+				download_macos_msu_start_error="CONNECT"
+				break
+			elif [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]]; then
+				download_macos_msu_start_error="NOUPDATE"
+				break
+			elif [[ $(echo "${log_line}" | grep -c 'Not enough free disk space') -gt 0 ]]; then
+				download_macos_msu_start_error="SPACE"
+				break
+			elif [[ $(echo "${log_line}" | grep -c 'Failed to authenticate') -gt 0 ]]; then
+				download_macos_msu_start_error="AUTH"
+				break
+			elif [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]]; then
+				download_macos_msu_start_error="FAILED"
+				break
+			elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_msu_phase}" == "START" ]]; then
+				macos_msu_title_downloaded="${log_line/Downloading /}"
+				log_super "softwareupdate: ${macos_msu_title_downloaded} is downloading..."
 				log_msu "**** TIMESTAMP ****"
-				download_macos_msu_phase="DONE"
-				sleep 10
-			elif [[ $download_macos_msu_complete_perecent -gt $download_macos_msu_complete_perecent_previous ]]; then
-				download_macos_msu_complete_display=$(((download_macos_msu_complete_perecent - 60) * 2))
-				log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: ${download_macos_msu_complete_display}%"
-				download_macos_msu_complete_perecent_previous=${download_macos_msu_complete_perecent}
+				download_macos_msu_phase="DOWNLOADING"
+				download_macos_msu_timeout_seconds="${TIMEOUT_MSU_SYSTEM_SECONDS}"
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_timeout_seconds is: ${download_macos_msu_timeout_seconds}"
+				download_macos_msu_start_error="FALSE"
+				download_macos_msu_start_timeout="FALSE"
+				[[ $(echo "${macos_msu_title_downloaded}" | grep -c 'macOS') -gt 0 ]] && download_macos_msu_phase="DOWNLOADING"
+			elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_msu_phase}" == "DOWNLOADING" ]]; then
+				download_macos_msu_complete_perecent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_complete_perecent is: ${download_macos_msu_complete_perecent}"
+				if [[ $download_macos_msu_complete_perecent -ge 60 ]]; then
+					log_echo_replace_line "${macos_msu_title_downloaded} download progress: 100%\n"
+					log_super "softwareupdate: ${macos_msu_title_downloaded} download complete, now preparing..."
+					log_msu "**** TIMESTAMP ****"
+					download_macos_msu_phase="PREPARING"
+				elif [[ $download_macos_msu_complete_perecent -gt $download_macos_msu_complete_perecent_previous ]]; then
+					download_macos_msu_complete_display=$( (echo "${download_macos_msu_complete_perecent} * 1.69" | bc) | cut -d '.' -f1)
+					log_echo_replace_line "${macos_msu_title_downloaded} download progress: ${download_macos_msu_complete_display}%"
+					download_macos_msu_complete_perecent_previous=${download_macos_msu_complete_perecent}
+				fi
+			elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_macos_msu_phase}" == "PREPARING" ]]; then
+				download_macos_msu_complete_perecent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_complete_perecent is: ${download_macos_msu_complete_perecent}"
+				if [[ ${download_macos_msu_complete_perecent} -ge 100 ]]; then
+					log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: 100%\n"
+					log_msu "**** TIMESTAMP ****"
+					download_macos_msu_phase="DONE"
+					sleep 10
+				elif [[ $download_macos_msu_complete_perecent -gt $download_macos_msu_complete_perecent_previous ]]; then
+					download_macos_msu_complete_display=$(((download_macos_msu_complete_perecent - 60) * 2))
+					log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: ${download_macos_msu_complete_display}%"
+					download_macos_msu_complete_perecent_previous=${download_macos_msu_complete_perecent}
+				fi
+			elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]] || [[ "${download_macos_msu_phase}" == "DONE" ]]; then
+				macos_msu_title_downloaded=$(echo "${log_line}" | sed -e 's/://' -e 's/Downloaded //')
+				log_super_audit "softwareupdate: ${macos_msu_title_downloaded} download and preparation complete."
+				download_macos_msu_start_error="FALSE"
+				download_macos_msu_start_timeout="FALSE"
+				download_macos_msu_timeout_error="FALSE"
+				break
 			fi
-		elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]] || [[ "${download_macos_msu_phase}" == "DONE" ]]; then
-			macos_msu_title_downloaded=$(echo "${log_line}" | sed -e 's/://' -e 's/Downloaded //')
-			log_super_audit "softwareupdate: ${macos_msu_title_downloaded} download and preparation complete."
+		done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
+	else
+		download_macos_msu_start_error="FALSE"
+		download_macos_msu_start_timeout="FALSE"
+		download_macos_msu_timeout_error="FALSE"
+	fi
+	# If start/progress watch timed out, re-check prepared assets and optionally wait for an already-running softwareupdate.
+	if [[ "${download_macos_msu_start_timeout}" == "TRUE" ]] || { [[ "${download_macos_msu_timeout_error}" == "TRUE" ]] && [[ "${download_macos_msu_start_error}" == "FALSE" ]]; }; then
+		check_macos_msu_download
+		if [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]]; then
+			log_super "Status: macOS update/upgrade is prepared; treating download workflow as complete."
+			macos_msu_title_downloaded="${macos_msu_title}"
 			download_macos_msu_start_error="FALSE"
 			download_macos_msu_start_timeout="FALSE"
 			download_macos_msu_timeout_error="FALSE"
-			break
+		elif [[ "${download_macos_msu_start_timeout}" == "TRUE" ]] && { { [[ -n "${download_macos_msu_pid}" ]] && kill -0 "${download_macos_msu_pid}" > /dev/null 2>&1; } || find_softwareupdate_download_pid "${macos_msu_label}" > /dev/null 2>&1; }; then
+			log_super "Warning: No new softwareupdate progress within ${TIMEOUT_START_SECONDS} seconds but softwareupdate --download is still running; waiting up to ${TIMEOUT_MSU_SYSTEM_SECONDS} seconds for prepare to finish..."
+			local download_macos_msu_poll_deadline
+			download_macos_msu_poll_deadline=$(($(date +%s) + TIMEOUT_MSU_SYSTEM_SECONDS))
+			while [[ $(date +%s) -lt ${download_macos_msu_poll_deadline} ]]; do
+				check_macos_msu_download
+				if [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]]; then
+					log_super_audit "softwareupdate: ${macos_msu_title} download and preparation complete."
+					macos_msu_title_downloaded="${macos_msu_title}"
+					download_macos_msu_start_error="FALSE"
+					download_macos_msu_start_timeout="FALSE"
+					download_macos_msu_timeout_error="FALSE"
+					break
+				fi
+				if ! { [[ -n "${download_macos_msu_pid}" ]] && kill -0 "${download_macos_msu_pid}" > /dev/null 2>&1; } && ! find_softwareupdate_download_pid "${macos_msu_label}" > /dev/null 2>&1; then
+					check_macos_msu_download
+					if [[ "${macos_msu_downloaded_version}" == "${macos_msu_version}" ]]; then
+						log_super_audit "softwareupdate: ${macos_msu_title} download and preparation complete."
+						macos_msu_title_downloaded="${macos_msu_title}"
+						download_macos_msu_start_error="FALSE"
+						download_macos_msu_start_timeout="FALSE"
+						download_macos_msu_timeout_error="FALSE"
+					fi
+					break
+				fi
+				sleep 10
+			done
 		fi
-	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
+	fi
+	#<<< END LOCAL PATCH (p01)
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream after download watch/poll (drain before reading max later)
+	stop_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_start_timeout is: ${download_macos_msu_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_start_error is: ${download_macos_msu_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_timeout_error is: ${download_macos_msu_timeout_error}"
 	
 	# If the softwareupdate download workflow completed, then validate the prepared macOS update/upgrade.
+	local download_macos_msu_title_error
+	download_macos_msu_title_error="TRUE"
+	local download_macos_msu_validation_error
+	download_macos_msu_validation_error="TRUE"
 	if [[ "${download_macos_msu_start_error}" == "FALSE" ]] && [[ "${download_macos_msu_start_timeout}" == "FALSE" ]] && [[ "${download_macos_msu_timeout_error}" == "FALSE" ]]; then	
-		local download_macos_msu_title_error
-		download_macos_msu_title_error="TRUE"
-		local download_macos_msu_validation_error
-		download_macos_msu_validation_error="TRUE"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_title is: ${macos_msu_title}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: macos_msu_title_downloaded is: ${macos_msu_title_downloaded}"
 		if [[ "${macos_msu_title}" == "${macos_msu_title_downloaded}" ]]; then
@@ -7239,12 +8342,17 @@ download_macos_msu() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_msu_validation_error is: ${download_macos_msu_validation_error}"
 	
 	# If the macOS update/upgrade is downloaded and prepared, then collect information.
-	if [[ "${download_macos_msu_start_error}" == "FALSE" ]] || [[ "${download_macos_msu_start_timeout}" == "FALSE" ]] || [[ "${download_macos_msu_timeout_error}" == "FALSE" ]] || [[ "${download_macos_msu_title_error}" == "FALSE" ]] || [[ "${download_macos_msu_validation_error}" == "FALSE" ]]; then
+	#>>> LOCAL PATCH (p01): require all success conditions (upstream used OR and could mark incomplete downloads complete)
+	if [[ "${download_macos_msu_start_error}" == "FALSE" ]] && [[ "${download_macos_msu_start_timeout}" == "FALSE" ]] && [[ "${download_macos_msu_timeout_error}" == "FALSE" ]] && [[ "${download_macos_msu_title_error}" == "FALSE" ]] && [[ "${download_macos_msu_validation_error}" == "FALSE" ]]; then
+	#<<< END LOCAL PATCH (p01)
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE COMPLETED ****"
 		log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		download_maocs_msu_error="FALSE"
 		macos_msu_download_required="FALSE"
 		set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
+		#>>> LOCAL PATCH (p26): successful download — reset withdrawn rediscovery backoff
+		clear_macos_msu_withdrawn_retry_count
+		#<<< END LOCAL PATCH (p26)
 	else # Some part of the softwareupdate download workflow failed.
 		if [[ "${download_macos_msu_start_error}" == "CONNECT" ]]; then
 			log_msu "Error: Unable to reach macOS software update servers."
@@ -7284,8 +8392,16 @@ download_macos_msu() {
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE FAILED ****"
 		download_maocs_msu_error="TRUE"
 		macos_msu_download_required="TRUE"
-		delete_pref_main "MacOSMSULabelDownloaded"
-		kill -9 "${download_macos_msu_pid}" > /dev/null 2>&1
+		#>>> LOCAL PATCH (p02): kill real softwareupdate --download (not just unreliable pipeline $!)
+		[[ "${download_macos_msu_started_by_super}" == "TRUE" ]] && kill_softwareupdate_download "${macos_msu_label}" "${download_macos_msu_pid}"
+		#<<< END LOCAL PATCH (p02)
+		#>>> LOCAL PATCH (p20): withdrawn label → clear MSU caches for rediscovery; otherwise only drop prepared-download pref
+		if [[ "${download_macos_msu_start_error}" == "NOUPDATE" ]]; then
+			clear_macos_msu_withdrawn_target
+		else
+			delete_pref_main "MacOSMSULabelDownloaded"
+		fi
+		#<<< END LOCAL PATCH (p20)
 		kick_softwareupdated
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_maocs_msu_error is: ${download_maocs_msu_error}"
@@ -7398,7 +8514,9 @@ download_macos_installer() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_macos_installer_validation_error is: ${download_macos_installer_validation_error}"
 	
 	# If the macOS installer application is downloaded and valid, then collect information.
-	if [[ "${download_macos_installer_start_error}" == "FALSE" ]] || [[ "${download_macos_installer_start_timeout}" == "FALSE" ]] || [[ "${download_macos_installer_timeout_error}" == "FALSE" ]] || [[ "${download_macos_installer_app_error}" == "FALSE" ]] || [[ "${download_macos_installer_validation_error}" == "FALSE" ]]; then
+	#>>> LOCAL PATCH (p06): require all success conditions (upstream used OR and could mark incomplete downloads complete)
+	if [[ "${download_macos_installer_start_error}" == "FALSE" ]] && [[ "${download_macos_installer_start_timeout}" == "FALSE" ]] && [[ "${download_macos_installer_timeout_error}" == "FALSE" ]] && [[ "${download_macos_installer_app_error}" == "FALSE" ]] && [[ "${download_macos_installer_validation_error}" == "FALSE" ]]; then
+	#<<< END LOCAL PATCH (p06)
 		log_installer "Status: A macOS installer is now available at: /Applications/Install ${macos_installer_title}.app"
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS INSTALLER APP COMPLETE ****"
 		log_super_audit "Status: A macOS installer is now available at: /Applications/Install ${macos_installer_title}.app"
@@ -7616,9 +8734,18 @@ workflow_download_macos() {
 			notification_install_now_failed
 			exit_error
 		else # Default super workflow.
-			deferral_timer_minutes=$deferral_timer_error_minutes
-			log_super "Error: Download macOS update/upgrade workflow failed, trying again in ${deferral_timer_minutes} minutes."
-			log_status "Pending: Download macOS update/upgrade workflow failed, trying again in ${deferral_timer_minutes} minutes."
+			#>>> LOCAL PATCH (p20/p26): withdrawn label — bounded rediscovery backoff (not uncapped 2‑min forever)
+			if [[ "${macos_msu_target_withdrawn}" == "TRUE" ]]; then
+				schedule_macos_msu_withdrawn_retry
+				log_super "Error: Download macOS update/upgrade workflow failed because the target is no longer available, trying again in ${deferral_timer_minutes} minutes to rediscover."
+				log_status "Pending: Download macOS update/upgrade workflow failed because the target is no longer available, trying again in ${deferral_timer_minutes} minutes to rediscover."
+			else
+				clear_macos_msu_withdrawn_retry_count
+				deferral_timer_minutes=$deferral_timer_error_minutes
+				log_super "Error: Download macOS update/upgrade workflow failed, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: Download macOS update/upgrade workflow failed, trying again in ${deferral_timer_minutes} minutes."
+			fi
+			#<<< END LOCAL PATCH (p20/p26)
 			set_auto_launch_deferral
 		fi
 	fi
@@ -7822,6 +8949,9 @@ install_safari_update_msu() {
 
 # Install macOS updates via the softwareupdate command, and also save responses to ${SUPER_LOG}, ${MSU_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 install_macos_msu() {
+	#>>> LOCAL PATCH (p17): pre-producer storage gate before notification_restart / --restart (test + production)
+	ensure_storage_ready_to_proceed
+	#<<< END LOCAL PATCH (p17)
 	[[ "${current_user_account_name}" != "FALSE" ]] && notification_restart
 	# If ${test_mode} then it's not necessary to continue this function.
 	if [[ "${test_mode}" == "TRUE" ]]; then
@@ -7836,6 +8966,10 @@ install_macos_msu() {
 		reset_workflow
 		return 0
 	fi
+	
+	#>>> LOCAL PATCH (p17): start Apple prepare stream after gate, before --install --restart
+	start_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	
 	# Start with log and status updates.
 	if [[ "${macos_msu_major_upgrade_target}" != "FALSE" ]]; then # macOS major upgrade via MSU.
@@ -7912,12 +9046,28 @@ install_macos_msu() {
 	
 	# Watch ${MSU_WORKFLOW_LOG} while waiting for the softwareupdate installation workflow to complete.
 	# Note this while read loop has a timeout based on ${TIMEOUT_START_SECONDS} then changes to ${TIMEOUT_MSU_SYSTEM_SECONDS}.
+	#>>> LOCAL PATCH (p16): read -t flag matrix for install watch
+	# install_macos_msu_start_error: TRUE until first real progress; SPACE on disk failure; stays FALSE after progress.
+	# install_macos_msu_start_timeout: TRUE until cleared on prepare/Downloaded; grace expiry must leave this FALSE.
+	# install_macos_msu_timeout_error: TRUE until cleared on prepare/Downloaded; grace expiry must leave this FALSE
+	#   (grace timeout must NOT be treated as download/prepare timeout_error).
+	# install_macos_msu_queue_error: TRUE only when "Failed to queue" seen during QUEUE_WATCH; distinct from timeouts.
+	# QUEUE_WATCH grace expiry with all FALSE + queue FALSE → success (COMPLETED after loop).
+	#<<< END LOCAL PATCH (p16)
 	local install_macos_msu_start_error
 	install_macos_msu_start_error="TRUE"
 	local install_macos_msu_start_timeout
 	install_macos_msu_start_timeout="TRUE"
 	local install_macos_msu_timeout_error
 	install_macos_msu_timeout_error="TRUE"
+	#>>> LOCAL PATCH (p16): Failed to queue detection state
+	#>>> LOCAL PATCH (p22): wall-clock QUEUE_WATCH deadline (idle read -t alone can be reset by chatter)
+	local install_macos_msu_queue_error
+	install_macos_msu_queue_error="FALSE"
+	local install_macos_msu_queue_deadline_epoch
+	install_macos_msu_queue_deadline_epoch=""
+	#<<< END LOCAL PATCH (p22)
+	#<<< END LOCAL PATCH (p16)
 	local install_macos_msu_timeout_seconds
 	install_macos_msu_timeout_seconds="${TIMEOUT_START_SECONDS}"
 	local install_macos_msu_phase
@@ -7930,8 +9080,41 @@ install_macos_msu() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
 	while read -t "${install_macos_msu_timeout_seconds}" -r log_line; do
 		# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-		if [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]]; then
+		#>>> LOCAL PATCH (p22): QUEUE_WATCH wall-clock — break when deadline passes even if log lines keep arriving
+		#>>> LOCAL PATCH (p23): honor Failed to queue on the line that triggered deadline break (don't discard it)
+		if [[ "${install_macos_msu_phase}" == "QUEUE_WATCH" ]] && [[ -n "${install_macos_msu_queue_deadline_epoch}" ]]; then
+			if [[ $(date +%s) -ge ${install_macos_msu_queue_deadline_epoch} ]]; then
+				if [[ $(echo "${log_line}" | grep -ci 'Failed to queue update and restart') -gt 0 ]]; then
+					install_macos_msu_queue_error="TRUE"
+				fi
+				break
+			fi
+			install_macos_msu_timeout_seconds=$((install_macos_msu_queue_deadline_epoch - $(date +%s)))
+			[[ ${install_macos_msu_timeout_seconds} -lt 1 ]] && install_macos_msu_timeout_seconds=1
+		fi
+		#<<< END LOCAL PATCH (p23)
+		#<<< END LOCAL PATCH (p22)
+		#>>> LOCAL PATCH (p16): Failed to queue during QUEUE_WATCH (match without requiring trailing period)
+		if [[ "${install_macos_msu_phase}" == "QUEUE_WATCH" ]] && [[ $(echo "${log_line}" | grep -ci 'Failed to queue update and restart') -gt 0 ]]; then
+			install_macos_msu_queue_error="TRUE"
 			break
+		#<<< END LOCAL PATCH (p16)
+		#>>> LOCAL PATCH (p14): detect Apple disk-space failures during install (download path already handled SPACE)
+		elif [[ $(echo "${log_line}" | grep -c 'Not enough free disk space') -gt 0 ]]; then
+			install_macos_msu_start_error="SPACE"
+			break
+		#<<< END LOCAL PATCH (p14)
+		#>>> LOCAL PATCH (p20): classify install start failures like download (CONNECT / NOUPDATE / FAILED)
+		elif [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]]; then
+			install_macos_msu_start_error="CONNECT"
+			break
+		elif [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]]; then
+			install_macos_msu_start_error="NOUPDATE"
+			break
+		elif [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]]; then
+			install_macos_msu_start_error="FAILED"
+			break
+		#<<< END LOCAL PATCH (p20)
 		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ $(echo "${log_line}" | grep -c 'Downloading:') -eq 0 ]]; then
 			macos_msu_title_downloaded="${log_line/Downloading /}"
 			log_super "softwareupdate: ${macos_msu_title_downloaded} is downloading..."
@@ -7961,10 +9144,17 @@ install_macos_msu() {
 			if [[ $install_macos_msu_complete_percent -ge 100 ]]; then
 				log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: 100%\n"
 				log_msu "**** TIMESTAMP ****"
+				#>>> LOCAL PATCH (p16/p22): enter QUEUE_WATCH — land-check prefs only (no WRV gate); wall-clock grace
 				install_macos_msu_start_error="FALSE"
 				install_macos_msu_start_timeout="FALSE"
 				install_macos_msu_timeout_error="FALSE"
-				break
+				set_workflow_restart_validate_land_prefs "${macos_msu_version}-${macos_msu_build}"
+				install_macos_msu_phase="QUEUE_WATCH"
+				install_macos_msu_queue_deadline_epoch=$(($(date +%s) + TIMEOUT_MSU_QUEUE_GRACE_SECONDS))
+				install_macos_msu_timeout_seconds="${TIMEOUT_MSU_QUEUE_GRACE_SECONDS}"
+				log_super "softwareupdate: Watching for Failed to queue for up to ${TIMEOUT_MSU_QUEUE_GRACE_SECONDS} seconds..."
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
+				#<<< END LOCAL PATCH (p16/p22)
 			elif [[ $install_macos_msu_complete_percent -gt $install_macos_msu_complete_percent_previous ]]; then
 				install_macos_msu_complete_percent_display=$(((install_macos_msu_complete_percent - 60) * 2))
 				log_echo_replace_line "${macos_msu_title_downloaded} preparing progress: ${install_macos_msu_complete_percent_display}%"
@@ -7973,26 +9163,101 @@ install_macos_msu() {
 		elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]]; then
 			macos_msu_title_downloaded=$(echo "${log_line}" | sed -e 's/://' -e 's/Downloaded //')
 			log_msu "**** TIMESTAMP ****"
+			#>>> LOCAL PATCH (p16/p22): enter QUEUE_WATCH — land-check prefs only (no WRV gate); wall-clock grace
 			install_macos_msu_start_error="FALSE"
 			install_macos_msu_start_timeout="FALSE"
 			install_macos_msu_timeout_error="FALSE"
-			break
+			if [[ "${install_macos_msu_phase}" != "QUEUE_WATCH" ]]; then
+				set_workflow_restart_validate_land_prefs "${macos_msu_version}-${macos_msu_build}"
+				install_macos_msu_phase="QUEUE_WATCH"
+				install_macos_msu_queue_deadline_epoch=$(($(date +%s) + TIMEOUT_MSU_QUEUE_GRACE_SECONDS))
+				install_macos_msu_timeout_seconds="${TIMEOUT_MSU_QUEUE_GRACE_SECONDS}"
+				log_super "softwareupdate: Watching for Failed to queue for up to ${TIMEOUT_MSU_QUEUE_GRACE_SECONDS} seconds..."
+				[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
+			fi
+			#<<< END LOCAL PATCH (p16/p22)
+		#>>> LOCAL PATCH (p16/p22): Restarting... also enters QUEUE_WATCH if not already (land prefs only)
+		elif [[ $(echo "${log_line}" | grep -c 'Restarting') -gt 0 ]] && [[ "${install_macos_msu_phase}" != "QUEUE_WATCH" ]]; then
+			log_msu "**** TIMESTAMP ****"
+			install_macos_msu_start_error="FALSE"
+			install_macos_msu_start_timeout="FALSE"
+			install_macos_msu_timeout_error="FALSE"
+			set_workflow_restart_validate_land_prefs "${macos_msu_version}-${macos_msu_build}"
+			install_macos_msu_phase="QUEUE_WATCH"
+			install_macos_msu_queue_deadline_epoch=$(($(date +%s) + TIMEOUT_MSU_QUEUE_GRACE_SECONDS))
+			install_macos_msu_timeout_seconds="${TIMEOUT_MSU_QUEUE_GRACE_SECONDS}"
+			log_super "softwareupdate: Watching for Failed to queue for up to ${TIMEOUT_MSU_QUEUE_GRACE_SECONDS} seconds..."
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_seconds is: ${install_macos_msu_timeout_seconds}"
+		#<<< END LOCAL PATCH (p16/p22)
 		fi
 	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
+	#>>> LOCAL PATCH (p17): stop Apple prepare stream after install watch/QUEUE_WATCH grace
+	stop_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_start_error is: ${install_macos_msu_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_start_timeout is: ${install_macos_msu_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_timeout_error is: ${install_macos_msu_timeout_error}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_msu_queue_error is: ${install_macos_msu_queue_error}"
 	
+	#>>> LOCAL PATCH (p16): Failed to queue → clear land-check prefs and fail (before COMPLETED)
+	if [[ "${install_macos_msu_queue_error}" == "TRUE" ]]; then
+		clear_workflow_restart_validate_os_prefs
+		log_msu "Error: softwareupdate failed to queue update and restart."
+		log_super "Error: softwareupdate failed to queue update and restart."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA SOFTWAREUPDATE FAILED ****"
+		kill -9 "${install_macos_msu_pid}" > /dev/null 2>&1
+		kick_softwareupdated
+		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed, install now workflow can not continue."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed, install now workflow can not continue."
+			log_status "Inactive Error: Installation of macOS update/upgrade via softwareupdate failed, install now workflow can not continue."
+			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
+			exit_error
+		else
+			deferral_timer_minutes=$deferral_timer_error_minutes
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			log_status "Pending: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
+			set_auto_launch_deferral
+		fi
+	#<<< END LOCAL PATCH (p16)
 	# If the softwareupdate installation workflow completed, then prepare for restart.
-	if [[ "${install_macos_msu_start_error}" == "FALSE" ]] && [[ "${install_macos_msu_start_timeout}" == "FALSE" ]] && [[ "${install_macos_msu_timeout_error}" == "FALSE" ]]; then
-		/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+	elif [[ "${install_macos_msu_start_error}" == "FALSE" ]] && [[ "${install_macos_msu_start_timeout}" == "FALSE" ]] && [[ "${install_macos_msu_timeout_error}" == "FALSE" ]]; then
+		#>>> LOCAL PATCH (p16/p22): grace success — arm WRV LaunchDaemon gate here (land prefs already set in QUEUE_WATCH)
+		set_workflow_restart_validate_os_prefs "${macos_msu_version}-${macos_msu_build}"
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+		#>>> LOCAL PATCH (p26): install prepared successfully — reset withdrawn rediscovery backoff
+		clear_macos_msu_withdrawn_retry_count
+		#<<< END LOCAL PATCH (p26)
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA SOFTWAREUPDATE COMPLETED ****"
 		log_super_audit "softwareupdate: macOS update/upgrade is prepared and ready for restart!"
+		#<<< END LOCAL PATCH (p16/p22)
 	else # Some part of the softwareupdate installation workflow failed.
-		if [[ "${install_macos_msu_start_error}" == "TRUE" ]]; then
+		#>>> LOCAL PATCH (p16): clear any land-check prefs from a partial QUEUE_WATCH entry
+		clear_workflow_restart_validate_os_prefs
+		#<<< END LOCAL PATCH (p16)
+		#>>> LOCAL PATCH (p14): log install SPACE failures like the download SPACE handler
+		if [[ "${install_macos_msu_start_error}" == "SPACE" ]]; then
+			#>>> LOCAL PATCH (p17): SPACE wording — install/prepare (not download)
+			log_msu "Error: Not enough available storage to install/prepare macOS update/upgrade."
+			log_super "Error: Not enough available storage to install/prepare macOS update/upgrade."
+			#<<< END LOCAL PATCH (p17)
+		#<<< END LOCAL PATCH (p14)
+		#>>> LOCAL PATCH (p20): distinct CONNECT / NOUPDATE / FAILED handling
+		elif [[ "${install_macos_msu_start_error}" == "CONNECT" ]]; then
+			log_msu "Error: Unable to reach macOS software update servers."
+			log_super "Error: Unable to reach macOS software update servers."
+		elif [[ "${install_macos_msu_start_error}" == "NOUPDATE" ]]; then
+			log_msu "Error: Unable to find requested macOS update/upgrade via softwareupdate."
+			log_super "Error: Unable to find requested macOS update/upgrade via softwareupdate."
+		elif [[ "${install_macos_msu_start_error}" == "FAILED" ]]; then
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed to start."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed to start."
+		elif [[ "${install_macos_msu_start_error}" == "TRUE" ]]; then
 			log_msu "Error: The softwareupdate process was unable to reach macOS software update servers or find the requested macOS update/upgrade."
 			log_super "Error: The softwareupdate process was unable to reach macOS software update servers or find the requested macOS update/upgrade."
+		#<<< END LOCAL PATCH (p20)
 		elif [[ "${install_macos_msu_start_timeout}" == "TRUE" ]]; then
 			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed to start downloading/preparing after waiting for ${install_macos_msu_timeout_seconds} seconds."
 			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed to start downloading/preparing after waiting for ${install_macos_msu_timeout_seconds} seconds."
@@ -8003,6 +9268,9 @@ install_macos_msu() {
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA SOFTWAREUPDATE FAILED ****"
 		kill -9 "${install_macos_msu_pid}" > /dev/null 2>&1
 		kick_softwareupdated
+		#>>> LOCAL PATCH (p20): after kill, clear caches when label was withdrawn so next run rediscovers
+		[[ "${install_macos_msu_start_error}" == "NOUPDATE" ]] && clear_macos_msu_withdrawn_target
+		#<<< END LOCAL PATCH (p20)
 	
 		# Handle workflow failure options.
 		if [[ "${workflow_install_now_active}" == "TRUE" ]]; then # Install now workflow mode.
@@ -8012,11 +9280,24 @@ install_macos_msu() {
 			[[ "${current_user_account_name}" != "FALSE" ]] && notification_install_now_failed
 			exit_error
 		else # Default super workflow.
-			deferral_timer_minutes=$deferral_timer_error_minutes
-			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
-			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
-			log_status "Pending: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
-			[[ "${current_user_account_name}" != "FALSE" ]] && notification_failed
+			#>>> LOCAL PATCH (p20/p26): withdrawn label — bounded rediscovery backoff; throttle failed dialogs
+			local install_macos_msu_should_notify
+			install_macos_msu_should_notify="TRUE"
+			if [[ "${install_macos_msu_start_error}" == "NOUPDATE" ]]; then
+				schedule_macos_msu_withdrawn_retry
+				install_macos_msu_should_notify="${macos_msu_withdrawn_should_notify}"
+				log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed because the target is no longer available, trying again in ${deferral_timer_minutes} minutes to rediscover."
+				log_super "Error: Installation of macOS update/upgrade via softwareupdate failed because the target is no longer available, trying again in ${deferral_timer_minutes} minutes to rediscover."
+				log_status "Pending: Installation of macOS update/upgrade via softwareupdate failed because the target is no longer available, trying again in ${deferral_timer_minutes} minutes to rediscover."
+			else
+				clear_macos_msu_withdrawn_retry_count
+				deferral_timer_minutes=$deferral_timer_error_minutes
+				log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+				log_super "Error: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+				log_status "Pending: Installation of macOS update/upgrade via softwareupdate failed, trying again in ${deferral_timer_minutes} minutes."
+			fi
+			#<<< END LOCAL PATCH (p20/p26)
+			[[ "${current_user_account_name}" != "FALSE" ]] && [[ "${install_macos_msu_should_notify}" == "TRUE" ]] && notification_failed
 			set_auto_launch_deferral
 		fi
 	fi
@@ -8024,6 +9305,9 @@ install_macos_msu() {
 
 # Install via macOS installer application, and also save responses to ${SUPER_LOG}, ${INSTALLER_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 install_macos_app() {
+	#>>> LOCAL PATCH (p17): pre-producer storage gate before test notify / startosinstall
+	ensure_storage_ready_to_proceed
+	#<<< END LOCAL PATCH (p17)
 	# If ${test_mode} then it's not necessary to continue this function.
 	if [[ "${test_mode}" == "TRUE" ]]; then
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
@@ -8040,6 +9324,10 @@ install_macos_app() {
 		reset_workflow
 		return 0
 	fi
+	
+	#>>> LOCAL PATCH (p17): start Apple prepare stream after gate, before startosinstall
+	start_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	
 	# Start with log and status updates.
 	log_super "startosinstall: Starting ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} install workflow, check ${INSTALLER_WORKFLOW_LOG} for more detail."
@@ -8104,17 +9392,30 @@ install_macos_app() {
 			break
 		fi
 	done < <(tail -n1 -F "${INSTALLER_WORKFLOW_LOG}" | tr -u '%' '\n')
+	#>>> LOCAL PATCH (p17): stop/drain Apple prepare stream before residual proceed check
+	stop_apple_snapshot_prepare_stream
+	#<<< END LOCAL PATCH (p17)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_app_start_error is: ${install_macos_app_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_app_start_timeout is: ${install_macos_app_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_macos_app_timeout is: ${install_macos_app_timeout}"
 	
 	# If the startosinstall workflow completed, then prepare for restart.
 	if [[ "${install_macos_app_start_error}" == "FALSE" ]] && [[ "${install_macos_app_start_timeout}" == "FALSE" ]] && [[ "${install_macos_app_timeout}" == "FALSE" ]]; then
-		/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+		#>>> LOCAL PATCH (p16): set restart-validate + PreBuild/Target for land check
+		set_workflow_restart_validate_os_prefs "${macos_installer_version}-${macos_installer_build}"
+		#<<< END LOCAL PATCH (p16)
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS COMPLETED ****"
+		#>>> LOCAL PATCH (p17): residual post-watch storage check (log only — reboot may already be owned)
+		#>>> LOCAL PATCH (p27): always audit + notify; do not skip user warning when free < required after prepare
+		check_storage_ready_to_proceed
+		if [[ "${check_storage_ready_to_proceed_error}" == "TRUE" ]] || [[ "${storage_ready}" != "TRUE" ]]; then
+			log_super "Warning: Insufficient storage after startosinstall prepare (free=${storage_available_gigabytes}GB required=${storage_required_gigabytes}GB); restart may still proceed — notifying user."
+		fi
 		log_super_audit "Status: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} is prepared and ready for restart!"
 		[[ "${current_user_account_name}" != "FALSE" ]] && notification_restart
+		#<<< END LOCAL PATCH (p27)
+		#<<< END LOCAL PATCH (p17)
 	else # Some part of the startosinstall workflow failed.
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS FAILED ****"
 		kill -9 "${install_macos_app_pid}" > /dev/null 2>&1
@@ -8149,6 +9450,9 @@ install_macos_app() {
 
 # Download and/or install macOS update/upgrade via MDM push command, and also save responses to ${SUPER_LOG}, ${MDM_COMMAND_LOG}, ${MDM_WORKFLOW_LOG}, and ${SUPER_MAIN_PLIST}.
 push_macos_mdm() {
+	#>>> LOCAL PATCH (p17): pre-producer storage gate before streams/POST and test-mode restart notify
+	ensure_storage_ready_to_proceed
+	#<<< END LOCAL PATCH (p17)
 	# If ${test_mode} then it's not necessary to continue this function.
 	if [[ "${test_mode}" == "TRUE" ]] && [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
 		log_super "Test Mode: Skipping the download macOS update/upgrade via MDM workflow."
@@ -8240,6 +9544,9 @@ push_macos_mdm() {
 	
 	# Only continue workflow if Jamf Pro API configuration is valid.
 	if [[ "${auth_error_jamf}" == "FALSE" ]]; then
+		#>>> LOCAL PATCH (p17): start Apple prepare stream before MDM POST (with other MDM streams)
+		start_apple_snapshot_prepare_stream
+		#<<< END LOCAL PATCH (p17)
 		# Start log streaming for MDM push commands and send to ${MDM_COMMAND_LOG}.
 		local log_stream_mdm_command_pid
 		log stream --style compact --predicate 'subsystem == "com.apple.ManagedClient" AND category == "HTTPUtil"' >> "${MDM_COMMAND_LOG}" &
@@ -8401,6 +9708,8 @@ push_macos_mdm() {
 		local push_macos_mdm_complete_percent_previous
 		push_macos_mdm_complete_percent_previous=0
 		local push_macos_mdm_complete_percent_display
+		local push_macos_mdm_download_asset_poll
+		push_macos_mdm_download_asset_poll="FALSE"
 		
 		# Watch ${MDM_WORKFLOW_LOG} while waiting for the update/upgrade workflow to complete.
 		# Note this while read loop has a timeout based on ${TIMEOUT_MDM_COMMAND_SECONDS} then may change to ${TIMEOUT_MDM_WORKFLOW_SECONDS}.
@@ -8451,6 +9760,38 @@ push_macos_mdm() {
 						[[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && log_super "MDM: ${macos_msu_label} is downloaded and prepared."
 						[[ "${push_macos_mdm_workflow}" == "INSTALL" ]] && log_super "MDM: ${macos_msu_label} is downloaded and prepared, system restart is soon..."
 						log_mdm_workflow "**** TIMESTAMP ****"
+						#>>> LOCAL PATCH (p07/p12): DOWNLOAD_ONLY often never emits PREPARED_COMMITTING_STASH; only exit at ≥98% after update-asset-attributes matches (re-poll up to 120s)
+						if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]] && [[ "${push_macos_mdm_download_asset_poll}" != "TRUE" ]]; then
+							push_macos_mdm_download_asset_poll="TRUE"
+							local push_macos_mdm_asset_elapsed
+							local push_macos_mdm_asset_match
+							local update_asset_attributes_poll
+							local macos_mdm_version_prepared_poll
+							local macos_mdm_prepared_version_extra_poll
+							push_macos_mdm_asset_elapsed=0
+							push_macos_mdm_asset_match="FALSE"
+							while [[ ${push_macos_mdm_asset_elapsed} -lt 120 ]]; do
+								update_asset_attributes_poll=$(defaults read /System/Volumes/Update/Update update-asset-attributes 2> /dev/null)
+								macos_mdm_version_prepared_poll=$(echo "${update_asset_attributes_poll}" | grep -w 'OSVersion' | awk -F '"' '{print $2;}')
+								if [[ $macos_version_major -ge 13 ]]; then
+									macos_mdm_prepared_version_extra_poll=$(echo "${update_asset_attributes_poll}" | grep -w 'ProductVersionExtra' | awk -F '"' '{print $2;}')
+									[[ -n "${macos_mdm_prepared_version_extra_poll}" ]] && macos_mdm_version_prepared_poll="${macos_mdm_version_prepared_poll} ${macos_mdm_prepared_version_extra_poll}"
+								fi
+								if [[ -n "${macos_mdm_version_prepared_poll}" ]] && [[ "${macos_mdm_version_prepared_poll}" == "${macos_msu_version}" ]]; then
+									push_macos_mdm_asset_match="TRUE"
+									break
+								fi
+								sleep 2
+								push_macos_mdm_asset_elapsed=$((push_macos_mdm_asset_elapsed + 2))
+							done
+							# Break either on asset match or after the re-poll window so DOWNLOAD_ONLY cannot hang forever; post-loop validation still gates success.
+							push_macos_mdm_timeout_error="FALSE"
+							push_macos_mdm_phase="DONE"
+							[[ "${push_macos_mdm_asset_match}" == "TRUE" ]] && log_super "MDM: ${macos_msu_label} prepared assets validated."
+							[[ "${push_macos_mdm_asset_match}" != "TRUE" ]] && log_super "Warning: MDM: ${macos_msu_label} prepare ≥98% but prepared assets not yet readable after 120 seconds; continuing to validation."
+							break
+						fi
+						#<<< END LOCAL PATCH (p07/p12)
 					elif [[ $push_macos_mdm_complete_percent -gt $push_macos_mdm_complete_percent_previous ]]; then
 						push_macos_mdm_complete_percent_display=$(((push_macos_mdm_complete_percent - 60) * 2))
 						log_echo_replace_line "${macos_msu_label} preparing progress: ${push_macos_mdm_complete_percent_display}%"
@@ -8512,7 +9853,18 @@ push_macos_mdm() {
 					fi
 				done < <(tail -n1 -F "${MDM_WORKFLOW_LOG}")
 			fi
-			{ [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; } && notification_restart
+			#>>> LOCAL PATCH (p18): residual mid-watch INSTALLER storage check (log only)
+			#>>> LOCAL PATCH (p27): always notify — prepare already committed / restart still proceeds
+			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]] && [[ "${current_user_account_name}" != "FALSE" ]]; then
+				sleep 1
+				check_storage_ready_to_proceed
+				if [[ "${check_storage_ready_to_proceed_error}" == "TRUE" ]] || [[ "${storage_ready}" != "TRUE" ]]; then
+					log_super "Warning: Insufficient storage after MDM prepare (free=${storage_available_gigabytes}GB required=${storage_required_gigabytes}GB); restart may still proceed — notifying user."
+				fi
+				notification_restart
+			fi
+			#<<< END LOCAL PATCH (p27)
+			#<<< END LOCAL PATCH (p18)
 			if [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
 				push_macos_mdm_timeout_error="TRUE"
 				while read -t "${push_macos_mdm_timeout_seconds}" -r log_line; do
@@ -8532,6 +9884,9 @@ push_macos_mdm() {
 	
 	# If the macOS update/upgrade completed, then prepare for restart.
 	if [[ "${auth_error_jamf}" == "FALSE" ]] && [[ "${push_macos_mdm_api_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_error}" == "FALSE" ]] && [[ "${push_macos_mdm_start_timeout}" == "FALSE" ]] && [[ "${push_macos_mdm_timeout_error}" == "FALSE" ]]; then
+		#>>> LOCAL PATCH (p17): stop Apple prepare stream after MDM watch success path
+		stop_apple_snapshot_prepare_stream
+		#<<< END LOCAL PATCH (p17)
 		kill -9 "${log_stream_mdm_workflow_pid}" > /dev/null 2>&1
 		[[ "${verbose_mode}" == "TRUE" ]] && kill -9 "${log_stream_mdm_workflow_debug_pid}" > /dev/null 2>&1
 		if [[ "${push_macos_mdm_workflow}" == "DOWNLOAD" ]]; then
@@ -8561,9 +9916,21 @@ push_macos_mdm() {
 				set_pref_main "MacOSMSULabelDownloaded" "${macos_msu_label}"
 			fi
 		else # Install workflow at this point is a success.
-			/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
+			#>>> LOCAL PATCH (p16): set restart-validate + PreBuild/Target for land check
+			if [[ "${push_macos_mdm_target_type}" == "INSTALLER" ]]; then
+				set_workflow_restart_validate_os_prefs "${macos_installer_version}-${macos_installer_build}"
+			else
+				set_workflow_restart_validate_os_prefs "${macos_msu_version}-${macos_msu_build}"
+			fi
+			#<<< END LOCAL PATCH (p16)
 			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 			log_mdm_workflow "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL UPDATE/UPGRADE MACOS VIA MDM COMPLETED ****"
+			#>>> LOCAL PATCH (p18): residual post-watch storage check (log only)
+			#>>> LOCAL PATCH (p27): always audit/notify/logout — do not skip when free < required after prepare committed
+			check_storage_ready_to_proceed
+			if [[ "${check_storage_ready_to_proceed_error}" == "TRUE" ]] || [[ "${storage_ready}" != "TRUE" ]]; then
+				log_super "Warning: Insufficient storage after MDM prepare (free=${storage_available_gigabytes}GB required=${storage_required_gigabytes}GB); restart may still proceed — notifying/auditing."
+			fi
 			[[ "${push_macos_mdm_target_type}" == "UPGRADE" ]] && log_super_audit "MDM: ${macos_msu_label} upgrade is prepared and ready for restart!"
 			[[ "${push_macos_mdm_target_type}" == "UPDATE" ]] && log_super_audit "MDM: ${macos_msu_label} update is prepared and ready for restart!"
 			[[ "${push_macos_mdm_target_type}" == "INSTALLER" ]] && log_super_audit "MDM: ${macos_installer_title} ${macos_installer_version}-${macos_installer_build} installer is prepared and ready for restart!"
@@ -8572,11 +9939,16 @@ push_macos_mdm() {
 				launchctl bootout "user/${current_user_id}" &
 				disown %
 			fi
+			#<<< END LOCAL PATCH (p27)
+			#<<< END LOCAL PATCH (p18)
 		fi
 	fi
 	
 	# Handle MDM workflow failures.
 	if [[ "${auth_error_jamf}" == "TRUE" ]] || [[ "${push_macos_mdm_api_error}" == "TRUE" ]] || [[ "${push_macos_mdm_start_error}" == "TRUE" ]] || [[ "${push_macos_mdm_start_timeout}" == "TRUE" ]] || [[ "${push_macos_mdm_timeout_error}" == "TRUE" ]] || [[ "${push_macos_mdm_download_validation_error}" == "TRUE" ]]; then
+		#>>> LOCAL PATCH (p17): stop Apple prepare stream on MDM failure path
+		stop_apple_snapshot_prepare_stream
+		#<<< END LOCAL PATCH (p17)
 		kill -9 "${log_stream_mdm_command_pid}" > /dev/null 2>&1
 		[[ "${verbose_mode}" == "TRUE" ]] && kill -9 "${log_stream_mdm_command_debug_pid}" > /dev/null 2>&1
 		kill -9 "${log_stream_mdm_workflow_pid}" > /dev/null 2>&1
@@ -8870,11 +10242,22 @@ workflow_install_no_user() {
 	else # Workflows when there are no macOS updates/upgrades.
 		if [[ "${workflow_restart_without_updates}" == "TRUE" ]]; then # If requested, restart without updates.
 			[[ -n "${install_jamf_policy_triggers}" ]] && run_jamf_policy_triggers
-			set_pref_main "WorkflowRestartValidate" "TRUE"
-			[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
-			log_super_audit "Status: Restarting computer in one minute..."
-			shutdown -o -r +1 > /dev/null 2>&1 &
-			disown -a
+			#>>> LOCAL PATCH (p06): honor test mode in no-user restart-without-updates (mirror workflow_install_active_user)
+			if [[ "${test_mode}" != "TRUE" ]]; then
+				#>>> LOCAL PATCH (p16): restart-without-updates — validate only; clear stale C prefs (no PreBuild write)
+				set_pref_main "WorkflowRestartValidate" "TRUE"
+				delete_pref_main "WorkflowRestartValidatePreBuild"
+				delete_pref_main "WorkflowRestartValidateTarget"
+				#<<< END LOCAL PATCH (p16)
+				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
+				log_super_audit "Status: Restarting computer in one minute..."
+				shutdown -o -r +1 > /dev/null 2>&1 &
+				disown -a
+			else # Test mode.
+				log_super "Test Mode: Skipping restart without updates because no active user is logged in."
+				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
+			fi
+			#<<< END LOCAL PATCH (p06)
 		else # Option to restart without updates is not enabled.
 			if [[ "${install_jamf_policy_triggers_without_restarting}" == "TRUE" ]] && [[ -n "${install_jamf_policy_triggers}" ]]; then
 				run_jamf_policy_triggers
@@ -9019,7 +10402,11 @@ workflow_install_active_user() {
 			[[ -n "${install_jamf_policy_triggers}" ]] && run_jamf_policy_triggers
 			notification_restart
 			if [[ "${test_mode}" != "TRUE" ]]; then
+				#>>> LOCAL PATCH (p16): restart-without-updates — validate only; clear stale C prefs (no PreBuild write)
 				set_pref_main "WorkflowRestartValidate" "TRUE"
+				delete_pref_main "WorkflowRestartValidatePreBuild"
+				delete_pref_main "WorkflowRestartValidateTarget"
+				#<<< END LOCAL PATCH (p16)
 				[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && delete_pref_main "WorkflowScheduledInstall"
 				log_super_audit "Status: Restarting computer in one minute..."
 				shutdown -o -r +1 > /dev/null 2>&1 &
@@ -9060,6 +10447,14 @@ workflow_install_active_user() {
 # This function checks the macOS upgrade/update status after a previous super macOS upgrade/update restart.
 workflow_restart_validate() {
 	log_status "Running: Restart validation workflow."
+	#>>> LOCAL PATCH (p16): read land-check prefs before status check (MacOSMSU*Downloaded may be wiped)
+	local workflow_restart_validate_pre_build
+	workflow_restart_validate_pre_build=$(get_pref "WorkflowRestartValidatePreBuild")
+	local workflow_restart_validate_target
+	workflow_restart_validate_target=$(get_pref "WorkflowRestartValidateTarget")
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_restart_validate_pre_build is: ${workflow_restart_validate_pre_build}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_restart_validate_target is: ${workflow_restart_validate_target}"
+	#<<< END LOCAL PATCH (p16)
 	if [[ "${workflow_disable_update_check}" != "TRUE" ]]; then # Skip software updates/upgrade mode option.
 		check_software_status_required="TRUE"
 		workflow_check_software_status
@@ -9079,8 +10474,23 @@ workflow_restart_validate() {
 	
 	# Log status of updates/upgrade completion.
 	if [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "FALSE" ]]; then
-		log_super_audit "Status: All available and enabled macOS software updates/upgrades completed!"
-		check_software_status_required="FALSE"
+		#>>> LOCAL PATCH (p16): land check — same build as PreBuild means update did not land (false success)
+		#>>> LOCAL PATCH (p25): no targets left — clear WRV and use error deferral (do not 5‑min restart-validate forever)
+		if [[ -n "${workflow_restart_validate_pre_build}" ]] && [[ "${macos_build}" == "${workflow_restart_validate_pre_build}" ]]; then
+			clear_workflow_restart_validate_os_prefs
+			deferral_timer_minutes="${deferral_timer_error_minutes}"
+			[[ -z "${deferral_timer_minutes}" || ! "${deferral_timer_minutes}" =~ ^[0-9]+$ ]] && deferral_timer_minutes="${DEFERRAL_TIMER_DEFAULT_MINUTES}"
+			[[ ${deferral_timer_minutes} -lt 2 ]] && deferral_timer_minutes=2
+			log_super "Warning: Restart validation expected an OS build change (pre-update build ${workflow_restart_validate_pre_build}$([[ -n "${workflow_restart_validate_target}" ]] && echo ", target ${workflow_restart_validate_target}"), current ${macos_build}); update did not land and no updates/upgrades remain available."
+			log_super "Status: Clearing WorkflowRestartValidate; scheduling normal workflow retry in ${deferral_timer_minutes} minutes (not pinned in restart-validation)."
+			log_status "Pending: Restart validation detected no OS build change and no remaining targets; retrying normal workflow in ${deferral_timer_minutes} minutes."
+			set_auto_launch_deferral
+		else
+			log_super_audit "Status: All available and enabled macOS software updates/upgrades completed!"
+			check_software_status_required="FALSE"
+		fi
+		#<<< END LOCAL PATCH (p25)
+		#<<< END LOCAL PATCH (p16)
 	elif [[ "${macos_installer_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_installer_minor_update_target}" == "FALSE" ]] && [[ "${macos_msu_major_upgrade_target}" == "FALSE" ]] && [[ "${macos_msu_minor_update_target}" == "FALSE" ]] && [[ "${non_system_msu_targets}" == "TRUE" ]]; then
 		deferral_timer_minutes="${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}"
 		log_super "Error: Some non-system macOS software updates remain available for installation, trying restart validation workflow again in ${deferral_timer_minutes} minutes."
@@ -9917,9 +11327,17 @@ open_dialog_ibm_notifier() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_return is: ${dialog_return}"
 	
 	# Collect and report dialog metrics.
-	kill "${dialog_metrics_counter_pid}"
+	#>>> LOCAL PATCH (p01): timeout-guarded FIFO read + hard kill/wait (upstream used a blocking "cat ${fifo}")
+	kill "${dialog_metrics_counter_pid}" > /dev/null 2>&1
 	local dialog_metrics_response
-	dialog_metrics_response=$(cat "${dialog_metrics_counter_fifo}")
+	if ! read -r -t 3 dialog_metrics_response < "${dialog_metrics_counter_fifo}"; then
+		dialog_metrics_response="0:0:0"
+	fi
+	if kill -0 "${dialog_metrics_counter_pid}" > /dev/null 2>&1; then
+		kill -9 "${dialog_metrics_counter_pid}" > /dev/null 2>&1
+	fi
+	wait "${dialog_metrics_counter_pid}" > /dev/null 2>&1
+	#<<< END LOCAL PATCH (p01)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_metrics_response is: ${dialog_metrics_response}"
 	rm -Rf "${dialog_metrics_counter_fifo}" > /dev/null 2>&1
 	log_metrics "Close Dialog $(echo "${dialog_type}" | sed -e 's/ALERT/Interactive Alert/' -e 's/CHOICE/User Choice/' -e 's/SCHEDULE/User Schedule/' -e 's/REMINDER/Schedule Reminder/' -e 's/SOFT/Soft Deadline/' -e 's/AUTH/User Authentication/'): User Active Elapsed Time" "$(echo "${dialog_metrics_response}" | awk -F ':' '{print $1}')"
@@ -10207,18 +11625,35 @@ dialog_insufficient_storage() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: STORAGE_REQUIRED_RECHECK_SECONDS is: ${STORAGE_REQUIRED_RECHECK_SECONDS}"
 	while [[ $dialog_insufficient_storage_check_timeout -ge 0 ]]; do
 		sleep $STORAGE_REQUIRED_RECHECK_SECONDS
-		check_storage_available
-		if [[ "${check_storage_available_error}" == "FALSE" ]]; then
-			if [[ "${storage_ready}" == "TRUE" ]]; then
-				log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
-				killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
-				log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		#>>> LOCAL PATCH (p17): proceed-aware dialog recheck uses proceed helper; precheck dialogs stay on formula
+		if [[ "${dialog_insufficient_storage_proceed_mode}" == "TRUE" ]]; then
+			check_storage_ready_to_proceed
+			if [[ "${check_storage_ready_to_proceed_error}" == "FALSE" ]]; then
+				if [[ "${storage_ready}" == "TRUE" ]]; then
+					log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
+					killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+					log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+					break
+				fi
+			else
+				dialog_insufficient_storage_error="TRUE"
 				break
 			fi
-		else # "${check_storage_available_error}" == "FALSE"
-			dialog_insufficient_storage_error="TRUE"
-			break
+		else
+			check_storage_available
+			if [[ "${check_storage_available_error}" == "FALSE" ]]; then
+				if [[ "${storage_ready}" == "TRUE" ]]; then
+					log_super "Status: Current available storage is now at ${storage_available_gigabytes} GBs, the macOS update/upgrade workflow can continue."
+					killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+					log_metrics "Dialog Insufficient Storage Success: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+					break
+				fi
+			else # "${check_storage_available_error}" == "TRUE"
+				dialog_insufficient_storage_error="TRUE"
+				break
+			fi
 		fi
+		#<<< END LOCAL PATCH (p17)
 		[[ -n "${dialog_timeout_seconds}" ]] && dialog_insufficient_storage_check_timeout=$((dialog_insufficient_storage_check_timeout - STORAGE_REQUIRED_RECHECK_SECONDS))
 	done
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_insufficient_storage_error is: ${dialog_insufficient_storage_error}"
@@ -10421,6 +11856,15 @@ dialog_user_choice() {
 		log_metrics "Dialog User Choice Timeout Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		set_auto_launch_deferral
 		;;
+	#>>> LOCAL PATCH (p11): unexpected Notifier exit (missing binary, crash) must defer, not fall through to reset_workflow
+	*)
+		deferral_timer_minutes=$deferral_timer_error_minutes
+		log_super "Error: User choice dialog returned unexpected code ${dialog_return}, trying again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: User choice dialog returned unexpected code ${dialog_return}, trying again in ${deferral_timer_minutes} minutes."
+		log_metrics "Dialog User Choice Error Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		set_auto_launch_deferral
+		;;
+	#<<< END LOCAL PATCH (p11)
 	esac
 }
 
@@ -10563,6 +12007,15 @@ dialog_user_schedule() {
 		log_metrics "Dialog User Schedule Timeout Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		set_auto_launch_deferral
 		;;
+	#>>> LOCAL PATCH (p11): unexpected Notifier exit must defer, not fall through
+	*)
+		deferral_timer_minutes=$deferral_timer_error_minutes
+		log_super "Error: User schedule dialog returned unexpected code ${dialog_return}, trying again in ${deferral_timer_minutes} minutes."
+		log_status "Pending: User schedule dialog returned unexpected code ${dialog_return}, trying again in ${deferral_timer_minutes} minutes."
+		log_metrics "Dialog User Schedule Error Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		set_auto_launch_deferral
+		;;
+	#<<< END LOCAL PATCH (p11)
 	esac
 }
 
@@ -10629,6 +12082,12 @@ dialog_schedule_reminder() {
 			log_super "Status: Schedule reminder dialog closed due to timeout."
 			log_metrics "Dialog Schedule Reminder Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
+		#>>> LOCAL PATCH (p11): log unexpected Notifier exit; continue like timeout (install about to start)
+		*)
+			log_super "Error: Schedule reminder dialog returned unexpected code ${dialog_return}."
+			log_metrics "Dialog Schedule Reminder Error: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+			;;
+		#<<< END LOCAL PATCH (p11)
 		esac
 	else # The schedule installation is not about to start so this dialog can exit normally or reschedule.
 		unset dialog_timeout_seconds
@@ -10667,6 +12126,12 @@ dialog_schedule_reminder() {
 			log_super "Background Schedule Reminder Dialog: Closed due to timeout."
 			log_metrics "Dialog Schedule Reminder Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
+		#>>> LOCAL PATCH (p11): log unexpected Notifier exit in background reminder
+		*)
+			log_super "Background Schedule Reminder Dialog: Unexpected code ${dialog_return}."
+			log_metrics "Dialog Schedule Reminder Error: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+			;;
+		#<<< END LOCAL PATCH (p11)
 		esac
 		exit 0
 	fi
@@ -10722,6 +12187,12 @@ dialog_soft_deadline() {
 		log_super "Status: Display timeout automatically chose to restart."
 		log_metrics "Dialog Soft Deadline Timeout Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		;;
+	#>>> LOCAL PATCH (p11): unexpected Notifier exit still continues (soft deadline is enforce-forward); log it
+	*)
+		log_super "Error: Soft deadline dialog returned unexpected code ${dialog_return}, continuing workflow."
+		log_metrics "Dialog Soft Deadline Error Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		;;
+	#<<< END LOCAL PATCH (p11)
 	esac
 }
 
@@ -10892,6 +12363,11 @@ main() {
 	set_defaults
 	get_options "$@"
 	workflow_startup
+	#>>> LOCAL PATCH (p01/p18/p24): install interrupt handler after startup logging/prefs are ready (pass signal name into handler)
+	trap 'handle_super_interrupt SIGINT' SIGINT
+	trap 'handle_super_interrupt SIGTERM' SIGTERM
+	trap 'handle_super_interrupt SIGHUP' SIGHUP
+	#<<< END LOCAL PATCH (p01/p18/p24)
 	workflow_time_epoch=$(date +%s)
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
 	[[ -n "${schedule_workflow_active}" ]] && check_schedule_workflow_active
@@ -10902,7 +12378,9 @@ main() {
 		log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - RESTART VALIDATION WORKFLOW ****"
 		workflow_restart_validate # This function will automatically defer if there are any errors.
 		# At this point the workflow_restart_validate() function was succesfull, so reset for future workflow runs.
-		delete_pref_main "WorkflowRestartValidate"
+		#>>> LOCAL PATCH (p16): clear land-check prefs whenever WorkflowRestartValidate is cleared
+		clear_workflow_restart_validate_os_prefs
+		#<<< END LOCAL PATCH (p16)
 		unset workflow_restart_validate_active
 		set_pref_main "MacLastStartup" "${mac_last_startup}"
 		workflow_time_epoch=$(date +%s)
