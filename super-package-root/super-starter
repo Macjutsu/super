@@ -1,0 +1,37 @@
+#!/bin/bash
+# S.U.P.E.R.M.A.N. STARTER
+# Software Update/Upgrade Policy Enforcement (with) Recursive Messaging And Notification
+# https://github.com/Macjutsu/super
+# by Kevin M. White
+
+# This script is ran by launchd every 60 seconds per the /Library/LaunchDaemons/com.macjutsu.super.plist.
+# This script checks a variety of settings to ensure that the super workflow only restarts when necessary.
+# Version 6.0.0-beta1
+# 2026/09/14
+
+# Exit this script if super is already running.
+[[ "$(pgrep -F "/var/run/super.pid" 2> /dev/null)" ]] && exit 0
+
+# Exit this script if the super auto launch workflow is disabled.
+next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "/Library/Preferences/com.macjutsu.super.plist" 2> /dev/null)
+if [[ "${next_auto_launch}" == "FALSE" ]] || [[ "${next_auto_launch}" == "false" ]]; then
+	exit 0
+fi
+
+# Exit this script if the super auto launch workflow is deferred until a system restart.
+if [[ "$(/usr/libexec/PlistBuddy -c "Print :WorkflowRestartValidate" "/Library/Preferences/com.macjutsu.super.plist" 2> /dev/null)" == "true" ]]; then
+	system_last_startup_saved_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "$(/usr/libexec/PlistBuddy -c "Print :SystemLastStartup" "/Library/Preferences/com.macjutsu.super.plist" 2> /dev/null)" +%s 2> /dev/null)
+	kernel_boot_epoch=$(sysctl -n kern.boottime | awk -F 'sec = |, usec' '{print $2}')
+	[[ -n "${system_last_startup_saved_epoch}" ]] && [[ -n "${kernel_boot_epoch}" ]] && [[ $system_last_startup_saved_epoch -ge $kernel_boot_epoch ]] && exit 0
+fi
+
+# Exit this script if the super auto launch workflow is deferred until a later date
+if [[ $(date +%s) -lt $(date -j -f %Y-%m-%d:%H:%M:%S "${next_auto_launch}" +%s 2> /dev/null) ]]; then
+	exit 0
+fi
+
+# If this script has not exited yet, then it's time to start the super workflow.
+echo "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. 6.0.0-beta1 - LAUNCHDAEMON ****" | tee -a "/var/log/super.log"
+"/Library/Application Support/super/super" &
+disown -a
+exit 0

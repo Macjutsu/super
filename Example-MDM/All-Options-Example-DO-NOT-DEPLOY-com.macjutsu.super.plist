@@ -2,15 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>SOFAMacOSCustomURL</key>
+	<string>https://sofa.example.domain.com/v2/macos_data_feed.json</string>
+	<key>SOFAAppleBetaCustomURL</key>
+	<string>https://sofa.example.domain.com/v1/apple-beta-os-feed.json</string>
+	<key>SOFASafariCustomURL</key>
+	<string>https://sofa.example.domain.com/v2/safari_data_feed.json</string>
 	<key>InstallMacOSMinorVersionTarget</key>
-	<string>14.7.8</string>
+	<string>26.6.2</string>
 	<key>InstallMacOSMajorUpgrades</key>
 	<true/>
 	<key>InstallMacOSMajorVersionTarget</key>
-	<string>26.1</string>
+	<string>27.1</string>
 	<key>InstallMacOSBSIUpdates</key>
-	<true/>
-	<key>InstallRapidSecurityResponses</key>
 	<true/>
 	<key>InstallNonSystemUpdatesWithoutRestarting</key>
 	<true/>
@@ -34,6 +38,8 @@
 	<true/>
 	<key>WorkflowDisableRelaunch</key>
 	<true/>
+	<key>WorkflowStartAfterInstallation</key>
+	<true/>
 	<key>DeferralTimerDefault</key>
 	<string>60</string>
 	<key>DeferralTimerMenu</key>
@@ -50,16 +56,12 @@
 	<string>/var/db/.MySetupDone</string>
 	<key>ScheduleDeferredStartDays</key>
 	<string>7</string>
-	<key>ScheduleZeroDateRelease</key>
-	<true/>
-	<key>ScheduleZeroDateSOFACustomURL</key>
-	<string>https://sofa.example.domain.com/v1/macos_data_feed.json</string>
 	<key>ScheduleZeroDateManual</key>
-	<string>2023-09-21:00:00</string>
+	<string>2026-09-21:00:00</string>
 	<key>ScheduledInstallDays</key>
 	<string>3</string>
 	<key>ScheduledInstallDate</key>
-	<string>2023-09-21:00:00</string>
+	<string>2026-09-21:00:00</string>
 	<key>ScheduledInstallUserChoice</key>
 	<true/>
 	<key>ScheduledInstallReminder</key>
@@ -96,60 +98,44 @@
 	<string>600</string>
 	<key>DialogTimeoutPowerRequired</key>
 	<string>600</string>
-	<key>DisplayUnmovable</key>
-	<string>ALWAYS</string>
+	<key>DisplayDialogBanner</key>
+	<string>/path/to/image</string>
+	<key>DisplayDialogBannerDark</key>
+	<string>/path/to/image</string>
+	<key>DisplayBackground</key>
+	<string>/path/to/image</string>
+	<key>DisplayBackgroundDark</key>
+	<string>/path/to/image</string>
+	<key>DisplayIcon</key>
+	<string>/path/to/image</string>
+	<key>DisplayIconDark</key>
+	<string>/path/to/image</string>
+	<key>DisplayIconOverlay</key>
+	<string>/path/to/image</string>
+	<key>DisplayIconOverlayDark</key>
+	<string>/path/to/image</string>
+	<key>DisplayMoreInfoCustomURL</key>
+	<string>https://sofa.macadmins.io</string>
+	<key>DisplayHelpMessage</key>
+	<true/>
+	<key>DisplayHelpImage</key>
+	<string>/path/to/image</string>
 	<key>DisplayHideBackground</key>
 	<string>DEADLINE,INSTALLNOW</string>
 	<key>DisplaySilently</key>
 	<string>INSTALLNOW</string>
-	<key>DisplayHideProgressBar</key>
-	<string>DEADLINE,INSTALLNOW</string>
 	<key>DisplayNotificationsCentered</key>
 	<string>DEADLINE,INSTALLNOW</string>
-	<key>DisplayIconSize</key>
-	<string>128</string>
-	<key>DisplayIconFile</key>
-	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
-	<key>DisplayIconLightFile</key>
-	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
-	<key>DisplayIconDarkFile</key>
-	<string>/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BurningIcon.icns</string>
-	<key>DisplayAccessoryType</key>
-	<string>HTML</string>
-	<key>DisplayAccessoryDefaultFile</key>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryMacOSMinorUpdateFile</key> <string>path or URL</string>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryMacOSMajorUpgradeFile</key> <string>path or URL</string>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryNonSystemUpdatesFile</key> <string>path or URL</string>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessorySafariUpdateFile</key> <string>path or URL</string>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryJamfPolicyTriggersFile</key> <string>path or URL</string>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayAccessoryRestartWithoutUpdatesFile</key> <string>path or URL</string>
-	<string>https://raw.githubusercontent.com/Macjutsu/super/main/Super-Friends/Display-Accessory-Example.html</string>
-	<key>DisplayHelpButtonString</key>
-	<string>https://support.apple.com/en-us/HT201541</string>
-	<key>DisplayWarningButtonString</key>
-	<string>https://support.apple.com/en-us/HT201222</string>
+	<key>DisplayConfigCustomFolder</key>
+	<string>/local/path</string>
 	<key>ConfigCodeSignature</key>
 	<string>pretendco.com</string>
 	<key>ConfigTempOverride</key>
 	<true/>
 	<key>AuthAskUserToSavePassword</key>
 	<true/>
-	<key>AuthJamfCustomURL</key>
-	<string>https://jamf-api.example.domain.com</string>
-	<key>AuthJamfComputerID</key>
-	<string>$JSSID</string>
-	<key>AuthJamfManagementID</key>
-	<string>$MANAGEMENTID</string>
 	<key>AuthCredentialFailoverToUser</key>
 	<true/>
-	<key>AuthMDMFailoverToUser</key>
-	<string>ERROR</string>
 	<key>TestMode</key>
 	<true/>
 	<key>TestModeTimeout</key>

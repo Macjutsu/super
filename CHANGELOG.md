@@ -2,42 +2,97 @@
 
 ## [6.0.0-beta1]
 
-2026-??
+2026-09-14
 
 ## Highlights (6.0.x)
 
-- Full upport for macOS 27 Golden Gate.
-- New support for DDM software update settings.
-- New support for DDM enforced software updates.
-- New dialogs and notifications now rendered via [swiftDialog](https://github.com/swiftDialog/swiftDialog) to provide customizable user messaging. (Thanks to @bartreardon for his dedication to the project!)
+- Full support for macOS 27 Golden Gate.
+- Full support for declarative software update settings along with continued support for legacy configuration profiles on supported systems.
+- __(Coming soon)__ New workflow options that integrate with declarative software update enforcement.
+- All new completely redesigned dialogs and notifications now rendered via [swiftDialog v3.1.0](https://github.com/swiftDialog/swiftDialog). (Thanks to @bartreardon for his dedication to the project!)
+- All new comprehensive display customization with native support for multiple languages (non-English localizations coming soon).
+- Now fully integrated with [MacAdmin's SOFA](https://sofa.macadmins.io) for update detection, including support for release dates and information URLs.
+- Significantly updated status reporting and troubleshooting options.
+- Complete reorganization of the `super` file structure to better align with standard macOS conventions.
+- New external default parameter configuration allows for customization of "fiddly-detail" settings.
+- All `super` runtime asset are now code signed, which enables a variety of security-related enhancements.
+- __New deployment method using macOS package installer.__
 
 ### Compatibility Notes (6.0.x)
 
 - `super` 6.0.x requires macOS 15 or newer.
 - `super` 6.0.x requires a Mac computer with Apple Silicon.
-- Previously saved `super` 5.x.x local authentication credentials are compatible with `super` 6.0.x.
-- __Previously saved `super` 5.x.x Apple Jamf Pro API authentication credentials are NOT compatible with `super` 6.0.x and will be deleted from the system the first time `super` 6.0.x runs.__
-- __A major version number change (like 5.x.x to 6.x.x) indicates that previous command line options and managed preferences are NOT fully compatible with the newer version of `super`.__
-- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-options-v6.0.0.tsv).
-- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-managed-preferences-v6.0.0.tsv).
+- Previously saved `super` 5.x.x __local__ authentication credentials are compatible with `super` 6.0.x.
+- __Previously saved `super` 5.x.x Jamf Pro API authentication credentials are not compatible with `super` 6.0.x and will be deleted from the system the first time `super` 6.0.x runs.__
+- __A major version number change (like 5.x.x to 6.x.x) indicates that previous command line options and managed preferences are not compatible with the newer version of `super`.__
+- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-options-6.0.x.tsv).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
 - Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Example-MDM).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Super-Friends).
+- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Super-Friends).
 
-### Known Issues (6.x)
+### Known Issues (6.0.0-beta1)
 
-- __macOS 27 is still in beta. The `super` workflow relies heavily on mechanisms that are built-in to macOS. As such, support for this operating system should be considered beta-quality as well.__
-- There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated against this version of `super`.
+- __The `super` installer package is not yet notarized by Apple. This should not present a problem for most managed deployment workflows, but downloaded `super` packages may fail when installed manually due to file system quarantine. Removing the file quarantine will resolve this issue.__
+- Full support for declarative software update enforcement is still in the works. __Support coming soon.__
+- The --scheduled-install-* options are not currently supported in `super` 6.0.0-beta1. __Support coming soon.__
+- The [MacAdmin's SOFA](https://sofa.macadmins.io) Apple Beta feed technically exists but it's not currently being updated by the SOFA project. Thus, systems enrolled in a macOS beta program cannot take advantage of this resource.
+- There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated.
 
-/Library/Application Support/super
-/Library/Preferences/com.macjutsu.super
-link to /var/logs?
+### Specific Changes (6.0.0-beta1)
 
-TIMEOUT_DOWNLOAD_HELPER_SECONDS
-improved downloader timeouts
-
-Removed:
---display-unmovable
---display-hide-progress-bar=
+- In addition to the "Highlights" and "Compatibility Notes" covered above...
+- The `super` 6.0.x runtime assets are now code signed, and thus must deployed via a signed package installer. Please visit the [`super` releases page](https://github.com/Macjutsu/super/releases) to download the latest installer. Additional `super` installer details:
+	- The `super` installer automatically migrates all previous `super` logs and non-credential `super` 5.x.x settings to the new `super` 6.x.x folder (detailed below).
+	- The `super` installer removes all previous versions of `super`.
+	- Previously running `super` workflows should automatically continue (albeit with a newer version of `super`) at the next appropriate runtime after installation.
+	- As a default behavior, when installing `super` to a system that does not have a previous version of `super`, __the workflow will not automatically start.__
+	- New `<key>WorkflowStartAfterInstallation</key> <true/>` managed preference key automatically starts the workflow when `super` is installed on a system without a previous version of `super`.
+- All `super` 6.x.x assets (except for the `super` LaunchDaemon) have new file system locations:
+	- Main `super` folder: __/Library/Application Support/super/__
+	- Main `super` settings file: __/Library/Preferences/com.macjutsu.super.plist__ (with an alias in root of main `super` folder)
+	- Main `super` log file: __/var/log/super.log__ (with an alias in the `super` logs folder)
+	- Alternate configurations folder: __/Library/Application Support/super/config/alternate-configs/__
+- There are a few significant new sub-folders in the `super` folder:
+	- The /Library/Application Support/super/config folder contains a variety of configuration items that allow you to further customize `super` workflow behaviors.
+	- The __/Library/Application Support/super/config/README.config.md__ file details the specifics of the `super` config folder.
+	- The /Library/Application Support/super/display folder contains a variety of configuration items that allow you to customize all `super` display (dialogs and notifications) behaviors.
+	- The __/Library/Application Support/super/display/README.display.md__ file details the specifics of the `super` display folder.
+- All new `super` configuration options and managed preference keys:	
+	- `--sofa-status` displays the currently cached [MacAdmin's SOFA](https://sofa.macadmins.io) feeds status.
+	- `--sofa-macos-custom-url` and `<key>SOFAMacOSCustomURL</key>` specify a custom SOFA macOS updates feed.
+	- `--sofa-apple-beta-custom-url` and `<key>SOFAAppleBetaCustomURL</key>` specify a custom SOFA Apple beta updates feed.
+	- `--sofa-safari-custom-url` and `<key>SOFASafariCustomURL</key>` specify a custom SOFA Safari updates feed.
+	- `--display-dialog-banner` and `<key>DisplayDialogBanner</key>` add a banner image (light mode) above all dialogs.
+	- `--display-dialog-banner-dark` and `<key>DisplayDialogBannerDark</key>` add a banner image (dark mode) above all dialogs.
+	- `--display-background` and `<key>DisplayBackground</key>` add a background image (light mode) to all dialogs and notifications.
+	- `--display-background-dark` and `<key>DisplayBackgroundDark</key>` add a background image (dark mode) to all dialogs and notifications.
+	- `--display-icon` and `<key>DisplayIcon</key>` replace the default icons (light mode) in all dialogs and notifications.
+	- `--display-icon-dark` and `<key>DisplayIconDark</key>` replace the default icons (dark mode) in all dialogs and notifications.
+	- `--display-icon-overlay` and `<key>DisplayIconOverlay</key>` add an overlay icon (light mode) in all dialogs and notifications.
+	- `--display-icon-overlay-dark` and `<key>DisplayIconOverlayDark</key>` add an overlay icon (dark mode) in all dialogs and notifications.
+	- `--display-more-info-custom-url` and `<key>DisplayMoreInfoCustomURL</key>` replace the default "More Info..." URL link in all dialogs.
+	- `--display-help-message` and `<key>DisplayHelpMessage</key>` show a help "?" button that when clicked displays the content of a display_help_message.md file (located in the `super` display folder).
+	- `--display-help-image` and `<key>DisplayHelpImage</key>` show an image next to the the content of a display help message.
+	- `--display-config-custom-folder` and `<key>DisplayConfigCustomFolder</key>` use an alternate display configuration folder that contains your customized display configuration items.
+- Significantly improved `--config-status` option shows even more hardware, operating system, current user, `super` runtime, and software update details.
+- Multiple simultaneous local authentication methods are now allowed. If multiple authentication options are available then the priority is as follows; local user password > local account credentials > local `super` service account.
+- Improved helper download mechanism now includes handling of connection timeouts.
+- Improved helper verification mechanism now allows for installation of newer versions than required by the `super` workflow. (Thanks to @smithjw for this!)
+- Resolved issues that prevented the `--auth-local-account=X` and `--auth-service-account=X` options from appropriately removing previously saved authentication credentials.
+- Resolved an issue that may cause inaccurate macOS update targeting when the `--install-macos-minor-version-target` or `--install-macos-major-version-target` options were used.
+- Countless code optimizations and improvements to both regular and verbose log output.
+- A final shout-out to @soward for his invaluable help with the rearchitecting and packaging of `super` 6.x.x.
+- The following configuration options and managed preference keys have been __replaced or removed__:
+	- `--install-rapid-security-responses` and `<key>InstallRapidSecurityResponses</key>` are replaced by `--install-macos-bsi-updates` and `<key>InstallMacOSBSIUpdates</key>`.
+	- `--schedule-zero-date-release` and `<key>ScheduleZeroDateRelease</key>` are removed because this is now the default `super` workflow behavior.
+	- `--display-icon-file` and `<key>DisplayIconFile</key>` are replaced by the various new display icon options.
+	- `--display-icon-size` and `<key>DisplayIconSize</key>` are removed because the icon sizes are now configured now configured via alternate display configuration files.
+	- `--display-unmovable` and `<key>DisplayUnmovable</key>` are removed because this is now the default `super` display behavior.
+	- `--display-hide-progress-bar` and `<key>DisplayHideProgressBar</key>` are removed because this is now the default `super` display behavior.
+	- All`--display-accessory-*` options and `<key>DisplayAccessory*</key>` preference keys are removed because this type of display customization is now configured via alternate display configuration files.
+	- `--display-help-button-string` and `<key>DisplayHelpButtonString</key>` are replaced by the new display help message options.
+	- `--display-warning-button-string` and `<key>DisplayWarningButtonString</key>` are removed because swift Dialog does not support this feature.
+- The `super` checksum is no longer generated because the `super` runtime assets are now code signed and deployed via a package installer.
 
 ## Highlights (5.1.x)
 
@@ -84,11 +139,11 @@ Removed:
 ### Specific Changes (5.1.1)
 
 - __Note this sub-section only covers specific changes for 5.1.0 to 5.1.1. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
-- Initial support for macOS 27 betas.
+- Initial support for early macOS 27 betas.
 - Resolved an issue affecting the deletion of `--scheduled-install-date` option. (Thanks to @ir77io for catching this one!)
 - Resolved inaccurate error handling in the `--config-status` option. (Thanks to @ir77io for catching this one!)
 - As always, internal typo fixes and improvements to both regular and verbose log output.
-- `super` [5.1.1 SHA-256: FIXME](https://github.com/Macjutsu/super/blob/5.1.1/super.checksum.txt)
+- `super` [5.1.1 SHA-256: c838f6eb4de1de4e24404c8c96c71c8afdc30cf97195b411306f6ea7ae9c408f](https://github.com/Macjutsu/super/blob/5.1.1/super.checksum.txt)
 
 ### Specific Changes (5.1.0)
 

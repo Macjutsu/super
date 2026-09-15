@@ -1,0 +1,212 @@
+#!/bin/bash
+# S.U.P.E.R.M.A.N. Package Installer Script: postinstall
+# Software Update/Upgrade Policy Enforcement (with) Recursive Messaging And Notification
+# https://github.com/Macjutsu/super
+# by Kevin M. White
+# 2026/09/14
+
+# This script is run by the system installer AFTER deploying the super package archive to the target drive.
+# If a legacy version of super is found, this script will migrate relevant legacy super items and then delete the remaining legacy super items.
+# This script complets the super installation and, if needed, restarts the super LaunchDaemon.
+
+# Built-in system installer paramaters.
+installer_script_path=${0}
+installer_package_path=${1}
+installer_target_location=${2}
+installer_target_volume=${3}
+
+# Set default parameters (constants) that are used throughout the script.
+# Path to the super working folder:
+readonly SUPER_FOLDER="/Library/Application Support/super"
+
+# Path to the LEGACY super working folder:
+readonly SUPER_LEGACY_FOLDER="/Library/Management/super"
+
+# Path to the super symbolic link in default command line binary folder:
+readonly SUPER_LINK="/usr/local/bin/super"
+
+# Label name for the super LaunchDaemon:
+readonly SUPER_LAUNCH_DAEMON_LABEL="com.macjutsu.super" # No trailing ".plist"
+
+# Path to the main property list file in the default computer preference domain folder:
+readonly SUPER_MAIN_PLIST="/Library/Preferences/com.macjutsu.super" # No trailing ".plist"
+
+# Path to the LEGACY main property list file in the default computer preference domain folder:
+readonly SUPER_LEGACY_MAIN_PLIST="${SUPER_LEGACY_FOLDER}/com.macjutsu.super" # No trailing ".plist"
+
+# Path to the LEGACY main property list symbolic link in the super working folder (for backwards compatibility):
+readonly SUPER_LEGACY_MAIN_PLIST_LINK="${SUPER_FOLDER}/com.macjutsu.super" # No trailing ".plist"
+
+# Path to the managed property list file:
+readonly SUPER_MANAGED_PLIST="/Library/Managed Preferences/com.macjutsu.super" # No trailing ".plist"
+
+# Path to the cached items folder:
+readonly SUPER_CACHES_FOLDER="${SUPER_FOLDER}/caches"
+
+# Path to the super config folder:
+readonly SUPER_CONFIG_FOLDER="${SUPER_FOLDER}/config"
+
+# Path to the super alternate configurations folder:
+readonly SUPER_ALTERNATE_CONFIGS_FOLDER="${SUPER_CONFIG_FOLDER}/alternate_configs"
+
+# Path to the LEGACY super alternate configurations folder:
+readonly SUPER_LEGACY_ALTERNATE_CONFIGS_FOLDER="${SUPER_LEGACY_FOLDER}/configs"
+
+# Path to the super log folder:
+readonly SUPER_LOGS_FOLDER="${SUPER_FOLDER}/logs"
+
+# Path to the LEGACY super log folder:
+readonly SUPER_LEGACY_LOGS_FOLDER="${SUPER_LEGACY_FOLDER}/logs"
+
+# Path to the super log archive folder:
+readonly SUPER_LOGS_ARCHIVE_FOLDER="${SUPER_FOLDER}/logs-archive"
+
+# Path to the LEGACY super log archive folder:
+readonly SUPER_LEGACY_LOGS_ARCHIVE_FOLDER="${SUPER_LEGACY_FOLDER}/logs-archive"
+
+# Path to the main super workflow log file in the default computer log folder:
+readonly SUPER_LOG="/var/log/super.log"
+
+# Path to the LEGACY main super workflow log file in the default computer log folder:
+readonly SUPER_LEGACY_LOG="${SUPER_LEGACY_LOGS_FOLDER}/super.log"
+
+# Path to the LEGACY main super workflow log symbolic link in the super log folder (for backwards compatibility):
+readonly SUPER_LEGACY_LOG_LINK="${SUPER_LOGS_FOLDER}/super.log"
+
+# Path to the super audit log:
+readonly SUPER_AUDIT_LOG="${SUPER_LOGS_FOLDER}/super-audit.log"
+
+# Append input to stout only.
+log_echo() {
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) super-preinstall[$$]: $*"
+}
+
+# Append input to stout and log located at ${SUPER_LOG}.
+log_super() {
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) super-postinstall[$$]: $*" | tee -a "${SUPER_LOG}"
+}
+
+# Append input to stout and logs located at ${SUPER_LOG} and ${SUPER_AUDIT_LOG}.
+log_super_audit() {
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) super-postinstall[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}" 
+}
+
+# Make sure this script is running as root.
+if [[ $(id -u) -ne 0 ]]; then
+	log_echo "Exit: This script must run with root privileges."
+	exit 1
+fi
+
+# If legacy super is still installed, move relevant items and then delete the rest.
+if [[ -e "${SUPER_LEGACY_FOLDER}" ]]; then
+	previous_ifs="${IFS}" && IFS=$'\n'
+	super_legacy_log_array=()
+	super_legacy_installed_version=$(awk -F '"' '/SUPER_VERSION=/ {print $2}' "${SUPER_LEGACY_FOLDER}/super" 2> /dev/null)
+	[[ -z "${super_legacy_installed_version}" ]] && super_legacy_installed_version=$(awk -F '"' '/superVERSION=/ {print $2}' "${SUPER_LEGACY_FOLDER}/super" 2> /dev/null)
+	super_legacy_log_array+=("Removing previously installed legacy super version ${super_legacy_installed_version}.")
+	if [[ -e "${SUPER_LEGACY_MAIN_PLIST}.plist" ]] && [[ ! -e "${SUPER_MAIN_PLIST}.plist" ]]; then
+		super_legacy_log_array+=("Moving the legacy super main property list file to new location in /Library/Preferences.")
+		mv "${SUPER_LEGACY_MAIN_PLIST}.plist" "${SUPER_MAIN_PLIST}.plist" > /dev/null 2>&1
+	fi
+	[[ -e "${SUPER_LEGACY_MAIN_PLIST}.plist" ]] && rm "${SUPER_LEGACY_MAIN_PLIST}.plist" > /dev/null 2>&1
+	if [[ -e "${SUPER_LEGACY_ALTERNATE_CONFIGS_FOLDER}" ]] && [[ -n "$(ls -A "${SUPER_LEGACY_ALTERNATE_CONFIGS_FOLDER}")" ]] && [[ ! -e "${SUPER_ALTERNATE_CONFIGS_FOLDER}" ]]; then
+		super_legacy_log_array+=("Moving all legacy super alternate configurations to new location in /Library/Preferences/config/alternate_configs.")
+		mv "${SUPER_LEGACY_ALTERNATE_CONFIGS_FOLDER}" "${SUPER_ALTERNATE_CONFIGS_FOLDER}" > /dev/null 2>&1
+	fi
+	if [[ -e "${SUPER_LEGACY_LOG}" ]] && [[ ! -e "${SUPER_LOG}" ]]; then
+		super_legacy_log_array+=("Moving the legacy main super workflow log to new location in /var/log.")
+		mv "${SUPER_LEGACY_LOG}" "${SUPER_LOG}" > /dev/null 2>&1
+	fi
+	[[ -e "${SUPER_LEGACY_LOG}" ]] && rm "${SUPER_LEGACY_LOG}" > /dev/null 2>&1
+	if [[ -e "${SUPER_LEGACY_LOGS_FOLDER}" ]] && [[ -n "$(ls -A "${SUPER_LEGACY_LOGS_FOLDER}")" ]] && [[ ! -e "${SUPER_LOGS_FOLDER}" ]]; then
+		super_legacy_log_array+=("Moving all other legacy super logs to new location in /Library/Application Support/super/logs.")
+		mv "${SUPER_LEGACY_LOGS_FOLDER}" "${SUPER_LOGS_FOLDER}" > /dev/null 2>&1
+	fi
+	if [[ -e "${SUPER_LEGACY_LOGS_ARCHIVE_FOLDER}" ]] && [[ -n "$(ls -A "${SUPER_LEGACY_LOGS_ARCHIVE_FOLDER}")" ]] && [[ ! -e "${SUPER_LOGS_ARCHIVE_FOLDER}" ]]; then
+		super_legacy_log_array+=("Moving all legacy super log archives to new location in /Library/Application Support/super/log-archives.")
+		mv "${SUPER_LEGACY_LOGS_ARCHIVE_FOLDER}" "${SUPER_LOGS_ARCHIVE_FOLDER}" > /dev/null 2>&1
+	fi
+	rm -Rf "${SUPER_LEGACY_FOLDER}" > /dev/null 2>&1
+fi
+
+# If any remaining ${SUPER_FOLDER} items are missing then create them.
+[[ ! -e "${SUPER_CACHES_FOLDER}" ]] && mkdir -p "${SUPER_CACHES_FOLDER}"
+[[ ! -e "${SUPER_ALTERNATE_CONFIGS_FOLDER}" ]] && mkdir -p "${SUPER_ALTERNATE_CONFIGS_FOLDER}"
+[[ ! -e "${SUPER_LOGS_FOLDER}" ]] && mkdir -p "${SUPER_LOGS_FOLDER}"
+[[ ! -e "${SUPER_LOGS_ARCHIVE_FOLDER}" ]] && mkdir -p "${SUPER_LOGS_ARCHIVE_FOLDER}"
+
+# Now the script can safely update the ${SUPER_LOG} and settings.
+super_installed_version=$("${SUPER_FOLDER}/super" --version)
+defaults write "${SUPER_MAIN_PLIST}" "SuperVersion" -string "${super_installed_version}"
+log_super "**** S.U.P.E.R.M.A.N. ${super_installed_version} - SUPER INSTALLATION ****"
+if [[ ${#super_legacy_log_array[@]} -gt 0 ]]; then
+	for super_legacy_log_line in "${super_legacy_log_array[@]}"; do
+		log_super "${super_legacy_log_line}"
+	done
+	IFS="${previous_ifs}"
+fi
+
+# Create super linked items.
+log_super "Creating super convenience links."
+[[ ! -e "/usr/local/bin" ]] && mkdir -p "/usr/local/bin" && chmod -R a+rx "/usr/local/bin"
+[[ -L "${SUPER_LINK}" ]] && rm -f "${SUPER_LINK}" > /dev/null 2>&1
+ln -s "${SUPER_FOLDER}/super" "${SUPER_LINK}" > /dev/null 2>&1
+ln -s "${SUPER_MAIN_PLIST}.plist" "${SUPER_LEGACY_MAIN_PLIST_LINK}.plist" > /dev/null 2>&1
+ln -s "${SUPER_LOG}" "${SUPER_LEGACY_LOG_LINK}" > /dev/null 2>&1
+
+# (Re)create the super LaunchDaemon.
+log_super "Installing the super LaunchDaemon /Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist."
+if [[ -f "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" ]]; then
+	launchctl bootout "system/${SUPER_LAUNCH_DAEMON_LABEL}" > /dev/null 2>&1
+	rm -f "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" 2> /dev/null
+fi
+cat <<EOLD >"/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${SUPER_LAUNCH_DAEMON_LABEL}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>${SUPER_FOLDER}/super-starter</string>
+	</array>
+	<key>UserName</key>
+	<string>root</string>
+	<key>AbandonProcessGroup</key>
+	<true/>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>60</integer>
+</dict>
+</plist>
+EOLD
+
+# (Re)setting appropriate permissions for all super items.
+log_super "Setting permissions for installed super items."
+chown -R root:wheel "${SUPER_FOLDER}" > /dev/null 2>&1
+chmod -R a+r "${SUPER_FOLDER}" > /dev/null 2>&1
+chmod -R go-w "${SUPER_FOLDER}" > /dev/null 2>&1
+chmod 755 "${SUPER_FOLDER}/super" "${SUPER_FOLDER}/super-starter" > /dev/null 2>&1
+chown root:wheel "${SUPER_LINK}" "${SUPER_MAIN_PLIST}.plist" "${SUPER_LOG}" "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
+chmod 755 "${SUPER_LINK}" > /dev/null 2>&1
+chmod 644 "${SUPER_MAIN_PLIST}.plist" "${SUPER_LOG}" "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
+
+# If needed, restart the super LaunchDaemon.
+next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null)
+workflow_start_after_installation_result=$(defaults read "${SUPER_MANAGED_PLIST}" "WorkflowStartAfterInstallation" 2> /dev/null)
+if [[ -n "${next_auto_launch}" ]]; then
+	log_super "The super workflow is scheduled to automatically relaunch at: ${next_auto_launch}"
+	log_super_audit "**** S.U.P.E.R.M.A.N. ${super_installed_version} - SUPER INSTALLATION COMPLETE WORKFLOW ACTIVE ****"
+	launchctl bootstrap system "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
+elif [[ "${workflow_start_after_installation_result}" == "1" ]] || [[ "${workflow_start_after_installation_result}" == "TRUE" ]]; then
+	log_super "Starting the super workflow right now."
+	log_super_audit "**** S.U.P.E.R.M.A.N. ${super_installed_version} - SUPER INSTALLATION COMPLETE WORKFLOW ACTIVE ****"
+	launchctl bootstrap system "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
+else
+	log_super_audit "**** S.U.P.E.R.M.A.N. ${super_installed_version} - SUPER INSTALLATION COMPLETE WORKFLOW INACTIVE ****"
+fi
+
+exit 0
+

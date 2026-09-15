@@ -1,3 +1,0 @@
-## This is markdown
-**It's cool**
-_It supports all major flavors_

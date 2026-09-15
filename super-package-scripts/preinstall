@@ -1,0 +1,63 @@
+#!/bin/bash
+# S.U.P.E.R.M.A.N. Package Installer Script: preinstall
+# Software Update/Upgrade Policy Enforcement (with) Recursive Messaging And Notification
+# https://github.com/Macjutsu/super
+# by Kevin M. White
+# 2026/09/14
+
+# This script is run by the system installer BEFORE deploying the super package archive to the target drive.
+# This script will unload and remove the super LaunchDaemon and then kill any previously running super processes.
+
+# Built-in system installer paramaters.
+installer_script_path=${0}
+installer_package_path=${1}
+installer_target_location=${2}
+installer_target_volume=${3}
+
+# Set default parameters (constants) that are used throughout the script.
+# Label name for the super LaunchDaemon:
+readonly SUPER_LAUNCH_DAEMON_LABEL="com.macjutsu.super" # No trailing ".plist"
+
+# Path to the super working folder:
+readonly SUPER_FOLDER="/Library/Application Support/super"
+
+# Path to the super log folder:
+readonly SUPER_LOGS_FOLDER="${SUPER_FOLDER}/logs"
+
+# Path to the local swiftDialog command log:
+readonly SWIFT_DIALOG_COMMAND_LOG="${SUPER_LOGS_FOLDER}/dialog.log"
+
+# Path to the super PID file in the default PID file folder:
+readonly SUPER_PID_FILE="/var/run/super.pid"
+
+# Append input to stout only.
+log_echo() {
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) super-preinstall[$$]: $*"
+}
+
+# Make sure this script is running as root.
+if [[ $(id -u) -ne 0 ]]; then
+	log_echo "Exit: This script must run with root privileges."
+	exit 1
+fi
+
+# Unload and remove the super LaunchDaemon.
+if [[ -e "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" ]]; then
+	log_echo "Unloading and removing the super LaunchDaemon /Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist."
+	launchctl bootout "system/${SUPER_LAUNCH_DAEMON_LABEL}" > /dev/null 2>&1
+	rm -f "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
+fi
+
+# Check for any previous super processes and kill them.
+killall -9 "softwareupdate" "mist" > /dev/null 2>&1
+[[ -e "${SWIFT_DIALOG_COMMAND_LOG}" ]] && echo "quit:" >> "${SWIFT_DIALOG_COMMAND_LOG}" && sleep 0.1
+killall -9 "dialog" "Dialog" > /dev/null 2>&1
+killall -9 "IBM Notifier" "IBM Notifier Popup" > /dev/null 2>&1
+super_previous_pid=$(pgrep -F "${SUPER_PID_FILE}" 2> /dev/null)
+if [[ -n "${super_previous_pid}" ]]; then
+	log_echo "Found previous super instance running with PID ${super_previous_pid}, killing processes."
+	kill -9 "${super_previous_pid}" > /dev/null 2>&1
+fi
+
+exit 0
+
