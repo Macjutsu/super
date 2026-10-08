@@ -14,11 +14,11 @@ S.U.P.E.R.M.A.N. (or just `super`) is open-source software that provides adminis
 
 __The `super` macOS update dialog with multiple customizations__
 
-![The `super` macOS update dialog with multiple customizations](https://github.com/Macjutsu/super/blob/main/Example-Screenshots/6.x.x/Example-macOS-Update-Dialog.png)
+![The `super` macOS update dialog with multiple customizations](https://raw.githubusercontent.com/Macjutsu/super/refs/heads/6.0.0-beta2/Example-Screenshots/6.x.x/Example-macOS-Update-Dialog.png)
 
 __The `super` macOS update restart notification__
 
-![The `super` macOS update restart notification](https://github.com/Macjutsu/super/blob/main/Example-Screenshots/6.x.x/Example-macOS-Restart-Notification.png)
+![The `super` macOS update restart notification](https://raw.githubusercontent.com/Macjutsu/super/refs/heads/6.0.0-beta2/Example-Screenshots/6.x.x/Example-macOS-Restart-Notification.png)
 
 ## Version Compatibility
 
