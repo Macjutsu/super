@@ -3,7 +3,7 @@
 # Software Update/Upgrade Policy Enforcement (with) Recursive Messaging And Notification
 # https://github.com/Macjutsu/super
 # by Kevin M. White
-# 2026/09/14
+# 2026/10/08
 
 # This script is run by the system installer AFTER deploying the super package archive to the target drive.
 # If a legacy version of super is found, this script will migrate relevant legacy super items and then delete the remaining legacy super items.
@@ -88,7 +88,7 @@ log_super() {
 
 # Append input to stout and logs located at ${SUPER_LOG} and ${SUPER_AUDIT_LOG}.
 log_super_audit() {
-	echo -e "$(date +"%a %b %d %T") $(hostname -s) super-postinstall[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}" 
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) super-postinstall[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}"
 }
 
 # Make sure this script is running as root.
@@ -208,5 +208,5 @@ else
 	log_super_audit "**** S.U.P.E.R.M.A.N. ${super_installed_version} - SUPER INSTALLATION COMPLETE WORKFLOW INACTIVE ****"
 fi
 
+sleep 1
 exit 0
-

@@ -8,8 +8,8 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-readonly SUPER_VERSION="6.0.0-beta1"
-readonly SUPER_DATE="2026/09/14"
+readonly SUPER_VERSION="6.0.0-beta2"
+readonly SUPER_DATE="2026/10/08"
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')" && readonly SUPER_USER_AGENT
 
 # MARK: *** Documentation ***
@@ -77,6 +77,7 @@ show_usage() {
   [--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...]
   [--schedule-deferred-start-file=/local/path]
   [--schedule-deferred-start-days=number]
+  [--schedule-automatic-download-max-days=number]
   [--schedule-zero-date-manual=YYYY-MM-DD:hh:mm]
   [--scheduled-install-days=number]  [--scheduled-install-date=YYYY-MM-DD:hh:mm]
   [--scheduled-install-user-choice]  [--scheduled-install-user-choice-off]
@@ -119,6 +120,7 @@ show_usage() {
   [--display-help-message]  [--display-help-message-off]
   [--display-help-image=/local/path | URL]
   [--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
+  [--display-movable=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
   [--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
   [--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR]
   [--display-config-custom-folder=/local/path]
@@ -181,6 +183,7 @@ show_usage() {
   <string>DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...</string>
   <key>ScheduleDeferredStartFile</key> <string>path</string>
   <key>ScheduleDeferredStartDays</key> <string>number</string>
+  <key>ScheduleAutomaticDownloadMaxDays</key> <string>number</string>
   <key>ScheduleZeroDateManual</key> <string>YYYY-MM-DD:hh:mm</string>
   <key>ScheduledInstallDays</key> <string>number</string>
   <key>ScheduledInstallDate</key> <string>YYYY-MM-DD:hh:mm</string>
@@ -223,6 +226,8 @@ show_usage() {
   <key>DisplayHelpImage</key> <string>/local/path | URL</string>
   <key>DisplayHideBackground</key>
   <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
+  <key>DisplayMovable</key>
+  <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplaySilently</key>
   <string>ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR</string>
   <key>DisplayNotificationsCentered</key>
@@ -247,7 +252,6 @@ show_usage() {
 	if [[ -n "${unrecognized_options_array[*]}" ]]; then
 		set_internal_defaults
 		log_super "Parameter Error: Unrecognized Options: ${unrecognized_options_array[*]%%=*}"
-		[[ "${parent_process_is_jamf}" == "TRUE" ]] && log_super "Warning: Note that each Jamf Pro Policy Parameter can only contain a single option."
 	fi
 	log_echo "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - EXIT SHOW USAGE ****"
 	exit 0
@@ -538,15 +542,8 @@ show_config_status() {
 # MARK: *** Configuration & Parameters ***
 ################################################################################
 
-# Collect input options and set associated parameters.
+# Collect input options and set associated parameters. Unrecognized options are collected in the ${unrecognized_options_array[]}.
 get_options() {
-	# If super is running via Jamf Pro Policy installation then the first 3 input parameters are skipped.
-	parent_process_is_jamf="FALSE"
-	if [[ "$1" == "/" ]] || [[ $(ps -p "${PPID}" | grep -c -e 'bin/jamf' -e 'jamf/bin' -e '\sjamf\s') -gt 0 ]]; then
-		shift 3
-		parent_process_is_jamf="TRUE"
-	fi
-	
 	# get_options debug mode.
 	# log_super "Debug Mode: Function ${FUNCNAME[0]}: @ is:\n$@"
 	
@@ -689,6 +686,9 @@ get_options() {
 		--schedule-deferred-start-days=*)
 			schedule_deferred_start_days_option="${1#*=}"
 			;;
+		--schedule-automatic-download-max-days=*)
+			schedule_automatic_download_max_days_option="${1#*=}"
+			;;
 		--schedule-zero-date-manual=*)
 			schedule_zero_date_manual_option="${1#*=}"
 			;;
@@ -815,6 +815,9 @@ get_options() {
 		--display-hide-background=*)
 			display_hide_background_option="${1#*=}"
 			;;
+		--display-movable=*)
+			display_movable_option="${1##*=}"
+			;;
 		--display-silently=*)
 			display_silently_option="${1#*=}"
 			;;
@@ -921,7 +924,7 @@ get_options() {
 		shift
 	done
 	
-	# Error log any unrecognized options.
+	# Log and exit if there are any unrecognized options.
 	[[ -n "${unrecognized_options_array[*]}" ]] && show_usage
 }
 
@@ -1157,8 +1160,12 @@ get_external_defaults() {
 	[[ -z "${DEFERRAL_TIMER_WORKFLOW_RELAUNCH_DEFAULT_MINUTES}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for DEFERRAL_TIMER_WORKFLOW_RELAUNCH_DEFAULT_MINUTES."
 	DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES=$(jq -r '.DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES
 	[[ -z "${DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for DEFERRAL_TIMER_RESTART_VALIDATION_ERROR_MINUTES."
-	DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES=$(jq -r '.DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES
-	[[ -z "${DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES."
+	DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE=$(jq -r '.DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE
+	[[ -z "${DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE."
+	DIALOG_USER_SCHEDULE_SELECT_MINIMUM_MINUTES=$(jq -r '.DIALOG_USER_SCHEDULE_SELECT_MINIMUM_MINUTES // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly DIALOG_USER_SCHEDULE_SELECT_MINIMUM_MINUTES
+	[[ -z "${DIALOG_USER_SCHEDULE_SELECT_MINIMUM_MINUTES}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for DIALOG_USER_SCHEDULE_SELECT_MINIMUM_MINUTES."
+	DIALOG_USER_SCHEDULE_SELECT_MAXIMUM_DAYS=$(jq -r '.DIALOG_USER_SCHEDULE_SELECT_MAXIMUM_DAYS // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly DIALOG_USER_SCHEDULE_SELECT_MAXIMUM_DAYS
+	[[ -z "${DIALOG_USER_SCHEDULE_SELECT_MAXIMUM_DAYS}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for DIALOG_USER_SCHEDULE_SELECT_MAXIMUM_DAYS."
 	STORAGE_REQUIRED_UPDATE_DEFAULT_GB=$(jq -r '.STORAGE_REQUIRED_UPDATE_DEFAULT_GB // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly STORAGE_REQUIRED_UPDATE_DEFAULT_GB
 	[[ -z "${STORAGE_REQUIRED_UPDATE_DEFAULT_GB}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for STORAGE_REQUIRED_UPDATE_DEFAULT_GB."
 	STORAGE_REQUIRED_UPGRADE_DEFAULT_GB=$(jq -r '.STORAGE_REQUIRED_UPGRADE_DEFAULT_GB // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly STORAGE_REQUIRED_UPGRADE_DEFAULT_GB
@@ -1185,6 +1192,8 @@ get_external_defaults() {
 	[[ -z "${TIMEOUT_INSTALLER_WORKFLOW_SECONDS}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for TIMEOUT_INSTALLER_WORKFLOW_SECONDS."
 	TEST_MODE_DEFAULT_TIMEOUT_SECONDS=$(jq -r '.TEST_MODE_DEFAULT_TIMEOUT_SECONDS // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly TEST_MODE_DEFAULT_TIMEOUT_SECONDS
 	[[ -z "${TEST_MODE_DEFAULT_TIMEOUT_SECONDS}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for TEST_MODE_DEFAULT_TIMEOUT_SECONDS."
+	PARENT_PROCESS_RESTART_ARRAY=($(jq -r '.PARENT_PROCESS_RESTART_ARRAY[] // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null)) && readonly PARENT_PROCESS_RESTART_ARRAY
+	[[ -z "${PARENT_PROCESS_RESTART_ARRAY}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for PARENT_PROCESS_RESTART_ARRAY."
 	[[ "${get_external_defaults_error}" == "TRUE" ]] && exit_error
 }
 
@@ -1918,6 +1927,25 @@ manage_parameter_options() {
 	{ [[ -n $schedule_deferred_start_days ]] && [[ ! $schedule_deferred_start_days =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --schedule-deferred-start-days=number value must only be a number."
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n $schedule_deferred_start_days ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_deferred_start_days is: ${schedule_deferred_start_days}"
 	
+	# Validate ${schedule_automatic_download_max_days_option} input and if valid set the $schedule_automatic_download_max_days parameter.
+	schedule_automatic_download_max_days=$(get_pref_managed "ScheduleAutomaticDownloadMaxDays")
+	if [[ "${schedule_automatic_download_max_days}" == "X" ]] || { [[ -z "${schedule_automatic_download_max_days}" ]] && [[ "${schedule_automatic_download_max_days_option}" == "X" ]]; }; then
+		delete_pref "ScheduleAutomaticDownloadMaxDays"
+		unset schedule_automatic_download_max_days
+	elif [[ -z "${schedule_automatic_download_max_days}" ]] && [[ -n "${schedule_automatic_download_max_days_option}" ]]; then
+		schedule_automatic_download_max_days="${schedule_automatic_download_max_days_option}"
+		set_pref "ScheduleAutomaticDownloadMaxDays" "${schedule_automatic_download_max_days}"
+	fi
+	[[ -z "${schedule_automatic_download_max_days}" ]] && schedule_automatic_download_max_days=$(get_pref "ScheduleAutomaticDownloadMaxDays")
+	if [[ -n "${schedule_automatic_download_max_days}" ]] && [[ "${schedule_automatic_download_max_days}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; then
+		if [[ $schedule_automatic_download_max_days -gt 90 ]]; then
+			log_super "Parameter Warning: Specified --schedule-automatic-download-max-days=number value of $schedule_automatic_download_max_days days is too high, rounding down to 90 days."
+			schedule_automatic_download_max_days=90
+		fi
+	fi
+	{ [[ -n "${schedule_automatic_download_max_days}" ]] && [[ ! "${schedule_automatic_download_max_days}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --schedule-automatic-download-max-days=number value must only be a number."
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${schedule_automatic_download_max_days}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_automatic_download_max_days is: $schedule_automatic_download_max_days"
+	
 	# Validate ${schedule_zero_date_manual_option} input and if valid set the ${schedule_zero_date_manual} parameter.
 	schedule_zero_date_manual=$(get_pref_managed "ScheduleZeroDateManual")
 	if [[ "${schedule_zero_date_manual}" == "X" ]] || { [[ -z "${schedule_zero_date_manual}" ]] && [[ "${schedule_zero_date_manual_option}" == "X" ]]; }; then
@@ -1959,6 +1987,7 @@ manage_parameter_options() {
 		fi
 	fi
 	{ [[ -n "${schedule_zero_date_manual}" ]] && [[ -n $schedule_deferred_start_days ]]; } && unset schedule_deferred_start_days && log_super "Parameter Warning: When both the --schedule-zero-date-manual and the --schedule-deferred-start-days options are enabled the --schedule-zero-date-manual option takes priority."
+	{ [[ -n $schedule_deferred_start_days ]] && [[ -n $schedule_automatic_download_max_days ]] && [[ $schedule_deferred_start_days -le $schedule_automatic_download_max_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --schedule-deferred-start-days=number value of $schedule_deferred_start_days day(s) must be more than the --schedule-automatic-download-max-days=number value of $schedule_automatic_download_max_days day(s)."
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${schedule_zero_date_manual}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_manual is: ${schedule_zero_date_manual}"
 	
 	# Validate ${scheduled_install_days_option} input and if valid set the ${scheduled_install_days} parameter.
@@ -1972,6 +2001,7 @@ manage_parameter_options() {
 	fi
 	[[ -z "${scheduled_install_days}" ]] && scheduled_install_days=$(get_pref "ScheduledInstallDays")
 	{ [[ -n "${scheduled_install_days}" ]] && [[ ! "${scheduled_install_days}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --scheduled-install-days=number value must only be a number."
+	{ [[ -n "${scheduled_install_days}" ]] && [[ -n $schedule_automatic_download_max_days ]] && [[ $scheduled_install_days -le $schedule_automatic_download_max_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --scheduled-install-days=number value of ${scheduled_install_days} day(s) must be more than the --schedule-automatic-download-max-days=number value of $schedule_automatic_download_max_days day(s)."
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${scheduled_install_days}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_days is: ${scheduled_install_days}"
 	
 	# Validate ${scheduled_install_date_option} input and if valid set the ${scheduled_install_date} parameter.
@@ -2059,12 +2089,6 @@ manage_parameter_options() {
 	{ [[ -n "${scheduled_install_reminder_minutes}" ]] && [[ $scheduled_install_option_counter -eq 0 ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --scheduled-install-reminder=minutes option requires that you also set one of the following options: --scheduled-install-days, --scheduled-install-date, or --scheduled-install-user-choice."
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${scheduled_install_reminder_minutes}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_reminder_minutes is: ${scheduled_install_reminder_minutes}"
 	
-	# FIXME: These options are not supported in v6.0.0-beta1.
-	[[ -n "${scheduled_install_days}" ]] && unset scheduled_install_days && log_super "Parameter Warning: The --scheduled-install-days option is not currently supported in super v6.0.0-beta1."
-	[[ -n "${scheduled_install_date}" ]] && unset scheduled_install_date && log_super "Parameter Warning: The --scheduled-install-date option is not currently supported in super v6.0.0-beta1."
-	[[ "${scheduled_install_user_choice}" == "TRUE" ]] && scheduled_install_user_choice="FALSE" && log_super "Parameter Warning: The --scheduled-install-user-choice option is not currently supported in super v6.0.0-beta1."
-	[[ -n "${scheduled_install_reminder_minutes}" ]] && unset scheduled_install_reminder_minutes  && log_super "Parameter Warning: The --scheduled-install-reminder option is not currently supported in super v6.0.0-beta1."
-	
 	# Validate ${deadline_count_focus_option} input and if valid set the ${deadline_count_focus} parameter.
 	deadline_count_focus=$(get_pref_managed "DeadlineCountFocus")
 	if [[ "${deadline_count_focus}" == "X" ]] || { [[ -z "${deadline_count_focus}" ]] && [[ "${deadline_count_focus_option}" == "X" ]]; }; then
@@ -2144,14 +2168,16 @@ manage_parameter_options() {
 	{ [[ -n "${deadline_days_hard}" ]] && [[ ! "${deadline_days_hard}" =~ ${REGEX_ANY_WHOLE_NUMBER} ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-hard=number value must only be a number."
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${deadline_days_hard}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: deadline_days_hard is: ${deadline_days_hard}"
 	
-	# Validate ${deadline_days_focus}, ${deadline_days_soft}, ${deadline_days_hard}, and ${schedule_deferred_start_days} parameters in relation to each other.
+	# Validate ${deadline_days_focus}, ${deadline_days_soft}, ${deadline_days_hard}, ${schedule_deferred_start_days}, and ${schedule_automatic_download_max_days} parameters in relation to each other.
 	{ [[ -n "${deadline_days_hard}" ]] && [[ -n "${deadline_days_soft}" ]] && [[ $deadline_days_hard -le $deadline_days_soft ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --deadline-days-soft=number value of ${deadline_days_soft} day(s)."
 	{ [[ -n "${deadline_days_hard}" ]] && [[ -n "${deadline_days_focus}" ]] && [[ $deadline_days_hard -le $deadline_days_focus ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --deadline-days-focus=number value of ${deadline_days_focus} day(s)."
 	{ [[ -n "${deadline_days_soft}" ]] && [[ -n "${deadline_days_focus}" ]] && [[ $deadline_days_soft -le $deadline_days_focus ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-soft=number value of ${deadline_days_soft} day(s) must be more than the --deadline-days-focus=number value of ${deadline_days_focus} day(s)."
 	{ [[ -n "${deadline_days_focus}" ]] && [[ -n $schedule_deferred_start_days ]] && [[ $deadline_days_focus -le $schedule_deferred_start_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-focus=number value of ${deadline_days_focus} day(s) must be more than the --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} day(s)."
 	{ [[ -n "${deadline_days_soft}" ]] && [[ -n $schedule_deferred_start_days ]] && [[ $deadline_days_soft -le $schedule_deferred_start_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-soft=number value of ${deadline_days_soft} day(s) must be more than the --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} day(s)."
 	{ [[ -n "${deadline_days_hard}" ]] && [[ -n $schedule_deferred_start_days ]] && [[ $deadline_days_hard -le $schedule_deferred_start_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --schedule-deferred-start-days=number value of ${schedule_deferred_start_days} day(s)."
-	
+	{ [[ -n "${deadline_days_focus}" ]] && [[ -n $schedule_automatic_download_max_days ]] && [[ $deadline_days_focus -le $schedule_automatic_download_max_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-focus=number value of ${deadline_days_focus} day(s) must be more than the --schedule-automatic-download-max-days=number value of $schedule_automatic_download_max_days day(s)."
+	{ [[ -n "${deadline_days_soft}" ]] && [[ -n $schedule_automatic_download_max_days ]] && [[ $deadline_days_soft -le $schedule_automatic_download_max_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-soft=number value of ${deadline_days_soft} day(s) must be more than the --schedule-automatic-download-max-days=number value of $schedule_automatic_download_max_days day(s)."
+	{ [[ -n "${deadline_days_hard}" ]] && [[ -n $schedule_automatic_download_max_days ]] && [[ $deadline_days_hard -le $schedule_automatic_download_max_days ]]; } && parameter_error="TRUE" && log_super "Parameter Error: The --deadline-days-hard=number value of ${deadline_days_hard} day(s) must be more than the --schedule-automatic-download-max-days=number value of $schedule_automatic_download_max_days day(s)."
 	
 	# Validate ${deadline_date_focus_option} input and if valid set the ${deadline_date_focus} and ${deadline_date_focus_epoch} parameters.
 	deadline_date_focus=$(get_pref_managed "DeadlineDateFocus")
@@ -2623,6 +2649,28 @@ manage_parameter_options() {
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_hide_background}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_hide_background is: ${display_hide_background}"
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_hide_background_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_hide_background_status is: ${display_hide_background_status}"
 	
+	# Validate ${display_movable_option} input and if valid set the ${display_movable} parameter.
+	display_movable=$(get_pref_managed "DisplayMovable")
+	if [[ "${display_movable}" == "X" ]] || { [[ -z "${display_movable}" ]] && [[ "${display_movable_option}" == "X" ]]; }; then
+		delete_pref "DisplayMovable"
+		unset display_movable
+	elif [[ -z "${display_movable}" ]] && [[ -n "${display_movable_option}" ]]; then
+		display_movable="${display_movable_option}"
+		set_pref "DisplayMovable" "${display_movable}"
+	fi
+	[[ -z "${display_movable}" ]] && display_movable=$(get_pref "DisplayMovable")
+	if [[ -n "${display_movable}" ]]; then
+		IFS=','
+		local display_movable_array && read -r -a display_movable_array <<<"${display_movable}"
+		for option_type in "${display_movable_array[@]}"; do
+			{ [[ ! "${option_type}" =~ ${REGEX_WORKFLOW_OPTIONS} ]]; } && parameter_error="TRUE" && log_super "Parameter Error: Unrecognized --display-movable type of ${option_type}. You can only specify the following types separated by commas (no spaces): ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR"
+		done
+		IFS="${previous_ifs}"
+		[[ $(echo "${display_movable}" | grep -c 'ALWAYS') -gt 0 ]] && display_movable_status="TRUE"
+	fi
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_movable}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_movable is: ${display_movable}"
+	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_movable_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_movable_status is: ${display_movable_status}"
+	
 	# Validate ${display_silently_option} input and if valid set the ${display_silently} parameter.
 	display_silently=$(get_pref_managed "DisplaySilently")
 	if [[ "${display_silently}" == "X" ]] || { [[ -z "${display_silently}" ]] && [[ "${display_silently_option}" == "X" ]]; }; then
@@ -2668,15 +2716,15 @@ manage_parameter_options() {
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_notifications_centered_status}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_notifications_centered_status is: ${display_notifications_centered_status}"
 	
 	# Validate ${display_config_is_custom_folder_option} input and if valid set the ${display_config_is_custom_folder} parameter.
-	display_config_is_custom_folder=$(get_pref_managed "DisplayCustomConfigFolder")
+	display_config_is_custom_folder=$(get_pref_managed "DisplayConfigCustomFolder")
 	if [[ "${display_config_is_custom_folder}" == "X" ]] || { [[ -z "${display_config_is_custom_folder}" ]] && [[ "${display_config_is_custom_folder_option}" == "X" ]]; }; then
-		delete_pref "DisplayCustomConfigFolder"
+		delete_pref "DisplayConfigCustomFolder"
 		unset display_config_is_custom_folder
 	elif [[ -z "${display_config_is_custom_folder}" ]] && [[ -n "${display_config_is_custom_folder_option}" ]]; then
 		display_config_is_custom_folder="${display_config_is_custom_folder_option}"
-		set_pref "DisplayCustomConfigFolder" "${display_config_is_custom_folder}"
+		set_pref "DisplayConfigCustomFolder" "${display_config_is_custom_folder}"
 	fi
-	[[ -z "${display_config_is_custom_folder}" ]] && display_config_is_custom_folder=$(get_pref "DisplayCustomConfigFolder")
+	[[ -z "${display_config_is_custom_folder}" ]] && display_config_is_custom_folder=$(get_pref "DisplayConfigCustomFolder")
 	[[ -n "${display_config_is_custom_folder}" ]] && [[ ! -d "${display_config_is_custom_folder}" ]] && parameter_error="TRUE" && log_super "Parameter Error: Unable to locate display custom folder at ${display_config_is_custom_folder}."
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${display_config_is_custom_folder}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_config_is_custom_folder is: ${display_config_is_custom_folder}"
 	
@@ -3259,8 +3307,8 @@ exit_error() {
 # Append input to stout and log located at ${SUPER_LOG}, unless not runing as root, or ${SUPER_LOG} doesn't exist, or any {*_status_option} is enabled, then just echo to stdout.
 log_super() {
 	if [[ "${sofa_status_option}" != "TRUE" ]] && [[ "${config_status_option}" != "TRUE" ]]; then
-		[[ "${running_as_root}" == "TRUE" ]] && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}"
-		[[ "${running_as_root}" == "FALSE" ]] && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: Not Logged: $*"
+		[[ "${super_running_as_root}" == "TRUE" ]] && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}"
+		[[ "${super_running_as_root}" == "FALSE" ]] && echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: Not Logged: $*"
 	else # A {*_status_option} is enabled, so only echo out without additional date and process details.
 		echo -e "$*"
 	fi
@@ -3268,7 +3316,7 @@ log_super() {
 
 # Append input to stout and logs located at ${SUPER_LOG} and ${SUPER_AUDIT_LOG}.
 log_super_audit() {
-	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}" 
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" | tee -a "${SUPER_LOG}" "${SUPER_AUDIT_LOG}"
 }
 
 # Append input to stout only. (Primarily used for when any {*_status_option} is enabled or when showing credentials in verbose mode testing.)
@@ -3747,8 +3795,10 @@ check_swift_dialog() {
 	swift_dialog_valid="FALSE"
 	local codesign_result && codesign_result=$(codesign --verify --verbose "${swift_dialog_app}" 2>&1)
 	if [[ $(echo "${codesign_result}" | grep -c 'valid on disk') -gt 0 ]]; then
-		local version_result && version_result=$("${SWIFT_DIALOG_BINARY}" --version 2> /dev/null | head -1 | awk -F '.' '{print $1"."$2"."$3;}') # Expected output: 3.1.2
-		if [[ -n "${version_result}" ]] && [[ "$(printf '%s\n' "${SWIFT_DIALOG_MINIMUM_VERSION}" "${version_result}" | sort -V | head -n 1)" == "${SWIFT_DIALOG_MINIMUM_VERSION}" ]]; then
+		local version_result && version_result=$(defaults read "${swift_dialog_app}/Contents/Info" CFBundleVersion 2> /dev/null) # Failover method: Expected output: 4997
+		if [[ -z "${version_result}" ]]; then
+			log_super "Error: Unable to determine swiftDialog version for binary located at ${SWIFT_DIALOG_BINARY}."
+		elif [[ -n "${version_result}" ]] && [[ "$(printf '%s\n' "${SWIFT_DIALOG_MINIMUM_VERSION}" "${version_result}" | sort -V | head -n 1)" == "${SWIFT_DIALOG_MINIMUM_VERSION}" ]]; then
 			swift_dialog_valid="TRUE"
 			[[ "${config_status_option}" == "TRUE" ]] && log_super "Status: swiftDialog application path: ${swift_dialog_app}"
 			[[ "${config_status_option}" == "TRUE" ]] && log_super "Status: swiftDialog binary path: ${SWIFT_DIALOG_BINARY}"
@@ -3789,7 +3839,9 @@ check_mist_cli() {
 	local codesign_result && codesign_result=$(codesign --verify --verbose "${MIST_CLI_BINARY}" 2>&1)
 	if [[ $(echo "${codesign_result}" | grep -c 'valid on disk') -gt 0 ]]; then
 		local version_result && version_result=$("${MIST_CLI_BINARY}" --version 2> /dev/null | head -1 | awk '{print $1;}') # Expected output: 2.3
-		if [[ -n "${version_result}" ]] && [[ "$(printf '%s\n' "${MIST_CLI_MINIMUM_VERSION}" "${version_result}" | sort -V | head -n 1)" == "${MIST_CLI_MINIMUM_VERSION}" ]]; then
+		if [[ -z "${version_result}" ]]; then
+			log_super "Error: Unable to determine mist-cli version for binary located at ${MIST_CLI_BINARY}."
+		elif [[ -n "${version_result}" ]] && [[ "$(printf '%s\n' "${MIST_CLI_MINIMUM_VERSION}" "${version_result}" | sort -V | head -n 1)" == "${MIST_CLI_MINIMUM_VERSION}" ]]; then
 			mist_cli_valid="TRUE"
 			[[ "${config_status_option}" == "TRUE" ]] && log_super "Status: mist-cli binary path: ${MIST_CLI_BINARY}"
 			[[ "${config_status_option}" == "TRUE" ]] && log_super "Status: mist-cli version: ${version_result}"
@@ -3839,7 +3891,7 @@ manage_helpers() {
 		fi
 		[[ "${swift_dialog_valid}" == "FALSE" ]] && log_super "Error: Unable to validate swiftDialog after re-installation."
 	fi
-	[[ "${swift_dialog_valid}" == "FALSE" ]] && helper_error="FALSE"
+	[[ "${swift_dialog_valid}" == "FALSE" ]] && helper_error="TRUE"
 	
 	# If needed, validate mist-cli and if missing or invalid then install and check again.
 	if [[ "${install_macos_major_upgrades}" == "TRUE" ]] || [[ -n "${install_macos_major_version_target}" ]] || [[ -n "${install_macos_minor_version_target}" ]]; then
@@ -3867,8 +3919,8 @@ manage_helpers() {
 # Prepare super by cleaning after previous super runs, record various maintenance modes, validate parameters, and if necessary restart via the super LaunchDaemon.
 workflow_startup() {
 	# Make sure super is running as root.
-	[[ "${running_as_root}" == "FALSE" ]] && log_echo "Exit: super must run with root privileges."
-	[[ "${running_as_root}" == "FALSE" ]] && exit_error
+	[[ "${super_running_as_root}" == "FALSE" ]] && log_echo "Exit: super must run with root privileges."
+	[[ "${super_running_as_root}" == "FALSE" ]] && exit_error
 	
 	# Make sure this system meets the minimum requirements for super.
 	system_macos_version_major=$(sw_vers -productVersion | cut -d'.' -f1) # Expected output: 10, 15, 26
@@ -3927,6 +3979,40 @@ workflow_startup() {
 		startup_timeout=$((startup_timeout + 10))
 	done
 	
+	# Checks to determine the process context in which the super workflow is running.
+	local super_current_folder && super_current_folder=$(dirname "$0")
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: super_current_folder is: ${super_current_folder}"
+	local previous_ifs="${IFS}" && IFS=$'\n'
+	local pid=$$
+	local ancestor_process
+	local ancestor_bundle_id
+	local super_ancestors_array=()
+	while [[ "${pid}" -gt 1 ]]; do
+		ancestor_process=$(ps -p "${pid}" -o comm=)
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: ancestor_process is: ${ancestor_process}"
+		[[ "${ancestor_process}" == "jamf" ]] && ancestor_process="${JAMF_PRO_BINARY}" # This is a static workaround because when running jamf from the command line the full path can't be resolved.
+		[[ $(echo "${ancestor_process}" | grep -c '/') -eq 0 ]] && ancestor_process=$(command -v "${ancestor_process/-/}")
+		[[ -n "${ancestor_process}" ]] && ancestor_bundle_id=$(codesign -dr - "${ancestor_process}" 2>&1 | awk -F '"' '/identifier/{print $2}')
+		[[ -n "${ancestor_process}" ]] && [[ -n "${ancestor_bundle_id}" ]] && super_ancestors_array+=("${ancestor_process},${ancestor_bundle_id}")
+		[[ -n "${ancestor_process}" ]] && [[ -z "${ancestor_bundle_id}" ]] && super_ancestors_array+=("${ancestor_process}")
+		pid=$(ps -p "${pid}" -o ppid=)
+	done
+	super_ancestors_hierarchy_array=()
+	for (( index=${#super_ancestors_array[@]}-1 ; index>=0 ; index-- )); do
+		super_ancestors_hierarchy_array+=("${super_ancestors_array[index]}")
+	done
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: super_ancestors_hierarchy_array is:\n${super_ancestors_hierarchy_array[*]}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: PARENT_PROCESS_RESTART_ARRAY is:\n${PARENT_PROCESS_RESTART_ARRAY[*]}"
+	local super_parent_restart="FALSE"
+	for super_parent in "${PARENT_PROCESS_RESTART_ARRAY[@]}"; do
+		[[ "${super_parent_restart}" != "FALSE" ]] && break
+		for ancestor_process in "${super_ancestors_hierarchy_array[@]}"; do
+			[[ $(echo "${ancestor_process}" | grep -c "${super_parent}" ) -gt 0 ]] && local super_parent_restart="${ancestor_process%%,*}" && break
+		done
+	done
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: super_parent_restart is: ${super_parent_restart}"
+	IFS="${previous_ifs}"
+	
 	# Initial system and user checks.
 	check_system
 	check_current_user
@@ -3955,7 +4041,7 @@ workflow_startup() {
 	fi
 	if [[ "${check_system_error}" == "FALSE" ]] && [[ "${parameter_error}" == "FALSE" ]]; then
 		manage_helpers
-		get_external_display_config
+		[[ "${current_user_account_name}" != "FALSE" ]] && get_external_display_config
 	fi
 	if [[ "${check_system_error}" == "TRUE" ]] || [[ "${parameter_error}" == "TRUE" ]] || [[ "${helper_error}" == "TRUE" ]] || [[ "${get_external_display_config_error}" == "TRUE" ]]; then
 		log_super "Exit: Initial startup validation failed."
@@ -3974,12 +4060,19 @@ workflow_startup() {
 			fi
 			if [[ $(compgen -A function | grep -c -E "^${test_display_function_option}\$") -gt 0 ]]; then
 				workflow_target="${system_macos_version_full}"
+				workflow_time_epoch=$(date +%s)
 				msu_macos_version="${system_macos_version_major}.${system_macos_version_minor}"
-				if [[ "${test_display_function_is_deadline}" == "FALSE" ]]; then
+				scheduled_install_user_choice_active="TRUE"
+				if [[ "${test_display_function_option}" == "dialog_user_schedule" ]] || [[ "${test_display_function_option}" == "dialog_schedule_reminder" ]]; then
+					display_string_deadline_date="$(date "+${DISPLAY_STRING_DATE_FORMAT}")"
+					display_string_deadline_scheduled_date="$(date "+${DISPLAY_STRING_DATE_FORMAT}")${DISPLAY_STRING_DATE_TIME_SEPARATOR}$(date "+${DISPLAY_STRING_TIME_FORMAT}")"
+					"${test_display_function_option}"
+				elif [[ "${test_display_function_is_deadline}" == "FALSE" ]]; then
 					log_super "Test Display Function: Starting ${test_display_function_option}..."
 					"${test_display_function_option}"
 				else
-					workflow_scheduled_install_now="TRUE" && display_string_deadline_scheduled_date="$(date "+${DISPLAY_STRING_DATE_FORMAT}")${DISPLAY_STRING_DATE_TIME_SEPARATOR}$(date "+${DISPLAY_STRING_TIME_FORMAT}")"
+					workflow_scheduled_install_now="TRUE"
+					display_string_deadline_scheduled_date="$(date "+${DISPLAY_STRING_DATE_FORMAT}")${DISPLAY_STRING_DATE_TIME_SEPARATOR}$(date "+${DISPLAY_STRING_TIME_FORMAT}")"
 					log_super "Test Display Function: Starting Scheduled ${test_display_function_option}_deadline..."
 					"${test_display_function_option}"
 					unset workflow_scheduled_install_now && unset display_string_deadline_scheduled_date
@@ -4065,6 +4158,7 @@ workflow_startup() {
 		log_super "Status: Install now workflow active."
 		workflow_install_now_active="TRUE"
 		[[ $(echo "${display_hide_background}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_hide_background_status="TRUE"
+		[[ $(echo "${display_movable}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_movable_status="TRUE"
 		[[ $(echo "${display_silently}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_silently_status="TRUE"
 		[[ $(echo "${display_notifications_centered}" | grep -c 'INSTALLNOW') -gt 0 ]] && display_notifications_centered_status="TRUE"
 		if [[ "${current_user_account_name}" != "FALSE" ]]; then
@@ -4107,17 +4201,14 @@ workflow_startup() {
 	{ [[ "${verbose_mode}" == "TRUE" ]] && [[ -n "${super_alternate_plist}" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Alternate preference file after startup validation: ${super_alternate_plist}:\n$(defaults read "${super_alternate_plist}" 2> /dev/null)"
 	
 	# If super needs to be restarted, and is properly installed, then restart via the super LaunchDeamon to release any parent process.
-	local super_current_folder && super_current_folder=$(dirname "$0")
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: super_current_folder is: ${super_current_folder}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: parent_process_is_jamf is: ${parent_process_is_jamf}"
-	if { [[ "${super_current_folder}" != "${SUPER_FOLDER}" ]] && [[ "${super_current_folder}" != $(dirname "${SUPER_LINK}") ]]; } || [[ "${parent_process_is_jamf}" == "TRUE" ]]; then
-		if [[ -f "${SUPER_FOLDER}/super" ]] && [[ -f "${SUPER_FOLDER}/super-starter" ]] && [[ -f "${SUPER_LAUNCH_DAEMON_LABEL}.plist" ]]; then
+	if { [[ "${super_current_folder}" != "${SUPER_FOLDER}" ]] && [[ "${super_current_folder}" != $(dirname "${SUPER_LINK}") ]]; } || [[ "${super_parent_restart}" != "FALSE" ]]; then
+		if [[ -f "${SUPER_FOLDER}/super" ]] && [[ -f "${SUPER_FOLDER}/super-starter" ]] && [[ -f "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" ]]; then
 			{ [[ "${super_current_folder}" != "${SUPER_FOLDER}" ]] && [[ "${super_current_folder}" != $(dirname "${SUPER_LINK}") ]]; } && log_super "Status: This copy of super is running from outside it's normal location, restarting super via LaunchDaemon..."
-			[[ "${parent_process_is_jamf}" == "TRUE" ]] && log_super "Status: Jamf is the parent process, restarting super via LaunchDaemon..."
+			[[ "${super_parent_restart}" != "FALSE" ]] && log_super "Status: ${super_parent_restart} is a parent process, restarting super via LaunchDaemon..."
 			restart_super 5
 		else
-			{ [[ "${super_current_folder}" != "${SUPER_FOLDER}" ]] || [[ "${super_current_folder}" != $(dirname "${SUPER_LINK}") ]]; } && log_super "Exit: This copy of super is running from outside it's normal location so super needs to restart but it's unable to because required super items are missing."
-			[[ "${parent_process_is_jamf}" == "TRUE" ]] && log_super "Exit: Jamf is the parent process so super needs to restart but it's unable to because required super items are missing."
+			{ [[ "${super_current_folder}" != "${SUPER_FOLDER}" ]] && [[ "${super_current_folder}" != $(dirname "${SUPER_LINK}") ]]; } && log_super "Exit: This copy of super is running from outside it's normal location so super needs to restart but it's unable to because required super items are missing."
+			[[ "${super_parent_restart}" != "FALSE" ]] && log_super "Exit: ${super_parent_restart} is a parent process so super needs to restart but it's unable to because required super items are missing."
 			exit_error
 		fi
 	fi
@@ -4544,6 +4635,7 @@ set_schedule_workflow_active_adjustments() {
 
 # Evaluate ${schedule_zero_date_manual}, any previously saved zero dates, and the ${SOFA_MACOS_CACHE_JSON} to set ${schedule_zero_date}, ${schedule_zero_date_epoch}, and ${display_string_schedule_zero_date} accordingly.
 check_schedule_zero_date() {
+	schedule_zero_date_release="FALSE"
 	schedule_zero_date="FALSE"
 	schedule_deferred_start_days_active="FALSE"
 	local schedule_zero_date_automatic_release_previous && schedule_zero_date_automatic_release_previous=$(get_pref "ScheduleZeroDateAutomaticRelease")
@@ -4565,14 +4657,13 @@ check_schedule_zero_date() {
 	# If no ${schedule_zero_date} yet then check for previously set automatic zero dates.
 	if [[ "${schedule_zero_date}" == "FALSE" ]]; then
 		# If the ${workflow_target} is not a macOS or Safari version that was found in the SOFA feeds, then ${schedule_zero_date_release} cannot be used.
-		if [[ $(echo "${workflow_target}" | grep -c 'macOS') -ge 1 ]]; then
-			[[ "${sofa_macos_failover}" == "FALSE" ]] && schedule_zero_date_release="TRUE"
-			[[ "${sofa_macos_failover}" == "TRUE" ]] && schedule_zero_date_release="FALSE"
-		elif [[ "${workflow_target}" == "Safari Update" ]]; then
-			[[ "${sofa_safari_failover}" == "FALSE" ]] && schedule_zero_date_release="TRUE"
-			[[ "${sofa_safari_failover}" == "TRUE" ]] && schedule_zero_date_release="FALSE"
+		if [[ $(echo "${workflow_target}" | grep -c 'macOS') -ge 1 ]] && [[ "${sofa_macos_failover}" != "TRUE" ]] && [[ "${test_mode}" != "TRUE" ]]; then
+			schedule_zero_date_release="TRUE"
+		elif [[ "${workflow_target}" == "Safari Update" ]] && [[ "${sofa_safari_failover}" != "TRUE" ]] && [[ "${test_mode}" != "TRUE" ]]; then
+			schedule_zero_date_release="TRUE"
 		else
-			schedule_zero_date_release="FALSE" && log_super "SOFA Warning: Feeds do not contain release dates for ${workflow_target} workflow target."
+			[[ "${test_mode}" != "TRUE" ]] && log_super "SOFA Warning: Feeds do not contain release dates for ${workflow_target} workflow target."
+			[[ "${test_mode}" == "TRUE" ]] && log_super "SOFA Warning: Test mode does not currently resolve release dates."
 		fi
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_release: ${schedule_zero_date_release}"
 		
@@ -4599,8 +4690,8 @@ check_schedule_zero_date() {
 	if [[ "${schedule_zero_date}" == "FALSE" ]] && [[ "${schedule_zero_date_release}" == "TRUE" ]]; then
 		{ [[ "${msu_macos_major_upgrade_target}" != "FALSE" ]] || [[ "${msu_macos_minor_update_target}" != "FALSE" ]]; } && local schedule_zero_date_version_target="macOS ${msu_macos_version}"
 		{ [[ "${installer_macos_major_upgrade_target}" != "FALSE" ]] || [[ "${installer_macos_minor_update_target}" != "FALSE" ]]; } && local schedule_zero_date_version_target="macOS ${installer_macos_version}"
-		[[ "${msu_safari_target}" != "FALSE" ]] && local schedule_zero_date_version_target="${msu_safari_target}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date: ${schedule_zero_date_version_target}"
+		[[ "${workflow_target}" == "Safari Update" ]] && local schedule_zero_date_version_target="Safari ${msu_safari_target}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_zero_date_version_target: ${schedule_zero_date_version_target}"
 		[[ $(echo "${schedule_zero_date_version_target}" | grep -c 'macOS') -ge 1 ]] && [[ "${system_macos_beta_enrollment}" == "FALSE" ]] && schedule_zero_date=$(jq -r --arg macos_version_full "${schedule_zero_date_version_target//macOS /}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.ReleaseDate[:-10]):00:00" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)
 		[[ $(echo "${schedule_zero_date_version_target}" | grep -c 'macOS') -ge 1 ]] && [[ "${system_macos_beta_enrollment}" != "FALSE" ]] && schedule_zero_date=$(jq -r --arg macos_version_full "${schedule_zero_date_version_target//macOS /}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.ReleaseDate[:-10]):00:00" // empty' "${SOFA_APPLE_BETA_CACHE_JSON}" 2> /dev/null)
 		[[ $(echo "${schedule_zero_date_version_target}" | grep -c 'Safari') -ge 1 ]] && schedule_zero_date=$(jq -r --arg safari_version_full "${schedule_zero_date_version_target//Safari /}" '.AppVersions[].SecurityReleases[] | select(.ProductVersion == $safari_version_full) | "\(.ReleaseDate[:-10]):00:00" // empty' "${SOFA_SAFARI_CACHE_JSON}" 2> /dev/null)
@@ -4745,6 +4836,7 @@ check_scheduled_install() {
 	if [[ "${workflow_scheduled_install_active}" == "TRUE" ]]; then
 		# Set various display options for scheduled installation dialogs.
 		[[ $(echo "${display_hide_background}" | grep -c 'SCHEDULED') -gt 0 ]] && display_hide_background_status="TRUE"
+		[[ $(echo "${display_movable}" | grep -c 'SCHEDULED') -gt 0 ]] && display_movable_status="TRUE"
 		[[ $(echo "${display_silently}" | grep -c 'SCHEDULED') -gt 0 ]] && display_silently_status="TRUE"
 		[[ $(echo "${display_notifications_centered}" | grep -c 'SCHEDULED') -gt 0 ]] && display_notifications_centered_status="TRUE"
 		local display_string_deadline_scheduled_only_date && display_string_deadline_scheduled_only_date=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_DATE_FORMAT}")
@@ -4772,6 +4864,7 @@ check_scheduled_install() {
 				[[ "${scheduled_install_user_choice_active}" == "TRUE" ]] && log_super "Status: Scheduled installation date of ${workflow_scheduled_install} is only ${workflow_scheduled_install_difference} seconds away but the user can still reschedule, waiting for time to pass..."
 				if [[ "${current_user_account_name}" != "FALSE" ]]; then
 					scheduled_install_final_reminder="TRUE"
+					check_deadlines_days_date
 					dialog_schedule_reminder
 				else
 					sleep $((workflow_scheduled_install_difference + 1))
@@ -5081,7 +5174,7 @@ check_user_focus() {
 		local plutil_result && plutil_result=$(plutil -extract data.0.storeAssertionRecords.0.assertionDetails.assertionDetailsModeIdentifier raw -o - "${current_user_home_folder}/Library/DoNotDisturb/DB/Assertions.json" 2>&1)
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: plutil_result is: ${plutil_result}"
 		if [[ $(echo "${plutil_result}" | grep -c 'permission') -gt 0 ]]; then
-			log_super "Warning: Unable to determine user Focus mode because the process that started super doesn't have Full Disk Access permissions."
+			log_super "Warning: Unable to determine user Focus mode because the process that started super doesn't have Full Disk Access permissions: ${super_ancestors_hierarchy_array[0]}"
 		elif [[ $(echo "${plutil_result}" | grep -c 'com.apple.') -gt 0 ]]; then
 			log_super "Status: Focus or Do Not Disturb enabled for current user: ${current_user_account_name}."
 			user_focus_active="TRUE"
@@ -6413,12 +6506,12 @@ download_macos_msu() {
 			break
 		fi
 	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_start_timeout is: ${download_msu_macos_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_start_error is: ${download_msu_macos_start_error}"
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_start_timeout is: ${download_msu_macos_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_timeout_error is: ${download_msu_macos_timeout_error}"
 	
 	# If the softwareupdate download workflow completed, then validate the prepared macOS update/upgrade.
-	if [[ "${download_msu_macos_start_error}" == "FALSE" ]] && [[ "${download_msu_macos_start_timeout}" == "FALSE" ]] && [[ "${download_msu_macos_timeout_error}" == "FALSE" ]]; then	
+	if [[ "${download_msu_macos_start_error}" == "FALSE" ]] && [[ "${download_msu_macos_start_timeout}" == "FALSE" ]] && [[ "${download_msu_macos_timeout_error}" == "FALSE" ]]; then
 		local download_msu_macos_title_error="TRUE"
 		local download_msu_macos_validation_error="TRUE"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_title is: ${msu_macos_title}"
@@ -6434,7 +6527,7 @@ download_macos_msu() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_validation_error is: ${download_msu_macos_validation_error}"
 	
 	# If the macOS update/upgrade is downloaded and prepared, then collect information.
-	if [[ "${download_msu_macos_start_error}" == "FALSE" ]] || [[ "${download_msu_macos_start_timeout}" == "FALSE" ]] || [[ "${download_msu_macos_timeout_error}" == "FALSE" ]] || [[ "${download_msu_macos_title_error}" == "FALSE" ]] || [[ "${download_msu_macos_validation_error}" == "FALSE" ]]; then
+	if [[ "${download_msu_macos_start_error}" == "FALSE" ]] && [[ "${download_msu_macos_start_timeout}" == "FALSE" ]] && [[ "${download_msu_macos_timeout_error}" == "FALSE" ]] && [[ "${download_msu_macos_title_error}" == "FALSE" ]] && [[ "${download_msu_macos_validation_error}" == "FALSE" ]]; then
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE COMPLETED ****"
 		log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		download_maocs_msu_error="FALSE"
@@ -6583,7 +6676,7 @@ download_macos_installer() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_installer_macos_validation_error is: ${download_installer_macos_validation_error}"
 	
 	# If the macOS installer application is downloaded and valid, then collect information.
-	if [[ "${download_installer_macos_start_error}" == "FALSE" ]] || [[ "${download_installer_macos_start_timeout}" == "FALSE" ]] || [[ "${download_installer_macos_timeout_error}" == "FALSE" ]] || [[ "${download_installer_macos_app_error}" == "FALSE" ]] || [[ "${download_installer_macos_validation_error}" == "FALSE" ]]; then
+	if [[ "${download_installer_macos_start_error}" == "FALSE" ]] && [[ "${download_installer_macos_start_timeout}" == "FALSE" ]] && [[ "${download_installer_macos_timeout_error}" == "FALSE" ]] && [[ "${download_installer_macos_app_error}" == "FALSE" ]] && [[ "${download_installer_macos_validation_error}" == "FALSE" ]]; then
 		log_installer "Status: A macOS installer is now available at: /Applications/Install ${installer_macos_title}.app"
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS INSTALLER APP COMPLETE ****"
 		log_super_audit "Status: A macOS installer is now available at: /Applications/Install ${installer_macos_title}.app"
@@ -6628,14 +6721,18 @@ workflow_download_macos() {
 	
 	# If downloads are required then check for possible automatic download deferral and available storage.
 	if [[ "${installer_macos_download_required}" == "TRUE" ]] || [[ "${msu_macos_download_required}" == "TRUE" ]]; then
-		# If a macOS automatic download should be possible then automatically defer.
+		# If a macOS automatic download should be possible then automatically defer, unless there is a valid reason to download now.
 		if [[ "${msu_macos_setting_automatic_download_deferral}" == "TRUE" ]]; then
-			# First check for a variety of reasons why the automatic download deferral should be ignored.
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: schedule_automatic_download_max_days is: ${schedule_automatic_download_max_days}"
 			local ignore_msu_macos_setting_automatic_download_deferral="FALSE"
-			[[ "${msu_macos_download_error}" == "TRUE" ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS minor update download deferral due an error with the previously downloaded macOS update."
-			[[ "${workflow_install_now_active}" == "TRUE" ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current install now workflow."
-			{ [[ -n "${deadline_epoch}" ]] && [[ $((deadline_epoch - workflow_time_epoch)) -le 86400 ]]; } && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS minor update download deferral because a deadline is within 24 hours."
-			{ [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_count_status}" != "FALSE" ]]; } && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS minor update download deferral due to current deadline workflow."
+			[[ "${msu_macos_download_error}" == "TRUE" ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS minor update download delay due an error with the previously downloaded macOS update."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && [[ "${workflow_install_now_active}" == "TRUE" ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS update download delay due to the current install now workflow."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && [[ $schedule_automatic_download_max_days -eq 0 ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: This system will always ignore the automatic macOS update download delay because the --schedule-automatic-download-max-days option is set for 0 days."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && [[ $schedule_automatic_download_max_days -gt 0 ]] && [[ $((schedule_zero_date_epoch + (schedule_automatic_download_max_days * 86400) )) -le $workflow_time_epoch ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS update download delay because it has been defered for more than $schedule_automatic_download_max_days days."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && [[ "${workflow_scheduled_install_now}" == "TRUE" ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS update download delay due to the current scheduled installation workflow."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && [[ -n "${workflow_scheduled_install_epoch}" ]] && [[ $((workflow_scheduled_install_epoch - workflow_time_epoch)) -le 86400 ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS update download delay because a scheduled installation is within 24 hours."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && { [[ "${deadline_date_status}" != "FALSE" ]] || [[ "${deadline_days_status}" != "FALSE" ]] || [[ "${deadline_count_status}" != "FALSE" ]]; } && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS update download delay due to current deadline workflow."
+			[[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]] && [[ -n "${deadline_epoch}" ]] && [[ $((deadline_epoch - workflow_time_epoch)) -le 86400 ]] && ignore_msu_macos_setting_automatic_download_deferral="TRUE" && log_super "Warning: Ignoring automatic macOS update download delay because a deadline is within 24 hours."
 			# Only defer the automatic download if the workflow can wait.
 			if [[ "${ignore_msu_macos_setting_automatic_download_deferral}" == "FALSE" ]]; then
 				if [[ "${msu_macos_setting_automatic_download_ramped}" != "FALSE" ]]; then
@@ -7731,6 +7828,8 @@ get_external_display_config() {
 	[[ -z "${DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE}" ]] && DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE=$(jq -r '.DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE, failing over to super default value."
 	DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE=$(jq -r '.DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}" ]] && DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE=$(jq -r '.DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE, failing over to super default value."
+	DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE=$(jq -r '.DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE // empty' "${display_config_json}" 2> /dev/null)
+	[[ -z "${DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE}" ]] && DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE=$(jq -r '.DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE, failing over to super default value."
 	DISPLAY_STRING_INFO_BOX_DEADLINE_NONE=$(jq -r '.DISPLAY_STRING_INFO_BOX_DEADLINE_NONE // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}" ]] && DISPLAY_STRING_INFO_BOX_DEADLINE_NONE=$(jq -r '.DISPLAY_STRING_INFO_BOX_DEADLINE_NONE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_INFO_BOX_DEADLINE_NONE, failing over to super default value."
 	DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING=$(jq -r '.DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING // empty' "${display_config_json}" 2> /dev/null)
@@ -7751,6 +7850,10 @@ get_external_display_config() {
 	[[ -z "${DISPLAY_STRING_SCHEDULE_RESTART}" ]] && DISPLAY_STRING_SCHEDULE_RESTART=$(jq -r '.DISPLAY_STRING_SCHEDULE_RESTART // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_SCHEDULE_RESTART, failing over to super default value."
 	DISPLAY_STRING_SCHEDULE_INSTALL=$(jq -r '.DISPLAY_STRING_SCHEDULE_INSTALL // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_STRING_SCHEDULE_INSTALL}" ]] && DISPLAY_STRING_SCHEDULE_INSTALL=$(jq -r '.DISPLAY_STRING_SCHEDULE_INSTALL // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_SCHEDULE_INSTALL, failing over to super default value."
+	DISPLAY_STRING_SCHEDULE_SELECT_DATE=$(jq -r '.DISPLAY_STRING_SCHEDULE_SELECT_DATE // empty' "${display_config_json}" 2> /dev/null)
+	[[ -z "${DISPLAY_STRING_SCHEDULE_SELECT_DATE}" ]] && DISPLAY_STRING_SCHEDULE_SELECT_DATE=$(jq -r '.DISPLAY_STRING_SCHEDULE_SELECT_DATE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_SCHEDULE_SELECT_DATE, failing over to super default value."
+	DISPLAY_STRING_SCHEDULE_SELECT_TIME=$(jq -r '.DISPLAY_STRING_SCHEDULE_SELECT_TIME // empty' "${display_config_json}" 2> /dev/null)
+	[[ -z "${DISPLAY_STRING_SCHEDULE_SELECT_TIME}" ]] && DISPLAY_STRING_SCHEDULE_SELECT_TIME=$(jq -r '.DISPLAY_STRING_SCHEDULE_SELECT_TIME // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_SCHEDULE_SELECT_TIME, failing over to super default value."
 	DISPLAY_STRING_RESCHEDULE=$(jq -r '.DISPLAY_STRING_RESCHEDULE // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_STRING_RESCHEDULE}" ]] && DISPLAY_STRING_RESCHEDULE=$(jq -r '.DISPLAY_STRING_RESCHEDULE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_STRING_RESCHEDULE, failing over to super default value."
 	DISPLAY_STRING_CANCEL=$(jq -r '.DISPLAY_STRING_CANCEL // empty' "${display_config_json}" 2> /dev/null)
@@ -7813,6 +7916,10 @@ get_external_display_config() {
 	[[ -z "${DISPLAY_DIALOG_MESSAGE_DEADLINE_DATE}" ]] && DISPLAY_DIALOG_MESSAGE_DEADLINE_DATE=$(jq -r '.DISPLAY_DIALOG_MESSAGE_DEADLINE_DATE // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_DIALOG_MESSAGE_DEADLINE_DATE, failing over to super default value."
 	DISPLAY_DIALOG_MESSAGE_DEADLINE_COUNT=$(jq -r '.DISPLAY_DIALOG_MESSAGE_DEADLINE_COUNT // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_DIALOG_MESSAGE_DEADLINE_COUNT}" ]] && DISPLAY_DIALOG_MESSAGE_DEADLINE_COUNT=$(jq -r '.DISPLAY_DIALOG_MESSAGE_DEADLINE_COUNT // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_DIALOG_MESSAGE_DEADLINE_COUNT, failing over to super default value."
+	DISPLAY_NOTIFICATION_WINDOW_POSITION=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_POSITION // empty' "${display_config_json}" 2> /dev/null)
+	[[ -z "${DISPLAY_NOTIFICATION_WINDOW_POSITION}" ]] && DISPLAY_NOTIFICATION_WINDOW_POSITION=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_POSITION // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_WINDOW_POSITION, failing over to super default value."
+	DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS // empty' "${display_config_json}" 2> /dev/null)
+	[[ -z "${DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS}" ]] && DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS, failing over to super default value."
 	DISPLAY_NOTIFICATION_WINDOW_SIZE_WIDTH_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_SIZE_WIDTH_PIXELS // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_NOTIFICATION_WINDOW_SIZE_WIDTH_PIXELS}" ]] && DISPLAY_NOTIFICATION_WINDOW_SIZE_WIDTH_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_SIZE_WIDTH_PIXELS // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_WINDOW_SIZE_WIDTH_PIXELS, failing over to super default value."
 	DISPLAY_NOTIFICATION_WINDOW_SIZE_HEIGHT_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_WINDOW_SIZE_HEIGHT_PIXELS // empty' "${display_config_json}" 2> /dev/null)
@@ -7821,8 +7928,6 @@ get_external_display_config() {
 	[[ -z "${DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_ADD_HEIGHT_PIXELS}" ]] && DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_ADD_HEIGHT_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_ADD_HEIGHT_PIXELS // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_ADD_HEIGHT_PIXELS, failing over to super default value."
 	DISPLAY_NOTIFICATION_ICON_SIZE_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_ICON_SIZE_PIXELS // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_NOTIFICATION_ICON_SIZE_PIXELS}" ]] && DISPLAY_NOTIFICATION_ICON_SIZE_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_ICON_SIZE_PIXELS // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_ICON_SIZE_PIXELS, failing over to super default value."
-	DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS // empty' "${display_config_json}" 2> /dev/null)
-	[[ -z "${DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS}" ]] && DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS=$(jq -r '.DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS, failing over to super default value."
 	DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_SCHEDULED=$(jq -r '.DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_SCHEDULED // empty' "${display_config_json}" 2> /dev/null)
 	[[ -z "${DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_SCHEDULED}" ]] && DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_SCHEDULED=$(jq -r '.DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_SCHEDULED // empty' "${SUPER_DISPLAY_DEFAULTS_FOLDER}/${FAILOVER_LOCALE_IDENTIFIER}/${SUPER_DISPLAY_CONFIG_FILENAME_JSON}" 2> /dev/null) && log_super "Display Warning: The ${display_config_json} does not contain a value for DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_SCHEDULED, failing over to super default value."
 	DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_DATE=$(jq -r '.DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_DATE // empty' "${display_config_json}" 2> /dev/null)
@@ -7855,7 +7960,7 @@ convert_display_asset() {
 	fi
 }
 
-# Set a variety of custom display assets including ${display_dialog_banner_*}, ${display_background_*}, ${display_icon_*}, ${display_more_info_custom_url_url}, ${display_help_message_path}, and ${display_string_target}.
+# Set a variety of custom display assets including ${display_dialog_banner_*}, ${display_background_*}, ${display_icon_*}, ${display_more_info_url}, ${display_help_message_path}, and ${display_string_target}.
 set_display_config() {
 	set_display_config_ready="FALSE"
 	local previous_umask && previous_umask=$(umask) && umask 066
@@ -8310,19 +8415,19 @@ set_display_config() {
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_icon_overlay_path is: ${display_icon_overlay_path}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_icon_overlay_dark_path is: ${display_icon_overlay_dark_path}"
 	
-	# If there is a (custom) ${display_more_info_custom_url} then attempt to set ${display_more_info_custom_url_url}.
-	display_more_info_custom_url_url="FALSE"
+	# If there is a (custom) ${display_more_info_custom_url} then attempt to set ${display_more_info_url}.
+	display_more_info_url="FALSE"
 	if [[ -n "${display_more_info_custom_url}" ]]; then
 		local curl_response && curl_response=$(curl --user-agent "${SUPER_USER_AGENT}" --silent --head --location "${display_more_info_custom_url}" | head -1)
 		if [[ $(echo "${curl_response}" | tail -n 1 | grep -c -E "${REGEX_HTTP_OK_STATUS}") -gt 0 ]]; then
-			display_more_info_custom_url_url="${display_more_info_custom_url}"
+			display_more_info_url="${display_more_info_custom_url}"
 		else
 			log_super "Display Error: Unable to verify custom more info URL at ${display_more_info_custom_url} which returned an HTTP status: ${curl_response}"
 			log_super "Display Warning: Unable to use custom more info URL because the specified asset could not be verified, using default more info URLs."
 		fi
 		unset curl_response
 	fi
-	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_more_info_custom_url_url is: ${display_more_info_custom_url_url}"
+	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_more_info_url is: ${display_more_info_url}"
 	
 	# If there is a ${display_help_image} then attempt to set ${display_help_image_path}.
 	display_help_image_path="FALSE"
@@ -8381,7 +8486,6 @@ set_display_config() {
 
 # Set a variety of display configurations based on ${workflow_target} including; ${display_string_target}, non-customized ${display_icon_*},and ${display_string_infobox}.
 set_display_workflow_target(){
-	set_display_workflow_target_ready="FALSE"
 	local previous_umask && previous_umask=$(umask) && umask 066
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_target is: ${workflow_target}"
 	
@@ -8390,27 +8494,31 @@ set_display_workflow_target(){
 		display_string_target="${msu_safari_target}"
 		display_action_type="INSTALL"
 		[[ "${display_icon_is_custom}" == "FALSE" ]] && display_icon_path="${APP_SAFARI_PATH}" && display_icon_dark_path="${APP_SAFARI_PATH}"
-		if [[ "${display_more_info_custom_url_url}" == "FALSE" ]] && [[ -f "${SOFA_SAFARI_CACHE_JSON}" ]]; then
+		display_string_more_info="${msu_safari_target}"
+		if [[ "${display_more_info_url}" == "FALSE" ]] && [[ -f "${SOFA_SAFARI_CACHE_JSON}" ]]; then
 			local sofa_safari_target_info_url && sofa_safari_target_info_url=$(jq -r --arg safari_version "$(echo "${msu_safari_target}" | awk '{print $2}')" '.AppVersions[].SecurityReleases[] | select(.ProductVersion == $safari_version) | .SecurityInfo // empty' "${SOFA_SAFARI_CACHE_JSON}" 2> /dev/null)
-			[[ -n "${sofa_safari_target_info_url}" ]] && display_more_info_custom_url_url="${sofa_safari_target_info_url}"
+			[[ -n "${sofa_safari_target_info_url}" ]] && display_more_info_url="${sofa_safari_target_info_url}"
 		fi
-		[[ "${display_more_info_custom_url_url}" == "FALSE" ]] && display_more_info_custom_url_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}" && log_super "Display Warning: Unable to get version-specific Safari update more info URL from the SOFA Safari feed, using failover more info Apple security releases URL."
+		[[ "${display_more_info_url}" == "FALSE" ]] && display_more_info_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}" && log_super "Display Warning: Unable to get version-specific Safari update more info URL from the SOFA Safari feed, using failover more info Apple security releases URL."
 	elif [[ "${workflow_target}" == "Non-system Software Updates" ]]; then
 		display_string_title="${DISPLAY_STRING_TITLE_NON_SYSTEM_UPDATES}"
 		display_string_target="${DISPLAY_STRING_TARGET_NON_SYSTEM_UPDATES}"
 		display_action_type="INSTALL"
 		[[ "${display_icon_is_custom}" == "FALSE" ]] && display_icon_path="${APP_STORE_PATH}" && display_icon_dark_path="${APP_STORE_PATH}"
-		[[ "${display_more_info_custom_url_url}" == "FALSE" ]] && display_more_info_custom_url_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}"
+		display_string_more_info="${DISPLAY_STRING_TITLE_NON_SYSTEM_UPDATES}"
+		[[ "${display_more_info_url}" == "FALSE" ]] && display_more_info_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}"
 	elif [[ "${workflow_target}" == "Jamf Pro Policy Triggers Without Restarting" ]] || [[ "${workflow_target}" == "Jamf Pro Policy Triggers With Restart" ]]; then
 		display_string_title="${DISPLAY_STRING_TITLE_JAMF_PRO_POLICY}"
 		display_string_target="${DISPLAY_STRING_TARGET_JAMF_PRO_POLICY}"
 		display_action_type="INSTALL"
 		[[ "${display_icon_is_custom}" == "FALSE" ]] && display_icon_path="${APP_JAMF_PRO_PATH}" && display_icon_dark_path="${APP_JAMF_PRO_PATH}"
+		display_string_more_info="${DISPLAY_STRING_TITLE_JAMF_PRO_POLICY}"
 	elif [[ "${workflow_target}" == "Restart Without Updates" ]]; then
 		display_string_title="${DISPLAY_STRING_TITLE_RESTART_WITHOUT_UPDATES}"
 		display_string_target="${DISPLAY_STRING_TARGET_RESTART_WITHOUT_UPDATES}"
 		display_action_type="RESTART"
 		[[ "${display_icon_is_custom}" == "FALSE" ]] && display_icon_path="${APP_SYSTEM_SETTINGS_PATH}" && display_icon_dark_path="${APP_SYSTEM_SETTINGS_PATH}"
+		display_string_more_info="${DISPLAY_STRING_TITLE_RESTART_WITHOUT_UPDATES}"
 	else # Standard macOS update/upgrade workflows.
 		# shellcheck disable=SC2001
 		display_string_title="${DISPLAY_STRING_TITLE_MACOS_UPDATE}"
@@ -8475,32 +8583,41 @@ set_display_workflow_target(){
 				[[ -f "${display_icon_path}" ]] && set_pref_main "DisplayIconMacOSCachedOrigin" "${display_icon_macos}"
 			fi
 		fi
-		if [[ "${display_more_info_custom_url_url}" == "FALSE" ]] && [[ -f "${SOFA_MACOS_CACHE_JSON}" ]]; then
+		display_string_more_info="${workflow_target//-*/}"
+		if [[ "${display_more_info_url}" == "FALSE" ]] && [[ -f "${SOFA_MACOS_CACHE_JSON}" ]]; then
 			local sofa_macos_target_info_url && sofa_macos_target_info_url=$(jq -r --arg macos_version "$(echo "${workflow_target}" | awk '{print $2}' | sed -e 's/-.*//')" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version) | .SecurityInfo // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)
-			[[ -n "${sofa_macos_target_info_url}" ]] && display_more_info_custom_url_url="${sofa_macos_target_info_url}"
+			[[ -n "${sofa_macos_target_info_url}" ]] && display_more_info_url="${sofa_macos_target_info_url}"
 		fi
-		[[ "${display_more_info_custom_url_url}" == "FALSE" ]] && display_more_info_custom_url_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}" && log_super "Display Warning: Unable to get version-specific macOS update/upgrade more info URL from the SOFA macOS feed, using failover more info Apple security releases URL."
+		[[ "${display_more_info_url}" == "FALSE" ]] && display_more_info_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}" && log_super "Display Warning: Unable to get version-specific macOS update/upgrade more info URL from the SOFA macOS feed, using failover more info Apple security releases URL."
 	fi
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_title is: ${display_string_title}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_target is: ${display_string_target}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_action_type is: ${display_action_type}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_icon_path is: ${display_icon_path}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_icon_dark_path is: ${display_icon_dark_path}"
-	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_more_info_custom_url_url is: ${display_more_info_custom_url_url}"
+	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_more_info is: ${display_string_more_info}"
+	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_more_info_url is: ${display_more_info_url}"
 	umask "${previous_umask}"
 	find "${SUPER_CACHES_FOLDER}" -maxdepth 1 -type f -name "tmp*" -delete > /dev/null 2>&1
-	
-	# Based on the ${workflow_target} create the ${display_string_infobox}.
-	display_string_infobox=""
-	[[ "${display_more_info_custom_url_url}" != "FALSE" ]] && display_string_infobox+="__${display_string_target}__${DISPLAY_STRING_BR}[${DISPLAY_STRING_INFO_BOX_MORE_INFO}](${display_more_info_custom_url_url})${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
-	[[ -n "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "RESTART" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
-	[[ -n "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "INSTALL" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
-	[[ -z "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "RESTART" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
-	[[ -z "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "INSTALL" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
-	[[ -n "${display_string_deadline_count}" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${display_string_deadline_count}${DISPLAY_STRING_INFO_BOX_DEFERRALS_SEPARATOR}${display_string_deadline_count_maximum}"
-	[[ -z "${display_string_deadline_count}" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEFERRALS_UNLIMITED}"
-	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_infobox is:\n${display_string_infobox}"
 	set_display_workflow_target_ready="TRUE"
+}
+
+# Based on the ${workflow_target} create the ${display_string_infobox}.
+set_display_infobox() {
+	display_string_infobox=""
+	[[ "${display_more_info_url}" != "FALSE" ]] && display_string_infobox+="__${display_string_more_info}__${DISPLAY_STRING_BR}[${DISPLAY_STRING_INFO_BOX_MORE_INFO}](${display_more_info_url})${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
+	if [[ "${FUNCNAME[1]}" != "dialog_schedule_reminder" ]]; then
+		[[ -n "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "RESTART" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
+		[[ -n "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "INSTALL" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
+		[[ -z "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "RESTART" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
+		[[ -z "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "INSTALL" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
+		[[ -n "${display_string_deadline_count}" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${display_string_deadline_count}${DISPLAY_STRING_INFO_BOX_DEFERRALS_SEPARATOR}${display_string_deadline_count_maximum}"
+		[[ -z "${display_string_deadline_count}" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEFERRALS_UNLIMITED}"
+	else # dialog_schedule_reminder()
+		[[ -n "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_active}" == "TRUE" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
+	fi
+	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_infobox is:\n${display_string_infobox}"
+	set_display_infobox_ready="TRUE"
 }
 
 # Given the calling function's name ${FUNCNAME[1]}, using either ${display_config_is_custom_folder} or the super defaults, evaluate and export the display message to the ${display_message_temp_md} file and also set ${display_string_deadline}.
@@ -8521,8 +8638,8 @@ set_display_message() {
 		[[ $(echo "${FUNCNAME[1]}" | grep -c 'notification') -gt 0 ]] && display_string_deadline=$(eval echo "${DISPLAY_NOTIFICATION_MESSAGE_DEADLINE_COUNT}")
 	fi
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_deadline is: ${display_string_deadline}"
-	{ [[ "${test_display_function_option}" == "dialog_soft_deadline" ]] || [[ "${display_string_deadline}" == "FALSE" ]]; } && local display_message_import_filename="${FUNCNAME[1]}.md"
-	[[ "${test_display_function_option}" != "dialog_soft_deadline" ]] && [[ "${display_string_deadline}" != "FALSE" ]] && local display_message_import_filename="${FUNCNAME[1]}_deadline.md"
+	{ [[ "${FUNCNAME[1]}" == "dialog_soft_deadline" ]] || [[ "${FUNCNAME[1]}" == "notification_failed" ]] || [[ "${display_string_deadline}" == "FALSE" ]]; } && local display_message_import_filename="${FUNCNAME[1]}.md"
+	[[ "${FUNCNAME[1]}" != "dialog_soft_deadline" ]] && [[ "${FUNCNAME[1]}" != "notification_failed" ]] && [[ "${display_string_deadline}" != "FALSE" ]] && local display_message_import_filename="${FUNCNAME[1]}_deadline.md"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_message_import_filename is: ${display_message_import_filename}"
 	
 	# Given ${display_config_is_custom_folder} and ${display_message_import_filename} try to set an appropriate ${display_message_import_path}.
@@ -8753,9 +8870,10 @@ open_notification_swift_dialog() {
 	[[ "${display_icon_overlay_path}" != "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_overlay_icon "${display_icon_overlay_path}:dark=${display_icon_overlay_dark_path}" '. + { "overlayicon": $display_overlay_icon }')
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${display_help_image_path}" == "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_help_message "${display_help_message_temp_md}" --arg display_help_alignment "${DISPLAY_HELP_MESSAGE_ALIGNMENT}" --arg display_help_button "${DISPLAY_STRING_OK}" '. + { "helpmessage": $display_help_message, "helpalignment": $display_help_alignment, "helpsheetbuttontext": $display_help_button }')
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${display_help_image_path}" != "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_help_message "${display_help_message_temp_md}" --arg display_help_alignment "${DISPLAY_HELP_MESSAGE_ALIGNMENT}" --arg display_help_image "${display_help_image_path}" --arg display_help_button "${DISPLAY_STRING_OK}" '. + { "helpmessage": $display_help_message, "helpalignment": $display_help_alignment, "helpimage": $display_help_image, "helpsheetbuttontext": $display_help_button }')
-	[[ "${display_notifications_centered_status}" != "TRUE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg corner_offset "${DISPLAY_NOTIFICATION_CORNER_OFFSET_PIXELS}" '. + { "position": "topright", "positionoffset": $corner_offset }')
+	[[ "${display_notifications_centered_status}" != "TRUE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg window_position "${DISPLAY_NOTIFICATION_WINDOW_POSITION}" --arg window_position_offset "${DISPLAY_NOTIFICATION_WINDOW_POSITION_OFFSET_PIXELS}" '. + { "position": $window_position, "positionoffset": $window_position_offset }')
 	[[ "${display_notifications_centered_status}" == "TRUE" ]] && dialog_json=$(echo "${dialog_json}" | jq '. + { "position": "center" }')
 	{ [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && dialog_json=$(echo "${dialog_json}" | jq '. + { "blurscreen": true }')
+	{ [[ "${display_movable_status}" == "TRUE" ]] || [[ "${display_movable_status}" == "TEMP" ]]; } && dialog_json=$(echo "${dialog_json}" | jq '. + { "moveable": true }')
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ "${display_silently_status}" != "TEMP" ]]; } && dialog_json=$(echo "${dialog_json}" | jq --arg dialog_sound "${current_user_alert_sound}" '. + { "sound": $dialog_sound }')
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: current_user_appearance_mode is: ${current_user_appearance_mode}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_json is:\n${dialog_json}"
@@ -8795,6 +8913,7 @@ open_dialog_swift_dialog() {
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${display_help_image_path}" == "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_help_message "${display_help_message_temp_md}" --arg display_help_alignment "${DISPLAY_HELP_MESSAGE_ALIGNMENT}" --arg display_help_button "${DISPLAY_STRING_OK}" '. + { "helpmessage": $display_help_message, "helpalignment": $display_help_alignment, "helpsheetbuttontext": $display_help_button }')
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${display_help_image_path}" != "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_help_message "${display_help_message_temp_md}" --arg display_help_alignment "${DISPLAY_HELP_MESSAGE_ALIGNMENT}" --arg display_help_image "${display_help_image_path}" --arg display_help_button "${DISPLAY_STRING_OK}" '. + { "helpmessage": $display_help_message, "helpalignment": $display_help_alignment, "helpimage": $display_help_image, "helpsheetbuttontext": $display_help_button }')
 	{ [[ "${display_hide_background_status}" == "TRUE" ]] || [[ "${display_hide_background_status}" == "TEMP" ]]; } && dialog_json=$(echo "${dialog_json}" | jq '. + { "blurscreen": true }')
+	{ [[ "${display_movable_status}" == "TRUE" ]] || [[ "${display_movable_status}" == "TEMP" ]]; } && dialog_json=$(echo "${dialog_json}" | jq '. + { "moveable": true }')
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ "${display_silently_status}" != "TEMP" ]]; } && dialog_json=$(echo "${dialog_json}" | jq --arg dialog_sound "${current_user_alert_sound}" '. + { "sound": $dialog_sound }')
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_json is:\n${dialog_json}"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_message_temp_md is: ${display_message_temp_md}"
@@ -8997,6 +9116,7 @@ dialog_insufficient_storage() {
 	# Display dialog parameter and message Markdown configuration, then create the initial ${dialog_json}.
 	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
 	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_infobox_ready}" != "TRUE" ]] && set_display_infobox
 	set_display_message
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
 	dialog_json=$(jq -n '{ "button1text": "none" }')
@@ -9005,6 +9125,7 @@ dialog_insufficient_storage() {
 	[[ -n $dialog_timeout_insufficient_storage_seconds ]] && dialog_timeout_seconds=$dialog_timeout_insufficient_storage_seconds
 	{ [[ -z $dialog_timeout_insufficient_storage_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	[[ "${display_hide_background_status}" == "TRUE" ]] && display_hide_background_status="TEMPOFF"
+	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'ERROR') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'ERROR') -gt 0 ]]; } && display_silently_status="TEMP"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_json is:\n${dialog_json}"
 	
@@ -9070,6 +9191,7 @@ dialog_power_required() {
 	# Display dialog parameter and message Markdown configuration, then create the initial ${dialog_json}.
 	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
 	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_infobox_ready}" != "TRUE" ]] && set_display_infobox
 	set_display_message
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
 	dialog_json=$(jq -n '{ "button1text": "none" }')
@@ -9078,6 +9200,7 @@ dialog_power_required() {
 	[[ -n $dialog_timeout_power_required_seconds ]] && dialog_timeout_seconds=$dialog_timeout_power_required_seconds
 	{ [[ -z $dialog_timeout_power_required_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'ERROR') -gt 0 ]]; } && display_hide_background_status="TEMP"
+	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'ERROR') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'ERROR') -gt 0 ]]; } && display_silently_status="TEMP"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_json is:\n${dialog_json}"
 	[[ -z "${test_display_function_option}" ]] && open_dialog_swift_dialog &
@@ -9123,6 +9246,7 @@ dialog_user_choice() {
 	# Display dialog parameter and message Markdown configuration.
 	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
 	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_infobox_ready}" != "TRUE" ]] && set_display_infobox
 	set_display_message
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
 	[[ -n "${deferral_timer_menu_minutes}" ]] && set_deferral_menu
@@ -9133,6 +9257,7 @@ dialog_user_choice() {
 	[[ -n $dialog_timeout_user_choice_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_choice_seconds
 	{ [[ -z $dialog_timeout_user_choice_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
+	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_json is:\n${dialog_json}"
 	
@@ -9158,6 +9283,7 @@ dialog_user_choice() {
 	
 	# Reset temporary display dialog items.
 	[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+	[[ "${display_movable_status}" == "TEMP" ]] && unset display_movable_status
 	[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
 	find "${SUPER_CACHES_FOLDER}" -maxdepth 1 -type f -name "tmp*" -delete > /dev/null 2>&1
 	unset display_message_temp_md
@@ -9202,9 +9328,7 @@ dialog_user_choice() {
 	fi
 }
 
-# FIXME: Currently on hold due to pending DDM integration.
-# Display an interactive dialog allowing the user to schedule an installation.
-# shellcheck disable=all
+# Display an interactive dialog allowing the user to schedule an installation, thus setting ${workflow_scheduled_install}.
 dialog_user_schedule() {
 	# First check if the user's password needs to be saved.
 	if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && [[ "${workflow_target}" != "Non-system Software Updates" ]] && [[ "${workflow_target}" != "Safari Update" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers Without Restarting" ]] && [[ "${workflow_target}" != "Jamf Pro Policy Triggers With Restart" ]] && [[ "${workflow_target}" != "Restart Without Updates" ]]; then
@@ -9219,215 +9343,173 @@ dialog_user_schedule() {
 		fi
 	fi
 	
-	# Start preparing for use schedule dialog.
-	dialog_temp_json="$(mktemp).json"
-	log_status "Running: Dialog user scheduled installation."
+	# Display dialog parameter and message Markdown configuration.
+	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_infobox_ready}" != "TRUE" ]] && set_display_infobox
+	set_display_message
+	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
+	[[ "${display_action_type}" == "RESTART" ]] && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_RESTART}"
+	[[ "${display_action_type}" == "INSTALL" ]] && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_INSTALL}"
 	unset dialog_timeout_seconds
-	[[ -n $dialog_timeout_user_schedule_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_schedule_seconds
-	{ [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
-	[[ -n "${dialog_timeout_seconds}" ]] && log_super "Display Status: User scheduled install selection dialog with a ${dialog_timeout_seconds} second timeout."
-	[[ -z "${dialog_timeout_seconds}" ]] && log_super "Display Status: User scheduled install selection dialog with no timeout."
-	
-	# Set the user schedule title and buttons display strings.
-	if [[ "${workflow_target}" == "Non-system Software Updates" ]] || [[ "${workflow_target}" == "Safari Update" ]] || [[ "${workflow_target}" == "Jamf Pro Policy Triggers Without Restarting" ]]; then
-		local display_string_user_schedule_title="${display_string_user_schedule_install_title}"
-		local dialog_user_schedule_button="${DISPLAY_STRING_SCHEDULE_INSTALL}"
-	else # Default restart workflows.
-		local display_string_user_schedule_title="${display_string_user_schedule_restart_title}"
-		local dialog_user_schedule_button="${DISPLAY_STRING_SCHEDULE_RESTART}"
-	fi
-	
-	# Create initial ${swift_dialog_array} settings for the dialog.
-	swift_dialog_array=(--title "${display_string_user_schedule_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --button1text "${dialog_user_schedule_button}" --button2text "${DISPLAY_STRING_CANCEL}")
-	
-	# Body text variations based on deadline options, also set ${display_accessory_datepicker_payload}.
-	local display_accessory_datepicker_start_epoch && display_accessory_datepicker_start_epoch=$((workflow_time_epoch + (DIALOG_USER_SCHEDULE_MINIMUM_SELECTION_MINUTES * 60) + 1))
-	local display_accessory_datepicker_start_date && display_accessory_datepicker_start_date=$(date -j -f %s "${display_accessory_datepicker_start_epoch}" +"%Y/%m/%d %H:%M:%S" | xargs)
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_accessory_datepicker_start_date is: ${display_accessory_datepicker_start_date}"
-	if [[ -n "${deadline_epoch}" ]]; then # Show date deadline.
-		swift_dialog_array+=(--message "${display_string_user_schedule_date_body}")
-		local display_accessory_datepicker_end_epoch && display_accessory_datepicker_end_epoch=$((deadline_epoch + 1))
-		local display_accessory_datepicker_end_date && display_accessory_datepicker_end_date=$(date -j -f %s "${display_accessory_datepicker_end_epoch}" +"%Y/%m/%d %H:%M:%S" | xargs)
-		log_super "Display Status: Scheduled install selection starts at ${display_accessory_datepicker_start_date} with a maximum end date of ${display_accessory_datepicker_end_date}."
-		display_accessory_datepicker_payload="/title ${display_string_user_schedule_calendar_title} /preselection ${display_accessory_datepicker_start_date} /start_date ${display_accessory_datepicker_start_date} /end_date ${display_accessory_datepicker_end_date} /style compact"
-	else # Show no deadlines.
-		swift_dialog_array+=(--message "${display_string_user_schedule_default_body}")
-		log_super "Display Status: Scheduled install selection starts at ${display_accessory_datepicker_start_date} with no maximum end date."
-		display_accessory_datepicker_payload="/title ${display_string_user_schedule_calendar_title} /preselection ${display_accessory_datepicker_start_date} /start_date ${display_accessory_datepicker_start_date} /style compact"
-	fi
-	[[ -n "${dialog_timeout_seconds}" ]] && display_string_dialog_timeout="${display_string_user_schedule_timeout}"
-	
-	# Manage ${display_hide_background} and ${display_silently}.
+# FIXME: An issue with swiftDialog prevents timeout from working with the time/date pickers.
+#	[[ -n $dialog_timeout_user_schedule_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_schedule_seconds
+#	{ [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
+	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
+	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_json is:\n${dialog_json}"
 	
-	# Start the dialog.
-	dialog_type="SCHEDULE"
+	# Create the initial ${dialog_json} and then start the open_dialog_swift_dialog() function.
+	dialog_json=$(jq -n --arg display_button_1 "${dialog_schedule_button}" --arg display_button_2 "${DISPLAY_STRING_CANCEL}" '{ "button1text": $display_button_1, "button2text": $display_button_2 }')
+	dialog_json=$(echo "${dialog_json}" | jq --arg display_icon "${display_icon_path}:dark=${display_icon_dark_path}" --arg display_icon_alpha "${DISPLAY_ICON_ALPHA}" '. + { "icon": $display_icon, "iconalpha": $display_icon_alpha }')
+	local dialog_user_schedule_select_minimum_epoch && dialog_user_schedule_select_minimum_epoch=$(( workflow_time_epoch + (DIALOG_USER_SCHEDULE_SELECT_MINIMUM_MINUTES * 60) ))
+	local dialog_user_schedule_select_minimum_date && dialog_user_schedule_select_minimum_date=$(date -j -f %s "${workflow_time_epoch}" +%Y-%m-%d)
+	[[ -n "${deadline_epoch}" ]] && local dialog_user_schedule_select_maximum_date && dialog_user_schedule_select_maximum_date=$(date -j -f %s "${deadline_epoch}" +%Y-%m-%d)
+	[[ -z "${deadline_epoch}" ]] && local dialog_user_schedule_select_maximum_date && dialog_user_schedule_select_maximum_date=$(date -j -f %s $(( workflow_time_epoch + (DIALOG_USER_SCHEDULE_SELECT_MAXIMUM_DAYS * 86400) )) +%Y-%m-%d)
+	dialog_json=$(echo "${dialog_json}" | jq --arg display_field_title_time "${DISPLAY_STRING_SCHEDULE_SELECT_TIME}" --arg display_field_default_time "$(date -j -f %s ${dialog_user_schedule_select_minimum_epoch} +%H:%M)" --arg display_field_min_time "${DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE%%-*}" --arg display_field_max_time "${DIALOG_USER_SCHEDULE_SELECT_TIME_RANGE#*-}" --arg display_field_title_date "${DISPLAY_STRING_SCHEDULE_SELECT_DATE}" --arg display_field_min_date "${dialog_user_schedule_select_minimum_date}" --arg display_field_max_date "${dialog_user_schedule_select_maximum_date}" '. + { "textfield": [ { "name": "time", "time": true, "title": $display_field_title_time, "value": $display_field_default_time, "mintime": $display_field_min_time, "maxtime": $display_field_max_time }, { "name": "date", "date": true, "title": $display_field_title_date, "mindate": $display_field_min_date, "maxdate": $display_field_max_date } ] }')
 	open_dialog_swift_dialog
-	unset dialog_type
 	
-	# Reset temporary ${display_hide_background} and ${display_silently}.
+	# Reset temporary display dialog items.
 	[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+	[[ "${display_movable_status}" == "TEMP" ]] && unset display_movable_status
 	[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
-
-	# The ${dialog_return} contains the IBM Notifier.app return code. If the user selected a scheduled restart then prepare and call the set_scheduled_install_deferral() function or if the dialog timed out then set ${deferral_timer_minutes}.
-	case $dialog_return in
-	0)
-		if [[ $(echo "${dialog_result}" | grep -Ec 'am|pm') -gt 0 ]]; then
-			local dialog_user_schedule_selection=$(echo "${dialog_result}" | tr '[:space:]' ':' | sed -e 's/[0-9][0-9]:am:$/00:am/' -e 's/[0-9][0-9]:pm:$/00:pm/')
-			local dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%I:%M:%S:%p "${dialog_user_schedule_selection}" +%s)
-		else # Default 24h time.
-			local dialog_user_schedule_selection=$(echo "${dialog_result}" | tr '[:space:]' ':' | sed -e 's/[0-9][0-9]:$/00/')
-			local dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${dialog_user_schedule_selection}" +%s)
-		fi
-		local dialog_user_schedule_minimum_selection_epoch=$((workflow_time_epoch + 121))
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection is: ${dialog_user_schedule_selection}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_epoch is: ${dialog_user_schedule_selection_epoch}"
-		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_minimum_selection_epoch is: ${dialog_user_schedule_minimum_selection_epoch}"
-		if [[ $dialog_user_schedule_selection_epoch -lt $dialog_user_schedule_minimum_selection_epoch ]]; then
-			log_super "Warning: Adjusting user selected scheduled installation because it's in the past or less than two minutes from now."
-			workflow_scheduled_install=$(date -r "${dialog_user_schedule_minimum_selection_epoch}" +%Y-%m-%d:%H:%M)
-		fi
-		if [[ -n "${deadline_epoch}" ]] && [[ $dialog_user_schedule_selection_epoch -gt $display_accessory_datepicker_end_epoch ]]; then
-			log_super "Warning: Adjusting user selected scheduled installation because it's past the current workflow deadline."
-			workflow_scheduled_install=$(date -r "${display_accessory_datepicker_end_epoch}" +%Y-%m-%d:%H:%M)
-		fi
-		[[ -z "${workflow_scheduled_install}" ]] && workflow_scheduled_install=$(date -r "${dialog_user_schedule_selection_epoch}" +%Y-%m-%d:%H:%M)
-		log_super "Status: User chose to schedule installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}."
-		log_metrics "Display User Schedule Set: Workflow Elapsed Time" "WorkflowTargetTimestamp"
-		if [[ -n "${schedule_workflow_active}" ]]; then
-			set_schedule_workflow_active_adjustments
-			if [[ -n "${workflow_scheduled_install_adjusted}" ]]; then
-				workflow_scheduled_install="${workflow_scheduled_install_adjusted}"
-				[[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]] && log_super "Status: Setting new user selected scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of a workflow active time frame that closest matches the user's choice."
-			else
-				log_super "Warning: The current user selected scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} is overriding the schedule workflow active option because no coordinating time frame could be resolved."
+	find "${SUPER_CACHES_FOLDER}" -maxdepth 1 -type f -name "tmp*" -delete > /dev/null 2>&1
+	unset display_message_temp_md
+	
+	# (If not testing a display function) Handle the ${display_dialog_return} and ${display_dialog_result} after the dialog has closed.
+	if [[ -z "${test_display_function_option}" ]]; then
+		case $display_dialog_return in
+		2)
+			log_super "Status: User chose to cancel schedule selection."
+			log_metrics "Display User Schedule Cancel: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+			dialog_user_choice # This function includes all workflows to facilitate user choices.
+			;;
+		4)
+			log_super "Status: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
+			log_status "Pending: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
+			log_metrics "Display User Schedule Timeout Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+			set_auto_launch_deferral
+			;;
+		*)
+			[[ $display_dialog_return -ne 0 ]] && [[ $display_dialog_return -ne 10 ]] && log_super "Display Warning: ${FUNCNAME[0]} returned an unexpected code: ${display_dialog_return}"
+			[[ $display_dialog_return -eq 10 ]] && log_super "Display Warning: User attempted to force quit the dialog."
+			local dialog_user_schedule_selection_time && dialog_user_schedule_selection_time=$(echo "${display_dialog_result}" | jq -r '.time // empty' 2> /dev/null)
+			local dialog_user_schedule_selection_date && dialog_user_schedule_selection_date=$(echo "${display_dialog_result}" | jq -r '.date // empty' 2> /dev/null)
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_time is: ${dialog_user_schedule_selection_time}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_date is: ${dialog_user_schedule_selection_date}"
+			local dialog_user_schedule_selection_epoch && dialog_user_schedule_selection_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${dialog_user_schedule_selection_date}:${dialog_user_schedule_selection_time}:00" +%s)
+			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: dialog_user_schedule_selection_epoch is: ${dialog_user_schedule_selection_epoch}"
+			if [[ $dialog_user_schedule_selection_epoch -lt $dialog_user_schedule_select_minimum_epoch ]]; then
+				log_super "Warning: Adjusting user selected scheduled installation because it's in the past or less than two minutes from now."
+				workflow_scheduled_install=$(date -r "${dialog_user_schedule_select_minimum_epoch}" +%Y-%m-%d:%H:%M)
 			fi
-		fi
-		set_pref_main "WorkflowScheduledInstall" "${workflow_scheduled_install}"
-		workflow_scheduled_install_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
-		local display_string_deadline_scheduled_only_date && display_string_deadline_scheduled_only_date=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_DATE_FORMAT}")
-		local display_string_deadline_scheduled_only_time && display_string_deadline_scheduled_only_time=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_TIME_FORMAT}" | sed 's/^ *//g')
-		if [[ $(date -r "${workflow_scheduled_install_epoch}" +%H:%M) == "00:00" ]]; then
-			display_string_deadline_scheduled_date="${display_string_deadline_scheduled_only_date}"
-		else
-			display_string_deadline_scheduled_date="${display_string_deadline_scheduled_only_date}${DISPLAY_STRING_DATE_TIME_SEPARATOR}${display_string_deadline_scheduled_only_time}"
-		fi
-		scheduled_install_user_choice_active="TRUE"
-		set_scheduled_install_deferral
-		dialog_schedule_reminder & disown -a
-		set_auto_launch_deferral
-		;;
-	2)
-		log_super "Status: User chose to cancel schedule selection."
-		log_metrics "Display User Schedule Cancel: Workflow Elapsed Time" "WorkflowTargetTimestamp"
-		dialog_user_choice # This function includes all workflows to facilitate user choices.
-		;;
-	4 | 137 | 255)
-		log_super "Status: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
-		log_status "Pending: Display timeout automatically chose to defer, using the default deferral of ${deferral_timer_minutes} minutes."
-		log_metrics "Display User Schedule Timeout Deferral: Workflow Elapsed Time" "WorkflowTargetTimestamp"
-		set_auto_launch_deferral
-		;;
-	esac
+			if [[ -n "${deadline_epoch}" ]] && [[ $dialog_user_schedule_selection_epoch -gt $deadline_epoch ]]; then
+				log_super "Warning: Adjusting user selected scheduled installation because it's past the current workflow deadline."
+				workflow_scheduled_install=$(date -r "${deadline_epoch}" +%Y-%m-%d:%H:%M)
+			fi
+			[[ -z "${workflow_scheduled_install}" ]] && workflow_scheduled_install=$(date -r "${dialog_user_schedule_selection_epoch}" +%Y-%m-%d:%H:%M)
+			log_super "Status: User chose to schedule installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install}."
+			log_metrics "Display User Schedule Set: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+			if [[ -n "${schedule_workflow_active}" ]]; then
+				set_schedule_workflow_active_adjustments
+				if [[ -n "${workflow_scheduled_install_adjusted}" ]]; then
+					workflow_scheduled_install="${workflow_scheduled_install_adjusted}"
+					[[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]] && log_super "Status: Setting new user selected scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} which is the start of a workflow active time frame that closest matches the user's choice."
+				else
+					log_super "Warning: The current user selected scheduled installation for $(date -j -f %Y-%m-%d "${workflow_scheduled_install:0:10}" +%a | tr '[:lower:]' '[:upper:]') ${workflow_scheduled_install} is overriding the schedule workflow active option because no coordinating time frame could be resolved."
+				fi
+			fi
+			set_pref_main "WorkflowScheduledInstall" "${workflow_scheduled_install}"
+			workflow_scheduled_install_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${workflow_scheduled_install}:00" +%s)
+			local display_string_deadline_scheduled_only_date && display_string_deadline_scheduled_only_date=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_DATE_FORMAT}")
+			local display_string_deadline_scheduled_only_time && display_string_deadline_scheduled_only_time=$(date -r "${workflow_scheduled_install_epoch}" "+${DISPLAY_STRING_TIME_FORMAT}" | sed 's/^ *//g')
+			if [[ $(date -r "${workflow_scheduled_install_epoch}" +%H:%M) == "00:00" ]]; then
+				display_string_deadline_scheduled_date="${display_string_deadline_scheduled_only_date}"
+			else
+				display_string_deadline_scheduled_date="${display_string_deadline_scheduled_only_date}${DISPLAY_STRING_DATE_TIME_SEPARATOR}${display_string_deadline_scheduled_only_time}"
+			fi
+			scheduled_install_user_choice_active="TRUE"
+			set_scheduled_install_deferral
+			dialog_schedule_reminder & disown -a
+			set_auto_launch_deferral
+			;;
+		esac
+	fi
 }
 
-# FIXME: Currently on hold due to pending DDM integration.
 # Display an interactive dialog that reminds the user of a pending scheduled installation and optionally allows for rescheduling.
-# shellcheck disable=all
 dialog_schedule_reminder() {
-	dialog_temp_json="$(mktemp).json"
-	
-	# Set the schedule reminder title and button display strings.
-	if [[ "${workflow_target}" == "Non-system Software Updates" ]] || [[ "${workflow_target}" == "Safari Update" ]] || [[ "${workflow_target}" == "Jamf Pro Policy Triggers Without Restarting" ]]; then
-		local display_string_schedule_reminder_title="${display_string_schedule_reminder_install_title}"
-		local dialog_schedule_reminder_now_button="${DISPLAY_STRING_INSTALL_NOW}"
-		local dialog_schedule_reminder_dialog_timeout="${display_string_schedule_reminder_install_timeout}"
-	else # Default restart workflows.
-		local display_string_schedule_reminder_title="${display_string_schedule_reminder_restart_title}"
-		local dialog_schedule_reminder_now_button="${DISPLAY_STRING_RESTART_NOW}"
-		local dialog_schedule_reminder_dialog_timeout="${display_string_schedule_reminder_restart_timeout}"
-	fi
-	
-	# There is an automatic timeout behavior if the scheduled install is about to start.
+	# Dialog parameter and message Markdown configuration.
+	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && set_display_infobox
+	set_display_message
+	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
+	[[ "${display_action_type}" == "RESTART" ]] && local dialog_now_button="${DISPLAY_STRING_RESTART_NOW}" && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_RESTART}"
+	[[ "${display_action_type}" == "INSTALL" ]] && local dialog_now_button="${DISPLAY_STRING_INSTALL_NOW}" && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_INSTALL}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_final_reminder is: ${scheduled_install_final_reminder}"
+	
+	# Create the initial ${dialog_json} and then start the open_dialog_swift_dialog() function.
 	[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_user_choice_active is: ${scheduled_install_user_choice_active}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: scheduled_install_user_choice_adjusted is: ${scheduled_install_user_choice_adjusted}"
-	if [[ "${scheduled_install_final_reminder}" == "TRUE" ]]; then
-		log_super "Display Status: Scheduled installation final warning dialog with a ${workflow_scheduled_install_difference} second timeout."
-		
-		# Create initial ${swift_dialog_array} settings for the dialog.
-		if [[ "${scheduled_install_user_choice}" == "TRUE" ]] && [[ "${scheduled_install_user_choice_active}" == "TRUE" ]]; then
-			{ [[ -z "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" != "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_default_body}" --button1text "${dialog_schedule_reminder_now_button}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-			{ [[ -n "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" != "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_reschedule_date_body}" --button1text "${dialog_schedule_reminder_now_button}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-			{ [[ -z "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_adjusted_body}" --button1text "${dialog_schedule_reminder_now_button}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-			{ [[ -n "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_adjusted_reschedule_date_body}" --button1text "${dialog_schedule_reminder_now_button}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-		else # Default scheduled restart warning dialog.
-			[[ "${scheduled_install_user_choice_adjusted}" != "TRUE" ]] && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_default_body}" --button1text "${dialog_schedule_reminder_now_button}")
-			[[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]] && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_adjusted_body}" --button1text "${dialog_schedule_reminder_now_button}")
-		fi
+	if [[ "${scheduled_install_final_reminder}" == "TRUE" ]]; then # There is an automatic timeout behavior if the scheduled install is about to start.
 		[[ -n "${dialog_timeout_seconds}" ]] && local dialog_timeout_seconds_previous && dialog_timeout_seconds_previous="${dialog_timeout_seconds}"
 		dialog_timeout_seconds=$((workflow_scheduled_install_difference + 1))
-		display_string_dialog_timeout="${dialog_schedule_reminder_dialog_timeout}"
-		
-		# Start the dialog.
-		dialog_type="REMINDER"
-		open_dialog_swift_dialog
-		unset dialog_type
-		[[ -n "${dialog_timeout_seconds_previous}" ]] && dialog_timeout_seconds="${dialog_timeout_seconds_previous}"
-		
-		# The ${dialog_return} contains the IBM Notifier.app return code. If the user selected a scheduled restart or the dialog timed out then set ${deferral_timer_minutes}.
-		case $dialog_return in
+		[[ "${scheduled_install_user_choice_active}" == "TRUE" ]] && dialog_json=$(jq -n --arg display_button_1 "${dialog_now_button}" --arg display_button_info "${DISPLAY_STRING_RESCHEDULE}" '{ "button1text": $display_button_1, "infobuttontext": $display_button_info }')
+		[[ "${scheduled_install_user_choice_active}" != "TRUE" ]] && dialog_json=$(jq -n --arg display_button_1 "${dialog_now_button}" '{ "button1text": $display_button_1 }')
+	else # The schedule installation is not about to start so this dialog will stay open indefinitely.
+		unset dialog_timeout_seconds
+		[[ "${scheduled_install_user_choice_active}" == "TRUE" ]] && dialog_json=$(jq -n --arg display_button_1 "${DISPLAY_STRING_OK}" --arg display_button_info "${DISPLAY_STRING_RESCHEDULE}" '{ "button1text": $display_button_1, "infobuttontext": $display_button_info }')
+		[[ "${scheduled_install_user_choice_active}" != "TRUE" ]] && dialog_json=$(jq -n --arg display_button_1 "${DISPLAY_STRING_OK}" '{ "button1text": $display_button_1 }')
+	fi
+	dialog_json=$(echo "${dialog_json}" | jq --arg display_icon "${display_icon_path}:dark=${display_icon_dark_path}" --arg display_icon_alpha "${DISPLAY_ICON_ALPHA}" '. + { "icon": $display_icon, "iconalpha": $display_icon_alpha }')
+	open_dialog_swift_dialog
+	
+	# Reset temporary display dialog items.
+	[[ -n "${dialog_timeout_seconds_previous}" ]] && dialog_timeout_seconds="${dialog_timeout_seconds_previous}"
+	find "${SUPER_CACHES_FOLDER}" -maxdepth 1 -type f -name "tmp*" -delete > /dev/null 2>&1
+	unset display_message_temp_md
+	
+	# (If not testing a display function) Handle the ${display_dialog_return} and ${display_dialog_result} after the dialog has closed.
+	if [[ -z "${test_display_function_option}" ]] && [[ "${scheduled_install_final_reminder}" == "TRUE" ]]; then
+		case $display_dialog_return in
 		0)
 			log_super "Status: User chose to install now."
 			log_metrics "Display Schedule Reminder User Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
-		2)
+		3)
 			delete_pref_main "WorkflowScheduledInstall"
 			log_super "Status: User chose to reschedule, removing previously scheduled installation and restarting super..."
 			log_metrics "Display Schedule Reminder User Reschedule: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			restart_super 1
 			;;
-		4 | 137 | 255)
+		4)
 			log_super "Status: Schedule reminder dialog closed due to timeout."
 			log_metrics "Display Schedule Reminder Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
-		esac
-	else # The schedule installation is not about to start so this dialog can exit normally or reschedule.
-		unset dialog_timeout_seconds
-		log_super "Display Status: Scheduled installation warning dialog (this dialog has no timeout)."
-		
-		# Create initial ${swift_dialog_array} settings for the dialog.
-		if [[ "${scheduled_install_user_choice}" == "TRUE" ]] && [[ "${scheduled_install_user_choice_active}" == "TRUE" ]]; then
-			{ [[ -z "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" != "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_default_body}" --button1text "${DISPLAY_STRING_OK}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-			{ [[ -n "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" != "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_reschedule_date_body}" --button1text "${DISPLAY_STRING_OK}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-			{ [[ -z "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_adjusted_body}" --button1text "${DISPLAY_STRING_OK}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-			{ [[ -n "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]]; } && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_adjusted_reschedule_date_body}" --button1text "${DISPLAY_STRING_OK}" --button2text "${DISPLAY_STRING_RESCHEDULE}")
-		else # Default scheduled restart warning dialog.
-			[[ "${scheduled_install_user_choice_adjusted}" != "TRUE" ]] && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_default_body}" --button1text "${DISPLAY_STRING_OK}")
-			[[ "${scheduled_install_user_choice_adjusted}" == "TRUE" ]] && swift_dialog_array=(--title "${display_string_schedule_reminder_title}" --icon "${display_icon}" --iconsize "${display_icon_size}" --message "${display_string_schedule_reminder_adjusted_body}" --button1text "${DISPLAY_STRING_OK}")
-		fi
-		
-		# Start the dialog.
-		dialog_type="REMINDER"
-		open_dialog_swift_dialog
-		unset dialog_type
-		
-		# The ${dialog_return} contains the IBM Notifier.app return code. If the user selected a scheduled restart or the dialog timed out then set ${deferral_timer_minutes}.
-		case $dialog_return in
-		0)
-			log_super "Background Schedule Reminder Dialog: User dismissed the dialog."
-			log_metrics "Display Schedule Reminder User Dimsissed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		*)
+			[[ $display_dialog_return -ne 0 ]] && [[ $display_dialog_return -ne 10 ]] && log_super "Display Warning: ${FUNCNAME[0]} returned an unexpected code: ${display_dialog_return}"
+			[[ $display_dialog_return -eq 10 ]] && log_super "Display Warning: User attempted to force quit the dialog."
+			log_metrics "Display Schedule Reminder Dimsissed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
-		2)
+		esac
+	fi
+	if [[ -z "${test_display_function_option}" ]] && [[ "${scheduled_install_final_reminder}" == "FALSE" ]]; then
+		case $display_dialog_return in
+		0)
+			log_super "Status: User chose to dismiss reminder."
+			log_metrics "Display Schedule Reminder Dimsissed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+			;;
+		3)
 			delete_pref_main "WorkflowScheduledInstall"
 			log_super "Background Schedule Reminder Dialog: User chose to reschedule, removing previously scheduled installation and restarting super..."
 			log_metrics "Display Schedule Reminder User Reschedule: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			restart_super 1
 			;;
-		4 | 137 | 255)
-			log_super "Background Schedule Reminder Dialog: Closed due to timeout."
-			log_metrics "Display Schedule Reminder Timeout: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		*)
+			[[ $display_dialog_return -ne 0 ]] && [[ $display_dialog_return -ne 10 ]] && log_super "Display Warning: ${FUNCNAME[0]} returned an unexpected code: ${display_dialog_return}"
+			[[ $display_dialog_return -eq 10 ]] && log_super "Display Warning: User attempted to force quit the dialog."
+			log_metrics "Display Schedule Reminder Dimsissed: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			;;
 		esac
 		exit 0
@@ -9439,6 +9521,7 @@ dialog_soft_deadline() {
 	# Display dialog parameter and message Markdown configuration.
 	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
 	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_infobox_ready}" != "TRUE" ]] && set_display_infobox
 	set_display_message
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
 	[[ -n "${deferral_timer_menu_minutes}" ]] && set_deferral_menu
@@ -9466,7 +9549,7 @@ dialog_soft_deadline() {
 	
 	# (If not testing a display function) Handle the ${display_dialog_return} and ${display_dialog_result} after the dialog has closed.
 	if [[ -z "${test_display_function_option}" ]]; then
-		case $dialog_return in
+		case $display_dialog_return in
 		4)
 			log_super "Status: Display timeout automatically chose to restart."
 			log_metrics "Display Soft Deadline Timeout Installation: Workflow Elapsed Time" "WorkflowTargetTimestamp"
@@ -9488,6 +9571,7 @@ dialog_user_auth() {
 	# Display dialog parameter and message Markdown configuration.
 	[[ "${set_display_config_ready}" != "TRUE" ]] && set_display_config
 	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_workflow_target_ready}" != "TRUE" ]] && set_display_workflow_target
+	[[ "${workflow_target}" != "FALSE" ]] && [[ "${set_display_infobox_ready}" != "TRUE" ]] && set_display_infobox
 	if [[ "${dialog_user_auth_type}" == "DOWNLOAD" ]]; then
 		display_string_auth_action="${DISPLAY_STRING_AUTH_ACTION_DOWNLOAD}"
 		local dialog_now_button="${DISPLAY_STRING_DOWNLOAD_NOW}"
@@ -9505,6 +9589,7 @@ dialog_user_auth() {
 	[[ -n $dialog_timeout_user_auth_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_auth_seconds
 	{ [[ -z $dialog_timeout_user_auth_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
+	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
 	
 	# Create the initial ${dialog_json}.
@@ -9542,6 +9627,7 @@ dialog_user_auth() {
 	
 	# Reset temporary display dialog items.
 	[[ "${display_hide_background_status}" == "TEMP" ]] && unset display_hide_background_status
+	[[ "${display_movable_status}" == "TEMP" ]] && unset display_movable_status
 	[[ "${display_silently_status}" == "TEMP" ]] && unset display_silently_status
 	find "${SUPER_CACHES_FOLDER}" -maxdepth 1 -type f -name "tmp*" -delete > /dev/null 2>&1
 	unset display_message_temp_md
@@ -9583,8 +9669,8 @@ dialog_user_auth() {
 
 main() {
 	# Initial super workflow preparations.
-	running_as_root="FALSE"
-	[[ $(id -u) -eq 0 ]] && running_as_root="TRUE"
+	super_running_as_root="FALSE"
+	[[ $(id -u) -eq 0 ]] && super_running_as_root="TRUE"
 	get_options "$@"
 	set_internal_defaults
 	get_external_defaults
@@ -9660,7 +9746,7 @@ main() {
 			workflow_check_download_status
 			workflow_time_epoch=$(date +%s)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
-		else # Test mode.
+		else # FIXME: Better test mode.
 			installer_macos_major_upgrade_target="FALSE"
 			installer_macos_minor_update_target="FALSE"
 			msu_macos_major_upgrade_target="FALSE"
@@ -9674,7 +9760,7 @@ main() {
 				log_super "Test Mode: Simulating install non-system updates workflow."
 			elif [[ "${install_safari_updates_without_restarting}" == "TRUE" ]]; then
 				msu_non_system_targets="TRUE"
-				msu_safari_target="Safari ${system_safari_version}"
+				msu_safari_target="${system_safari_version}"
 				log_super "Test Mode: Simulating install Safari update workflow."
 			elif [[ "${install_macos_major_upgrades}" == "TRUE" ]]; then
 				msu_macos_major_upgrade_target="Title:macOS ${system_macos_version_major}.${system_macos_version_minor},Build:${system_macos_build},Version:${system_macos_version_major}.${system_macos_version_minor}"
@@ -9954,7 +10040,8 @@ main() {
 			fi
 		else # Default super workflow, can run with or without logged in user.
 			# Double-check for local user, and if recently started up then wait until later.
-			{ [[ -z "${current_user_account_name}" ]] || [[ "${current_user_account_name}" == "FALSE" ]]; } && check_current_user && get_external_display_config
+			{ [[ -z "${current_user_account_name}" ]] || [[ "${current_user_account_name}" == "FALSE" ]]; } && check_current_user
+			[[ "${current_user_account_name}" != "FALSE" ]] && get_external_display_config
 			if [[ "${current_user_account_name}" == "FALSE" ]] && [[ $((workflow_time_epoch - kernel_boot_epoch)) -lt $RECENT_STARTUP_AUTO_DEFERRAL_SECONDS ]]; then
 				deferral_timer_minutes=$deferral_timer_error_minutes
 				log_super "Error: The system started up less than $RECENT_STARTUP_AUTO_DEFERRAL_SECONDS seconds ago so it's unsafe to assume current active user status, trying again in ${deferral_timer_minutes} minutes."
@@ -9978,13 +10065,14 @@ main() {
 						log_status "Pending: The active user logged out while the update was downloading, trying again in ${deferral_timer_minutes} minutes."
 						set_auto_launch_deferral
 					fi
-					get_external_display_config
+					[[ "${current_user_account_name}" != "FALSE" ]] && get_external_display_config
 					workflow_time_epoch=$(date +%s)
 					[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: Setting new workflow_time_epoch to: ${workflow_time_epoch}"
 				fi
 				# Manage various workflow options when any deadline is active.
 				if [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_count_status}" == "HARD" ]] || [[ "${deadline_date_status}" == "SOFT" ]] || [[ "${deadline_days_status}" == "SOFT" ]] || [[ "${deadline_count_status}" == "SOFT" ]]; then
 					[[ $(echo "${display_hide_background}" | grep -c 'DEADLINE') -gt 0 ]] && display_hide_background_status="TRUE"
+					[[ $(echo "${display_movable}" | grep -c 'DEADLINE') -gt 0 ]] && display_movable_status="TRUE"
 					[[ $(echo "${display_silently}" | grep -c 'DEADLINE') -gt 0 ]] && display_silently_status="TRUE"
 					[[ $(echo "${display_notifications_centered}" | grep -c 'DEADLINE') -gt 0 ]] && display_notifications_centered_status="TRUE"
 				fi

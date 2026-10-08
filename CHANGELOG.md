@@ -1,15 +1,15 @@
 # CHANGELOG
 
-## [6.0.0-beta1]
+## [6.0.0-beta2]
 
-2026-09-14
+2026-10-08
 
 ## Highlights (6.0.x)
 
 - Full support for macOS 27 Golden Gate.
 - Full support for declarative software update settings along with continued support for legacy configuration profiles on supported systems.
 - __(Coming soon)__ New workflow options that integrate with declarative software update enforcement.
-- All new completely redesigned dialogs and notifications now rendered via [swiftDialog v3.1.0](https://github.com/swiftDialog/swiftDialog). (Thanks to @bartreardon for his dedication to the project!)
+- All new completely redesigned dialogs and notifications now rendered via [swiftDialog v3.1.1](https://github.com/swiftDialog/swiftDialog). (Thanks to @bartreardon for his dedication to the project!)
 - All new comprehensive display customization with native support for multiple languages (non-English localizations coming soon).
 - Now fully integrated with [MacAdmin's SOFA](https://sofa.macadmins.io) for update detection, including support for release dates and information URLs.
 - Significantly updated status reporting and troubleshooting options.
@@ -25,18 +25,36 @@
 - Previously saved `super` 5.x.x __local__ authentication credentials are compatible with `super` 6.0.x.
 - __Previously saved `super` 5.x.x Jamf Pro API authentication credentials are not compatible with `super` 6.0.x and will be deleted from the system the first time `super` 6.0.x runs.__
 - __A major version number change (like 5.x.x to 6.x.x) indicates that previous command line options and managed preferences are not compatible with the newer version of `super`.__
-- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-options-6.0.x.tsv).
-- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta1/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Example-MDM).
-- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta1/Super-Friends).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta2/Super-Friends/super-migration-options-6.0.x.tsv).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta2/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta2/Example-MDM).
+- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta2/Super-Friends).
 
-### Known Issues (6.0.0-beta1)
+### Known Issues (6.0.0-beta2)
 
 - __The `super` installer package is not yet notarized by Apple. This should not present a problem for most managed deployment workflows, but downloaded `super` packages may fail when installed manually due to file system quarantine. Removing the file quarantine will resolve this issue.__
 - Full support for declarative software update enforcement is still in the works. __Support coming soon.__
-- The --scheduled-install-* options are not currently supported in `super` 6.0.0-beta1. __Support coming soon.__
+- Due to a swiftDialog issue the user schedule dialog does not currently support a dialog timeout.
+- Forced macOS update downloads via `softwareupdate` occasionally fail upon first attempt, but they are consistently successful after multiple attempts.
 - The [MacAdmin's SOFA](https://sofa.macadmins.io) Apple Beta feed technically exists but it's not currently being updated by the SOFA project. Thus, systems enrolled in a macOS beta program cannot take advantage of this resource.
 - There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated.
+
+### Specific Changes (6.0.0-beta2)
+
+- __Note this sub-section only covers specific changes for 6.0.0-beta1 to 6.0.0-beta2. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
+- Reinstated all previous `--scheduled-install-*` options.  (Thanks to @bartreardon for adding a new features in swiftDialog that allow for this!)
+- New support for beta releases of swiftDialog; the minimum version verification is now based on the swiftDialog build number.
+- New [swiftDialog v3.1.1b3-4997](https://github.com/swiftDialog/swiftDialog/releases) is automatically installed. (Thanks to @bartreardon for his dedication to the project!)
+- New `--schedule-automatic-download-max-days=number` option allows you to specify the maximum number of days after workflow zero day that `super` is allowed to wait for the built-in automatic software update to download a targeted macOS update.
+- Improved logic for when to automatically force a macOS update download if it's delay might interfere with workflow options (like pending deadlines and schedule installations).
+- New `--display-movable=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR` option allows you to specify if dialogs and notifications can be moved by the end user.
+- Improved detection of parent processes that should be released early in the `super` workflow (like the `jamf` binary).
+- New support for the detection of additional parent processes that should be released via the `PARENT_PROCESS_RESTART_ARRAY` in the __DEFAULT_PARAMETERS.json__.
+- Resolved several issues would cause failures to derive the correct workflow target release date.
+- Resolved issues that would cause inaccurate error detection when downloading helper applications and macOS updates. (Thanks to @ir77io for spotting these issues!)
+- Improved handling of helper version errors.
+- Resolved issues that would cause display errors for the soft deadline dialog and the workflow failed notification.
+- Refinements to the display info box text and deferral menu strings.
 
 ### Specific Changes (6.0.0-beta1)
 
@@ -116,17 +134,23 @@
 - Even more user interface customization options.
 - Please visit [the `super` Wiki](https://github.com/Macjutsu/super/wiki) for full details!
 
-### Compatibility Notes (5.1.x)
+### Specific Changes (5.1.2)
 
-- `super` 5.1.x requires macOS 11 or newer.
-- __Many `super` 4.x command line options and managed preferences are NOT compatible with `super` 5.1.x__
-- __Most `super` 3.0 command line options and managed preferences are not compatible with `super` 5.1.x__
-- __Previously saved `super` 3.0 and 4.x Apple silicon authentication credentials are automatically migrated the first time `super` 5.1.x runs.__
-- Refer to this [spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-options-v5.1.0.tsv).
-- Refer to this [spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/main/Super-Friends/super-migration-managed-preferences-v5.1.0.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/main/Example-MDM).
-- Updated [Jamf Pro External Application Custom Schema](https://github.com/Macjutsu/super/blob/main/Example-MDM/Jamf-Pro-External-Application-Custom-Schema-com.macjutsu.super-v5.1.0.json).
-- Updated [Jamf Pro Extension Attribute scripts](https://github.com/Macjutsu/super/tree/main/Super-Friends).
+- __Note this sub-section only covers specific changes for 5.1.1 to 5.1.2. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
+- The `super` workflow automatically exits if running on macOS 27 or later.
+- Improved helper verification mechanism now allows for installation of newer versions than required by the `super` workflow. (Thanks to @smithjw for this!)
+- Resolved an issue that may cause inaccurate macOS update targeting when the `--install-macos-minor-version-target` or `--install-macos-major-version-target` options were used.
+- `super` [5.1.2 SHA-256: a8ac2a725c7b1402b23e835dc507eb9a37a3d67c20d25abab31b4f6ab221c2d6](https://github.com/Macjutsu/super/blob/5.1.2/super.checksum.txt)
+
+### Specific Changes (5.1.1)
+
+- __Note this sub-section only covers specific changes for 5.1.0 to 5.1.1. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
+- Improved `dscl` search mechanism improves support for network user accounts (Thanks to @tranziq for catching this one!)
+- Resolved a cache validation issue that could cause logic errors. (Thanks to @mdicecca for catching this one!)
+- Resolved an issue affecting the deletion of `--scheduled-install-date` option. (Thanks to @ir77io for catching this one!)
+- Resolved inaccurate error handling in the `--config-status` option. (Thanks to @ir77io for catching this one!)
+- As always, internal typo fixes and improvements to both regular and verbose log output.
+- `super` [5.1.1 SHA-256: c838f6eb4de1de4e24404c8c96c71c8afdc30cf97195b411306f6ea7ae9c408f](https://github.com/Macjutsu/super/blob/5.1.1/super.checksum.txt)
 
 ### Known Issues (5.x)
 

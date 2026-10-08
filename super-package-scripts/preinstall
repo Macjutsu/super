@@ -60,4 +60,3 @@ if [[ -n "${super_previous_pid}" ]]; then
 fi
 
 exit 0
-

@@ -1,4 +1,4 @@
-super 6.x Supports Alternate Config	super 6.0.0-beta1	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
+super 6.x Supports Alternate Config	super 6.0.0-beta2	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 N/A	--usage	--usage	--usage	--usage	--usage
 N/A	--help	--help	--help	--help	--help
 N/A	--version	--version	N/A	N/A	N/A
@@ -45,12 +45,13 @@ YES	--deferral-timer-reset-all	--deferral-timer-reset-all	--deferral-timer-reset
 YES	--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...	--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...	--schedule-workflow-active=DAY:hh:mm-hh:mm,DAY:hh:mm-hh:mm,etc...	N/A	N/A
 YES	--schedule-deferred-start-file=/local/path	--schedule-deferred-start-file=/local/path	N/A	N/A	N/A
 YES	--schedule-deferred-start-days=number	--schedule-deferred-start-days=number	N/A	N/A	N/A
-YES	(COMING SOON)	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--workflow-zero-date-manual=YYYY-MM-DD:hh:mm	--zero-day=YYYY-MM-DD:hh:mm
-YES	(COMING SOON)	--scheduled-install-days=number	--scheduled-install-days=number	N/A	N/A
-YES	(COMING SOON)	--scheduled-install-date=YYYY-MM-DD:hh:mm	--scheduled-install-date=YYYY-MM-DD:hh:mm	N/A	N/A
-YES	(COMING SOON)	--scheduled-install-user-choice	--scheduled-install-user-choice	N/A	N/A
-YES	(COMING SOON)	--scheduled-install-user-choice-off	--scheduled-install-user-choice-off	N/A	N/A
-YES	(COMING SOON)	--scheduled-install-reminder=minutes,minutes,etc...	--scheduled-install-reminder=minutes,minutes,etc...	N/A	N/A
+YES	--schedule-automatic-download-max-days=number	N/A	N/A	N/A	N/A
+YES	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--schedule-zero-date-manual=YYYY-MM-DD:hh:mm	--workflow-zero-date-manual=YYYY-MM-DD:hh:mm	--zero-day=YYYY-MM-DD:hh:mm
+YES	--scheduled-install-days=number	--scheduled-install-days=number	--scheduled-install-days=number	N/A	N/A
+YES	--scheduled-install-date=YYYY-MM-DD:hh:mm	--scheduled-install-date=YYYY-MM-DD:hh:mm	--scheduled-install-date=YYYY-MM-DD:hh:mm	N/A	N/A
+YES	--scheduled-install-user-choice	--scheduled-install-user-choice	--scheduled-install-user-choice	N/A	N/A
+YES	--scheduled-install-user-choice-off	--scheduled-install-user-choice-off	--scheduled-install-user-choice-off	N/A	N/A
+YES	--scheduled-install-reminder=minutes,minutes,etc...	--scheduled-install-reminder=minutes,minutes,etc...	--scheduled-install-reminder=minutes,minutes,etc...	N/A	N/A
 YES	--scheduled-install-delete-all	--scheduled-install-delete-all	--scheduled-install-delete-all	N/A	N/A
 YES	--deadline-count-focus=number	--deadline-count-focus=number	--deadline-count-focus=number	--deadline-count-focus=number	--focus-count=number
 YES	--deadline-count-soft=number	--deadline-count-soft=number	--deadline-count-soft=number	--deadline-count-soft=number	--soft-count=number
@@ -87,6 +88,7 @@ YES	--display-help-message	N/A	N/A	N/A	N/A
 YES	--display-help-message-off	N/A	N/A	N/A	N/A
 YES	--display-help-image=/local/path | URL	N/A	N/A	N/A	N/A
 YES	--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-hide-background=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-hide-background=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER	N/A
+YES	--display-movable=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	N/A	N/A	N/A	N/A
 YES	--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-silently=ALWAYS,DIALOG,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-silently=ALWAYS,SOFT,HARD,INSTALLNOW,DEFER,USERAUTH,POWER,STORAGE	--display-silently (—display-silently-off)
 YES	--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-notifications-centered=ALWAYS,DEADLINE,SCHEDULED,INSTALLNOW,ERROR	--display-notifications-centered=ALWAYS,SOFT,HARD,INSTALLNOW	N/A
 YES	--display-config-custom-folder=/local/path	N/A	N/A	N/A	N/A
