@@ -529,11 +529,11 @@ set_defaults() {
 	# IMPORTANT DETAIL: Changing this path provides no benefit as this is the default location for the jamf binary.
 	
 	# URL to the IBM Notifier.app download:
-	IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.2.3-b-135/IBM.Notifier.zip"
+	IBM_NOTIFIER_DOWNLOAD_URL="https://github.com/IBM/mac-ibm-notifications/releases/download/v-3.2.4-b-136/IBM.Notifier.zip"
 	readonly IBM_NOTIFIER_DOWNLOAD_URL
 	
 	# Target minimum version for IBM Notifier.app:
-	IBM_NOTIFIER_MINIMUM_VERSION="3.2.3"
+	IBM_NOTIFIER_MINIMUM_VERSION="3.2.4"
 	readonly IBM_NOTIFIER_MINIMUM_VERSION
 	
 	# Path to the local IBM Notifier.app:
