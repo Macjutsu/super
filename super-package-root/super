@@ -8,8 +8,8 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-readonly SUPER_VERSION="6.0.0-beta2"
-readonly SUPER_DATE="2026/10/08"
+readonly SUPER_VERSION="6.0.0-beta3"
+readonly SUPER_DATE="2026/10/16"
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')" && readonly SUPER_USER_AGENT
 
 # MARK: *** Documentation ***
@@ -144,7 +144,7 @@ show_usage() {
   [--auth-service-add-via-admin-account=AccountName]
   [--auth-service-add-via-admin-password=Password]
   [--auth-service-account=AccountName]  [--auth-service-password=Password]
-  [--auth-delete-all]
+  [--auth-service-picture=/local/path | URL ]  [--auth-delete-all]
   [--auth-credential-failover-to-user]  [--auth-credential-failover-to-user-off]
   
   Troubleshooting Options:
@@ -896,6 +896,9 @@ get_options() {
 		--auth-service-password=*)
 			auth_service_password_option="${1#*=}"
 			;;
+		--auth-service-picture=*)
+			auth_service_picture_option="${1#*=}"
+			;;
 		--auth-delete-all)
 			auth_delete_all_option="TRUE"
 			;;
@@ -987,6 +990,9 @@ set_internal_defaults() {
 	# Path to the local cached copy of the display help image:
 	readonly DISPLAY_HELP_IMAGE_CACHE_PATH="${SUPER_CACHES_FOLDER}/display_help_image_cache"
 	
+	# Path to the local cached copy of the super service picture:
+	readonly SUPER_SERVICE_PICTURE_CACHE_PATH="${SUPER_CACHES_FOLDER}/super_service_picture_cache"
+	
 	# Path to the super config folder:
 	readonly SUPER_CONFIG_FOLDER="${SUPER_FOLDER}/config"
 	
@@ -1031,6 +1037,9 @@ set_internal_defaults() {
 	
 	# Path to the log for all softwareupdate download/install workflows:
 	readonly MSU_WORKFLOW_LOG="${SUPER_LOGS_FOLDER}/msu-workflow.log"
+	
+	# Path to the verbose log for all softwareupdate download/install workflows:
+	readonly MSU_WORKFLOW_VERBOSE_LOG="${SUPER_LOGS_FOLDER}/msu-workflow-verbose.log"
 	
 	# Path to the log for all macOS installer application download/install workflows:
 	readonly INSTALLER_WORKFLOW_LOG="${SUPER_LOGS_FOLDER}/installer-workflow.log"
@@ -1150,8 +1159,6 @@ get_external_defaults() {
 	[[ -z "${MIST_CLI_BINARY}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for MIST_CLI_BINARY."
 	JAMF_PRO_BINARY=$(jq -r '.JAMF_PRO_BINARY // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly JAMF_PRO_BINARY
 	[[ -z "${JAMF_PRO_BINARY}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for JAMF_PRO_BINARY."
-	SUPER_SERVICE_ACCOUNT_PICTURE=$(jq -r '.SUPER_SERVICE_ACCOUNT_PICTURE // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly SUPER_SERVICE_ACCOUNT_PICTURE
-	[[ -z "${SUPER_SERVICE_ACCOUNT_PICTURE}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for SUPER_SERVICE_ACCOUNT_PICTURE."
 	SOFTWARE_STATUS_CACHE_AGE_MINUTES=$(jq -r '.SOFTWARE_STATUS_CACHE_AGE_MINUTES // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly SOFTWARE_STATUS_CACHE_AGE_MINUTES
 	[[ -z "${SOFTWARE_STATUS_CACHE_AGE_MINUTES}" ]] && get_external_defaults_error="TRUE" && log_super "Exit: Unable to get external default parameter for SOFTWARE_STATUS_CACHE_AGE_MINUTES."
 	DEFERRAL_TIMER_DEFAULT_MINUTES=$(jq -r '.DEFERRAL_TIMER_DEFAULT_MINUTES // empty' "${SUPER_DEFAULT_PARAMETERS_JSON}" 2> /dev/null) && readonly DEFERRAL_TIMER_DEFAULT_MINUTES
@@ -2837,8 +2844,9 @@ manage_parameter_options() {
 	# Additional authentication validation is handled by the manage_authentication_options() function.
 	# Manage ${auth_ask_user_to_save_password} parameter.
 	auth_ask_user_to_save_password=$(get_pref_managed "AuthAskUserToSavePassword")
-	{ [[ -z "${auth_ask_user_to_save_password}" ]] && [[ -n "${auth_ask_user_to_save_password_option}" ]] && [[ "${auth_delete_all_option}" != "TRUE" ]]; } && auth_ask_user_to_save_password="${auth_ask_user_to_save_password_option}" && set_pref_main "AuthAskUserToSavePassword" "${auth_ask_user_to_save_password_option}"
-	{ [[ -z "${auth_ask_user_to_save_password}" ]] && [[ "${auth_delete_all_option}" != "TRUE" ]]; }  && auth_ask_user_to_save_password=$(get_pref "AuthAskUserToSavePassword")
+	{ [[ -z "${auth_ask_user_to_save_password}" ]] && [[ "${auth_ask_user_to_save_password_option}" != "TRUE" ]] && [[ "${auth_delete_all_option}" == "TRUE" ]]; } && delete_pref_main "AuthAskUserToSavePassword"
+	{ [[ -z "${auth_ask_user_to_save_password}" ]] && [[ -n "${auth_ask_user_to_save_password_option}" ]]; } && auth_ask_user_to_save_password="${auth_ask_user_to_save_password_option}" && set_pref_main "AuthAskUserToSavePassword" "${auth_ask_user_to_save_password_option}"
+	[[ -z "${auth_ask_user_to_save_password}" ]] && auth_ask_user_to_save_password=$(get_pref "AuthAskUserToSavePassword")
 	[[ "${verbose_mode}" == "TRUE" ]]  && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_ask_user_to_save_password is: ${auth_ask_user_to_save_password}"
 	
 	# Manage ${auth_local_account_option} parameter.
@@ -2855,18 +2863,22 @@ manage_parameter_options() {
 	if [[ "${auth_service_account_option}" == "X" ]]; then
 		unset auth_service_add_via_admin_account_option
 		unset auth_service_add_via_admin_password_option
+		unset auth_service_account_option
 		unset auth_service_password_option
+		unset auth_service_picture_option
 	else
 		{ [[ -n "${auth_service_add_via_admin_account_option}" ]] && [[ -z "${auth_service_add_via_admin_password_option}" ]]; } && parameter_error="TRUE" && log_super "Auth Error: The --auth-service_add_via_admin-account option requires that you also use the --auth-service_add_via_admin-password option."
 		{ [[ -z "${auth_service_add_via_admin_account_option}" ]] && [[ -n "${auth_service_add_via_admin_password_option}" ]]; } && parameter_error="TRUE" && log_super "Auth Error: The --auth-service_add_via_admin-password option requires that you also set the --auth-service_add_via_admin-account option."
 		{ [[ -n "${auth_service_account_option}" ]] && { [[ -z "${auth_service_add_via_admin_account_option}" ]] || [[ -z "${auth_service_add_via_admin_password_option}" ]]; }; } && parameter_error="TRUE" && log_super "Auth Error: The --auth-service-account option requires that you also set the ---auth-service-add-via-admin-account and --auth-service-add-via-admin-password options."
 		{ [[ -n "${auth_service_password_option}" ]] && { [[ -z "${auth_service_add_via_admin_account_option}" ]] || [[ -z "${auth_service_add_via_admin_password_option}" ]]; }; } && parameter_error="TRUE" && log_super "Auth Error: The --auth-service-password option requires that you also set the ---auth-service-add-via-admin-account and --auth-service-add-via-admin-password options."
+		{ [[ -n "${auth_service_picture_option}" ]] && { [[ -z "${auth_service_add_via_admin_account_option}" ]] || [[ -z "${auth_service_add_via_admin_password_option}" ]]; }; } && parameter_error="TRUE" && log_super "Auth Error: The --auth-service-picture option requires that you also set the ---auth-service-add-via-admin-account and --auth-service-add-via-admin-password options."
 	fi
 	[[ "${verbose_mode}" == "TRUE" ]]  && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_add_via_admin_account_option is: ${auth_service_add_via_admin_account_option}"
 	[[ "${verbose_mode}" == "TRUE" ]]  && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_add_via_admin_password_option is: ${auth_service_add_via_admin_password_option}"
 	[[ "${verbose_mode}" == "TRUE" ]]  && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_account_option is: ${auth_service_account_option}"
 	[[ "${verbose_mode}" == "TRUE" ]]  && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_password_option is: ${auth_service_password_option}"
-	
+	[[ "${verbose_mode}" == "TRUE" ]]  && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_picture_option is: ${auth_service_picture_option}"
+		
 	# Manage ${auth_credential_failover_to_user} parameter.
 	auth_credential_failover_to_user=$(get_pref_managed "AuthCredentialFailoverToUser")
 	{ [[ -z "${auth_credential_failover_to_user}" ]] && [[ -n "${auth_credential_failover_to_user_option}" ]]; } && auth_credential_failover_to_user="${auth_credential_failover_to_user_option}" && set_pref_main "AuthCredentialFailoverToUser" "${auth_credential_failover_to_user_option}"
@@ -2874,13 +2886,14 @@ manage_parameter_options() {
 	[[ -n "${auth_credential_failover_to_user}" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_credential_failover_to_user is: ${auth_credential_failover_to_user}"
 }
 
+# FIXME: Add output to config status?
 # Manage macOS update/upgrade credentials given the various --auth_* options. Any error will set ${auth_error_new}.
 manage_authentication_options() {
 	auth_error_new="FALSE"
 	
 	# Collect any previously saved credential states (including legacy methods) from ${SUPER_MAIN_PLIST}.
 	auth_user_account_saved="FALSE"
-	if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
+	if [[ -n "${auth_ask_user_to_save_password}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; then
 		if [[ "${current_user_account_name}" != "FALSE" ]]; then
 			auth_user_password_keychain=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security find-generic-password -w -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" 2>&1)
 			[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_user_password_keychain: ${auth_user_password_keychain}"
@@ -2890,13 +2903,14 @@ manage_authentication_options() {
 				unset auth_user_password_keychain
 			fi
 		else # No ${current_user_account_name}
-			log_super "Auth Warning: No currently logged in user, unable to the check status of any previously saved local user passwords."
+			[[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && log_super "Auth Warning: No currently logged in user, unable to the check status of any previously saved local user passwords."
 		fi
 	fi
 	auth_local_account_saved=$(get_pref "AuthLocalAccount")
 	auth_service_account_saved=$(get_pref "AuthServiceAccount")
 	auth_jamf_client_saved=$(get_pref "AuthJamfClient")
 	auth_jamf_account_saved=$(get_pref "AuthJamfAccount")
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_delete_all_option: ${auth_delete_all_option}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_ask_user_to_save_password: ${auth_ask_user_to_save_password}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_user_account_saved: ${auth_user_account_saved}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_local_account_saved: ${auth_local_account_saved}"
@@ -2905,15 +2919,13 @@ manage_authentication_options() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_jamf_account_saved: ${auth_jamf_account_saved}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_local_account_option: ${auth_local_account_option}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_add_via_admin_account_option: ${auth_service_add_via_admin_account_option}"
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_delete_all_option: ${auth_delete_all_option}"
-	[[ "${auth_delete_all_option}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && [[ -z "${auth_local_account_saved}" ]] && [[ -z "${auth_service_account_saved}" ]] && log_super "Status: No saved authentication credentials to delete."
+	[[ "${auth_delete_all_option}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && [[ -z "${auth_local_account_saved}" ]] && [[ -z "${auth_service_account_saved}" ]] && log_super "Auth Status: No saved authentication credentials to delete."
 	
 	# If needed, handle deletion of saved user credentials.
 	if [[ "${auth_user_account_saved}" == "TRUE" ]] && { [[ "${auth_ask_user_to_save_password}" == "FALSE" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; }; then
 		log_super_audit "Auth Status: Deleting previously saved local user password for ${current_user_account_name}."
 		launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "/Users/${current_user_account_name}/Library/Keychains/login.keychain" > /dev/null 2>&1
-		delete_pref_main "AuthAskUserToSavePassword"
-		unset auth_ask_user_to_save_password
+		[[ "${auth_ask_user_to_save_password}" != "TRUE" ]] && delete_pref_main "AuthAskUserToSavePassword"
 		auth_user_account_saved="FALSE"
 	fi
 	
@@ -2927,7 +2939,7 @@ manage_authentication_options() {
 	fi
 	
 	# If needed, handle deletion of saved local super service credentials.
-	if [[ "${auth_service_account_saved}" == "TRUE" ]] && { [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ -n "${auth_service_account_option}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; }; then
+	if [[ "${auth_service_account_saved}" == "TRUE" ]] && { [[ -n "${auth_service_add_via_admin_account_option}" ]] || [[ "${auth_delete_all_option}" == "TRUE" ]]; }; then
 		log_super_audit "Auth Status: Deleting previously created local super service account."
 		auth_service_account_keychain=$(security find-generic-password -w -a "super_auth_service_account" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 		sysadminctl -deleteUser "${auth_service_account_keychain}" > /dev/null 2>&1
@@ -2952,7 +2964,6 @@ manage_authentication_options() {
 		delete_pref_main "AuthJamfAccount"
 		unset auth_jamf_account_saved
 	fi
-	[[ "${auth_delete_all_option}" == "TRUE" ]] && return 0
 	
 	# The ${auth_ask_user_to_save_password} option is saved later via the dialog_user_auth() function.
 	[[ "${auth_ask_user_to_save_password}" == "TRUE" ]] && [[ "${auth_user_account_saved}" == "FALSE" ]] && log_super "Auth Status: A local user's password will be saved the next time a valid user succesfully authenticates."
@@ -3029,12 +3040,13 @@ manage_authentication_options() {
 			[[ -z "${auth_service_account_option}" ]] && local auth_service_account="super" && local auth_service_real_name="Super Update Service"
 			[[ -n "${auth_service_password_option}" ]] && local auth_service_password="${auth_service_password_option}"
 			[[ -z "${auth_service_password_option}" ]] && local auth_service_password && auth_service_password=$(uuidgen)
+			[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_account is: ${auth_service_account}"
+			[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_password is: ${auth_service_password}"
 			
 			# Save ${auth_service_account} and ${auth_service_password} credentials to keychain and then validate retrieval by setting ${auth_service_account_keychain} and ${auth_service_password_keychain}.
 			security add-generic-password -a "super_auth_service_account" -s "Super Update Service" -w "$(echo "${auth_service_account}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 			auth_service_account_keychain=$(security find-generic-password -w -a "super_auth_service_account" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 			if [[ "${auth_service_account}" != "${auth_service_account_keychain}" ]]; then
-				[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_account is: ${auth_service_account}"
 				[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_account_keychain is: ${auth_service_account_keychain}"
 				auth_error_new="TRUE" && log_super "Auth Error: Unable to validate keychain item for the new local super service account, deleting keychain item."
 				security delete-generic-password -a "super_auth_service_account" "/Library/Keychains/System.keychain" > /dev/null 2>&1
@@ -3042,32 +3054,78 @@ manage_authentication_options() {
 			security add-generic-password -a "super_auth_service_password" -s "Super Update Service" -w "$(echo "${auth_service_password}" | base64)" -T "/usr/bin/security" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 			auth_service_password_keychain=$(security find-generic-password -w -a "super_auth_service_password" "/Library/Keychains/System.keychain" 2> /dev/null | base64 --decode)
 			if [[ "${auth_service_password}" != "${auth_service_password_keychain}" ]]; then
-				[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_password is: ${auth_service_password}"
 				[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_service_password_keychain is: ${auth_service_password_keychain}"
 				auth_error_new="TRUE" && log_super "Auth Error: Unable to validate keychain item for the new local super service password, deleting keychain item."
 				security delete-generic-password -a "super_auth_service_password" "/Library/Keychains/System.keychain" > /dev/null 2>&1
 			fi
 		fi
-	
+		
+		# Set the ${auth_service_account_picture_path} given the status of ${auth_service_picture_option}.
+		if [[ "${auth_error_new}" != "TRUE" ]]; then
+			local previous_umask && previous_umask=$(umask) && umask 066
+			if [[ "${auth_service_picture_option}" =~ ${REGEX_HTML_URL} ]]; then
+				log_super "Auth Status: Attempting to download new local super service picture..."
+				local get_display_asset_result && get_display_asset_result=$(get_display_asset "${auth_service_picture_option}")
+				if [[ $(echo "${get_display_asset_result}" | head -1 | grep -c 'ERROR') -eq 0 ]]; then
+					auth_service_account_picture_path="${SUPER_SERVICE_PICTURE_CACHE_PATH}.${get_display_asset_result##*.}"
+					mv "${get_display_asset_result}" "${auth_service_account_picture_path}" 2> /dev/null 2>&1
+				else
+					log_super "Auth Error: Unable to download new local super service picture from ${auth_service_picture_option}:\n${get_display_asset_result}"
+				fi
+				unset get_display_asset_result
+			elif [[ -n "${auth_service_picture_option}" ]]; then
+				[[ -f "${auth_service_picture_option}" ]] && auth_service_account_picture_path="${SUPER_SERVICE_PICTURE_CACHE_PATH}.${auth_service_picture_option##*.}"
+				[[ -f "${auth_service_picture_option}" ]] && cp "${auth_service_picture_option}" "${auth_service_account_picture_path}" 2> /dev/null 2>&1
+				[[ ! -f "${auth_service_picture_option}" ]] && log_super "Auth Error: No new local super service picture in the expected location at ${auth_service_picture_option}."
+			fi
+			if [[ ! -f "${auth_service_account_picture_path}" ]]; then
+				[[ -n "${auth_service_picture_option}" ]] && log_super "Auth Warning: Using failover new local super service picture of a generic macOS icon."
+				[[ -f "${FAILOVER_DISPLAY_ICON_MACOS_BADGE}" ]] && auth_service_account_picture_path="${SUPER_SERVICE_PICTURE_CACHE_PATH}.${FAILOVER_DISPLAY_ICON_MACOS_BADGE##*.}"
+				[[ -f "${FAILOVER_DISPLAY_ICON_MACOS_BADGE}" ]] && cp "${FAILOVER_DISPLAY_ICON_MACOS_BADGE}" "${auth_service_account_picture_path}" 2> /dev/null 2>&1
+			fi
+			if [[ $(echo "${auth_service_account_picture_path}" | grep -c '.png$') -eq 0 ]]; then
+				log_super "Auth Status: Attempting to convert new local super service picture to PNG..."
+				local convert_display_asset_result && convert_display_asset_result=$(convert_display_asset "${auth_service_account_picture_path}")
+				rm -f "${auth_service_account_picture_path}" 2> /dev/null 2>&1
+				if [[ $(echo "${convert_display_asset_result}" | head -1 | grep -c 'ERROR') -eq 0 ]]; then
+					auth_service_account_picture_path="${SUPER_SERVICE_PICTURE_CACHE_PATH}.png"
+					mv "${convert_display_asset_result}" "${auth_service_account_picture_path}" 2> /dev/null 2>&1
+				else
+					log_super "Auth Error: Unable to convert new local super service picture to PNG."
+					unset auth_service_account_picture_path
+				fi
+				unset convert_display_asset_result
+			fi
+			[[ -f "${auth_service_account_picture_path}" ]] && chmod a+r "${auth_service_account_picture_path}" 2> /dev/null 2>&1
+			[[ ! -f "${auth_service_account_picture_path}" ]] && auth_error_new="TRUE" && log_super "Auth Error: Unable to create new local super service account due to picture errors."
+			umask "${previous_umask}"
+			find "${SUPER_CACHES_FOLDER}" -maxdepth 1 -type f -name "tmp*" -delete > /dev/null 2>&1
+		fi
+		
 		# If the saved credentials are valid then create the new super service account.
 		if [[ "${auth_error_new}" != "TRUE" ]]; then
 			local auth_service_uid=501
 			while [[ $(id "${auth_service_uid}" 2>&1 | grep -c 'no such user') -eq 0 ]]; do
 				auth_service_uid=$((auth_service_uid + 1))
 			done
-			local sysadminctl_result && sysadminctl_result=$(sysadminctl -addUser "${auth_service_account}" -fullName "${auth_service_real_name}" -password "${auth_service_password}" -UID "${SUPER_SERVICE_ACCOUNT_PICTURE}" -GID 20 -shell "/dev/null" -home "/dev/null" -picture "${display_icon_path}" -adminUser "${auth_service_add_via_admin_account_option}" -adminPassword "${auth_service_add_via_admin_password_option}" 2>&1)
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: sysadminctl_result is:\n${sysadminctl_result}"
-			dscl . create "/Users/${auth_service_account}" IsHidden 1
+			local sysadminctl_result && sysadminctl_result=$(sysadminctl -addUser "${auth_service_account}" -fullName "${auth_service_real_name}" -password "${auth_service_password}" -UID "${auth_service_uid}" -GID 20 -shell "/dev/null" -home "/dev/null" -picture "${auth_service_account_picture_path}" -adminUser "${auth_service_add_via_admin_account_option}" -adminPassword "${auth_service_add_via_admin_password_option}" 2>&1)
+			if [[ $(id "${auth_service_uid}" 2>&1 | grep -c 'no such user') -eq 0 ]]; then
+				dscl . create "/Users/${auth_service_account}" IsHidden 1 > /dev/null 2>&1
+			else
+				auth_error_new="TRUE" && log_super "Auth Error: Attempting to create a new local super service account failed with error: \n${sysadminctl_result}"
+			fi
 		fi
-	
+		
 		# Validate the super service account locally.
-		auth_local_account="${auth_service_account}"
-		auth_local_password="${auth_service_password}"
-		check_auth_local_account
-		unset auth_local_account
-		unset auth_local_password
+		if [[ "${auth_error_new}" != "TRUE" ]]; then
+			auth_local_account="${auth_service_account}"
+			auth_local_password="${auth_service_password}"
+			check_auth_local_account
+			unset auth_local_account
+			unset auth_local_password
 		[[ "${auth_error_local}" == "TRUE" ]] && auth_error_new="TRUE"
-	
+		fi
+		
 		# If the super service account is valid then update ${SUPER_MAIN_PLIST}.
 		if [[ "${auth_error_new}" != "TRUE" ]]; then
 			log_super_audit "Auth Status: Created new local super service account."
@@ -3229,7 +3287,7 @@ get_saved_authentication() {
 			auth_local_password="${auth_service_password_keychain}"
 			check_auth_local_account
 			if [[ "${auth_error_local}" != "TRUE" ]]; then
-				auth_service_account_valid="TRUE" && log_super "Status: Validated credentials for the local super service account."
+				auth_service_account_valid="TRUE" && log_super "Auth Status: Validated credentials for the local super service account."
 			else
 				auth_error_saved="TRUE" && log_super "Auth Error: Unable to validate credentials for the local super service account."
 				unset auth_local_account
@@ -6368,7 +6426,6 @@ workflow_check_download_status() {
 		# If an MSU macOS version is cached then determine if it's valid.
 		if [[ "${msu_macos_downloaded_version}" != "FALSE" ]]; then
 			if [[ "${msu_macos_downloaded_version}" == "${msu_macos_version}" ]] && [[ -z "${msu_macos_label_downloaded}" ]]; then
-				log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 				msu_macos_label_downloaded="${msu_macos_label}" && set_pref_main "MacOSMSULabelDownloaded" "${msu_macos_label}"
 			fi
 			if [[ "${msu_macos_downloaded_version}" != "${msu_macos_version}" ]]; then
@@ -6413,17 +6470,26 @@ download_macos_msu() {
 	
 	# Start with log and status updates.
 	if [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then
-		log_super "softwareupdate: Starting ${msu_macos_title} authenticated download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
-		log_status "Running: softwareupdate: Starting ${msu_macos_title} authenticated download workflow."
-		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${msu_macos_title} VIA AUTHENTICATED SOFTWAREUPDATE START ****"
+		log_super "softwareupdate: Starting ${msu_macos_title} ${msu_macos_version}authenticated download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+		log_status "Running: softwareupdate: Starting ${msu_macos_title} ${msu_macos_version} authenticated download workflow."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${msu_macos_title} ${msu_macos_version} VIA AUTHENTICATED SOFTWAREUPDATE START ****"
 	else
-		log_super "softwareupdate: Starting ${msu_macos_title} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
-		log_status "Running: softwareupdate: Starting ${msu_macos_title} download workflow."
-		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${msu_macos_title} VIA SOFTWAREUPDATE START ****"
+		log_super "softwareupdate: Starting ${msu_macos_title} ${msu_macos_version} download workflow, check ${MSU_WORKFLOW_LOG} for more detail."
+		log_status "Running: softwareupdate: Starting ${msu_macos_title} ${msu_macos_version} download workflow."
+		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD ${msu_macos_title} ${msu_macos_version} VIA SOFTWAREUPDATE START ****"
 	fi
-	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_label is: ${msu_macos_label}"
+	log stream --style compact --predicate 'subsystem == "com.apple.SoftwareUpdateMacController" AND eventMessage CONTAINS[c] "reported progress"' >> "${MSU_WORKFLOW_LOG}" &
+	local log_stream_msu_workflow_pid="$!"
+	disown log_stream_msu_workflow_pid
+	if [[ "${verbose_mode}" == "TRUE" ]]; then
+		log_super "Verbose Mode: Starting debug log for softwareupdate workflow progress at: ${MSU_WORKFLOW_VERBOSE_LOG}"
+		log stream --style compact --predicate 'subsystem == "com.apple.SoftwareUpdateMacController"' >> "${MSU_WORKFLOW_VERBOSE_LOG}" &
+		local log_stream_msu_workflow_verbose_pid="$!"
+		disown $log_stream_msu_workflow_verbose_pid
+	fi
 	
 	# The softwareupdate download process is backgrounded and is watched via a while loop later on.
+	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_label is: ${msu_macos_label}"
 	if [[ "${workflow_download_macos_auth_required}" == "TRUE" ]]; then # On systems that require authenticated downloads.
 		echo "${auth_local_password}" | launchctl asuser "${current_user_id}" sudo -u root softwareupdate --download "${msu_macos_label}" --agree-to-license --user "${auth_local_account}" --stdinpass >> "${MSU_WORKFLOW_LOG}" 2>&1 &
 		local download_msu_macos_pid="$!"
@@ -6439,9 +6505,7 @@ download_macos_msu() {
 	local download_msu_macos_timeout_error="TRUE"
 	local download_msu_macos_timeout_seconds="${TIMEOUT_START_SECONDS}"
 	local download_msu_macos_phase="START"
-	local download_msu_macos_complete_perecent=0
-	local download_msu_macos_complete_perecent_previous=0
-	local download_msu_macos_complete_display
+	local download_msu_macos_complete_perecent
 	unset msu_macos_title_downloaded
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_timeout_seconds is: ${download_msu_macos_timeout_seconds}"
 	while read -t "${download_msu_macos_timeout_seconds}" -r log_line; do
@@ -6471,38 +6535,29 @@ download_macos_msu() {
 			download_msu_macos_start_error="FALSE"
 			download_msu_macos_start_timeout="FALSE"
 			[[ $(echo "${msu_macos_title_downloaded}" | grep -c 'macOS') -gt 0 ]] && download_msu_macos_phase="DOWNLOADING"
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_msu_macos_phase}" == "DOWNLOADING" ]]; then
-			download_msu_macos_complete_perecent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
+		elif [[ $(echo "${log_line}" | grep -c 'phase:DOWNLOADING') -gt 0 ]] && [[ "${download_msu_macos_phase}" == "DOWNLOADING" ]]; then
+			download_msu_macos_complete_perecent=$(echo "${log_line}" | awk -F 'portionComplete:| estimatedTimeRemaining:' '{printf "%.2f", $2 * 100}')
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_complete_perecent is: ${download_msu_macos_complete_perecent}"
-			if [[ $download_msu_macos_complete_perecent -ge 60 ]]; then
-				log_echo_replace_line "${msu_macos_title_downloaded} download progress: 100%\n"
+			log_echo_replace_line "${msu_macos_title_downloaded} download progress: $(printf "%.2f\n" "$(echo "scale=2; $download_msu_macos_complete_perecent * 1.69" | bc)")%"
+		elif [[ $(echo "${log_line}" | grep -c 'phase:PREFLIGHT_FDR_RECOVERY') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+			if [[ "${download_msu_macos_phase}" == "DOWNLOADING" ]]; then
+				log_echo_replace_line "${msu_macos_title_downloaded} download progress: 100.00%\n"
 				log_super "softwareupdate: ${msu_macos_title_downloaded} download complete, now preparing..."
 				log_msu "**** TIMESTAMP ****"
 				download_msu_macos_phase="PREPARING"
-			elif [[ $download_msu_macos_complete_perecent -gt $download_msu_macos_complete_perecent_previous ]]; then
-				download_msu_macos_complete_display=$( (echo "${download_msu_macos_complete_perecent} * 1.69" | bc) | cut -d '.' -f1)
-				log_echo_replace_line "${msu_macos_title_downloaded} download progress: ${download_msu_macos_complete_display}%"
-				download_msu_macos_complete_perecent_previous=${download_msu_macos_complete_perecent}
 			fi
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${download_msu_macos_phase}" == "PREPARING" ]]; then
-			download_msu_macos_complete_perecent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
+			download_msu_macos_complete_perecent=$(echo "${log_line}" | awk -F 'portionComplete:| estimatedTimeRemaining:' '{printf "%.2f", $2 * 100}')
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_msu_macos_complete_perecent is: ${download_msu_macos_complete_perecent}"
-			if [[ ${download_msu_macos_complete_perecent} -ge 100 ]]; then
-				log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: 100%\n"
-				log_msu "**** TIMESTAMP ****"
-				download_msu_macos_phase="DONE"
-				sleep 10
-			elif [[ $download_msu_macos_complete_perecent -gt $download_msu_macos_complete_perecent_previous ]]; then
-				download_msu_macos_complete_display=$(((download_msu_macos_complete_perecent - 60) * 2))
-				log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: ${download_msu_macos_complete_display}%"
-				download_msu_macos_complete_perecent_previous=${download_msu_macos_complete_perecent}
-			fi
-		elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]] || [[ "${download_msu_macos_phase}" == "DONE" ]]; then
-			msu_macos_title_downloaded=$(echo "${log_line}" | sed -e 's/://' -e 's/Downloaded //')
+			log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: $(printf "%.2f\n" "$(echo "scale=2; ($download_msu_macos_complete_perecent - 60)  * 2" | bc)")%"
+		elif [[ $(echo "${log_line}" | grep -c 'phase:COMPLETED') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Downloading: 100.00%') -gt 0 ]]; then
+			log_msu "**** TIMESTAMP ****"
+			log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: 100.00%\n"
 			log_super_audit "softwareupdate: ${msu_macos_title_downloaded} download and preparation complete."
+			download_msu_macos_phase="DONE"
 			download_msu_macos_start_error="FALSE"
 			download_msu_macos_start_timeout="FALSE"
 			download_msu_macos_timeout_error="FALSE"
+			sleep 10
 			break
 		fi
 	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
@@ -6515,11 +6570,11 @@ download_macos_msu() {
 		local download_msu_macos_title_error="TRUE"
 		local download_msu_macos_validation_error="TRUE"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_title is: ${msu_macos_title}"
+		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_version is: ${msu_macos_version}"
 		[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_title_downloaded is: ${msu_macos_title_downloaded}"
-		if [[ "${msu_macos_title}" == "${msu_macos_title_downloaded}" ]]; then
+		if [[ "${msu_macos_title} ${msu_macos_version}" == "${msu_macos_title_downloaded}" ]]; then
 			download_msu_macos_title_error="FALSE"
 			check_msu_macos_download
-			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_version is: ${msu_macos_version}"
 			[[ "${msu_macos_downloaded_version}" == "${msu_macos_version}" ]] && download_msu_macos_validation_error="FALSE"
 		fi
 	fi
@@ -6529,7 +6584,8 @@ download_macos_msu() {
 	# If the macOS update/upgrade is downloaded and prepared, then collect information.
 	if [[ "${download_msu_macos_start_error}" == "FALSE" ]] && [[ "${download_msu_macos_start_timeout}" == "FALSE" ]] && [[ "${download_msu_macos_timeout_error}" == "FALSE" ]] && [[ "${download_msu_macos_title_error}" == "FALSE" ]] && [[ "${download_msu_macos_validation_error}" == "FALSE" ]]; then
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS VIA SOFTWAREUPDATE COMPLETED ****"
-		log_metrics "MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		log_super_audit "softwareupdate: ${msu_macos_title_downloaded} is being applied for pending system restart!"
+		log_metrics "macOS MSU Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		download_maocs_msu_error="FALSE"
 		msu_macos_download_required="FALSE"
 		set_pref_main "MacOSMSULabelDownloaded" "${msu_macos_label}"
@@ -6558,8 +6614,8 @@ download_macos_msu() {
 			log_msu "Error: Download of macOS update/upgrade via softwareupdate failed to complete, as indicated by no progress after waiting for ${download_msu_macos_timeout_seconds} seconds."
 			log_super "Error: Download of macOS update/upgrade via softwareupdate failed to complete, as indicated by no progress after waiting for ${download_msu_macos_timeout_seconds} seconds."
 		elif [[ "${download_msu_macos_title_error}" == "TRUE" ]]; then
-			log_msu "Error: Download of ${msu_macos_title} did not complete or match requested download title."
-			log_super "Error: Download of ${msu_macos_title} ddid not complete or match requested download title."
+			log_msu "Error: Download of ${msu_macos_title} ${msu_macos_version} did not complete or match requested download title of ${msu_macos_title_downloaded}."
+			log_super "Error: Download of ${msu_macos_title} ${msu_macos_version} did not complete or match requested download title of ${msu_macos_title_downloaded}."
 		else # "${download_msu_macos_validation_error}" == "TRUE"
 			if [[ "${msu_macos_major_upgrade_target}" != "FALSE" ]]; then
 				log_msu "Error: Downloaded macOS major upgrade version of ${msu_macos_downloaded_version} doesn't match expected version ${msu_macos_version}."
@@ -6576,6 +6632,8 @@ download_macos_msu() {
 		kill -9 "${download_msu_macos_pid}" > /dev/null 2>&1
 		kick_softwareupdated
 	fi
+	[[ -n "${log_stream_msu_workflow_pid}" ]] && kill -9 "${log_stream_msu_workflow_pid}" > /dev/null 2>&1
+	[[ -n "${log_stream_msu_workflow_verbose_pid}" ]] && kill -9 "${log_stream_msu_workflow_pid}" > /dev/null 2>&1
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: download_maocs_msu_error is: ${download_maocs_msu_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_download_required is: ${msu_macos_download_required}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: workflow_download_macos_auth_required is: ${workflow_download_macos_auth_required}"
@@ -6680,7 +6738,7 @@ download_macos_installer() {
 		log_installer "Status: A macOS installer is now available at: /Applications/Install ${installer_macos_title}.app"
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - DOWNLOAD MACOS INSTALLER APP COMPLETE ****"
 		log_super_audit "Status: A macOS installer is now available at: /Applications/Install ${installer_macos_title}.app"
-		log_metrics "Installer Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+		log_metrics "macOS APP Download Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		download_installer_macos_error="FALSE"
 		installer_macos_download_required="FALSE"
 		set_pref_main "MacOSInstallerDownloaded" "${installer_macos_title} ${installer_macos_version}-${installer_macos_build}"
@@ -7073,6 +7131,15 @@ install_macos_msu() {
 			log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE ${msu_macos_label} VIA SOFTWAREUPDATE START ****"
 		fi
 	fi
+	log stream --style compact --predicate 'subsystem == "com.apple.SoftwareUpdateMacController" AND eventMessage CONTAINS[c] "reported progress"' >> "${MSU_WORKFLOW_LOG}" &
+	local log_stream_msu_workflow_pid="$!"
+	disown log_stream_msu_workflow_pid
+	if [[ "${verbose_mode}" == "TRUE" ]]; then
+		log_super "Verbose Mode: Starting debug log for softwareupdate workflow progress at: ${MSU_WORKFLOW_VERBOSE_LOG}"
+		log stream --style compact --predicate 'subsystem == "com.apple.SoftwareUpdateMacController"' >> "${MSU_WORKFLOW_VERBOSE_LOG}" &
+		local log_stream_msu_workflow_verbose_pid="$!"
+		disown $log_stream_msu_workflow_verbose_pid
+	fi
 	
 	# The update/upgrade process is backgrounded and is watched via while loops later on.
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_macos_label is: ${msu_macos_label}"
@@ -7092,75 +7159,92 @@ install_macos_msu() {
 	local install_msu_macos_timeout_error="TRUE"
 	local install_msu_macos_timeout_seconds="${TIMEOUT_START_SECONDS}"
 	local install_msu_macos_phase="START"
-	local install_msu_macos_complete_percent=0
-	local install_msu_macos_complete_percent_previous=0
-	local install_msu_macos_complete_percent_display
+	local install_msu_macos_complete_percent
+	unset msu_macos_title_downloaded
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_timeout_seconds is: ${install_msu_macos_timeout_seconds}"
 	while read -t "${install_msu_macos_timeout_seconds}" -r log_line; do
 		# log_super "Debug Mode: Function ${FUNCNAME[0]}: log_line is:\n${log_line}"
-		if [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Failed to authenticate') -gt 0 ]]; then
+		if [[ $(echo "${log_line}" | grep -c "Can’t connect") -gt 0 ]] || [[ $(echo "${log_line}" | grep -c "Couldn't communicate") -gt 0 ]]; then
+			download_msu_macos_start_error="CONNECT"
 			break
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ $(echo "${log_line}" | grep -c 'Downloading:') -eq 0 ]]; then
+		elif [[ $(echo "${log_line}" | grep -c 'No such update') -gt 0 ]]; then
+			download_msu_macos_start_error="NOUPDATE"
+			break
+		elif [[ $(echo "${log_line}" | grep -c 'Not enough free disk space') -gt 0 ]]; then
+			download_msu_macos_start_error="SPACE"
+			break
+		elif [[ $(echo "${log_line}" | grep -c 'Failed to authenticate') -gt 0 ]]; then
+			download_msu_macos_start_error="AUTH"
+			break
+		elif [[ $(echo "${log_line}" | grep -c 'Failed to download') -gt 0 ]]; then
+			download_msu_macos_start_error="FAILED"
+			break
+		elif [[ $(echo "${log_line}" | grep -c 'Downloading') -gt 0 ]] && [[ "${install_msu_macos_phase}" == "START" ]]; then
 			msu_macos_title_downloaded="${log_line/Downloading /}"
 			log_super "softwareupdate: ${msu_macos_title_downloaded} is downloading..."
 			log_msu "**** TIMESTAMP ****"
+			install_msu_macos_phase="DOWNLOADING"
 			install_msu_macos_timeout_seconds="${TIMEOUT_MSU_SYSTEM_SECONDS}"
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_timeout_seconds is: ${install_msu_macos_timeout_seconds}"
 			install_msu_macos_start_error="FALSE"
+			install_msu_macos_start_timeout="FALSE"
 			[[ $(echo "${msu_macos_title_downloaded}" | grep -c 'macOS') -gt 0 ]] && install_msu_macos_phase="DOWNLOADING"
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading:') -gt 0 ]] && [[ "${install_msu_macos_phase}" == "DOWNLOADING" ]]; then
-			install_msu_macos_complete_percent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
-			install_msu_macos_complete_percent=${install_msu_macos_complete_percent#0}
+		elif [[ $(echo "${log_line}" | grep -c 'phase:DOWNLOADING') -gt 0 ]] && [[ "${install_msu_macos_phase}" == "DOWNLOADING" ]]; then
+			install_msu_macos_complete_percent=$(echo "${log_line}" | awk -F 'portionComplete:| estimatedTimeRemaining:' '{printf "%.2f", $2 * 100}')
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_complete_percent is: ${install_msu_macos_complete_percent}"
-			if [[ $install_msu_macos_complete_percent -ge 60 ]]; then
-				log_echo_replace_line "${msu_macos_title_downloaded} download progress: 100%\n"
+			log_echo_replace_line "${msu_macos_title_downloaded} download progress: $(printf "%.2f\n" "$(echo "scale=2; $install_msu_macos_complete_percent * 1.69" | bc)")%"
+		elif [[ $(echo "${log_line}" | grep -c 'phase:PREFLIGHT_FDR_RECOVERY') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'phase:PREPARING_UPDATE') -gt 0 ]]; then
+			if [[ "${install_msu_macos_phase}" == "DOWNLOADING" ]]; then
+				log_echo_replace_line "${msu_macos_title_downloaded} download progress: 100.00%\n"
 				log_super "softwareupdate: ${msu_macos_title_downloaded} download complete, now preparing..."
 				log_msu "**** TIMESTAMP ****"
 				install_msu_macos_phase="PREPARING"
-			elif [[ $install_msu_macos_complete_percent -gt $install_msu_macos_complete_percent_previous ]]; then
-				install_msu_macos_complete_percent_display=$( (echo "$install_msu_macos_complete_percent * 1.69" | bc) | cut -d '.' -f1)
-				log_echo_replace_line "${msu_macos_title_downloaded} download progress: ${install_msu_macos_complete_percent_display}%"
-				install_msu_macos_complete_percent_previous=$install_msu_macos_complete_percent
 			fi
-		elif [[ $(echo "${log_line}" | grep -c 'Downloading:') -gt 0 ]] && [[ "${install_msu_macos_phase}" == "PREPARING" ]]; then
-			install_msu_macos_complete_percent=$(echo "${log_line}" | sed -e 's/Downloading: //' -e 's/\.[0-9][0-9]//' | tr -d '\n' | tr -d '\r')
-			install_msu_macos_complete_percent=${install_msu_macos_complete_percent#0}
+			install_msu_macos_complete_percent=$(echo "${log_line}" | awk -F 'portionComplete:| estimatedTimeRemaining:' '{printf "%.2f", $2 * 100}')
 			[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_complete_percent is: ${install_msu_macos_complete_percent}"
-			if [[ $install_msu_macos_complete_percent -ge 100 ]]; then
-				log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: 100%\n"
-				log_msu "**** TIMESTAMP ****"
-				install_msu_macos_start_error="FALSE"
-				install_msu_macos_start_timeout="FALSE"
-				install_msu_macos_timeout_error="FALSE"
-				break
-			elif [[ $install_msu_macos_complete_percent -gt $install_msu_macos_complete_percent_previous ]]; then
-				install_msu_macos_complete_percent_display=$(((install_msu_macos_complete_percent - 60) * 2))
-				log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: ${install_msu_macos_complete_percent_display}%"
-				install_msu_macos_complete_percent_previous=$install_msu_macos_complete_percent
-			fi
-		elif [[ $(echo "${log_line}" | grep -c 'Downloaded') -gt 0 ]]; then
-			msu_macos_title_downloaded=$(echo "${log_line}" | sed -e 's/://' -e 's/Downloaded //')
+			log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: $(printf "%.2f\n" "$(echo "scale=2; ($install_msu_macos_complete_percent - 60)  * 2" | bc)")%"
+		elif [[ $(echo "${log_line}" | grep -c 'phase:COMPLETED') -gt 0 ]] || [[ $(echo "${log_line}" | grep -c 'Downloading: 100.00%') -gt 0 ]]; then
 			log_msu "**** TIMESTAMP ****"
+			log_echo_replace_line "${msu_macos_title_downloaded} preparing progress: 100.00%\n"
+			log_super_audit "softwareupdate: ${msu_macos_title_downloaded} download and preparation complete."
+		elif [[ $(echo "${log_line}" | grep -c 'phase:APPLYING') -gt 0 ]]; then
+			log_msu "**** TIMESTAMP ****"
+			install_msu_macos_phase="DONE"
 			install_msu_macos_start_error="FALSE"
 			install_msu_macos_start_timeout="FALSE"
 			install_msu_macos_timeout_error="FALSE"
 			break
 		fi
 	done < <(tail -n1 -F "${MSU_WORKFLOW_LOG}" | tr -u '%' '\n')
+	[[ -n "${log_stream_msu_workflow_pid}" ]] && kill -9 "${log_stream_msu_workflow_pid}" > /dev/null 2>&1
+	[[ -n "${log_stream_msu_workflow_verbose_pid}" ]] && kill -9 "${log_stream_msu_workflow_pid}" > /dev/null 2>&1
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_start_error is: ${install_msu_macos_start_error}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_start_timeout is: ${install_msu_macos_start_timeout}"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: install_msu_macos_timeout_error is: ${install_msu_macos_timeout_error}"
 	
-	# If the softwareupdate installation workflow completed, then prepare for restart.
+	# If the softwareupdate installation workflow completed, then prepare for immediate restart.
 	if [[ "${install_msu_macos_start_error}" == "FALSE" ]] && [[ "${install_msu_macos_start_timeout}" == "FALSE" ]] && [[ "${install_msu_macos_timeout_error}" == "FALSE" ]]; then
 		/usr/libexec/PlistBuddy -c "Add :WorkflowRestartValidate bool true" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		log_msu "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - UPDATE/UPGRADE MACOS VIA SOFTWAREUPDATE COMPLETED ****"
-		log_super_audit "softwareupdate: macOS update/upgrade is prepared and ready for restart!"
+		log_super_audit "softwareupdate: ${msu_macos_title_downloaded} is being applied for pending system restart!"
+		log_metrics "macOS MSU Installation Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 	else # Some part of the softwareupdate installation workflow failed.
-		if [[ "${install_msu_macos_start_error}" == "TRUE" ]]; then
-			log_msu "Error: The softwareupdate process was unable to reach macOS software update servers or find the requested macOS update/upgrade."
-			log_super "Error: The softwareupdate process was unable to reach macOS software update servers or find the requested macOS update/upgrade."
+		if [[ "${install_msu_macos_start_error}" == "CONNECT" ]]; then
+			log_msu "Error: Unable to reach macOS software update servers."
+			log_super "Error: Unable to reach macOS software update servers."
+		elif [[ "${install_msu_macos_start_error}" == "NOUPDATE" ]]; then
+			log_msu "Error: Unable to find requested macOS update/upgrade via softwareupdate."
+			log_super "Error: Unable to find requested macOS update/upgrade via softwareupdate."
+		elif [[ "${install_msu_macos_start_error}" == "SPACE" ]]; then
+			log_msu "Error: Not enough available storage to install macOS update/upgrade."
+			log_super "Error: Not enough available storage to install macOS update/upgrade."
+		elif [[ "${install_msu_macos_start_error}" == "AUTH" ]]; then
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed to authenticate."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed to authenticate."
+		elif [[ "${install_msu_macos_start_error}" == "FAILED" ]]; then
+			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed to start."
+			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed to start."
 		elif [[ "${install_msu_macos_start_timeout}" == "TRUE" ]]; then
 			log_msu "Error: Installation of macOS update/upgrade via softwareupdate failed to start downloading/preparing after waiting for ${install_msu_macos_timeout_seconds} seconds."
 			log_super "Error: Installation of macOS update/upgrade via softwareupdate failed to start downloading/preparing after waiting for ${install_msu_macos_timeout_seconds} seconds."
@@ -7270,6 +7354,7 @@ install_macos_app() {
 		[[ "${workflow_scheduled_install_active}" == "TRUE" ]] && /usr/libexec/PlistBuddy -c "Delete :WorkflowScheduledInstall" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS COMPLETED ****"
 		log_super_audit "Status: ${installer_macos_title} ${installer_macos_version}-${installer_macos_build} is prepared and ready for restart!"
+		log_metrics "macOS APP Installation Complete: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 		[[ "${current_user_account_name}" != "FALSE" ]] && notification_macos_restart & disown
 	else # Some part of the startosinstall workflow failed.
 		log_installer "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - INSTALL MACOS FAILED ****"
@@ -7454,7 +7539,7 @@ workflow_install_no_user() {
 					install_macos_msu
 				fi
 			else # No saved update/upgrade credentials can not enforce macOS upgrade/update.
-				log_super "Error: No saved Apple silicon credentials and no active logged in user."
+				log_super "Auth Error: No saved Apple silicon credentials and no active logged in user."
 				workflow_install_macos_no_user_error="TRUE"
 			fi
 		fi
@@ -8525,15 +8610,9 @@ set_display_workflow_target(){
 		display_string_target="${workflow_target//-*/}"
 		display_action_type="RESTART"
 		if [[ "${display_icon_is_custom}" == "FALSE" ]]; then
-			if [[ "${msu_macos_version//.*/}" == "${system_macos_version_major}" ]]; then
-				local find_result && find_result=$(find "/System/Library/AssetsV2/" -name "OSBadge.icns" 2> /dev/null | head -1)
-				[[ -f "${find_result}" ]] && local display_icon_macos="${find_result}"
-			fi
-			if [[ -z "${display_icon_macos}" ]]; then
-				[[ $(echo "${workflow_target}" | sed -e 's/macOS //' -e 's/\..*//') == "15" ]] && local display_icon_macos && display_icon_macos="${DISPLAY_ICON_MACOS_BADGE_15}"
-				[[ $(echo "${workflow_target}" | sed -e 's/macOS //' -e 's/\..*//') == "26" ]] && local display_icon_macos && display_icon_macos="${DISPLAY_ICON_MACOS_BADGE_26}"
-				[[ $(echo "${workflow_target}" | sed -e 's/macOS //' -e 's/\..*//') == "27" ]] && local display_icon_macos && display_icon_macos="${DISPLAY_ICON_MACOS_BADGE_27}"
-			fi
+			[[ $(echo "${workflow_target}" | grep -c ' 15.') -gt 0 ]] && local display_icon_macos && display_icon_macos="${DISPLAY_ICON_MACOS_BADGE_15}"
+			[[ $(echo "${workflow_target}" | grep -c ' 26.') -gt 0 ]] && local display_icon_macos && display_icon_macos="${DISPLAY_ICON_MACOS_BADGE_26}"
+			[[ $(echo "${workflow_target}" | grep -c ' 27.') -gt 0 ]] && local display_icon_macos && display_icon_macos="${DISPLAY_ICON_MACOS_BADGE_27}"
 			if [[ -z "${display_icon_macos}" ]]; then
 				log_super "Display Warning: Unable to source macOS update/upgrade icon, using failover default macOS icon badge."
 				local display_icon_macos="${FAILOVER_DISPLAY_ICON_MACOS_BADGE}"
@@ -8585,7 +8664,7 @@ set_display_workflow_target(){
 		fi
 		display_string_more_info="${workflow_target//-*/}"
 		if [[ "${display_more_info_url}" == "FALSE" ]] && [[ -f "${SOFA_MACOS_CACHE_JSON}" ]]; then
-			local sofa_macos_target_info_url && sofa_macos_target_info_url=$(jq -r --arg macos_version "$(echo "${workflow_target}" | awk '{print $2}' | sed -e 's/-.*//')" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version) | .SecurityInfo // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)
+			local sofa_macos_target_info_url && sofa_macos_target_info_url=$(jq -r --arg macos_version "$(echo "${workflow_target}" | sed -e 's/-.*//' -e 's/[^0-9.]//g')" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version) | .SecurityInfo // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)
 			[[ -n "${sofa_macos_target_info_url}" ]] && display_more_info_url="${sofa_macos_target_info_url}"
 		fi
 		[[ "${display_more_info_url}" == "FALSE" ]] && display_more_info_url="${FAILOVER_MORE_INFO_APPLE_SECURITY_URL}" && log_super "Display Warning: Unable to get version-specific macOS update/upgrade more info URL from the SOFA macOS feed, using failover more info Apple security releases URL."
@@ -8908,6 +8987,8 @@ open_dialog_swift_dialog() {
 	[[ "${display_background_path}" != "FALSE" ]] && [[ "${current_user_appearance_mode}" == "LIGHT" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_background "${display_background_path}" --arg display_bgalpha "${DISPLAY_BACKGROUND_ALPHA}" --arg display_bgfill "${DISPLAY_BACKGROUND_FILL_MODE}" '. + { "background": $display_background, "bgalpha": $display_bgalpha, "bgfill": $display_bgfill }')
 	[[ "${display_background_dark_path}" != "FALSE" ]] && [[ "${current_user_appearance_mode}" == "DARK" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_background "${display_background_dark_path}" --arg display_bgalpha "${DISPLAY_BACKGROUND_ALPHA}" --arg display_bgfill "${DISPLAY_BACKGROUND_FILL_MODE}" '. + { "background": $display_background, "bgalpha": $display_bgalpha, "bgfill": $display_bgfill }')
 	[[ "${display_icon_overlay_path}" != "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_overlay_icon "${display_icon_overlay_path}:dark=${display_icon_overlay_dark_path}" '. + { "overlayicon": $display_overlay_icon }')
+	# FIXME: Issue with swiftDialog beta...
+	[[ -n $display_string_infobox ]] && log_super "Display Warning: Due to issues with the current beta version of swiftDialog; More Info URL links are currently disabled."
 	[[ -n "${display_string_infobox}" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_infobox "${display_string_infobox}" '. + { "infobox": $display_infobox }')
 	[[ -n $dialog_timeout_seconds ]] && dialog_json=$(echo "${dialog_json}" | jq --arg dialog_timeout "${dialog_timeout_seconds}" '. + { "timer": $dialog_timeout }')
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${display_help_image_path}" == "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_help_message "${display_help_message_temp_md}" --arg display_help_alignment "${DISPLAY_HELP_MESSAGE_ALIGNMENT}" --arg display_help_button "${DISPLAY_STRING_OK}" '. + { "helpmessage": $display_help_message, "helpalignment": $display_help_alignment, "helpsheetbuttontext": $display_help_button }')
@@ -9351,10 +9432,11 @@ dialog_user_schedule() {
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
 	[[ "${display_action_type}" == "RESTART" ]] && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_RESTART}"
 	[[ "${display_action_type}" == "INSTALL" ]] && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_INSTALL}"
+	# FIXME: Issue with swiftDialog beta...
+	[[ -n $dialog_timeout_seconds ]] && log_super "Display Warning: Due to issues with the current beta version of swiftDialog; dialog timeouts for the ${FUNCNAME[0]} are currently disabled."
 	unset dialog_timeout_seconds
-# FIXME: An issue with swiftDialog prevents timeout from working with the time/date pickers.
-#	[[ -n $dialog_timeout_user_schedule_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_schedule_seconds
-#	{ [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
+	# [[ -n $dialog_timeout_user_schedule_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_schedule_seconds
+	# { [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
 	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
@@ -9585,9 +9667,11 @@ dialog_user_auth() {
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_auth_action is: ${display_string_auth_action}"
 	set_display_message
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
+	# FIXME: Issue with swiftDialog beta...
+	[[ -n $dialog_timeout_seconds ]] && log_super "Display Warning: Due to issues with the current beta version of swiftDialog; dialog timeouts for the ${FUNCNAME[0]} are currently disabled."
 	unset dialog_timeout_seconds
-	[[ -n $dialog_timeout_user_auth_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_auth_seconds
-	{ [[ -z $dialog_timeout_user_auth_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
+	# [[ -n $dialog_timeout_user_auth_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_auth_seconds
+	# { [[ -z $dialog_timeout_user_auth_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
 	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
@@ -9635,7 +9719,7 @@ dialog_user_auth() {
 	# (If not testing a display function) user authentication was successful.
 	if [[ -z "${test_display_function_option}" ]]; then
 		if [[ "${dialog_user_auth_valid}" == "TRUE" ]]; then
-			log_super "Status: Credentials verified for current user: ${auth_local_account}"
+			log_super "Auth Status: Credentials verified for current user: ${auth_local_account}"
 			log_metrics "Display User Authentication Successful: Workflow Elapsed Time" "WorkflowTargetTimestamp"
 			if [[ "${auth_ask_user_to_save_password}" == "TRUE" ]]; then
 				local auth_user_save_password_result && auth_user_save_password_result=$(launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security add-generic-password -a "super_auth_user_password" -s "Super Update Service" -w "${auth_local_password}" "${current_user_home_folder}/Library/Keychains/login.keychain" 2>&1)
@@ -9644,7 +9728,7 @@ dialog_user_auth() {
 				[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_local_password is: ${auth_local_password}"
 				[[ "${verbose_mode}" == "TRUE" ]] && log_echo "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: auth_user_password_keychain is: ${auth_user_password_keychain}"
 				if [[ "${auth_local_password}" == "${auth_user_password_keychain}" ]]; then
-					log_super "Status: Saved new --auth-ask-user-to-save-password credentials for current user: ${auth_local_account}"
+					log_super "Auth Status: Saved new --auth-ask-user-to-save-password credentials for current user: ${auth_local_account}"
 				else
 					log_super "Warning: Unable to validate keychain item for --auth-ask-user-to-save-password, deleting keychain item."
 					launchctl asuser "${current_user_id}" sudo -u "${current_user_account_name}" security delete-generic-password -a "super_auth_user_password" "${current_user_home_folder}/Library/Keychains/login.keychain" > /dev/null 2>&1

@@ -16,7 +16,6 @@
 	"MIST_CLI_DOWNLOAD_URL": "https://github.com/ninxsoft/mist-cli/releases/download/v2.3/mist-cli.2.3.pkg",
 	"MIST_CLI_BINARY": "/usr/local/bin/mist",
 	"JAMF_PRO_BINARY": "/usr/local/bin/jamf",
-	"SUPER_SERVICE_ACCOUNT_PICTURE": "/System/Applications/System Settings.app/Contents/Resources/Settings.icns",
 	"SOFTWARE_STATUS_CACHE_AGE_MINUTES": "360",
 	"DEFERRAL_TIMER_DEFAULT_MINUTES": "60",
 	"DEFERRAL_TIMER_WORKFLOW_RELAUNCH_DEFAULT_MINUTES": "360",

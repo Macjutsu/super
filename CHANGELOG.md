@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [6.0.0-beta2]
+## [6.0.0-beta3]
 
-2026-10-08
+2026-10-16
 
 ## Highlights (6.0.x)
 
@@ -25,23 +25,36 @@
 - Previously saved `super` 5.x.x __local__ authentication credentials are compatible with `super` 6.0.x.
 - __Previously saved `super` 5.x.x Jamf Pro API authentication credentials are not compatible with `super` 6.0.x and will be deleted from the system the first time `super` 6.0.x runs.__
 - __A major version number change (like 5.x.x to 6.x.x) indicates that previous command line options and managed preferences are not compatible with the newer version of `super`.__
-- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta2/Super-Friends/super-migration-options-6.0.x.tsv).
-- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta2/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta2/Example-MDM).
-- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta2/Super-Friends).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta3/Super-Friends/super-migration-options-6.0.x.tsv).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta3/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta3/Example-MDM).
+- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta3/Super-Friends).
 
-### Known Issues (6.0.0-beta2)
+### Known Issues (6.0.0-beta3)
 
 - __The `super` installer package is not yet notarized by Apple. This should not present a problem for most managed deployment workflows, but downloaded `super` packages may fail when installed manually due to file system quarantine. Removing the file quarantine will resolve this issue.__
 - Full support for declarative software update enforcement is still in the works. __Support coming soon.__
-- Due to a swiftDialog issue the user schedule dialog does not currently support a dialog timeout.
-- Forced macOS update downloads via `softwareupdate` occasionally fail upon first attempt, but they are consistently successful after multiple attempts.
+- Due to swiftDialog beta issues More Info URL links are currently inactive.
+- Due to swiftDialog beta issues and timeouts for the user authentication and user schedule dialogs are currently disabled.
 - The [MacAdmin's SOFA](https://sofa.macadmins.io) Apple Beta feed technically exists but it's not currently being updated by the SOFA project. Thus, systems enrolled in a macOS beta program cannot take advantage of this resource.
 - There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated.
 
+### Specific Changes (6.0.0-beta3)
+
+- __Note this sub-section only covers specific changes for 6.0.0-beta2 to 6.0.0-beta3. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/6.0.0-beta3/CHANGELOG.md) full details of all the changes.__
+- Significant improvements to the method that tracks "over-the-air" macOS download, preparation, and installation progress. The `super` workflow now tracks progress via both the `softwareupdate` command output and a filtered log stream of the `com.apple.SoftwareUpdateMacController` sub-process.
+- New `--auth-service-picture=/local/path | URL` option allows you to specify a custom account picture for a new local `super` service account (because it will appear on the FileVault authentication screen despite being unable to log in and otherwise hidden throughout the rest of the UI).
+- Resolved an issue that prevented a new local `super` service account from being created.
+- Resolved several logic issues that caused unexpected behavior when using the `--auth-delete-all` option simultaneously with other `--auth-*` options.
+- Resolved an issue that would cause an incorrect macOS version icon to appear in dialogs.
+- Resolved an issue that prevented proper lookup of the macOS update/upgrade More Info URL from the SOFA feed.
+- Updated [example PPPC Configuration Profile](https://github.com/Macjutsu/super/tree/6.0.0-beta3/Example-MDM/Super-Service-Account-Jamf-Pro-PPPC.mobileconfig) for allowing the Jamf Pro agent to create a new local `super` service account.
+- New [example PPPC Configuration Profile](https://github.com/Macjutsu/super/tree/6.0.0-beta3/Example-MDM/Terminal-Allow-All-Files-PPPC.mobileconfig) to allow for testing `super` configuration workflows from Terminal.
+- As always, countless logging refinements and correction of typos.
+
 ### Specific Changes (6.0.0-beta2)
 
-- __Note this sub-section only covers specific changes for 6.0.0-beta1 to 6.0.0-beta2. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/main/CHANGELOG.md) full details of all the changes.__
+- __Note this sub-section only covers specific changes for 6.0.0-beta1 to 6.0.0-beta2. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/6.0.0-beta2/CHANGELOG.md) full details of all the changes.__
 - Reinstated all previous `--scheduled-install-*` options.  (Thanks to @bartreardon for adding a new features in swiftDialog that allow for this!)
 - New support for beta releases of swiftDialog; the minimum version verification is now based on the swiftDialog build number.
 - New [swiftDialog v3.1.1b3-4997](https://github.com/swiftDialog/swiftDialog/releases) is automatically installed. (Thanks to @bartreardon for his dedication to the project!)
@@ -110,6 +123,7 @@
 	- All`--display-accessory-*` options and `<key>DisplayAccessory*</key>` preference keys are removed because this type of display customization is now configured via alternate display configuration files.
 	- `--display-help-button-string` and `<key>DisplayHelpButtonString</key>` are replaced by the new display help message options.
 	- `--display-warning-button-string` and `<key>DisplayWarningButtonString</key>` are removed because swift Dialog does not support this feature.
+	- All `--auth-jamf-*` options and the `--auth-mdm-failover-to-user` option are removed because `super` 6.x.x and later (and macOS 27 and later) no longer support MDM-based macOS update enforcement.
 - The `super` checksum is no longer generated because the `super` runtime assets are now code signed and deployed via a package installer.
 
 ## Highlights (5.1.x)
