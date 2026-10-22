@@ -4,7 +4,7 @@
 	"DISPLAY_STRING_TITLE_SAFARI_UPDATE": "Safari Update",
 	"_comment2": "The display string target for Safari updates is programmatically created as Safari <version>.",
 	"DISPLAY_STRING_TITLE_NON_SYSTEM_UPDATES": "Apple Software Updates",
-	"DISPLAY_STRING_TARGET_NON_SYSTEM_UPDATES": "Non-system Apple software udpates installation",
+	"DISPLAY_STRING_TARGET_NON_SYSTEM_UPDATES": "Non-system Apple software updates installation",
 	"DISPLAY_STRING_TITLE_JAMF_PRO_POLICY": "Jamf Pro Policy",
 	"DISPLAY_STRING_TARGET_JAMF_PRO_POLICY": "Jamf Pro Policy installation",
 	"DISPLAY_STRING_TITLE_RESTART_WITHOUT_UPDATES": "System Restart",

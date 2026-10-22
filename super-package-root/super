@@ -5441,9 +5441,9 @@ check_msu_settings() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: MSU_MANAGED_PLIST is:\n$(defaults read "${MSU_MANAGED_PLIST}" 2>&1)"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: MSU_LOCAL_PLIST is:\n$(defaults read "${MSU_LOCAL_PLIST}" 2>&1)"
 	if [[ $system_macos_version_major -ge 27 ]] && [[ -f "${MSU_MANAGED_PLIST}.plist" ]]; then
-		log_super "Warning: Detected legacy configuration profile software udpate settings. This configuration method is not supported on macOS 27 or later."
+		log_super "Warning: Detected legacy configuration profile software update settings. This configuration method is not supported on macOS 27 or later."
 	elif [[ $system_macos_version_major -ge 26 ]] && [[ -f "${MSU_MANAGED_PLIST}.plist" ]]; then
-		log_super "Warning: Detected legacy configuration profile software udpate settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
+		log_super "Warning: Detected legacy configuration profile software update settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
 	fi
 	
 	# Check for for automatic software update managed declarations as they supersede legacy configuration profile and local settings.
@@ -5529,9 +5529,9 @@ check_msu_settings() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_setting_deferral_restrictions_result is:\n${msu_setting_deferral_restrictions_result}"
 	if [[ -n "${msu_setting_deferral_restrictions_result}" ]]; then
 		if [[ $system_macos_version_major -ge 27 ]]; then
-			log_super "Warning: Detected legacy configuration profile managed software udpate deferral settings. This configuration method is not supported on macOS 27 or later."
+			log_super "Warning: Detected legacy configuration profile managed software update deferral settings. This configuration method is not supported on macOS 27 or later."
 		else
-			[[ $system_macos_version_major -ge 26 ]] && log_super "Warning: Detected legacy configuration profile managed software udpate deferral settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
+			[[ $system_macos_version_major -ge 26 ]] && log_super "Warning: Detected legacy configuration profile managed software update deferral settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
 			if [[ -z "${msu_setting_defferal_macos_major_upgrades_declarative}" ]]; then
 				[[ $(echo "${msu_setting_deferral_restrictions_result}" | awk '/forceDelayedMajorSoftwareUpdates/ {print $3}') -gt 0 ]] && msu_setting_defferal_macos_major_upgrades=30
 				[[ $(echo "${msu_setting_deferral_restrictions_result}" | awk '/enforcedSoftwareUpdateMajorOSDeferredInstallDelay/ {print $3}') -gt 0 ]] && msu_setting_defferal_macos_major_upgrades=$(echo "${msu_setting_deferral_restrictions_result}" | awk '/enforcedSoftwareUpdateMajorOSDeferredInstallDelay/ {print $3}')
@@ -6222,8 +6222,8 @@ workflow_check_software_status() {
 			[[ "${msu_macos_minor_update_target}" != "FALSE" ]] && [[ $msu_macos_minor_update_target_version_normalized -eq $(echo "${sofa_macos_minor_updates_array[0]}" | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]] && macos_minor_update_latest="TRUE"
 			[[ "${installer_macos_minor_update_target}" != "FALSE" ]] && [[ $installer_macos_minor_update_target_version_normalized -eq $(echo "${sofa_macos_minor_updates_array[0]}" | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]] && macos_minor_update_latest="TRUE"
 			if [[ "${macos_minor_update_latest}" == "FALSE" ]]; then
-				[[ ${#sofa_macos_minor_updates_array[@]} -eq 1 ]] && log_super "Status: An available macOS minor udpate is not allowed, $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
-				[[ ${#sofa_macos_minor_updates_array[@]} -gt 1 ]] && log_super "Status: Multiple available macOS minor udpates are not allowed, including the latest $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
+				[[ ${#sofa_macos_minor_updates_array[@]} -eq 1 ]] && log_super "Status: An available macOS minor update is not allowed, $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
+				[[ ${#sofa_macos_minor_updates_array[@]} -gt 1 ]] && log_super "Status: Multiple available macOS minor updates are not allowed, including the latest $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
 			fi
 		elif [[ "${sofa_macos_failover}" == "TRUE" ]]; then
 			[[ "${msu_macos_minor_update_target}" != "FALSE" ]] && macos_minor_update_latest="TRUE"
