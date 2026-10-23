@@ -7,8 +7,8 @@
 	"MACOS_INSTALLERS_LIST_DEBUG_LOG": "",
 	"VIRTUAL_SYSTEM_MAC_MODEL_NAME": "MacBook Pro",
 	"VIRTUAL_SYSTEM_MAC_MODEL_ID": "Mac16,5",
-	"SWIFT_DIALOG_MINIMUM_VERSION": "4997",
-	"SWIFT_DIALOG_DOWNLOAD_URL": "https://github.com/swiftDialog/swiftDialog/releases/download/v3.1.1b3/dialog-3.1.1-beta-4997.pkg",
+	"SWIFT_DIALOG_MINIMUM_VERSION": "5000",
+	"SWIFT_DIALOG_DOWNLOAD_URL": "https://github.com/swiftDialog/swiftDialog/releases/download/v3.1.1/dialog-3.1.1-5000.pkg",
 	"SWIFT_DIALOG_BINARY": "/usr/local/bin/dialog",
 	"SWIFT_DIALOG_COLOR_REGEX": "^colour=|^gradient=",
 	"SWIFT_DIALOG_ICON_REGEX": "^info$|^caution$|^warning$|^computer$|^text=|^qr=|^SF=|.*\\.app$",
@@ -38,6 +38,7 @@
 	"TEST_MODE_DEFAULT_TIMEOUT_SECONDS": "10",
 	"PARENT_PROCESS_RESTART_ARRAY": [
 		"jamf",
-		"Jamf"
+		"Jamf",
+		"zuludesk"
 	]
 }

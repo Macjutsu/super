@@ -1,8 +1,8 @@
 # CHANGELOG
 
-## [6.0.0-beta3]
+## [6.0.0-beta4]
 
-2026-10-16
+2026-10-23
 
 ## Highlights (6.0.x)
 
@@ -25,19 +25,26 @@
 - Previously saved `super` 5.x.x __local__ authentication credentials are compatible with `super` 6.0.x.
 - __Previously saved `super` 5.x.x Jamf Pro API authentication credentials are not compatible with `super` 6.0.x and will be deleted from the system the first time `super` 6.0.x runs.__
 - __A major version number change (like 5.x.x to 6.x.x) indicates that previous command line options and managed preferences are not compatible with the newer version of `super`.__
-- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta3/Super-Friends/super-migration-options-6.0.x.tsv).
-- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta3/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
-- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta3/Example-MDM).
-- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta3/Super-Friends).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` command line options](https://github.com/Macjutsu/super/blob/6.0.0-beta4/Super-Friends/super-migration-options-6.0.x.tsv).
+- Refer to [this spreadsheet (tab separated values) for migrating `super` managed preferences](https://github.com/Macjutsu/super/blob/6.0.0-beta4/Super-Friends/super-migration-managed-preferences-6.0.x.tsv).
+- Updated [example MDM configuration profiles](https://github.com/Macjutsu/super/tree/6.0.0-beta4/Example-MDM).
+- Updated additional [Super-Friends assets](https://github.com/Macjutsu/super/tree/6.0.0-beta4/Super-Friends).
 
-### Known Issues (6.0.0-beta3)
+### Known Issues (6.0.0-beta4)
 
 - __The `super` installer package is not yet notarized by Apple. This should not present a problem for most managed deployment workflows, but downloaded `super` packages may fail when installed manually due to file system quarantine. Removing the file quarantine will resolve this issue.__
 - Full support for declarative software update enforcement is still in the works. __Support coming soon.__
-- Due to swiftDialog beta issues More Info URL links are currently inactive.
-- Due to swiftDialog beta issues and timeouts for the user authentication and user schedule dialogs are currently disabled.
 - The [MacAdmin's SOFA](https://sofa.macadmins.io) Apple Beta feed technically exists but it's not currently being updated by the SOFA project. Thus, systems enrolled in a macOS beta program cannot take advantage of this resource.
 - There are currently no publicly available [Background Security Improvement (BSI, formerly named Rapid Security Response) updates](https://support.apple.com/en-us/102657) for any version of macOS. As such, production BSI update workflows have not been validated.
+
+### Specific Changes (6.0.0-beta4)
+
+- __Note this sub-section only covers specific changes for 6.0.0-beta3 to 6.0.0-beta4. Please refer to [other sections of the CHANGELOG](https://github.com/Macjutsu/super/blob/6.0.0-beta4/CHANGELOG.md) full details of all the changes.__
+- New [swiftDialog v3.1.1-5000](https://github.com/swiftDialog/swiftDialog/releases) is automatically installed. This resolves several `super` dialog issues. (Thanks to @bartreardon for his dedication to the project!)
+- Added support for automatic workflow restart when `super` is started from Jamf School (zuludesk).
+- Updated all [Jamf Pro Extension Attribute scripts to support `super` 6.x.x.](https://github.com/Macjutsu/super/tree/6.0.0-beta4/Super-Friends).
+- If any soft or hard deadlines have passed, dialog info boxes now properly show that the number of deferrals remaining is "None".
+- As always, countless logging refinements and correction of typos. (Thanks to @sculliga for pointing a few out.)
 
 ### Specific Changes (6.0.0-beta3)
 

@@ -8,8 +8,8 @@
 # shellcheck disable=SC2012,SC2024,SC2207
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-readonly SUPER_VERSION="6.0.0-beta3"
-readonly SUPER_DATE="2026/10/16"
+readonly SUPER_VERSION="6.0.0-beta4"
+readonly SUPER_DATE="2026/10/23"
 SUPER_USER_AGENT="super/${SUPER_VERSION} $(curl --version | head -1 | sed -e 's/curl /curl\//')" && readonly SUPER_USER_AGENT
 
 # MARK: *** Documentation ***
@@ -5296,8 +5296,8 @@ check_deadlines_count() {
 				display_string_deadline_count_soft=$((deadline_count_soft - deadline_counter_soft_current))
 				log_super "Status: Soft maximum deferral count of ${deadline_count_soft} not passed with ${display_string_deadline_count_soft} remaining."
 				log_metrics "Soft Count Remaining ${display_string_deadline_count_soft}: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+				display_string_deadline_count="${display_string_deadline_count_soft}"
 			fi
-			display_string_deadline_count="${display_string_deadline_count_soft}"
 			display_string_deadline_count_maximum="${deadline_count_soft}"
 		fi
 		if [[ -n "${deadline_count_hard}" ]]; then
@@ -5317,8 +5317,8 @@ check_deadlines_count() {
 				display_string_deadline_count_hard=$((deadline_count_hard - deadline_counter_hard_current))
 				log_super "Status: Hard maximum deferral count of ${deadline_count_hard} not passed with ${display_string_deadline_count_hard} remaining."
 				log_metrics "Hard Count Remaining ${display_string_deadline_count_hard}: Workflow Elapsed Time" "WorkflowTargetTimestamp"
+				display_string_deadline_count="${display_string_deadline_count_hard}"
 			fi
-			display_string_deadline_count="${display_string_deadline_count_hard}"
 			display_string_deadline_count_maximum="${deadline_count_hard}"
 		fi
 	fi
@@ -5441,9 +5441,9 @@ check_msu_settings() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: MSU_MANAGED_PLIST is:\n$(defaults read "${MSU_MANAGED_PLIST}" 2>&1)"
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: MSU_LOCAL_PLIST is:\n$(defaults read "${MSU_LOCAL_PLIST}" 2>&1)"
 	if [[ $system_macos_version_major -ge 27 ]] && [[ -f "${MSU_MANAGED_PLIST}.plist" ]]; then
-		log_super "Warning: Detected legacy configuration profile software udpate settings. This configuration method is not supported on macOS 27 or later."
+		log_super "Warning: Detected legacy configuration profile software update settings. This configuration method is not supported on macOS 27 or later."
 	elif [[ $system_macos_version_major -ge 26 ]] && [[ -f "${MSU_MANAGED_PLIST}.plist" ]]; then
-		log_super "Warning: Detected legacy configuration profile software udpate settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
+		log_super "Warning: Detected legacy configuration profile software update settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
 	fi
 	
 	# Check for for automatic software update managed declarations as they supersede legacy configuration profile and local settings.
@@ -5529,9 +5529,9 @@ check_msu_settings() {
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: msu_setting_deferral_restrictions_result is:\n${msu_setting_deferral_restrictions_result}"
 	if [[ -n "${msu_setting_deferral_restrictions_result}" ]]; then
 		if [[ $system_macos_version_major -ge 27 ]]; then
-			log_super "Warning: Detected legacy configuration profile managed software udpate deferral settings. This configuration method is not supported on macOS 27 or later."
+			log_super "Warning: Detected legacy configuration profile managed software update deferral settings. This configuration method is not supported on macOS 27 or later."
 		else
-			[[ $system_macos_version_major -ge 26 ]] && log_super "Warning: Detected legacy configuration profile managed software udpate deferral settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
+			[[ $system_macos_version_major -ge 26 ]] && log_super "Warning: Detected legacy configuration profile managed software update deferral settings. This configuration method is deprecated on macOS 26 and will not be supported in macOS 27 or later."
 			if [[ -z "${msu_setting_defferal_macos_major_upgrades_declarative}" ]]; then
 				[[ $(echo "${msu_setting_deferral_restrictions_result}" | awk '/forceDelayedMajorSoftwareUpdates/ {print $3}') -gt 0 ]] && msu_setting_defferal_macos_major_upgrades=30
 				[[ $(echo "${msu_setting_deferral_restrictions_result}" | awk '/enforcedSoftwareUpdateMajorOSDeferredInstallDelay/ {print $3}') -gt 0 ]] && msu_setting_defferal_macos_major_upgrades=$(echo "${msu_setting_deferral_restrictions_result}" | awk '/enforcedSoftwareUpdateMajorOSDeferredInstallDelay/ {print $3}')
@@ -6222,8 +6222,8 @@ workflow_check_software_status() {
 			[[ "${msu_macos_minor_update_target}" != "FALSE" ]] && [[ $msu_macos_minor_update_target_version_normalized -eq $(echo "${sofa_macos_minor_updates_array[0]}" | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]] && macos_minor_update_latest="TRUE"
 			[[ "${installer_macos_minor_update_target}" != "FALSE" ]] && [[ $installer_macos_minor_update_target_version_normalized -eq $(echo "${sofa_macos_minor_updates_array[0]}" | awk -F'.' '{printf "%02d%02d%02d", $1, $2, $3}') ]] && macos_minor_update_latest="TRUE"
 			if [[ "${macos_minor_update_latest}" == "FALSE" ]]; then
-				[[ ${#sofa_macos_minor_updates_array[@]} -eq 1 ]] && log_super "Status: An available macOS minor udpate is not allowed, $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
-				[[ ${#sofa_macos_minor_updates_array[@]} -gt 1 ]] && log_super "Status: Multiple available macOS minor udpates are not allowed, including the latest $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
+				[[ ${#sofa_macos_minor_updates_array[@]} -eq 1 ]] && log_super "Status: An available macOS minor update is not allowed, $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
+				[[ ${#sofa_macos_minor_updates_array[@]} -gt 1 ]] && log_super "Status: Multiple available macOS minor updates are not allowed, including the latest $(jq -r --arg macos_version_full "${sofa_macos_minor_updates_array[0]}" '.OSVersions[].SecurityReleases[] | select(.ProductVersion == $macos_version_full) | "\(.UpdateName) released on \(.ReleaseDate[:-10])" // empty' "${SOFA_MACOS_CACHE_JSON}" 2> /dev/null)."
 			fi
 		elif [[ "${sofa_macos_failover}" == "TRUE" ]]; then
 			[[ "${msu_macos_minor_update_target}" != "FALSE" ]] && macos_minor_update_latest="TRUE"
@@ -8690,7 +8690,8 @@ set_display_infobox() {
 		[[ -n "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "INSTALL" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
 		[[ -z "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "RESTART" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESTART_DEADLINE}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
 		[[ -z "${display_string_deadline_date}" ]] && [[ "${display_action_type}" == "INSTALL" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_INSTALL_DEADLINE}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
-		[[ -n "${display_string_deadline_count}" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${display_string_deadline_count}${DISPLAY_STRING_INFO_BOX_DEFERRALS_SEPARATOR}${display_string_deadline_count_maximum}"
+		[[ -n "${display_string_deadline_count}" ]] && [[ $display_string_deadline_count -gt 0 ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${display_string_deadline_count}${DISPLAY_STRING_INFO_BOX_DEFERRALS_SEPARATOR}${display_string_deadline_count_maximum}"
+		[[ -n "${display_string_deadline_count}" ]] && [[ $display_string_deadline_count -eq 0 ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEADLINE_NONE}"
 		[[ -z "${display_string_deadline_count}" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_DEFERRALS_REMAINING}__${DISPLAY_STRING_BR}${DISPLAY_STRING_INFO_BOX_DEFERRALS_UNLIMITED}"
 	else # dialog_schedule_reminder()
 		[[ -n "${display_string_deadline_date}" ]] && [[ "${scheduled_install_user_choice_active}" == "TRUE" ]] && display_string_infobox+="__${DISPLAY_STRING_INFO_BOX_RESCHEDULE_DEADLINE}__${DISPLAY_STRING_BR}${display_string_deadline_date}${DISPLAY_STRING_BR}${DISPLAY_STRING_BR}"
@@ -8987,8 +8988,6 @@ open_dialog_swift_dialog() {
 	[[ "${display_background_path}" != "FALSE" ]] && [[ "${current_user_appearance_mode}" == "LIGHT" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_background "${display_background_path}" --arg display_bgalpha "${DISPLAY_BACKGROUND_ALPHA}" --arg display_bgfill "${DISPLAY_BACKGROUND_FILL_MODE}" '. + { "background": $display_background, "bgalpha": $display_bgalpha, "bgfill": $display_bgfill }')
 	[[ "${display_background_dark_path}" != "FALSE" ]] && [[ "${current_user_appearance_mode}" == "DARK" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_background "${display_background_dark_path}" --arg display_bgalpha "${DISPLAY_BACKGROUND_ALPHA}" --arg display_bgfill "${DISPLAY_BACKGROUND_FILL_MODE}" '. + { "background": $display_background, "bgalpha": $display_bgalpha, "bgfill": $display_bgfill }')
 	[[ "${display_icon_overlay_path}" != "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_overlay_icon "${display_icon_overlay_path}:dark=${display_icon_overlay_dark_path}" '. + { "overlayicon": $display_overlay_icon }')
-	# FIXME: Issue with swiftDialog beta...
-	[[ -n $display_string_infobox ]] && log_super "Display Warning: Due to issues with the current beta version of swiftDialog; More Info URL links are currently disabled."
 	[[ -n "${display_string_infobox}" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_infobox "${display_string_infobox}" '. + { "infobox": $display_infobox }')
 	[[ -n $dialog_timeout_seconds ]] && dialog_json=$(echo "${dialog_json}" | jq --arg dialog_timeout "${dialog_timeout_seconds}" '. + { "timer": $dialog_timeout }')
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${display_help_image_path}" == "FALSE" ]] && dialog_json=$(echo "${dialog_json}" | jq --arg display_help_message "${display_help_message_temp_md}" --arg display_help_alignment "${DISPLAY_HELP_MESSAGE_ALIGNMENT}" --arg display_help_button "${DISPLAY_STRING_OK}" '. + { "helpmessage": $display_help_message, "helpalignment": $display_help_alignment, "helpsheetbuttontext": $display_help_button }')
@@ -9432,11 +9431,9 @@ dialog_user_schedule() {
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
 	[[ "${display_action_type}" == "RESTART" ]] && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_RESTART}"
 	[[ "${display_action_type}" == "INSTALL" ]] && local dialog_schedule_button="${DISPLAY_STRING_SCHEDULE_INSTALL}"
-	# FIXME: Issue with swiftDialog beta...
-	[[ -n $dialog_timeout_seconds ]] && log_super "Display Warning: Due to issues with the current beta version of swiftDialog; dialog timeouts for the ${FUNCNAME[0]} are currently disabled."
 	unset dialog_timeout_seconds
-	# [[ -n $dialog_timeout_user_schedule_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_schedule_seconds
-	# { [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
+	[[ -n $dialog_timeout_user_schedule_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_schedule_seconds
+	{ [[ -z $dialog_timeout_user_schedule_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
 	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
@@ -9667,11 +9664,9 @@ dialog_user_auth() {
 	{ [[ -n "${test_display_function_option}" ]] || [[ "${verbose_mode}" == "TRUE" ]]; } && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_string_auth_action is: ${display_string_auth_action}"
 	set_display_message
 	[[ "${display_help_message}" == "TRUE" ]] && [[ "${set_display_help_message_ready}" != "TRUE" ]] && set_display_help_message
-	# FIXME: Issue with swiftDialog beta...
-	[[ -n $dialog_timeout_seconds ]] && log_super "Display Warning: Due to issues with the current beta version of swiftDialog; dialog timeouts for the ${FUNCNAME[0]} are currently disabled."
 	unset dialog_timeout_seconds
-	# [[ -n $dialog_timeout_user_auth_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_auth_seconds
-	# { [[ -z $dialog_timeout_user_auth_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
+	[[ -n $dialog_timeout_user_auth_seconds ]] && dialog_timeout_seconds=$dialog_timeout_user_auth_seconds
+	{ [[ -z $dialog_timeout_user_auth_seconds ]] && [[ -n $dialog_timeout_default_seconds ]]; } && dialog_timeout_seconds=$dialog_timeout_default_seconds
 	{ [[ "${display_hide_background_status}" != "TRUE" ]] && [[ $(echo "${display_hide_background}" | grep -c 'DIALOG') -gt 0 ]]; } && display_hide_background_status="TEMP"
 	{ [[ "${display_movable_status}" != "TRUE" ]] && [[ $(echo "${display_movable}" | grep -c 'DIALOG') -gt 0 ]]; } && display_movable_status="TEMP"
 	{ [[ "${display_silently_status}" != "TRUE" ]] && [[ $(echo "${display_silently}" | grep -c 'DIALOG') -gt 0 ]]; } && display_silently_status="TEMP"
@@ -10159,6 +10154,7 @@ main() {
 					[[ $(echo "${display_movable}" | grep -c 'DEADLINE') -gt 0 ]] && display_movable_status="TRUE"
 					[[ $(echo "${display_silently}" | grep -c 'DEADLINE') -gt 0 ]] && display_silently_status="TRUE"
 					[[ $(echo "${display_notifications_centered}" | grep -c 'DEADLINE') -gt 0 ]] && display_notifications_centered_status="TRUE"
+					display_string_deadline_count=0
 				fi
 				# At this point all deferral and deadline options have been evaluated.
 				if [[ "${deadline_date_status}" == "HARD" ]] || [[ "${deadline_days_status}" == "HARD" ]] || [[ "${deadline_count_status}" == "HARD" ]]; then # A hard deadline has passed, similar to no logged in user but with a notification.

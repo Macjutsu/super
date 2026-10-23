@@ -6,8 +6,8 @@
 
 # This script is ran by launchd every 60 seconds per the /Library/LaunchDaemons/com.macjutsu.super.plist.
 # This script checks a variety of settings to ensure that the super workflow only restarts when necessary.
-# Version 6.0.0-beta3
-# 2026/10/16
+# Version 6.0.0-beta4
+# 2026/10/23
 
 # Exit this script if super is already running.
 [[ "$(pgrep -F "/var/run/super.pid" 2> /dev/null)" ]] && exit 0

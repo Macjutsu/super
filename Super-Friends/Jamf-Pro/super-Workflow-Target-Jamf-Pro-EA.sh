@@ -4,15 +4,16 @@
 # Make sure to set the Extension Attribute Data Type to "String".
 # https://github.com/Macjutsu/super
 # by Kevin M. White
-# 2024/10/02
+# 2026/10/23
 
-# Path to the super working folder:
-SUPER_FOLDER="/Library/Management/super"
-
-# Path to the local property list file:
-SUPER_LOCAL_PLIST="${SUPER_FOLDER}/com.macjutsu.super" # No trailing ".plist"
-
-# Report if the super preference file exists.
+if [[ -d "/Library/Application Support/super" ]]; then
+	readonly SUPER_LOCAL_PLIST="/Library/Preferences/com.macjutsu.super" # No trailing ".plist"
+elif [[ -d "/Library/Management/super" ]]; then
+	readonly SUPER_LOCAL_PLIST="/Library/Management/super/com.macjutsu.super" # No trailing ".plist"
+else
+	echo "<result>Not installed.</result>"
+	exit 0
+fi
 if [[ -f "${SUPER_LOCAL_PLIST}.plist" ]]; then
 	super_version_local=$(defaults read "${SUPER_LOCAL_PLIST}" SuperVersion 2> /dev/null)
 	if [[ $(echo "${super_version_local}" | cut -c 1) -ge 5 ]]; then
@@ -20,15 +21,12 @@ if [[ -f "${SUPER_LOCAL_PLIST}.plist" ]]; then
 	else
 		echo "<result>Installed super is older than version 5.0.0.</result>"
 	fi
-	
-	# Report if the ${workflow_target_local} has a value.
 	if [[ -n "${workflow_target_local}" ]]; then
 		echo "<result>${workflow_target_local}</result>"
 	else
-		echo "<result>No current super workflow workflow target.</result>"
+		echo "<result>No current super workflow target.</result>"
 	fi
 else
 	echo "<result>No super preference file.</result>"
 fi
-
 exit 0
