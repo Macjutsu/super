@@ -2556,6 +2556,11 @@ manage_parameter_options() {
 		set_pref "DisplayIcon" "${display_icon}"
 	fi
 	[[ -z "${display_icon}" ]] && display_icon=$(get_pref "DisplayIcon")
+	# Fall back to the legacy DisplayIconFile preference when DisplayIcon is unset.
+	if [[ -z "${display_icon}" ]]; then
+		display_icon=$(get_pref_managed "DisplayIconFile")
+		[[ -z "${display_icon}" ]] && display_icon=$(get_pref "DisplayIconFile")
+	fi
 	[[ "${verbose_mode}" == "TRUE" ]] && log_super "Verbose Mode: Function ${FUNCNAME[0]}: Line ${LINENO}: display_icon is: ${display_icon}"
 	
 	# Validate ${display_icon_dark_option} input and if valid set the ${display_icon_dark} parameter.
