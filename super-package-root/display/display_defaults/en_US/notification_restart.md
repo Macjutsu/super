@@ -2,4 +2,4 @@
 
 A :${current_user_appearance_accent_color_hex}[${display_string_target}] will automatically restart this computer very soon.
 
-Save any open documents now.
+Save all open documents now. Unsaved changes may be lost due to the restart.

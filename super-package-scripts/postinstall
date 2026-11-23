@@ -3,7 +3,7 @@
 # Software Update/Upgrade Policy Enforcement (with) Recursive Messaging And Notification
 # https://github.com/Macjutsu/super
 # by Kevin M. White
-# 2026/10/08
+# 2026/11/05
 
 # This script is run by the system installer AFTER deploying the super package archive to the target drive.
 # If a legacy version of super is found, this script will migrate relevant legacy super items and then delete the remaining legacy super items.
@@ -189,9 +189,11 @@ chown -R root:wheel "${SUPER_FOLDER}" > /dev/null 2>&1
 chmod -R a+r "${SUPER_FOLDER}" > /dev/null 2>&1
 chmod -R go-w "${SUPER_FOLDER}" > /dev/null 2>&1
 chmod 755 "${SUPER_FOLDER}/super" "${SUPER_FOLDER}/super-starter" > /dev/null 2>&1
+chmod -RN "${SUPER_FOLDER}" > /dev/null 2>&1
 chown root:wheel "${SUPER_LINK}" "${SUPER_MAIN_PLIST}.plist" "${SUPER_LOG}" "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
 chmod 755 "${SUPER_LINK}" > /dev/null 2>&1
 chmod 644 "${SUPER_MAIN_PLIST}.plist" "${SUPER_LOG}" "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
+chmod -N "${SUPER_LINK}" "${SUPER_MAIN_PLIST}.plist" "${SUPER_LOG}" "/Library/LaunchDaemons/${SUPER_LAUNCH_DAEMON_LABEL}.plist" > /dev/null 2>&1
 
 # If needed, restart the super LaunchDaemon.
 next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "${SUPER_MAIN_PLIST}.plist" 2> /dev/null)

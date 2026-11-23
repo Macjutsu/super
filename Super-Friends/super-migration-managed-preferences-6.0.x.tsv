@@ -1,4 +1,4 @@
-super 6.0.0-beta2	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
+super 6.0.0-rc1	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>SOFAMacOSCustomURL</key> <string>URL</string>	<key>ScheduleZeroDateSOFACustomURL</key> <string>URL</string>	<key>ScheduleZeroDateSOFACustomURL</key> <string>URL</string>	N/A	N/A
 <key>SOFAAppleBetaCustomURL</key> <string>URL</string>	N/A	N/A	N/A	N/A
 <key>SOFASafariCustomURL</key> <string>URL</string>	N/A	N/A	N/A	N/A
@@ -13,6 +13,7 @@ super 6.0.0-beta2	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	<key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	<key>InstallJamfPolicyTriggersWithoutRestarting</key> <true/> | <false/>	N/A	N/A
 <key>WorkflowInstallNow</key> <true/> | <false/>	<key>WorkflowInstallNow</key> <true/> | <false/>	<key>WorkflowInstallNow</key> <true/> | <false/>	REMOVED	<key>InstallNow</key> <true/> | <false/>
 <key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>WorkflowOnlyDownload</key> <true/> | <false/>	<key>OnlyDownload</key> <true/> | <false/>
+<key>WorkflowOnlyDDMEnforcement</key> <true/> | <false/>	N/A	N/A	N/A	N/A
 <key>WorkflowRequireActiveUser</key> <true/> | <false/>	<key>WorkflowRequireActiveUser</key> <true/> | <false/>	N/A	N/A	N/A
 <key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>WorkflowRestartWithoutUpdates</key> <true/> | <false/>	<key>RestartWithoutUpdates</key> <true/> | <false/>
 <key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>WorkflowDisableUpdateCheck</key> <true/> | <false/>	<key>SkipUpdates</key> <true/> | <false/>
@@ -42,12 +43,15 @@ super 6.0.0-beta2	super 5.1.x	super 5.0.x	super 4.0.x	super 3.0
 <key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateSoft</key> <string>YYYY-MM-DD:hh:mm</string>	<key>SoftDate</key> <string>YYYY-MM-DD:hh:mm</string>
 <key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>	<key>DeadlineDateHard</key> <string>YYYY-MM-DD:hh:mm</string>	<key>HardDate</key> <string>YYYY-MM-DD:hh:mm</string>
 <key>DialogTimeoutDefault</key> <string>seconds</string>	<key>DialogTimeoutDefault</key> <string>seconds</string>	<key>DialogTimeoutDefault</key> <string>seconds</string>	<key>DialogTimeoutDefault</key> <string>seconds</string>	N/A
+<key>DialogTimeoutUserOnboarding</key> <string>seconds</string>	N/A	N/A	N/A	N/A
 <key>DialogTimeoutUserAuth</key> <string>seconds</string>	<key>DialogTimeoutUserAuth</key> <string>seconds</string>	<key>DialogTimeoutUserAuth</key> <string>seconds</string>	<key>DialogTimeoutUserAuth</key> <string>seconds</string>	<key>UserAuthTimeout</key> <string>seconds</string>
 <key>DialogTimeoutUserChoice</key> <string>seconds</string>	<key>DialogTimeoutUserChoice</key> <string>seconds</string>	<key>DialogTimeoutUserChoice</key> <string>seconds</string>	<key>DialogTimeoutRestartOrDefer</key> <string>seconds</string>	<key>DeferDialogTimeout</key> <string>seconds</string>
 <key>DialogTimeoutUserSchedule</key> <string>seconds</string>	<key>DialogTimeoutUserSchedule</key> <string>seconds</string>	<key>DialogTimeoutUserSchedule</key> <string>seconds</string>	N/A	N/A
 <key>DialogTimeoutSoftDeadline</key> <string>seconds</string>	<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>	<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>	<key>DialogTimeoutSoftDeadline</key> <string>seconds</string>	<key>SoftDialogTimeout</key> <string>seconds</string>
 <key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>	<key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>	<key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>	<key>DialogTimeoutInsufficientStorage</key> <string>seconds</string>	<key>FreeSpaceTimeout</key> <string>seconds</string>
 <key>DialogTimeoutPowerRequired</key> <string>seconds</string>	<key>DialogTimeoutPowerRequired</key> <string>seconds</string>	<key>DialogTimeoutPowerRequired</key> <string>seconds</string>	<key>DialogTimeoutPowerRequired</key> <string>seconds</string>	<key>BatteryTimeout</key> <string>seconds</string>
+<key>DisplayUserOnboarding</key> <true/> | <false/>	N/A	N/A	N/A	N/A
+<key>DisplayUserOnboardingExclusions</key> <string>username,username</string>	N/A	N/A	N/A	N/A
 <key>DisplayDialogBanner</key> <string>/local/path | URL | colour= | gradient=</string>	N/A	N/A	N/A	N/A
 <key>DisplayDialogBannerDark</key> <string>/local/path | URL | colour= | gradient=</string>	N/A	N/A	N/A	N/A
 <key>DisplayBackground</key> <string>/local/path | URL | colour= | gradient=</string>	N/A	N/A	N/A	N/A

@@ -1,7 +1,7 @@
-## :${current_user_appearance_accent_color_hex}[Insufficient Storage For ${display_string_title}]
+## :${current_user_appearance_accent_color_hex}[Insufficient Storage for ${display_string_title}]
 
 ${display_string_deadline}
 
-The required :${current_user_appearance_accent_color_hex}[${display_string_target}] update needs ${storage_required_gigabytes} GBs of storage space and only ${storage_available_gigabytes} GBs is available.
+The required :${current_user_appearance_accent_color_hex}[${display_string_target}] update needs ${storage_required_gigabytes} GB of storage space but, only ${storage_available_gigabytes} GB is available.
 
-Please use the storage settings (shown behind this notification) to remove unnecessary items.
+Use the Storage settings (shown behind this notification) to free up space by removing unnecessary items.

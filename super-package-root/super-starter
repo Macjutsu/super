@@ -4,34 +4,98 @@
 # https://github.com/Macjutsu/super
 # by Kevin M. White
 
-# This script is ran by launchd every 60 seconds per the /Library/LaunchDaemons/com.macjutsu.super.plist.
-# This script checks a variety of settings to ensure that the super workflow only restarts when necessary.
-# Version 6.0.0-beta4
-# 2026/10/23
+# This script is run by launchd every 60 seconds per the /Library/LaunchDaemons/com.macjutsu.super.plist LaunchDaemon.
+# This script validates the super-starter and super scripts and checks a variety of settings to ensure that the super script workflow only starts when necessary.
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+readonly SUPER_VERSION="6.0.0-rc1"
+readonly SUPER_DATE="2026/11/23"
+readonly SUPER_PID_FILE="/var/run/super.pid"
+readonly SUPER_PLIST="/Library/Preferences/com.macjutsu.super.plist"
+readonly SUPER_LOG="/var/log/super.log"
+readonly SUPER_FOLDER="/Library/Application Support/super"
+readonly SUPER_FOLDER_PERMISSIONS="drwxr-xr-x - root wheel"
+readonly SUPER_STARTER="${SUPER_FOLDER}/super-starter"
+readonly SUPER_RUNTIME="${SUPER_FOLDER}/super"
+readonly SUPER_LINK="/usr/local/bin/super"
+readonly SUPER_PERMISSIONS="-rwxr-xr-x - root wheel"
+readonly SUPER_STARTER_CODESIGN_REQUIREMENT='=identifier "com.macjutsu.super-starter" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = PX7N8NYXD3'
+readonly SUPER_CODESIGN_REQUIREMENT='=identifier "com.macjutsu.super" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = PX7N8NYXD3'
+
+# Append input to log located at ${SUPER_LOG}.
+log_super() {
+	echo -e "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: $*" >> "${SUPER_LOG}"
+}
 
 # Exit this script if super is already running.
-[[ "$(pgrep -F "/var/run/super.pid" 2> /dev/null)" ]] && exit 0
+[[ -f "${SUPER_PID_FILE}" ]] && pgrep -q -F "${SUPER_PID_FILE}" -f "(${SUPER_RUNTIME}|${SUPER_LINK})( |\$)" 2> /dev/null && exit 0
 
 # Exit this script if the super auto launch workflow is disabled.
-next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "/Library/Preferences/com.macjutsu.super.plist" 2> /dev/null)
-if [[ "${next_auto_launch}" == "FALSE" ]] || [[ "${next_auto_launch}" == "false" ]]; then
-	exit 0
-fi
+next_auto_launch=$(/usr/libexec/PlistBuddy -c "Print :NextAutoLaunch" "${SUPER_PLIST}" 2> /dev/null)
+{ [[ "${next_auto_launch}" == "FALSE" ]] || [[ "${next_auto_launch}" == "false" ]]; } && exit 0
 
 # Exit this script if the super auto launch workflow is deferred until a system restart.
-if [[ "$(/usr/libexec/PlistBuddy -c "Print :WorkflowRestartValidate" "/Library/Preferences/com.macjutsu.super.plist" 2> /dev/null)" == "true" ]]; then
-	system_last_startup_saved_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "$(/usr/libexec/PlistBuddy -c "Print :SystemLastStartup" "/Library/Preferences/com.macjutsu.super.plist" 2> /dev/null)" +%s 2> /dev/null)
+workflow_restart_validate_previous=$(/usr/libexec/PlistBuddy -c "Print :WorkflowRestartValidate" "${SUPER_PLIST}" 2> /dev/null)
+if [[ -n "${workflow_restart_validate_previous}" ]]; then
+	system_last_startup_saved_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "$(/usr/libexec/PlistBuddy -c "Print :SystemLastStartup" "${SUPER_PLIST}" 2> /dev/null)" +%s 2> /dev/null)
 	kernel_boot_epoch=$(sysctl -n kern.boottime | awk -F 'sec = |, usec' '{print $2}')
 	[[ -n "${system_last_startup_saved_epoch}" ]] && [[ -n "${kernel_boot_epoch}" ]] && [[ $system_last_startup_saved_epoch -ge $kernel_boot_epoch ]] && exit 0
 fi
 
-# Exit this script if the super auto launch workflow is deferred until a later date
-if [[ $(date +%s) -lt $(date -j -f %Y-%m-%d:%H:%M:%S "${next_auto_launch}" +%s 2> /dev/null) ]]; then
-	exit 0
+# Exit this script if the super auto launch workflow is deferred until a later date.
+next_auto_launch_epoch=$(date -j -f %Y-%m-%d:%H:%M:%S "${next_auto_launch}" +%s 2> /dev/null)
+[[ -n "${next_auto_launch_epoch}" ]] && [[ $(date +%s) -lt ${next_auto_launch_epoch} ]] && exit 0
+
+# Report errors and exit if required items for the super workflow are missing or invalid.
+if [[ -d "${SUPER_FOLDER}" ]]; then
+	permissions_result=$(stat -f '%Sp %Sf %Su %Sg' "${SUPER_FOLDER}" 2> /dev/null)
+	acl_result=$(ls -lde "${SUPER_FOLDER}" 2> /dev/null | tail -n +2)
+	if [[ "${permissions_result}" != "${SUPER_FOLDER_PERMISSIONS}" ]] || [[ -n "${acl_result}" ]]; then
+		[[ "${permissions_result}" != "${SUPER_FOLDER_PERMISSIONS}" ]] && log_super "LaunchDaemon Error: The super folder does not have the appropriate file permissions: ${permissions_result}"
+		[[ -n "${acl_result}" ]] && log_super "LaunchDaemon Error: The super folder has inappropriate access controls:\n${acl_result}"
+		exit 1
+	fi
+	unset permissions_result && unset acl_result
+else
+	log_super "LaunchDaemon Error: The super folder is missing from the original installation path: ${SUPER_FOLDER}"
+	exit 1
+fi
+if [[ "${SUPER_STARTER}" == "${BASH_SOURCE[0]}" ]]; then
+	permissions_result=$(stat -f '%Sp %Sf %Su %Sg' "${SUPER_STARTER}" 2> /dev/null)
+	acl_result=$(ls -le "${SUPER_STARTER}" 2> /dev/null | tail -n +2)
+	if [[ "${permissions_result}" != "${SUPER_PERMISSIONS}" ]] || [[ -n "${acl_result}" ]]; then
+		[[ "${permissions_result}" != "${SUPER_PERMISSIONS}" ]] && log_super "LaunchDaemon Error: The super-starter script does not have the appropriate file permissions: ${permissions_result}"
+		[[ -n "${acl_result}" ]] && log_super "LaunchDaemon Error: The super-starter script has inappropriate access controls:\n${acl_result}"
+		exit 1
+	fi
+	unset permissions_result && unset acl_result
+	if ! codesign_verify_result=$(codesign --verify --strict --verbose --test-requirement="${SUPER_STARTER_CODESIGN_REQUIREMENT}" "${SUPER_STARTER}" 2>&1); then
+		log_super "LaunchDaemon Error: The super-starter script does not have a valid code signature:\n${codesign_verify_result}"
+		exit 1
+	fi
+else
+	log_super "LaunchDaemon Error: The super-starter script is not running from the original installation path: ${SUPER_STARTER}"
+	exit 1
+fi
+if [[ -f "${SUPER_RUNTIME}" ]]; then
+	permissions_result=$(stat -f '%Sp %Sf %Su %Sg' "${SUPER_RUNTIME}" 2> /dev/null)
+	acl_result=$(ls -le "${SUPER_RUNTIME}" 2> /dev/null | tail -n +2)
+	if [[ "${permissions_result}" != "${SUPER_PERMISSIONS}" ]] || [[ -n "${acl_result}" ]]; then
+		[[ "${permissions_result}" != "${SUPER_PERMISSIONS}" ]] && log_super "LaunchDaemon Error: The super script does not have the appropriate file permissions: ${permissions_result}"
+		[[ -n "${acl_result}" ]] && log_super "LaunchDaemon Error: The super script has inappropriate access controls:\n${acl_result}"
+		exit 1
+	fi
+	unset permissions_result && unset acl_result
+	if ! codesign_verify_result=$(codesign --verify --strict --verbose --test-requirement="${SUPER_CODESIGN_REQUIREMENT}" "${SUPER_RUNTIME}" 2>&1); then
+		log_super "LaunchDaemon Error: The super script does not have a valid code signature:\n${codesign_verify_result}"
+		exit 1
+	fi
+else
+	log_super "LaunchDaemon Error: The super script is missing from the original installation path: ${SUPER_RUNTIME}"
+	exit 1
 fi
 
 # If this script has not exited yet, then it's time to start the super workflow.
-echo "$(date +"%a %b %d %T") $(hostname -s) $(basename "$0")[$$]: **** S.U.P.E.R.M.A.N. 6.0.0-beta1 - LAUNCHDAEMON ****" | tee -a "/var/log/super.log"
-"/Library/Application Support/super/super" &
-disown -a
+log_super "**** S.U.P.E.R.M.A.N. ${SUPER_VERSION} - LAUNCHDAEMON ****"
+"${SUPER_RUNTIME}" &
+disown -a # This line is redundant because the /Library/LaunchDaemons/com.macjutsu.super.plist LaunchDaemon includes <key>AbandonProcessGroup</key><true/>.
 exit 0
